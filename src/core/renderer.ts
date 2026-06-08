@@ -269,7 +269,7 @@ export class Renderer {
     return this.cy;
   }
 
-  private runLayout(name: string): void {
+  public runLayout(name: string): void {
     this.currentLayout = name;
     const cfg = LAYOUTS[name] ?? { ...FALLBACK_LAYOUT, name };
     this.cy.layout(cfg).run();

@@ -269,8 +269,17 @@
   </div><!-- /main -->
 
   <!-- ── Mobile bottom sheet ────────────────────────────────────────────── -->
+  <!-- Pull zone at top captures drag-to-open gesture when sheet is closed -->
+  <div id="sheet-pull-zone"></div>
+
+  <!-- Handle bar fixed at top edge when sheet is closed -->
+  <div id="sheet-handle" style="display:none" onpointerdown="startSheetDrag(event)">
+    <div id="sheet-handle-bar"></div>
+  </div>
+
   <div id="bottom-sheet" class="bottom-sheet" role="dialog" aria-label="控制面板">
-    <div class="bottom-sheet__handle" id="sheet-handle" onpointerdown="startSheetDrag(event)">
+    <!-- Inner handle (visible when open, also draggable to close) -->
+    <div class="bottom-sheet__handle" id="sheet-handle-inner" onpointerdown="startSheetDrag(event)">
       <div class="bottom-sheet__handle-bar"></div>
     </div>
 

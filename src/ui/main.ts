@@ -627,35 +627,114 @@ function toggleBottomSheet(): void {
   const sheet = document.getElementById('bottom-sheet');
   const fab = document.getElementById('fab');
   const fabIcon = document.getElementById('fab-icon');
+  const pullZone = document.getElementById('sheet-pull-zone');
+  const handle = document.getElementById('sheet-handle');
   if (!sheet || !fab) return;
   sheetOpen = !sheetOpen;
   sheet.classList.toggle('open', sheetOpen);
   fab.classList.toggle('active', sheetOpen);
+  if (pullZone) {
+    pullZone.style.pointerEvents = sheetOpen ? 'none' : 'auto';
+    pullZone.style.height = sheetOpen ? '0' : '24px';
+  }
+  if (handle) {
+    handle.classList.toggle('visible', !sheetOpen);
+  }
 }
 
 function closeBottomSheet(): void {
   const sheet = document.getElementById('bottom-sheet');
   const fab = document.getElementById('fab');
+  const pullZone = document.getElementById('sheet-pull-zone');
+  const handle = document.getElementById('sheet-handle');
   if (!sheet || !fab) return;
   sheetOpen = false;
   sheet.classList.remove('open');
   fab.classList.remove('active');
+  if (pullZone) {
+    pullZone.style.pointerEvents = 'auto';
+    pullZone.style.height = '24px';
+  }
+  if (handle) {
+    handle.classList.add('visible');
+  }
 }
 
-// ── Drag to close bottom sheet ─────────────────────────────────────────────
+// ── Drag to open/close bottom sheet (slides down from top) ───────────────────
 function startSheetDrag(e: PointerEvent): void {
   const sheet = document.getElementById('bottom-sheet');
-  const handle = document.getElementById('sheet-handle');
-  if (!sheet || !handle) return;
+  if (!sheet) return;
 
   const startY = e.clientY;
-  const startTransform = sheet.style.transform;
-  let dragged = false;
+  const isOpen = sheet.classList.contains('open');
 
   const onMove = (me: PointerEvent) => {
     const delta = me.clientY - startY;
-    if (Math.abs(delta) > 5) dragged = true;
-    if (delta > 0) {
+    if (isOpen) {
+      // Open: drag down to close (delta > 0), drag up to keep open
+      if (delta > 0) {
+        sheet.style.transform = `translateY(${delta}px)`;
+        sheet.style.transition = 'none';
+      } else {
+        sheet.style.transform = `translateY(${delta}px)`;
+        sheet.style.transition = 'none';
+      }
+    } else {
+      // Closed: drag down from top to open (delta > 0)
+      if (delta > 0) {
+        sheet.style.transform = `translateY(calc(-100% + ${delta}px))`;
+        sheet.style.transition = 'none';
+      }
+    }
+  };
+
+  const onUp = (ue: PointerEvent) => {
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+    const delta = ue.clientY - startY;
+    sheet.style.transform = '';
+    sheet.style.transition = '';
+
+    if (isOpen) {
+      if (delta > 80) {
+        closeBottomSheet();
+      }
+    } else {
+      if (delta > 80) {
+        toggleBottomSheet();
+      }
+    }
+  };
+
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp);
+}
+
+// Pull-zone / handle: drag down to open when sheet is closed
+document.addEventListener('pointerdown', (e: PointerEvent) => {
+  const pullZone = document.getElementById('sheet-pull-zone');
+  const handle = document.getElementById('sheet-handle');
+  const sheet = document.getElementById('bottom-sheet');
+  if (!sheet || sheet.classList.contains('open')) return;
+
+  const target = e.target as HTMLElement;
+  const inZone = pullZone && pullZone.contains(target);
+  const inHandle = handle && handle.contains(target);
+
+  if (!inZone && !inHandle) return;
+  e.preventDefault();
+  startSheetDrag(e);
+});
+
+// Bottom half: drag up to close when sheet is open
+document.addEventListener('pointerdown', (e: PointerEvent) => {
+  const sheet = document.getElementById('bottom-sheet');
+  if (!sheet || !sheet.classList.contains('open')) return;
+  const startY = e.clientY;
+
+  const onMove = (me: PointerEvent) => {
+    const delta = me.clientY - startY;
+    if (delta < 0) {
       sheet.style.transform = `translateY(${delta}px)`;
       sheet.style.transition = 'none';
     }
@@ -667,14 +746,14 @@ function startSheetDrag(e: PointerEvent): void {
     const delta = ue.clientY - startY;
     sheet.style.transform = '';
     sheet.style.transition = '';
-    if (delta > 80 || dragged && delta > 30) {
+    if (delta < -80) {
       closeBottomSheet();
     }
   };
 
   document.addEventListener('pointermove', onMove);
   document.addEventListener('pointerup', onUp);
-}
+});
 
 // ── Bottom sheet: show node detail ─────────────────────────────────────────
 function showBottomSheetDetail(node: cytoscape.NodeSingular): void {
@@ -713,8 +792,6 @@ function showBottomSheetDetail(node: cytoscape.NodeSingular): void {
 
   if (container) {
     container.style.display = '';
-    // Auto-open bottom sheet when node selected on mobile
-    if (!sheetOpen) toggleBottomSheet();
   }
 }
 
@@ -740,6 +817,16 @@ loadGraphData()
     initShortcuts();
     updateStats();
     syncBottomSheetStats();
+    // Init sheet pull-zone and handle visibility
+    const pullZone = document.getElementById('sheet-pull-zone');
+    const handle = document.getElementById('sheet-handle');
+    if (pullZone) {
+      pullZone.style.pointerEvents = 'auto';
+      pullZone.style.height = '24px';
+    }
+    if (handle) {
+      handle.classList.add('visible');
+    }
   })
   .catch((err) => {
     const n = document.getElementById('stat-nodes');

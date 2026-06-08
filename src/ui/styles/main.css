@@ -1066,11 +1066,24 @@
   #sidebar { display: none !important; }
   #main    { grid-template-columns: 1fr; }
 
-  /* Show bottom sheet on mobile */
+  /* Bottom sheet slides down from top, peeks at top edge */
   #bottom-sheet {
     display: flex;
-    transform: translateY(100%);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: auto;
+    transform: translateY(-100%);
     pointer-events: none;
+    border-radius: 0 0 18px 18px;
+    border-top: none;
+    border-bottom: 1px solid var(--border-hi);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.04) inset;
+    flex-direction: column;
+    max-height: 92vh;
+    overflow-y: auto;
+    touch-action: none;
   }
 
   #bottom-sheet.open {
@@ -1078,23 +1091,54 @@
     pointer-events: auto;
   }
 
-  /* FAB */
-  #fab {
+  /* Grab handle bar — fixed at top when sheet is closed */
+  #sheet-handle {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    padding: 10px 0;
+    cursor: grab;
+    touch-action: none;
+    z-index: 48;
+    pointer-events: auto;
+  }
+
+  #sheet-handle-bar {
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.3);
+  }
+
+  #sheet-handle.visible {
     display: flex;
   }
 
-  .toolbar {
-    height: 40px;
-    gap: 2px;
-    padding: 0 8px;
+  /* Area above sheet, captures pull-down gesture */
+  #sheet-pull-zone {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 0;
+    pointer-events: none;
+    touch-action: none;
+    z-index: 47;
   }
-  .toolbar__label { display: none; }
-  .toolbar__sep { margin: 0 3px; }
-  .btn {
-    padding: 3px 7px;
-    font-size: 0.7rem;
+
+  /* Hide desktop toolbar on mobile — controls live in bottom sheet */
+  .toolbar { display: none; }
+
+  #fab {
+    top: 16px;
+    right: 16px;
+    bottom: auto;
+    left: auto;
   }
-  .btn svg { width: 12px; height: 12px; }
 }
 
 @media (max-width: 480px) {
@@ -1387,7 +1431,6 @@
 
 /* ── FAB ─────────────────────────────────────────────────────────────── */
 #fab {
-  display: none; /* hidden on desktop */
   position: fixed;
   bottom: 20px;
   right: 20px;
@@ -1405,6 +1448,10 @@
     0 8px 24px rgba(0,0,0,0.4);
   transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s;
   -webkit-tap-highlight-color: transparent;
+}
+
+@media (min-width: 769px) {
+  #fab { display: none; }
 }
 
 #fab:hover {
