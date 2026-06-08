@@ -12,7 +12,7 @@ import { dirname } from "path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const ROOT = path.resolve(__dirname, "../..");
-const OUT_FILE = path.join(ROOT, "dist", "graph-data.json");
+const OUT_FILE = path.join(ROOT, "public", "graph-data.json");
 
 async function main() {
   console.log("🔍 Scanning content/ ...");

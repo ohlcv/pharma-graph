@@ -113,7 +113,7 @@ function fmt(val: number, step: number): string {
 // ── Data loading ─────────────────────────────────────────────────────────────
 
 async function loadGraphData(): Promise<GraphData> {
-  const res = await fetch('dist/graph-data.json');
+  const res = await fetch('/graph-data.json');
   if (!res.ok) throw new Error('无法加载 dist/graph-data.json');
   const data = await res.json();
   const nodes = (data.nodes ?? []).length;

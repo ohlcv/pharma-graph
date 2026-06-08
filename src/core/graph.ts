@@ -2,6 +2,7 @@
 // 图谱数据类型定义，对应 Cytoscape.js 的 data 字段
 
 export interface NodeData {
+  weight: number;
   id: string;
   label: string;
   type: string;
@@ -11,6 +12,7 @@ export interface NodeData {
 }
 
 export interface EdgeData {
+  id: string;
   source: string; // 源节点 id（相对于 content/ 的路径去掉 .md）
   target: string; // 目标节点 id
   type: string;   // 关系类型，如 "isa"、"mechanism"、"has"

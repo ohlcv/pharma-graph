@@ -4,9 +4,13 @@
 import cytoscape from 'cytoscape';
 
 // Register layout extensions
-import 'cytoscape-cose-bilkent';
-import 'cytoscape-dagre';
-import 'cytoscape-euler';
+import coseBilkent from 'cytoscape-cose-bilkent';
+import dagre from 'cytoscape-dagre';
+import euler from 'cytoscape-euler';
+
+cytoscape.use(coseBilkent);
+cytoscape.use(dagre);
+cytoscape.use(euler);
 
 import { GraphData } from './graph.js';
 import { NODE_TYPE_SHAPE, EDGE_TYPE_STYLE } from './config.js';
@@ -96,14 +100,13 @@ export class Renderer {
       },
       circle: {
         name: 'circle',
-        radii: 200,
-        divsFactor: 2,
+        radius: 200,
         padding: 50,
         animate: true,
         animationDuration: 700,
         fit: true,
         clockwise: true,
-      },
+      } as any,
       grid: {
         name: 'grid',
         condense: false,
@@ -203,8 +206,8 @@ export class Renderer {
     return colors[type] ?? '#94a3b8';
   }
 
-  private buildStyle(): cytoscape.Stylesheet[] {
-    const style: cytoscape.Stylesheet[] = [
+  private buildStyle(): any {
+    return [
       {
         selector: 'node',
         style: {
@@ -319,7 +322,5 @@ export class Renderer {
         },
       },
     ];
-
-    return style;
   }
 }
