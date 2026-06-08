@@ -1,0 +1,2010 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>药学知识拓扑图</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f6f8;
+  --surface:#ffffff;
+  --border:#e2e8f0;
+  --text-primary:#1a202c;
+  --text-secondary:#64748b;
+  --text-muted:#94a3b8;
+  --accent:#0F6E56;
+}
+body{
+  font-family:'Noto Sans SC','DM Sans',sans-serif;
+  background:var(--bg);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+#app{
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+  width:100%;
+  margin:0 auto;
+}
+
+/* ── Header ── */
+#header{
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  padding:8px 16px;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+  gap:10px;
+  min-height:52px;
+}
+#header-center{
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:2px;
+  pointer-events:none;
+  white-space:nowrap;
+}
+#header-title{
+  font-size:16px;
+  font-weight:700;
+  color:var(--text-primary);
+  letter-spacing:-0.02em;
+}
+#header-sub{
+  font-size:11px;
+  color:var(--text-muted);
+  min-height:1.3em;
+  text-align:center;
+}
+#header-sub-text{
+  display:inline-block;
+  opacity:1;
+  transition:opacity 0.45s ease;
+}
+#header-sub-text.is-hidden{
+  opacity:0;
+}
+#header-credit{
+  display:flex;
+  align-items:baseline;
+  gap:4px;
+  font-size:11px;
+  user-select:none;
+  opacity:0.55;
+  transition:opacity .2s;
+}
+#header-credit:hover{
+  opacity:0.9;
+}
+#header-credit .credit-by{
+  font-weight:400;
+  font-style:italic;
+  color:var(--text-muted);
+  letter-spacing:0.02em;
+}
+#header-credit .credit-name{
+  font-family:'DM Sans','Noto Sans SC',sans-serif;
+  font-weight:600;
+  color:var(--accent);
+  letter-spacing:0.06em;
+}
+
+/* ── Search bar ── */
+#search-wrap{flex:1;max-width:260px;position:relative;}
+#search-input{
+  width:100%;height:32px;border:1px solid var(--border);border-radius:8px;
+  padding:0 28px 0 30px;font-size:12px;font-family:inherit;color:var(--text-primary);
+  background:var(--bg);outline:none;transition:border-color .15s,box-shadow .15s;
+}
+#search-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(15,110,86,.1);background:#fff;}
+#search-input::placeholder{color:var(--text-muted);}
+#search-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);width:13px;height:13px;color:var(--text-muted);pointer-events:none;}
+#search-clear{
+  position:absolute;right:7px;top:50%;transform:translateY(-50%);
+  width:16px;height:16px;border-radius:50%;background:var(--text-muted);color:#fff;
+  font-size:10px;display:none;align-items:center;justify-content:center;
+  cursor:pointer;border:none;line-height:1;
+}
+#search-clear.visible{display:flex;}
+#search-badge{
+  position:absolute;
+  bottom:14px;
+  left:50%;
+  transform:translateX(-50%);
+  background:rgba(15,110,86,.88);color:#fff;font-size:11px;padding:4px 12px;
+  border-radius:20px;pointer-events:none;white-space:nowrap;
+  backdrop-filter:blur(4px);opacity:0;transition:opacity .2s;
+  z-index:10;
+}
+#search-badge.visible{opacity:1;}
+
+/* ── Canvas area ── */
+#canvas-wrap{
+  flex:1;
+  position:relative;
+  overflow:hidden;
+  background:var(--surface);
+  touch-action:none;
+}
+canvas{
+  display:block;
+  width:100%;
+  height:100%;
+}
+
+/* ── Info panel (follows mouse) ── */
+#info-panel{
+  position:absolute;
+  width:220px;
+  min-height:120px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:12px 14px;
+  box-shadow:0 4px 20px rgba(0,0,0,0.12);
+  pointer-events:none;
+  opacity:0;
+  z-index:100;
+  transition:left 0.22s cubic-bezier(0.22,1,0.36,1), top 0.22s cubic-bezier(0.22,1,0.36,1), opacity 0.2s ease;
+}
+#info-panel.visible{
+  opacity:1;
+}
+#info-panel-name{
+  font-size:14px;
+  font-weight:700;
+  color:var(--text-primary);
+  margin-bottom:4px;
+}
+#info-panel-code{
+  display:inline-block;
+  font-size:10px;
+  font-weight:600;
+  padding:2px 8px;
+  border-radius:4px;
+  margin-bottom:8px;
+}
+#info-panel-desc{
+  font-size:12px;
+  line-height:1.7;
+  color:var(--text-secondary);
+  margin-bottom:10px;
+}
+#info-panel-links{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.link-row{
+  font-size:11px;
+  color:var(--text-muted);
+}
+.link-row span{
+  font-weight:600;
+  color:var(--text-secondary);
+  margin-right:4px;
+}
+.link-tag{
+  display:inline-block;
+  background:var(--bg);
+  border-radius:4px;
+  padding:1px 6px;
+  margin:1px 2px 1px 0;
+  font-size:10px;
+  color:var(--text-secondary);
+}
+#info-panel-hint{
+  margin-top:8px;
+  font-size:10px;
+  color:var(--text-muted);
+  text-align:center;
+}
+
+
+.leg{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  font-size:10px;
+  color:var(--text-secondary);
+}
+.leg-dot{
+  width:10px;height:10px;
+  border-radius:50%;
+  border:1.5px solid;
+  flex-shrink:0;
+}
+
+/* ── Canvas toolbar (top-left: music + search) ── */
+#canvas-toolbar{
+  position:absolute;
+  top:10px;
+  left:10px;
+  z-index:10;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  pointer-events:none;
+}
+#canvas-toolbar .tool-btn,
+#canvas-toolbar #search-wrap{
+  pointer-events:auto;
+}
+.tool-btn{
+  width:32px;height:32px;
+  border-radius:8px;
+  background:rgba(255,255,255,0.9);
+  border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;flex-shrink:0;
+  transition:all 0.15s;
+  color:var(--text-muted);
+}
+.tool-btn svg{width:14px;height:14px;}
+.tool-btn:hover{background:#fff;border-color:var(--accent);color:var(--accent);}
+.tool-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+
+/* ── Legend: toggle pinned top-right, panel expands downward ── */
+#legend-wrap{
+  position:absolute;
+  top:10px;
+  right:10px;
+  z-index:5;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:6px;
+  pointer-events:none;
+}
+#legend-toggle{
+  order:1;
+  pointer-events:auto;
+  width:32px;
+  height:32px;
+  border-radius:8px;
+  background:rgba(255,255,255,0.9);
+  border:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  transition:all 0.15s;
+  flex-shrink:0;
+}
+#legend-toggle:hover{
+  background:rgba(255,255,255,1);
+  border-color:var(--accent);
+}
+#legend-toggle svg{
+  width:14px;
+  height:14px;
+  color:var(--text-muted);
+}
+#legend{
+  order:2;
+  background:rgba(255,255,255,0.95);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:10px 12px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  backdrop-filter:blur(6px);
+  white-space:nowrap;
+  opacity:0;
+  visibility:hidden;
+  transform:translateY(-6px);
+  transition:opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+  box-shadow:0 4px 16px rgba(0,0,0,0.10);
+}
+#legend.open{
+  opacity:1;
+  visibility:visible;
+  transform:translateY(0);
+  pointer-events:auto;
+}
+
+/* ── Hint overlay (center splash, highest layer) ── */
+#hint-bar{
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  z-index:200;
+  background:rgba(26,32,44,0.82);
+  color:rgba(255,255,255,0.92);
+  font-size:12px;
+  padding:10px 20px;
+  border-radius:24px;
+  pointer-events:none;
+  white-space:nowrap;
+  backdrop-filter:blur(6px);
+  box-shadow:0 8px 32px rgba(0,0,0,0.18);
+  transition:opacity 0.3s;
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div id="header-center">
+      <div id="header-title">药学知识拓扑图</div>
+      <div id="header-sub"><span id="header-sub-text">四力引擎</span></div>
+    </div>
+    <div id="header-credit"><span class="credit-by">by</span><span class="credit-name">meow</span></div>
+  </div>
+
+  <div id="canvas-wrap">
+    <canvas id="c"></canvas>
+
+    <!-- 左上角工具栏：漫游 + 音乐 + 搜索 -->
+    <div id="canvas-toolbar">
+      <button class="tool-btn" id="roam-btn" title="自动漫游">
+        <svg id="roam-icon-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0"/>
+          <path d="M12 8v4l3 3"/>
+        </svg>
+        <svg id="roam-icon-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M10 8l6 4-6 4V8z" fill="currentColor" stroke="none"/>
+        </svg>
+      </button>
+      <button class="tool-btn" id="music-btn" title="播放背景音乐">
+        <svg id="music-icon-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
+          <rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/>
+          <rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/>
+        </svg>
+        <svg id="music-icon-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="5 3 19 12 5 21 5 3" fill="currentColor" stroke="none"/>
+        </svg>
+      </button>
+      <div id="search-wrap">
+        <svg id="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input id="search-input" type="text" placeholder="搜索节点…" autocomplete="off" spellcheck="false">
+        <button id="search-clear" title="清除">×</button>
+      </div>
+    </div>
+
+    <!-- 节点信息浮窗 -->
+    <div id="info-panel">
+      <div id="info-panel-name"></div>
+      <div id="info-panel-code"></div>
+      <div id="info-panel-desc"></div>
+      <div id="info-panel-links"></div>
+      <div id="info-panel-hint">点击节点可锁定 · 再次点击解锁</div>
+    </div>
+
+    <!-- 图例：toggle在右上，panel向下展开 -->
+    <div id="legend-wrap">
+      <div id="legend-toggle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/>
+          <line x1="12" y1="4" x2="12" y2="20"/>
+        </svg>
+      </div>
+      <div id="legend">
+        <div class="leg" style="font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:.05em;margin-bottom:2px">— 层 —</div>
+        <div class="leg"><span class="leg-dot" style="background:#00A5B5;border-color:#00A5B5"></span>基础层（foundation）</div>
+        <div class="leg"><span class="leg-dot" style="background:#9C27B0;border-color:#9C27B0"></span>靶点层（bridge）</div>
+        <div class="leg"><span class="leg-dot" style="background:#185FA5;border-color:#185FA5"></span>临床层（clinical）</div>
+        <div class="leg"><span class="leg-dot" style="background:#534AB7;border-color:#534AB7"></span>服务层（service）</div>
+        <div class="leg" style="font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:.05em;margin-top:4px;margin-bottom:2px">— 系统 —</div>
+        <div class="leg"><span class="leg-dot" style="background:#1E40AF;border-color:#1E40AF"></span>神经系统</div>
+        <div class="leg"><span class="leg-dot" style="background:#059669;border-color:#059669"></span>呼吸系统</div>
+        <div class="leg"><span class="leg-dot" style="background:#D97706;border-color:#D97706"></span>消化系统</div>
+        <div class="leg"><span class="leg-dot" style="background:#DC2626;border-color:#DC2626"></span>心血管·内分泌</div>
+        <div class="leg"><span class="leg-dot" style="background:#2563EB;border-color:#2563EB"></span>泌尿系统</div>
+        <div class="leg"><span class="leg-dot" style="background:#CA8A04;border-color:#CA8A04"></span>免疫系统</div>
+        <div class="leg"><span class="leg-dot" style="background:#4B5563;border-color:#4B5563"></span>肿瘤·专科</div>
+      </div>
+    </div>
+
+    <div id="search-badge"></div>
+    <div id="hint-bar">空白处拖动平移 · 节点/分组可拖拽 · 滚轮缩放 · 点击节点查看详情</div>
+  </div>
+</div>
+
+<!-- BGM playlist -->
+<audio id="bgm" preload="none"></audio>
+
+<script>
+// ═══════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════
+const NODE_INFO={
+  '生命药学':{code:'基础层',desc:'提供人体解剖、生理、病理基础，是理解疾病机制和药物作用靶点的起点。'},
+  '药理毒理学':{code:'核心基础',desc:'研究药物-机体相互作用规律（药效学+毒理学）。是推导所有靶点机制→临床药物的核心桥梁。'},
+  '药物化学':{code:'基础层',desc:'从化学结构出发研究构效关系，决定药物选择性靶点和代谢特征。'},
+  '药物动力学':{code:'基础层',desc:'ADME四过程（吸收分布代谢排泄）。横向连接全部药物，纵向支撑处方审核、用药咨询。'},
+  '药剂学':{code:'基础层',desc:'剂型设计与制剂技术，影响药物释放与吸收。直接支撑药学服务和处方审核。'},
+  '受体':{code:'靶点层',desc:'G蛋白偶联受体、核受体、酶联受体等。'},
+  '酶':{code:'靶点层',desc:'ACE、COX、DPP-4、拓扑异构酶等。'},
+  '离子通道':{code:'靶点层',desc:'钙通道、钠通道、钾通道、氯通道。'},
+  '转运体':{code:'靶点层',desc:'SERT（5-HT转运体）、SGLT2、肾小管转运体等。'},
+  '激素':{code:'靶点层',desc:'内源性激素信号分子作为靶点或药物本身。'},
+  '病原体':{code:'靶点层',desc:'细菌、病毒、真菌等作为靶点，主要连接抗感染药物。'},
+  '精神与\n中枢神经用药':{code:'A1 · 神经系统',desc:'靶点：受体（多巴胺D2、5-HT、GABA）、离子通道、转运体。对应疾病：神经系统常见疾病。',category:'neuro'},
+  '神经系统\n常见疾病':{code:'B10 · 神经系统',desc:'帕金森、癫痫、失眠、抑郁、精神分裂。',category:'neuro'},
+  '呼吸系统\n用药':{code:'A3 · 呼吸系统',desc:'靶点：受体（β2激动剂、M受体拮抗剂）。对应疾病：呼吸系统常见疾病。',category:'resp'},
+  '呼吸系统\n常见疾病':{code:'B8 · 呼吸系统',desc:'哮喘、COPD、肺炎。',category:'resp'},
+  '消化系统\n用药':{code:'A4 · 消化系统',desc:'靶点：受体（H2受体、M受体）、酶（质子泵）。对应疾病：消化系统常见疾病。',category:'digest'},
+  '消化系统\n常见疾病':{code:'B11 · 消化系统',desc:'消化性溃疡、肠易激、便秘、腹泻。',category:'digest'},
+  '心血管系统\n用药':{code:'A5 · 心血管',desc:'靶点：受体（β/α受体）、离子通道（Ca2+）、酶（ACE）。关联慢性病管理。',category:'cardio'},
+  '血液系统\n用药':{code:'A6 · 心血管',desc:'靶点：凝血酶、Xa因子、ADP受体。抗凝、溶栓、抗血小板。',category:'cardio'},
+  '心血管系统\n常见疾病':{code:'B9 · 心血管',desc:'高血压、冠心病、心衰、心律失常。与内分泌共病。',category:'cardio'},
+  '内分泌系统\n用药':{code:'A8 · 内分泌',desc:'靶点：激素（胰岛素）、酶（DPP-4）、转运体（SGLT2）。关联慢性病管理。',category:'endo'},
+  '内分泌系统\n常见疾病':{code:'B12 · 内分泌',desc:'糖尿病、甲亢/甲减、骨质疏松。与心血管共病。',category:'endo'},
+  '泌尿系统\n用药':{code:'A7 · 泌尿',desc:'靶点：离子通道、受体（α1受体）、转运体。',category:'uro'},
+  '水电解质\n营养用药':{code:'A11 · 泌尿',desc:'调节水、电解质、酸碱平衡与营养用药。',category:'uro'},
+  '泌尿系统\n常见疾病':{code:'B14 · 泌尿',desc:'UTI、肾结石、前列腺增生。',category:'uro'},
+  '抗感染\n药物':{code:'A9 · 免疫系统',desc:'靶点：病原体细胞壁、蛋白质合成、核酸合成。跨系统关联。',category:'immuno'},
+  '解热镇痛\n抗炎抗风湿':{code:'A2 · 免疫系统',desc:'靶点：COX酶（NSAIDs）、受体、激素（糖皮质激素）。跨系统关联。',category:'immuno'},
+  '皮肤用药\n及抗过敏':{code:'A13 · 免疫系统',desc:'靶点：受体（H1受体）、激素（外用糖皮质激素）。',category:'immuno'},
+  '免疫系统\n常见疾病':{code:'B13 · 免疫系统',desc:'类风湿、SLE、过敏性疾病。',category:'immuno'},
+  '抗肿瘤\n药物':{code:'A10 · 肿瘤',desc:'靶点：拓扑异构酶、激素受体、PD-1/CTLA-4。关联用药安全。',category:'onco'},
+  '肿瘤':{code:'B15 · 肿瘤',desc:'关联：用药安全（高警示药品）、急救（化疗毒性处理）。',category:'onco'},
+  '眼科耳鼻喉\n口腔用药':{code:'A12 · 专科',desc:'局部靶点为主，药剂学影响疗效。',category:'special'},
+  '慢性病\n管理':{code:'B7 · 服务层',desc:'高血压/糖尿病/高脂血症长期管理。核心药物：心血管+内分泌。',category:'service'},
+  '用药安全':{code:'B4 · 服务层',desc:'不良反应、药物相互作用、高警示药品。关联抗肿瘤药。',category:'service'},
+  '处方审核\n与调剂':{code:'B2 · 服务层',desc:'核心支撑：药动学（配伍/相互作用）、药剂学。',category:'service'},
+  '用药咨询\n与治疗管理':{code:'B3 · 服务层',desc:'支撑：药动学（剂量调整）、药理毒理学。',category:'service'},
+  '常见病症\n健康管理':{code:'B6 · 服务层',desc:'OTC用药、自我药疗。支撑：生命药学、解热镇痛。',category:'service'},
+  '药学服务\n与药品管理':{code:'B1 · 服务层',desc:'药品采购、储存、调配、发放与管理制度。支撑处方审核与调剂。',category:'service'},
+  '急救、中毒\n解救及职业防护':{code:'B5 · 服务层',desc:'急救药品管理、中毒解救方案与职业安全防护。关联用药安全。',category:'service'},
+};
+
+const CATEGORY_COLORS={
+  foundation:{fill:'#E0F4F9',stroke:'#00A5B5',text:'#006B7A'},  // 青色系 - 基础
+  bridge:{fill:'#F3E5F5',stroke:'#9C27B0',text:'#5D1B7A'},        // 紫色系 - 连接
+  neuro: {fill:'#DEE9FA',stroke:'#1E40AF',text:'#0F2774'},        // 深蓝色 - 神经
+  resp:  {fill:'#D1FAE5',stroke:'#059669',text:'#035A42'},        // 翠绿色 - 呼吸
+  digest:{fill:'#FEF3C7',stroke:'#D97706',text:'#92400E'},        // 橙色系 - 消化
+  cardio:{fill:'#FEE2E2',stroke:'#DC2626',text:'#991B1B'},        // 红色系 - 心血管
+  endo:  {fill:'#FCE7F3',stroke:'#DB2777',text:'#9D174D'},        // 紫红色 - 内分泌
+  uro:   {fill:'#DBEAFE',stroke:'#2563EB',text:'#1E40AF'},        // 天蓝色 - 泌尿
+  immuno:{fill:'#FEF9C3',stroke:'#CA8A04',text:'#854D0E'},        // 金黄色 - 免疫
+  onco:  {fill:'#E5E7EB',stroke:'#4B5563',text:'#1F2937'},        // 深灰色 - 肿瘤
+  special:{fill:'#FED7AA',stroke:'#EA580C',text:'#9A3412'},       // 橙色系 - 眼科耳鼻喉
+  service:{fill:'#F5F3FF',stroke:'#7C3AED',text:'#4C1D95'},       // 紫罗兰 - 服务
+};
+
+const CATEGORY_BG={
+  foundation:'rgba(0,165,181,0.08)',
+  bridge:'rgba(156,39,176,0.08)',
+  neuro: 'rgba(30,64,175,0.06)',
+  resp:  'rgba(5,150,105,0.06)',
+  digest:'rgba(217,119,6,0.06)',
+  cardio:'rgba(220,38,38,0.06)',
+  endo:  'rgba(219,39,119,0.06)',
+  uro:   'rgba(37,99,235,0.06)',
+  immuno:'rgba(202,138,4,0.06)',
+  onco:  'rgba(75,85,99,0.06)',
+  special:'rgba(234,88,12,0.06)',
+  service:'rgba(83,74,183,0.05)',
+};
+
+// Layer ordering for Y-axis constraint（4层）
+// foundation（基础+核心）/ bridge（靶点）/ clinical（用药+疾病）/ service（药学服务）
+const LAYER_Y={foundation:0.12, bridge:0.35, clinical:0.62, service:0.88};
+
+const rawNodes=[
+  {id:'药理毒理学',layer:'foundation',r:40,category:'foundation'},
+  {id:'生命药学',layer:'foundation',r:28,category:'foundation'},
+  {id:'药物化学',layer:'foundation',r:26,category:'foundation'},
+  {id:'药物动力学',layer:'foundation',r:30,category:'foundation'},
+  {id:'药剂学',layer:'foundation',r:26,category:'foundation'},
+  {id:'受体',layer:'bridge',r:25,category:'bridge'},
+  {id:'酶',layer:'bridge',r:23,category:'bridge'},
+  {id:'离子通道',layer:'bridge',r:25,category:'bridge'},
+  {id:'转运体',layer:'bridge',r:22,category:'bridge'},
+  {id:'激素',layer:'bridge',r:21,category:'bridge'},
+  {id:'病原体',layer:'bridge',r:21,category:'bridge'},
+  {id:'精神与\n中枢神经用药',layer:'clinical',r:26,category:'neuro'},
+  {id:'神经系统\n常见疾病',layer:'clinical',r:24,category:'neuro'},
+  {id:'呼吸系统\n用药',layer:'clinical',r:22,category:'resp'},
+  {id:'呼吸系统\n常见疾病',layer:'clinical',r:22,category:'resp'},
+  {id:'消化系统\n用药',layer:'clinical',r:22,category:'digest'},
+  {id:'消化系统\n常见疾病',layer:'clinical',r:22,category:'digest'},
+  {id:'心血管系统\n用药',layer:'clinical',r:28,category:'cardio'},
+  {id:'血液系统\n用药',layer:'clinical',r:24,category:'cardio'},
+  {id:'内分泌系统\n用药',layer:'clinical',r:26,category:'endo'},
+  {id:'心血管系统\n常见疾病',layer:'clinical',r:24,category:'cardio'},
+  {id:'内分泌系统\n常见疾病',layer:'clinical',r:24,category:'endo'},
+  {id:'泌尿系统\n用药',layer:'clinical',r:22,category:'uro'},
+  {id:'水电解质\n营养用药',layer:'clinical',r:22,category:'uro'},
+  {id:'泌尿系统\n常见疾病',layer:'clinical',r:22,category:'uro'},
+  {id:'抗感染\n药物',layer:'clinical',r:25,category:'immuno'},
+  {id:'解热镇痛\n抗炎抗风湿',layer:'clinical',r:25,category:'immuno'},
+  {id:'皮肤用药\n及抗过敏',layer:'clinical',r:22,category:'immuno'},
+  {id:'免疫系统\n常见疾病',layer:'clinical',r:22,category:'immuno'},
+  {id:'抗肿瘤\n药物',layer:'clinical',r:23,category:'onco'},
+  {id:'肿瘤',layer:'clinical',r:21,category:'onco'},
+  {id:'眼科耳鼻喉\n口腔用药',layer:'clinical',r:22,category:'special'},
+  {id:'慢性病\n管理',layer:'service',r:27,category:'service'},
+  {id:'用药安全',layer:'service',r:25,category:'service'},
+  {id:'处方审核\n与调剂',layer:'service',r:24,category:'service'},
+  {id:'用药咨询\n与治疗管理',layer:'service',r:24,category:'service'},
+  {id:'常见病症\n健康管理',layer:'service',r:24,category:'service'},
+  {id:'药学服务\n与药品管理',layer:'service',r:24,category:'service'},
+  {id:'急救、中毒\n解救及职业防护',layer:'service',r:24,category:'service'},
+];
+
+const rawEdges=[
+  ['药理毒理学','受体','main'],['药理毒理学','酶','main'],['药理毒理学','离子通道','main'],
+  ['药理毒理学','转运体','main'],['药理毒理学','激素','main'],['药理毒理学','病原体','main'],
+  ['药物化学','受体','main'],['药物化学','酶','main'],['药物化学','离子通道','main'],
+  ['生命药学','受体','main'],['生命药学','激素','main'],['生命药学','离子通道','main'],
+  ['受体','精神与\n中枢神经用药','main'],['受体','心血管系统\n用药','main'],['受体','内分泌系统\n用药','main'],
+  ['酶','心血管系统\n用药','main'],['酶','内分泌系统\n用药','main'],['酶','抗感染\n药物','main'],
+  ['酶','抗肿瘤\n药物','main'],['酶','解热镇痛\n抗炎抗风湿','main'],
+  ['离子通道','精神与\n中枢神经用药','main'],['离子通道','心血管系统\n用药','main'],['离子通道','泌尿系统\n用药','main'],
+  ['转运体','精神与\n中枢神经用药','main'],['转运体','内分泌系统\n用药','main'],
+  ['激素','内分泌系统\n用药','main'],['激素','抗肿瘤\n药物','main'],['激素','解热镇痛\n抗炎抗风湿','main'],
+  ['病原体','抗感染\n药物','main'],
+  ['受体','呼吸系统\n用药','main'],['受体','消化系统\n用药','main'],
+  ['受体','皮肤用药\n及抗过敏','main'],['受体','泌尿系统\n用药','main'],
+  ['精神与\n中枢神经用药','神经系统\n常见疾病','main'],
+  ['呼吸系统\n用药','呼吸系统\n常见疾病','main'],
+  ['消化系统\n用药','消化系统\n常见疾病','main'],
+  ['心血管系统\n用药','心血管系统\n常见疾病','main'],
+  ['血液系统\n用药','心血管系统\n常见疾病','main'],
+  ['内分泌系统\n用药','内分泌系统\n常见疾病','main'],
+  ['泌尿系统\n用药','泌尿系统\n常见疾病','main'],
+  ['抗感染\n药物','免疫系统\n常见疾病','main'],
+  ['解热镇痛\n抗炎抗风湿','免疫系统\n常见疾病','main'],
+  ['皮肤用药\n及抗过敏','免疫系统\n常见疾病','main'],
+  ['抗肿瘤\n药物','肿瘤','main'],
+  ['药物动力学','处方审核\n与调剂','main'],['药物动力学','用药咨询\n与治疗管理','main'],['药物动力学','慢性病\n管理','main'],
+  ['药剂学','处方审核\n与调剂','main'],['药理毒理学','用药安全','main'],
+  ['生命药学','常见病症\n健康管理','main'],
+  ['心血管系统\n用药','内分泌系统\n用药','net'],
+  ['心血管系统\n用药','慢性病\n管理','net'],
+  ['内分泌系统\n用药','慢性病\n管理','net'],
+  ['心血管系统\n常见疾病','内分泌系统\n常见疾病','net'],
+  ['抗感染\n药物','呼吸系统\n常见疾病','net'],
+  ['抗感染\n药物','泌尿系统\n常见疾病','net'],
+  ['解热镇痛\n抗炎抗风湿','常见病症\n健康管理','net'],
+  ['抗肿瘤\n药物','用药安全','net'],
+  ['处方审核\n与调剂','用药咨询\n与治疗管理','net'],
+  ['用药咨询\n与治疗管理','用药安全','net'],
+  ['药学服务\n与药品管理','处方审核\n与调剂','main'],
+  ['药学服务\n与药品管理','用药安全','net'],
+  ['急救、中毒\n解救及职业防护','用药安全','main'],
+  ['急救、中毒\n解救及职业防护','处方审核\n与调剂','net'],
+  // V4.1: 修复孤立节点和增强连通性
+  ['药剂学','眼科耳鼻喉\n口腔用药','main'],
+  ['受体','眼科耳鼻喉\n口腔用药','main'],
+  ['病原体','眼科耳鼻喉\n口腔用药','main'],
+  ['眼科耳鼻喉\n口腔用药','常见病症\n健康管理','net'],
+  ['药物动力学','水电解质\n营养用药','main'],
+  ['水电解质\n营养用药','泌尿系统\n常见疾病','main'],
+  ['药物动力学','用药安全','main'],
+  ['心血管系统\n用药','用药安全','net'],
+  ['内分泌系统\n用药','用药安全','net'],
+  ['抗感染\n药物','用药安全','net'],
+];
+
+// System groupings for background frames
+const CATEGORY_GROUPS={
+  foundation:['药理毒理学','生命药学','药物化学','药物动力学','药剂学'],
+  bridge:['受体','酶','离子通道','转运体','激素','病原体'],
+  neuro: ['精神与\n中枢神经用药','神经系统\n常见疾病'],
+  resp:  ['呼吸系统\n用药','呼吸系统\n常见疾病'],
+  digest:['消化系统\n用药','消化系统\n常见疾病'],
+  cardio:['心血管系统\n用药','血液系统\n用药','心血管系统\n常见疾病'],
+  endo:  ['内分泌系统\n用药','内分泌系统\n常见疾病'],
+  uro:   ['泌尿系统\n用药','水电解质\n营养用药','泌尿系统\n常见疾病'],
+  immuno:['抗感染\n药物','解热镇痛\n抗炎抗风湿','皮肤用药\n及抗过敏','免疫系统\n常见疾病'],
+  onco:  ['抗肿瘤\n药物','肿瘤'],
+  special:['眼科耳鼻喉\n口腔用药'],
+  service:['慢性病\n管理','用药安全','处方审核\n与调剂','用药咨询\n与治疗管理','常见病症\n健康管理','药学服务\n与药品管理','急救、中毒\n解救及职业防护'],
+};
+
+const CATEGORY_LABELS={
+  foundation:'基础层',bridge:'靶点层',
+  neuro:'神经系统',resp:'呼吸系统',digest:'消化系统',
+  cardio:'心血管系统',endo:'内分泌系统',uro:'泌尿系统',
+  immuno:'免疫系统',onco:'肿瘤',special:'专科',service:'药学服务',
+};
+
+// ═══════════════════════════════════════════════════
+// PHYSICS CONSTANTS (module scope — easy to tune)
+// ═══════════════════════════════════════════════════
+const S_REPULSE_K = 45000;
+const S_TARGET_F  = 1.8;
+const S_ALPHA     = 0.35;
+const EM_K        = 28000;   // stronger same-layer repulsion → systems push apart in 2D
+const EM_RANGE    = 600;     // longer range → feel each other across the wider world
+const EM_MAX_F    = 30;
+const G_WELL_K    = 0.025;   // weaker Y-well → nodes free to spread vertically inside band
+const W_BOUND_K   = 0.40;
+const W_DAMP_PHYS = 0.985;
+const W_TOP_PAD   = 0.04;
+const W_BOT_PAD   = 0.04;
+
+// ═══════════════════════════════════════════════════
+// ENGINE
+// ═══════════════════════════════════════════════════
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const wrap=document.getElementById('canvas-wrap');
+const DPR=window.devicePixelRatio||1;
+
+let LW, LH;  // computed after node radii are set
+let W, H;    // screen pixels
+
+// Node objects with physics
+const nodes=rawNodes.map(n=>({
+  ...n,
+  x:0,y:0,vx:0,vy:0,
+  pinned:false,
+  degree:0,
+  // Visual smooth-transition state
+  _scale:1,
+  _targetScale:1,
+  _glow:0,
+  _targetGlow:0,
+  _alpha:1,
+  _targetAlpha:1,
+  _pulse:0,    // 0~1 pulse ring progress
+  _pulseDir:1, // 1=growing, -1=shrinking
+}));
+
+const nmap={};
+nodes.forEach(n=>nmap[n.id]=n);
+
+// Adjacency
+const adj={};
+nodes.forEach(n=>adj[n.id]=new Set());
+rawEdges.forEach(([a,b])=>{adj[a].add(b);adj[b].add(a);});
+nodes.forEach(n=>n.degree=adj[n.id].size);
+
+// Edge animation state: each edge gets a progress (0=hidden, 1=fully drawn)
+const edgeState=rawEdges.map(()=>({progress:0,_alpha:0}));
+
+// Scale radius by degree (增强团块感)
+nodes.forEach(n=>{
+  const base=rawNodes.find(r=>r.id===n.id).r;
+  n.r=base+Math.min(n.degree*1.2,12);
+});
+
+// Compute logical world size now that radii are final (called after LAYER_ORDER is defined below)
+
+function initPositions(){
+  const NODE_GAP = 52;
+  const LAYER_VPAD = 120;
+  const H_MARGIN = 100;
+
+  // 按层计算实际所需高度（与 computeWorldSize 一致的逻辑）
+  const byLayer={};
+  LAYER_ORDER.forEach(l=>byLayer[l]=[]);
+  nodes.forEach(n=>byLayer[n.layer].push(n));
+
+  const bandHeights={};
+  LAYER_ORDER.forEach(l=>{
+    const ns=byLayer[l];
+    if(!ns.length){bandHeights[l]=LAYER_VPAD;return;}
+    const maxDiam=Math.max(...ns.map(n=>n.r*2));
+    const cellSize=maxDiam+NODE_GAP;
+    const rows=Math.max(1,Math.ceil(Math.sqrt(ns.length*0.6)));
+    bandHeights[l]=rows*cellSize+LAYER_VPAD;
+  });
+
+  // 分配层核 Y（从上往下累加实际带高）
+  let cumY=H_MARGIN;
+  LAYER_ORDER.forEach(l=>{
+    const bh=bandHeights[l];
+    layerCores[l].y=cumY+bh/2;
+    layerCores[l].bandH=bh;
+    layerCores[l].vy=0;
+    cumY+=bh;
+  });
+
+  // 节点初始位置：在本层带内随机散开
+  nodes.forEach(n=>{
+    const core=layerCores[n.layer];
+    const halfBand=(core.bandH)*0.42;
+    const xSpread = n.layer==='clinical' ? 0.82 : 0.60;
+    n.x=LW/2+(Math.random()-0.5)*LW*xSpread;
+    n.y=core.y+(Math.random()-0.5)*halfBand*2;
+    n.vx=0;n.vy=0;n.pinned=false;
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// 宇宙四大基本力 物理引擎 · 纯四力版
+// ═══════════════════════════════════════════════════
+//
+// 【强相互作用力】同类节点
+//   · 极近距：强排斥（渐近自由）→ 防止同类重叠
+//   · 中程：吸引（色禁闭）→ 同类紧密成团，不可分散
+//   · 超出作用范围：骤降为零
+//   → 完全替代"硬碰撞"（同类间），并保证聚集
+//
+// 【电磁力】异类节点
+//   · 长程库仑斥力 F∝1/r²
+//   · 同层异类横向推开，跨层异类纵向推开
+//   → 异类不重叠；各类群自然向画布中部平衡（替代弱中心引力）
+//   · 同类之间：短程排斥（同号电荷） → 防止异类重叠的补充
+//
+// 【引力】层间万有引力
+//   · 每个节点被本层"层核"（层质心虚拟天体）吸引
+//   · 层核之间互相排斥（不同层不可合并）
+//   · 节点越偏离层核，受到的回拉力越强
+//   · 层间距由层核排斥自动撑开，无需预设 LAYER_Y
+//   → 动态确定层高度，节点被限制在本层引力井内
+//
+// 【弱相互作用力】量子涨落
+//   · 早期随机扰动，帮助逃离局部极小
+//   · 振幅指数衰减，收敛后静止
+//   → 防止系统冻结在次优布局
+//
+// ═══════════════════════════════════════════════════
+
+// 层定义（顺序决定初始纵向排布）
+const LAYER_ORDER=['foundation','bridge','clinical','service'];
+
+// 层核：每层一个虚拟质心天体，位置动态更新
+const layerCores={};
+LAYER_ORDER.forEach(l=>{ layerCores[l]={y:0, vy:0}; });
+
+// ── 世界尺寸：根据节点实际体积反向推算，保证每层不拥挤 ──
+function computeWorldSize(){
+  const NODE_GAP = 52;    // 节点间距加大
+  const LAYER_VPAD = 120; // 层间垂直留白加大
+  const H_MARGIN = 100;   // 上下边距加大
+  const byLayer={};
+  LAYER_ORDER.forEach(l=>byLayer[l]=[]);
+  nodes.forEach(n=>byLayer[n.layer].push(n));
+  let totalH = H_MARGIN * 2;
+  let maxLayerW = 0;
+  LAYER_ORDER.forEach(l=>{
+    const ns = byLayer[l];
+    if(!ns.length) return;
+    const maxDiam = Math.max(...ns.map(n=>n.r*2));
+    const cellSize = maxDiam + NODE_GAP;
+    const rows = Math.max(1, Math.ceil(Math.sqrt(ns.length * 0.6)));
+    const cols = Math.ceil(ns.length / rows);
+    const layerH = rows * cellSize + LAYER_VPAD;
+    const layerW = cols * cellSize + 200; // 左右各100
+    totalH += layerH;
+    if(layerW > maxLayerW) maxLayerW = layerW;
+  });
+  return { LW: Math.max(maxLayerW, 1200), LH: Math.max(totalH, 1000) };
+}
+
+function fitView(){
+  const fitZoom = Math.min(W/LW, H/LH) * 0.92;
+  zoom = fitZoom;
+  pan.x = (W - LW*zoom) / 2;
+  pan.y = (H - LH*zoom) / 2;
+}
+
+let _layoutInitialized=false;
+
+function resize(){
+  W=wrap.clientWidth;
+  H=wrap.clientHeight;
+  canvas.width=W*DPR;
+  canvas.height=H*DPR;
+  canvas.style.width=W+'px';
+  canvas.style.height=H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  fitView();
+  if(!_layoutInitialized){
+    initPositions();
+    runForce(400);
+    _layoutInitialized=true;
+  }
+}
+
+// 现在 LAYER_ORDER 和 nodes 都已就绪，计算世界尺寸
+({LW, LH} = computeWorldSize());
+
+function runForce(steps){
+  const pad=50;
+  const damp=0.82;
+  const MAX_V=25;
+
+  // Physics constants defined at module scope above
+
+  for(let step=0;step<steps;step++){
+    const alpha = Math.max(0, 1 - step/steps);
+
+    // 层核位置固定（由 initPositions 预分配），无需互斥更新
+
+    // ════════════════════════════════════════════
+    // 【强相互作用力】重构：簇心吸引 + 节点间排斥
+    // 实现二维稳定聚簇
+    // ════════════════════════════════════════════
+    // 第一步：计算每个类别的质心
+    const catCenters={};
+    const catNodes={};
+    nodes.forEach(n=>{
+      if(!catNodes[n.category]){
+        catNodes[n.category]=[];
+        catCenters[n.category]={x:0,y:0};
+      }
+      catNodes[n.category].push(n);
+      catCenters[n.category].x+=n.x;
+      catCenters[n.category].y+=n.y;
+    });
+    // 计算质心坐标
+    Object.keys(catCenters).forEach(cat=>{
+      const count=catNodes[cat].length;
+      catCenters[cat].x/=count;
+      catCenters[cat].y/=count;
+    });
+
+    // 第二步：强力 = 簇心吸引 + 节点间短程排斥
+    for(let i=0;i<nodes.length;i++){
+      const a=nodes[i];
+      if(a.pinned)continue;
+      
+      // 【簇心吸引】节点→类别质心的吸引力（支持二维稳定）
+      const center=catCenters[a.category];
+      if(center){
+        const dcx=center.x-a.x, dcy=center.y-a.y;
+        const distToCenter=Math.sqrt(dcx*dcx+dcy*dcy);
+        if(distToCenter>0){
+          const ncx=dcx/distToCenter, ncy=dcy/distToCenter;
+          // 吸引力随距离增大而增强，但有上限
+          const clusterF=Math.min(distToCenter*S_ALPHA*0.5, 8);
+          a.vx+=ncx*clusterF;
+          a.vy+=ncy*clusterF;
+        }
+      }
+    }
+
+    // 第三步：节点间短程排斥（防止重叠）
+    for(let i=0;i<nodes.length;i++){
+      for(let j=i+1;j<nodes.length;j++){
+        const a=nodes[i], b=nodes[j];
+        const dx=b.x-a.x, dy=b.y-a.y;
+        const dist=Math.max(Math.sqrt(dx*dx+dy*dy), 1);
+        const nx=dx/dist, ny=dy/dist;
+        const minDist=a.r+b.r+14;
+
+        if(a.category===b.category){
+          // 【节点间排斥】分两段：强排斥 + 弱排斥，防止重叠
+          const targetDist=minDist*S_TARGET_F;
+          
+          if(dist < minDist){
+            // 强排斥：距离过近时强力推开
+            const safeDist=Math.max(dist, minDist*0.2);
+            const repF=Math.min(S_REPULSE_K/(safeDist*safeDist), 300);
+            if(!a.pinned){a.vx-=nx*repF; a.vy-=ny*repF;}
+            if(!b.pinned){b.vx+=nx*repF; b.vy+=ny*repF;}
+          } else if(dist < targetDist){
+            // 弱排斥：中等距离时轻微推开，保持间距
+            const repF=(targetDist-dist)*0.25;
+            if(!a.pinned){a.vx-=nx*repF; a.vy-=ny*repF;}
+            if(!b.pinned){b.vx+=nx*repF; b.vy+=ny*repF;}
+          }
+          // 同类中远程吸引已由簇心吸引处理
+
+        } else {
+          // ════════════════════════════
+          // 【电磁力】类别电荷模型：同层不同类互相排斥
+          // （异层交互由层势阱与簇心吸引处理；当前数据中 category 与 layer 一一对应）
+          // ════════════════════════════
+          if(dist < EM_RANGE && dist > 1 && a.layer===b.layer){
+            const qa=Math.sqrt(catNodes[a.category]?.length || 1);
+            const qb=Math.sqrt(catNodes[b.category]?.length || 1);
+            const kx = Math.abs(dx) > 1 ? dx/dist : (Math.random()-0.5)*0.01;
+            const ky = Math.abs(dy) > 1 ? dy/dist : (Math.random()-0.5)*0.01;
+            const emF = Math.min(EM_K * qa * qb / (dist*dist), EM_MAX_F) * (alpha*0.5+0.5);
+            if(!a.pinned){a.vx -= kx*emF; a.vy -= ky*emF;}
+            if(!b.pinned){b.vx += kx*emF; b.vy += ky*emF;}
+          }
+        }
+      }
+    }
+
+    // ════════════════════════════════════════════
+    // 【引力】层带约束：带内轻柔，超出边界强力弹回
+    // ════════════════════════════════════════════
+    nodes.forEach(n=>{
+      if(n.pinned)return;
+      const core=layerCores[n.layer];
+      const dy=core.y-n.y;
+      const halfBand=(core.bandH||200)*0.5;
+      const relDist=Math.abs(dy)/halfBand;
+      // 带内几乎不拉（让节点自由二维分布）；超出带边界强力弹回
+      let k;
+      if(relDist < 0.7)       k = G_WELL_K * 0.3;
+      else if(relDist < 1.0)  k = G_WELL_K;
+      else                     k = G_WELL_K * (1 + (relDist-1)*12); // 硬墙
+      n.vy += dy * k;
+    });
+
+    // ════════════════════════════════════════════
+    // 【弱相互作用力】边界恢复弹力 — 基于逻辑世界尺寸
+    // ════════════════════════════════════════════
+    const weakK = W_BOUND_K * Math.pow(W_DAMP_PHYS, step);
+    const topPad = LH * W_TOP_PAD;
+    const botPad = LH * W_BOT_PAD;
+    nodes.forEach(n=>{
+      if(n.pinned)return;
+      if(n.y < topPad + n.r) n.vy += (topPad + n.r - n.y) * weakK;
+      if(n.y > LH - botPad - n.r) n.vy += (LH - botPad - n.r - n.y) * weakK;
+    });
+
+    // ════════════════════════════════════════════
+    // 速度积分 + 阻尼 + 软边界
+    // ════════════════════════════════════════════
+    nodes.forEach(n=>{
+      if(n.pinned)return;
+      n.vx*=damp; n.vy*=damp;
+      const spd=Math.sqrt(n.vx*n.vx+n.vy*n.vy);
+      if(spd>MAX_V){n.vx=n.vx/spd*MAX_V; n.vy=n.vy/spd*MAX_V;}
+      n.x+=n.vx; n.y+=n.vy;
+      if(!isFinite(n.x)||!isFinite(n.y)){
+        n.x=LW/2+(Math.random()-0.5)*80;
+        n.y=layerCores[n.layer]?.y||(LH*0.5);
+        n.vx=0; n.vy=0;
+      }
+      // Soft clamp — nodes stay within logical world
+      n.x=Math.max(pad+n.r, Math.min(LW-pad-n.r, n.x));
+      n.y=Math.max(pad+n.r, Math.min(LH-pad-n.r, n.y));
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// INTERACTION STATE
+// ═══════════════════════════════════════════════════
+let hovered=null;
+let locked=null;
+let searchQuery='';
+let drag=null;
+let _didDrag=false;
+
+// Pan / zoom
+let pan={x:0,y:0};
+let zoom=1;
+
+function toWorld(cx,cy){
+  return {x:(cx-pan.x)/zoom, y:(cy-pan.y)/zoom};
+}
+
+// Adjacency 2-hop
+function getHighlighted(id){
+  if(!id)return null;
+  const set=new Set();
+  set.add(id);
+  adj[id].forEach(nb=>{
+    set.add(nb);
+    adj[nb].forEach(nb2=>set.add(nb2));
+  });
+  return set;
+}
+
+// ═══════════════════════════════════════════════════
+// INFO PANEL
+// ═══════════════════════════════════════════════════
+// Panel smooth-position state
+const panelState={
+  currentX:0,currentY:0,
+  targetX:0,targetY:0,
+  _rafId:null,
+};
+
+function showPanel(nodeId, mouseX, mouseY){
+  const panel=document.getElementById('info-panel');
+  if(!nodeId){panel.classList.remove('visible');panelState.targetX=-9999;panelState.targetY=-9999;return;}
+
+  const info=NODE_INFO[nodeId]||{};
+  const n=nmap[nodeId];
+  const colors=CATEGORY_COLORS[n.category]||CATEGORY_COLORS.foundation;
+
+  document.getElementById('info-panel-name').textContent=nodeId.replace(/\n/g,'');
+
+  const codeEl=document.getElementById('info-panel-code');
+  codeEl.textContent=info.code||'';
+  codeEl.style.background=colors.fill;
+  codeEl.style.color=colors.text;
+  codeEl.style.border='1px solid '+colors.stroke+'44';
+
+  document.getElementById('info-panel-desc').textContent=info.desc||'';
+
+  const linksEl=document.getElementById('info-panel-links');
+  const nbIds=[...adj[nodeId]];
+  if(nbIds.length){
+    const nLayerIdx=LAYER_ORDER.indexOf(n.layer);
+    const upstream=nbIds.filter(id=>{
+      const nb=nmap[id];
+      return nb&&LAYER_ORDER.indexOf(nb.layer)<nLayerIdx;
+    });
+    const downstream=nbIds.filter(id=>{
+      const nb=nmap[id];
+      return nb&&LAYER_ORDER.indexOf(nb.layer)>nLayerIdx;
+    });
+    const samelevel=nbIds.filter(id=>{
+      const nb=nmap[id];
+      return nb&&LAYER_ORDER.indexOf(nb.layer)===nLayerIdx;
+    });
+    let html='';
+    if(upstream.length){
+      html+=`<div class="link-row"><span>上游</span>${upstream.map(id=>`<span class="link-tag">${id.replace(/\n/g,'')}</span>`).join('')}</div>`;
+    }
+    if(samelevel.length){
+      html+=`<div class="link-row"><span>关联</span>${samelevel.map(id=>`<span class="link-tag">${id.replace(/\n/g,'')}</span>`).join('')}</div>`;
+    }
+    if(downstream.length){
+      html+=`<div class="link-row"><span>下游</span>${downstream.map(id=>`<span class="link-tag">${id.replace(/\n/g,'')}</span>`).join('')}</div>`;
+    }
+    linksEl.innerHTML=html;
+  } else {
+    linksEl.innerHTML='';
+  }
+
+  const panelW = 220;
+  panel.style.visibility='hidden';
+  panel.classList.add('visible');
+  // Force reflow so offsetHeight is accurate after content update
+  void panel.offsetHeight;
+  const panelH=panel.offsetHeight||180;
+  let px=mouseX+18;
+  let py=mouseY+18;
+  if(px+panelW>W-10) px=mouseX-panelW-18;
+  if(py+panelH>H-10) py=mouseY-panelH-18;
+  px=Math.max(8,px);
+  py=Math.max(8,py);
+
+  // First time: snap instantly; subsequent: smooth transition via CSS
+  const isFirstShow=!(panelState.targetX>-9000);
+  if(isFirstShow){
+    panel.style.transition='opacity 0.2s';
+  }
+  panel.style.left=px+'px';
+  panel.style.top=py+'px';
+  panel.style.visibility='';
+}
+
+function updateLockedPanelPos(){
+  if(!locked) return;
+  const n=nmap[locked]; if(!n) return;
+  const panel=document.getElementById('info-panel');
+  const panelW=220;
+  const panelH=panel.offsetHeight||180;
+  let px=n.x*zoom+pan.x+18;
+  let py=n.y*zoom+pan.y+18;
+  if(px+panelW>W-10) px=n.x*zoom+pan.x-panelW-18;
+  if(py+panelH>H-10) py=n.y*zoom+pan.y-panelH-18;
+  px=Math.max(8,px);py=Math.max(8,py);
+  panel.style.left=px+'px';
+  panel.style.top=py+'px';
+}
+
+// ═══════════════════════════════════════════════════
+// DRAW
+// ═══════════════════════════════════════════════════
+function computeGroupFrames(){
+  const frames={};
+  Object.entries(CATEGORY_GROUPS).forEach(([sys,ids])=>{
+    const ns=ids.map(id=>nmap[id]).filter(Boolean);
+    if(!ns.length)return;
+    const maxR=Math.max(...ns.map(n=>n.r));
+    const pad=maxR+16;  // tighter pad — just enough clearance around the outermost node
+    const xs=ns.map(n=>n.x), ys=ns.map(n=>n.y);
+    frames[sys]={
+      minX:Math.min(...xs)-pad,
+      maxX:Math.max(...xs)+pad,
+      minY:Math.min(...ys)-pad-14,  // extra 14 for label
+      maxY:Math.max(...ys)+pad,
+    };
+  });
+  return frames;
+}
+
+function drawGroupBg(frames){
+  // First pass: filled backgrounds (clipped to own rect)
+  Object.entries(frames).forEach(([sys,f])=>{
+    const bg=CATEGORY_BG[sys]||'rgba(200,200,200,0.05)';
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(f.minX,f.minY,f.maxX-f.minX,f.maxY-f.minY,14);
+    ctx.clip();
+    ctx.fillStyle=bg;
+    ctx.fill();
+    ctx.restore();
+  });
+  // Second pass: strokes + labels (no clip needed, stroke is thin)
+  Object.entries(frames).forEach(([sys,f])=>{
+    const stroke=CATEGORY_COLORS[sys]?.stroke||'#ccc';
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(f.minX,f.minY,f.maxX-f.minX,f.maxY-f.minY,14);
+    ctx.strokeStyle=stroke+'30';
+    ctx.lineWidth=1;
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    ctx.font='600 9px Noto Sans SC,sans-serif';
+    ctx.textAlign='left';
+    ctx.textBaseline='bottom';
+    ctx.fillStyle=CATEGORY_COLORS[sys]?.stroke||'#888';
+    ctx.globalAlpha=0.65;
+    ctx.fillText(CATEGORY_LABELS[sys]||sys, f.minX+6, f.minY+1);
+    ctx.restore();
+  });
+}
+
+function drawEdge(a,b,type,highlighted,progress,eState){
+  ctx.save();
+  const isLit=highlighted?highlighted.has(a.id)&&highlighted.has(b.id):true;
+
+  // Smooth alpha transition
+  let targetAlpha=isLit?1:0.04;
+  eState._alpha=lerp(eState._alpha,targetAlpha,0.10);
+  ctx.globalAlpha=eState._alpha;
+
+  // Compute bezier length for dash sizing
+  const mx=(a.x+b.x)/2;
+  const my=(a.y+b.y)/2;
+  const dy=Math.abs(b.y-a.y);
+  const curve=dy>100?40:16;
+  // Approximate quadratic bezier arc length
+  const ax=a.x,ay=a.y,cx=mx,cy=my-curve,bx_=b.x,by=b.y;
+  const bezierLen=approxBezierLen(ax,ay,cx,cy,bx_,by);
+  const dashLen=bezierLen;
+
+  // Draw path from 0 → progress fraction
+  ctx.beginPath();
+  ctx.moveTo(a.x,a.y);
+  if(progress>=1){
+    ctx.quadraticCurveTo(mx,my-curve,b.x,b.y);
+  } else {
+    // Sample point along bezier at progress
+    const pt=getBezierPoint(ax,ay,cx,cy,bx_,by,progress);
+    ctx.lineTo(pt.x,pt.y);
+  }
+
+  if(type==='net'){
+    ctx.setLineDash([5,4]);
+    ctx.strokeStyle=isLit?'rgba(216,90,48,0.5)':'rgba(216,90,48,0.3)';
+    ctx.lineWidth=1;
+  } else {
+    ctx.setLineDash([]);
+    ctx.strokeStyle=isLit?'rgba(80,110,160,0.3)':'rgba(180,185,190,0.15)';
+    ctx.lineWidth=isLit?1.2:0.7;
+  }
+  ctx.stroke();
+
+  // Highlight glow
+  if(isLit&&highlighted&&progress>=1){
+    ctx.beginPath();
+    ctx.moveTo(a.x,a.y);
+    ctx.quadraticCurveTo(mx,my-curve,b.x,b.y);
+    ctx.strokeStyle='rgba(24,95,165,0.07)';
+    ctx.lineWidth=10;
+    ctx.setLineDash([]);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// Approximate quadratic bezier arc length (Simpson's rule, 20 samples)
+function approxBezierLen(ax,ay,cx,cy,bx,by){
+  const n=20;
+  let len=0;
+  let px=ax,py=ay;
+  for(let i=1;i<=n;i++){
+    const t=i/n;
+    const pt=getBezierPoint(ax,ay,cx,cy,bx,by,t);
+    const dx=pt.x-px,dy=pt.y-py;
+    len+=Math.sqrt(dx*dx+dy*dy);
+    px=pt.x;py=pt.y;
+  }
+  return len;
+}
+
+// Quadratic bezier point at parameter t
+function getBezierPoint(ax,ay,cx,cy,bx,by,t){
+  const mt=1-t;
+  const x=mt*mt*ax+2*mt*t*cx+t*t*bx;
+  const y=mt*mt*ay+2*mt*t*cy+t*t*by;
+  return {x,y};
+}
+
+function lerp(a,b,t){return a+(b-a)*t;}
+
+function drawNode(n,highlighted){
+  const isHovered=hovered===n.id;
+  const isLocked=locked===n.id;
+  const isActive=!highlighted||highlighted.has(n.id);
+  const inSearch=!searchQuery||n.id.replace(/\n/g,'').toLowerCase().includes(searchQuery)||
+    [...adj[n.id]].some(nb=>nb.replace(/\n/g,'').toLowerCase().includes(searchQuery));
+
+  // Compute target alpha
+  let targetAlpha=1;
+  if(!isActive)targetAlpha=0.07;
+  else if(searchQuery&&!inSearch)targetAlpha=0.1;
+  n._alpha=lerp(n._alpha,targetAlpha,0.12);
+  n._targetAlpha=targetAlpha;
+
+  ctx.save();
+  ctx.globalAlpha=n._alpha;
+
+  // Smooth transition targets
+  const targetScale=isHovered||isLocked?1.12:1;
+  const targetGlow=isHovered||isLocked?1:0;
+  n._scale=lerp(n._scale,targetScale,0.18);
+  n._glow=lerp(n._glow,targetGlow,0.18);
+
+  const nodeR=n.r*n._scale;
+  const colors=CATEGORY_COLORS[n.category]||CATEGORY_COLORS.foundation;
+
+  // Pulsing breath ring for idle nodes
+  if(n._glow<0.05&&!searchQuery){
+    n._pulse+=0.018*n._pulseDir;
+    if(n._pulse>=1){n._pulse=1;n._pulseDir=-1;}
+    if(n._pulse<=0){n._pulse=0;n._pulseDir=1;}
+    const pulseR=nodeR+4+n._pulse*12;
+    ctx.beginPath();
+    ctx.arc(n.x,n.y,pulseR,0,Math.PI*2);
+    ctx.strokeStyle=colors.stroke+(Math.round((1-n._pulse)*35)).toString(16).padStart(2,'0');
+    ctx.lineWidth=1;
+    ctx.setLineDash([]);
+    ctx.stroke();
+  }
+
+  if(n._glow>0.05){
+    ctx.shadowColor=colors.stroke+'55';
+    ctx.shadowBlur=18*n._glow;
+    ctx.shadowOffsetY=3*n._glow;
+  }
+
+  // Fill
+  ctx.beginPath();
+  ctx.arc(n.x,n.y,nodeR,0,Math.PI*2);
+  const grad=ctx.createRadialGradient(n.x-nodeR*0.3,n.y-nodeR*0.3,0,n.x,n.y,nodeR);
+  grad.addColorStop(0,lighten(colors.fill,0.3));
+  grad.addColorStop(1,colors.fill);
+  ctx.fillStyle=grad;
+  ctx.fill();
+
+  ctx.shadowColor='transparent';
+
+  // Stroke — smooth lineWidth transition
+  const targetLW=isHovered||isLocked?2.5:1.3;
+  const lw=lerp(ctx.lineWidth||1.3, targetLW, 0.18);
+  ctx.strokeStyle=colors.stroke;
+  ctx.lineWidth=lw;
+  ctx.stroke();
+
+  // Locked indicator ring
+  if(isLocked){
+    ctx.beginPath();
+    ctx.arc(n.x,n.y,nodeR+5,0,Math.PI*2);
+    ctx.strokeStyle=colors.stroke+'55';
+    ctx.lineWidth=1.5;
+    ctx.setLineDash([4,3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Search match highlight ring
+  if(searchQuery&&n.id.replace(/\n/g,'').toLowerCase().includes(searchQuery)&&!isHovered&&!isLocked){
+    ctx.beginPath();ctx.arc(n.x,n.y,nodeR+4,0,Math.PI*2);
+    ctx.strokeStyle=colors.stroke+'aa';ctx.lineWidth=2;ctx.setLineDash([3,2]);ctx.stroke();ctx.setLineDash([]);
+  }
+
+  // Text — smooth font-weight transition
+  const targetWeight=isHovered||isLocked?700:500;
+  ctx.fillStyle=colors.text;
+  const fontSize=n.r>28?12:n.r>22?11:10;
+  // Approximate weight with size nudge
+  const weightSize=lerp(fontSize, fontSize+(targetWeight-400)/80, 0.18);
+  ctx.font=`${targetWeight} ${weightSize}px 'Noto Sans SC',sans-serif`;
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  const lines=n.id.split('\n');
+  const lh=weightSize+3;
+  lines.forEach((line,i)=>{
+    ctx.fillText(line,n.x,n.y-(lines.length-1)*lh/2+i*lh);
+  });
+
+  ctx.restore();
+}
+
+function lighten(hex,amt){
+  var h=hex.replace('#','');
+  if(h.length===3) h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  if(h.length===8) h=h.slice(0,6);
+  if(h.length!==6) return hex;
+  var r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);
+  if(isNaN(r)||isNaN(g)||isNaN(b)) return hex;
+  return'rgb('+Math.round(r+(255-r)*amt)+','+Math.round(g+(255-g)*amt)+','+Math.round(b+(255-b)*amt)+')';
+}
+
+function render(){
+  ctx.clearRect(0,0,W,H);
+
+  // Background
+  ctx.fillStyle='#fafbfc';
+  ctx.fillRect(0,0,W,H);
+
+  ctx.save();
+  ctx.translate(pan.x,pan.y);
+  ctx.scale(zoom,zoom);
+
+  const frames=computeGroupFrames();
+
+  drawGroupBg(frames);
+
+  const focusId=locked||hovered;
+  const highlighted=focusId?getHighlighted(focusId):null;
+
+  // Edges — animate each edge's drawing progress
+  for(let ei=0;ei<rawEdges.length;ei++){
+    const [a,b,type]=rawEdges[ei];
+    const na=nmap[a],nb=nmap[b];
+    if(!na||!nb) continue;
+    // Advance progress toward 1 each frame
+    edgeState[ei].progress=Math.min(1, edgeState[ei].progress+0.018);
+    drawEdge(na,nb,type,highlighted,edgeState[ei].progress,edgeState[ei]);
+  }
+
+  // Nodes
+  nodes.forEach(n=>drawNode(n,highlighted));
+
+  ctx.restore();
+
+  requestAnimationFrame(render);
+}
+
+// ═══════════════════════════════════════════════════
+// MOUSE / TOUCH EVENTS
+// ═══════════════════════════════════════════════════
+const MIN_HIT_PX=28; // 屏幕像素最小点击热区（移动端友好）
+
+function getNodeAt(cx,cy){
+  const {x,y}=toWorld(cx,cy);
+  let best=null,bestDist=Infinity;
+  for(const n of nodes){
+    const sdx=(n.x-x)*zoom,sdy=(n.y-y)*zoom;
+    const screenDist=Math.sqrt(sdx*sdx+sdy*sdy);
+    const hitR=Math.max((n.r+8)*zoom,MIN_HIT_PX);
+    if(screenDist<hitR&&screenDist<bestDist){
+      best=n;
+      bestDist=screenDist;
+    }
+  }
+  return best;
+}
+
+function getGroupAt(cx,cy){
+  const {x,y}=toWorld(cx,cy);
+  const frames=computeGroupFrames();
+  for(const [sys,f] of Object.entries(frames)){
+    if(x>=f.minX && x<=f.maxX && y>=f.minY && y<=f.maxY){
+      return {sys, frame:f};
+    }
+  }
+  return null;
+}
+
+canvas.addEventListener('mousemove',e=>{
+  const rect=canvas.getBoundingClientRect();
+  const cx=e.clientX-rect.left;
+  const cy=e.clientY-rect.top;
+
+  if(drag){
+    _didDrag=true;
+    const {x,y}=toWorld(cx,cy);
+    if(drag.type==='pan'){
+      pan.x=drag.startPanX+(cx-drag.startX);
+      pan.y=drag.startPanY+(cy-drag.startY);
+      canvas.style.cursor='grabbing';
+      return;
+    } else if(drag.type==='node'){
+      drag.node.x=x;
+      drag.node.y=y;
+      drag.node.vx=0;drag.node.vy=0;
+      if(locked) updateLockedPanelPos();
+    } else if(drag.type==='group'){
+      const oldFrame=computeGroupFrames()[drag.sys];
+      if(!oldFrame)return;
+      const newMinX=x-drag.offsetX;
+      const newMinY=y-drag.offsetY;
+      const dx=newMinX-oldFrame.minX;
+      const dy=newMinY-oldFrame.minY;
+      (CATEGORY_GROUPS[drag.sys]||[]).forEach(id=>{
+        const node=nmap[id];
+        if(node){node.x+=dx;node.y+=dy;node.vx=0;node.vy=0;}
+      });
+    }
+    return;
+  }
+
+  const n=getNodeAt(cx,cy);
+  hovered=n?n.id:null;
+  if(n){ canvas.style.cursor='pointer'; }
+  else {
+    const group=getGroupAt(cx,cy);
+    canvas.style.cursor=group?'move':'grab';
+  }
+
+  if(!locked){
+    showPanel(n?n.id:null, cx, cy);
+  }
+});
+
+canvas.addEventListener('click',e=>{
+  if(_didDrag)return; // was a drag, not a click
+  const rect=canvas.getBoundingClientRect();
+  const cx=e.clientX-rect.left;
+  const cy=e.clientY-rect.top;
+  const n=getNodeAt(cx,cy);
+  if(n){
+    if(locked===n.id){locked=null;showPanel(null);}
+    else{locked=n.id;showPanel(n.id,cx,cy);}
+  } else {
+    locked=null;showPanel(null);
+  }
+});
+
+canvas.addEventListener('mousedown',e=>{
+  if(e.button!==0)return;
+  const rect=canvas.getBoundingClientRect();
+  const cx=e.clientX-rect.left;
+  const cy=e.clientY-rect.top;
+  _didDrag=false;
+
+  // Priority: node > group > canvas pan
+  const n=getNodeAt(cx,cy);
+  if(n){
+    drag={node:n, type:'node'};
+    n.pinned=true;
+    return;
+  }
+  const group=getGroupAt(cx,cy);
+  if(group){
+    const {x,y}=toWorld(cx,cy);
+    drag={
+      type:'group',
+      sys:group.sys,
+      offsetX:x-group.frame.minX,
+      offsetY:y-group.frame.minY
+    };
+    (CATEGORY_GROUPS[group.sys]||[]).forEach(id=>{
+      const node=nmap[id]; if(node)node.pinned=true;
+    });
+    return;
+  }
+  // Empty canvas — pan
+  drag={type:'pan', startX:cx, startY:cy, startPanX:pan.x, startPanY:pan.y};
+});
+
+canvas.addEventListener('mouseup',()=>{
+  if(drag){
+    if(drag.type==='node'){
+      drag.node.pinned=false;
+    } else if(drag.type==='group'){
+      (CATEGORY_GROUPS[drag.sys]||[]).forEach(id=>{
+        const node=nmap[id]; if(node)node.pinned=false;
+      });
+    }
+    drag=null;
+    canvas.style.cursor='default';
+  }
+  _didDrag=false;
+});
+
+canvas.addEventListener('mouseleave',()=>{
+  if(drag){
+    if(drag.type==='node') drag.node.pinned=false;
+    else if(drag.type==='group')(CATEGORY_GROUPS[drag.sys]||[]).forEach(id=>{if(nmap[id])nmap[id].pinned=false;});
+    drag=null;
+    canvas.style.cursor='default';
+  }
+  _didDrag=false;
+  hovered=null;
+});
+
+canvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const rect=canvas.getBoundingClientRect();
+  const mx=e.clientX-rect.left;
+  const my=e.clientY-rect.top;
+  const delta=e.deltaY>0?0.9:1.1;
+  const newZoom=Math.max(0.4,Math.min(3,zoom*delta));
+  pan.x=mx-(mx-pan.x)*(newZoom/zoom);
+  pan.y=my-(my-pan.y)*(newZoom/zoom);
+  zoom=newZoom;
+},{passive:false});
+
+// ═══════════════════════════════════════════════════
+// TOUCH EVENTS
+// 单指：拖节点 / 平移画布 / 轻触点击
+// 双指：捏合缩放
+// ═══════════════════════════════════════════════════
+(function(){
+  let t0=null,t1=null;
+  let lastPinchDist=0;
+  let touchNode=null;
+  let touchPending=null;
+  let touchStartX=0,touchStartY=0;
+  let touchStartPanX=0,touchStartPanY=0;
+  let touchStartTime=0;
+  const TAP_TIME=400;
+  const DRAG_START=8;
+
+  function getTouchPos(touch){
+    const rect=canvas.getBoundingClientRect();
+    return{x:touch.clientX-rect.left,y:touch.clientY-rect.top};
+  }
+
+  function pinchDist(a,b){
+    const dx=a.clientX-b.clientX,dy=a.clientY-b.clientY;
+    return Math.sqrt(dx*dx+dy*dy);
+  }
+
+  function detectTouchTarget(cx,cy){
+    const node=getNodeAt(cx,cy);
+    if(node) return{type:'node',node};
+    const group=getGroupAt(cx,cy);
+    if(group){
+      const {x,y}=toWorld(cx,cy);
+      return{type:'group',sys:group.sys,offsetX:x-group.frame.minX,offsetY:y-group.frame.minY};
+    }
+    return{type:'pan'};
+  }
+
+  function activateTouchDrag(pending,sx,sy){
+    if(pending.type==='node'){
+      touchNode=pending.node;
+      pending.node.pinned=true;
+      drag={type:'node',node:pending.node};
+    }else if(pending.type==='group'){
+      touchNode=null;
+      drag={type:'group',sys:pending.sys,offsetX:pending.offsetX,offsetY:pending.offsetY};
+      (CATEGORY_GROUPS[pending.sys]||[]).forEach(id=>{
+        const nd=nmap[id];if(nd)nd.pinned=true;
+      });
+    }else{
+      touchNode=null;
+      drag={type:'pan',startX:sx,startY:sy,startPanX:pan.x,startPanY:pan.y};
+    }
+  }
+
+  function releaseTouchDrag(){
+    if(touchNode){touchNode.pinned=false;touchNode=null;}
+    if(drag&&drag.type==='group'){
+      (CATEGORY_GROUPS[drag.sys]||[]).forEach(id=>{const nd=nmap[id];if(nd)nd.pinned=false;});
+    }
+    drag=null;
+  }
+
+  canvas.addEventListener('touchstart',e=>{
+    e.preventDefault();
+    const touches=e.touches;
+
+    if(touches.length===1){
+      const p=getTouchPos(touches[0]);
+      t0={id:touches[0].identifier,...p};
+      t1=null;
+      touchStartX=p.x;touchStartY=p.y;
+      touchStartPanX=pan.x;touchStartPanY=pan.y;
+      touchStartTime=Date.now();
+      touchPending=detectTouchTarget(p.x,p.y);
+      touchNode=null;
+      drag=null;
+      _didDrag=false;
+
+    }else if(touches.length===2){
+      touchPending=null;
+      releaseTouchDrag();
+      t0={id:touches[0].identifier,...getTouchPos(touches[0])};
+      t1={id:touches[1].identifier,...getTouchPos(touches[1])};
+      lastPinchDist=pinchDist(touches[0],touches[1]);
+    }
+  },{passive:false});
+
+  canvas.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    const touches=e.touches;
+
+    if(touches.length===2){
+      touchPending=null;
+      const dist=pinchDist(touches[0],touches[1]);
+      if(lastPinchDist>0){
+        const scale=dist/lastPinchDist;
+        const mx=(touches[0].clientX+touches[1].clientX)/2-canvas.getBoundingClientRect().left;
+        const my=(touches[0].clientY+touches[1].clientY)/2-canvas.getBoundingClientRect().top;
+        const newZoom=Math.max(0.3,Math.min(4,zoom*scale));
+        pan.x=mx-(mx-pan.x)*(newZoom/zoom);
+        pan.y=my-(my-pan.y)*(newZoom/zoom);
+        zoom=newZoom;
+      }
+      lastPinchDist=dist;
+      _didDrag=true;
+
+    }else if(touches.length===1&&t0!==null){
+      const p=getTouchPos(touches[0]);
+      const dx=p.x-touchStartX,dy=p.y-touchStartY;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+
+      if(!drag&&touchPending&&dist>DRAG_START){
+        activateTouchDrag(touchPending,touchStartX,touchStartY);
+        touchPending=null;
+        _didDrag=true;
+      }
+
+      if(drag){
+        if(drag.type==='node'){
+          const w=toWorld(p.x,p.y);
+          drag.node.x=w.x;drag.node.y=w.y;
+          drag.node.vx=0;drag.node.vy=0;
+          if(locked)updateLockedPanelPos();
+        }else if(drag.type==='group'){
+          const w=toWorld(p.x,p.y);
+          const frames=computeGroupFrames();
+          const f=frames[drag.sys];
+          if(f){
+            const shiftX=w.x-drag.offsetX-f.minX;
+            const shiftY=w.y-drag.offsetY-f.minY;
+            (CATEGORY_GROUPS[drag.sys]||[]).forEach(id=>{
+              const nd=nmap[id];
+              if(nd){nd.x+=shiftX;nd.y+=shiftY;nd.vx=0;nd.vy=0;}
+            });
+          }
+          if(locked)updateLockedPanelPos();
+        }else{
+          pan.x=touchStartPanX+dx;
+          pan.y=touchStartPanY+dy;
+        }
+      }
+    }
+  },{passive:false});
+
+  canvas.addEventListener('touchend',e=>{
+    e.preventDefault();
+    const remaining=e.touches.length;
+    const isTap=!_didDrag&&(Date.now()-touchStartTime<TAP_TIME);
+
+    if(remaining===0&&isTap&&e.changedTouches.length>0){
+      const p=getTouchPos(e.changedTouches[0]);
+      const node=getNodeAt(p.x,p.y);
+      if(node){
+        if(locked===node.id){locked=null;showPanel(null);}
+        else{locked=node.id;showPanel(node.id,p.x,p.y);}
+      }else{
+        locked=null;showPanel(null);
+      }
+    }
+
+    releaseTouchDrag();
+    touchPending=null;
+    lastPinchDist=0;
+    t0=null;t1=null;
+    _didDrag=false;
+  },{passive:false});
+
+  canvas.addEventListener('touchcancel',e=>{
+    releaseTouchDrag();
+    touchPending=null;
+    t0=null;t1=null;
+    lastPinchDist=0;
+    _didDrag=false;
+  },{passive:false});
+})();
+
+// ── Legend click toggle (works on mobile too) ──
+(function(){
+  const legendToggle=document.getElementById('legend-toggle');
+  const legend=document.getElementById('legend');
+  legendToggle.addEventListener('click',e=>{e.stopPropagation();legend.classList.toggle('open');});
+  document.addEventListener('click',e=>{
+    if(!legend.contains(e.target)&&e.target!==legendToggle) legend.classList.remove('open');
+  });
+})();
+
+// ── Search ──
+(function(){
+  const searchInput=document.getElementById('search-input');
+  const searchClear=document.getElementById('search-clear');
+  const searchBadge=document.getElementById('search-badge');
+  function applySearch(raw){
+    searchQuery=raw.trim().toLowerCase();
+    searchClear.classList.toggle('visible',searchQuery.length>0);
+    if(!searchQuery){
+      searchBadge.classList.remove('visible');
+    } else {
+      let directCount=0;
+      nodes.forEach(n=>{if(n.id.replace(/\n/g,'').toLowerCase().includes(searchQuery))directCount++;});
+      searchBadge.textContent=directCount>0?('找到 '+directCount+' 个节点'):'无匹配节点';
+      searchBadge.classList.add('visible');
+    }
+  }
+  searchInput.addEventListener('input',e=>applySearch(e.target.value));
+  searchClear.addEventListener('click',()=>{searchInput.value='';applySearch('');searchInput.focus();});
+})();
+
+
+// ═══════════════════════════════════════════════════
+// ROAM MODE — Auto-cruise along graph edges
+// ═══════════════════════════════════════════════════
+(function(){
+  const btn      = document.getElementById('roam-btn');
+  const iconOff  = document.getElementById('roam-icon-off');
+  const iconOn   = document.getElementById('roam-icon-on');
+
+  const ROAM_STEP_MS  = 2800;   // ms per node visit
+  const PAN_DURATION  = 800;    // ms for camera pan to target node
+  const HOLD_MS       = 600;    // extra dwell time on each node
+  const IDLE_PAUSE    = 4000;   // pause when no node is active
+
+  let roaming    = false;
+  let roamTimer  = null;
+  let currentRoamNode = null;
+  let roamQueue  = [];
+  let roamPaused = false;
+
+  // Build a BFS traversal order starting from a random node
+  function buildRoamPath(){
+    if(!nodes.length) return;
+    const start = nodes[Math.floor(Math.random()*nodes.length)];
+    const visited = new Set();
+    const queue = [start];
+    const order = [];
+    while(queue.length){
+      const cur = queue.shift();
+      if(visited.has(cur.id)) continue;
+      visited.add(cur.id);
+      order.push(cur.id);
+      const nbs = [...(adj[cur.id]||[])];
+      // Shuffle neighbors for variety
+      for(let i=nbs.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));
+        [nbs[i],nbs[j]]=[nbs[j],nbs[i]];
+      }
+      nbs.forEach(nb=>{ if(!visited.has(nb)) queue.push(nmap[nb]); });
+    }
+    return order;
+  }
+
+  function panToNode(nodeId){
+    if(!nodeId) return;
+    const n = nmap[nodeId];
+    if(!n) return;
+    const targetX = W/2 - n.x*zoom;
+    const targetY = H/2 - n.y*zoom;
+    const startX=pan.x, startY=pan.y;
+    const startT=performance.now();
+    function step(now){
+      const t=Math.min(1,(now-startT)/PAN_DURATION);
+      const ease=1-Math.pow(1-t,3); // cubic ease-out
+      pan.x=startX+(targetX-startX)*ease;
+      pan.y=startY+(targetY-startY)*ease;
+      if(t<1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function roamStep(){
+    if(!roaming||roamPaused) return;
+
+    // Advance queue
+    if(!roamQueue.length) roamQueue=buildRoamPath();
+
+    const nextId = roamQueue.shift();
+    roamQueue.push(nextId); // cycle
+    currentRoamNode = nextId;
+
+    // Pan camera to node
+    panToNode(nextId);
+
+    // Lock highlight panel briefly, then unlock for next step
+    locked=nextId;
+    showPanel(nextId, W/2, H/2);
+
+    roamPaused=true;
+    roamTimer=setTimeout(()=>{
+      locked=null;
+      roamPaused=false;
+      roamTimer=setTimeout(roamStep, HOLD_MS);
+    }, ROAM_STEP_MS);
+  }
+
+  // Pause roaming while user interacts with canvas
+  canvas.addEventListener('mousedown',()=>{
+    if(roaming){
+      clearTimeout(roamTimer);
+      roamPaused=false;
+      roaming=false;
+      locked=null;
+      showPanel(null);
+      updateRoamUI(false);
+    }
+  });
+  canvas.addEventListener('touchstart',()=>{
+    if(roaming){
+      clearTimeout(roamTimer);
+      roamPaused=false;
+      roaming=false;
+      locked=null;
+      showPanel(null);
+      updateRoamUI(false);
+    }
+  },{passive:true});
+
+  function updateRoamUI(active){
+    btn.classList.toggle('active', active);
+    iconOff.style.display = active?'none':'block';
+    iconOn.style.display  = active?'block':'none';
+    btn.title = active?'暂停漫游':'自动漫游';
+  }
+
+  btn.addEventListener('click',()=>{
+    if(roaming){
+      clearTimeout(roamTimer);
+      roaming=false;
+      roamPaused=false;
+      locked=null;
+      showPanel(null);
+      updateRoamUI(false);
+    } else {
+      roaming=true;
+      roamQueue=buildRoamPath();
+      roamPaused=false;
+      updateRoamUI(true);
+      roamStep();
+    }
+  });
+})();
+
+
+// 【维护说明】把 assets/ 文件夹里的音频文件名填入下方数组，支持 mp3/ogg/wav/flac/aac/m4a。
+// file:// 协议下浏览器禁止目录扫描，所以这里手动列出。
+// 程序会随机打乱后循环播放，播完一轮再重新洗牌。
+(function(){
+  const btn      = document.getElementById('music-btn');
+  const audio    = document.getElementById('bgm');
+  const iconPlay = document.getElementById('music-icon-play');
+  const iconPause= document.getElementById('music-icon-pause');
+
+  // ↓↓↓ 在这里填写 assets/ 文件夹内所有音频文件名 ↓↓↓
+  const TRACKS = [
+    "Echoes of the Eye - Travelers Encore.mp3",
+    // "another-song.mp3",
+    // "bgm2.ogg",
+  ];
+  // ↑↑↑ 文件名列表结束 ↑↑↑
+
+  let queue = [], trackIdx = 0, playing = false;
+
+  function shuffle(arr){
+    const a=[...arr];
+    for(let i=a.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [a[i],a[j]]=[a[j],a[i]];
+    }
+    return a;
+  }
+
+  function buildQueue(){ queue = shuffle(TRACKS); trackIdx = 0; }
+
+  function audioEndsWithTrack(filename){
+    if(!audio.src) return false;
+    try{
+      const path=decodeURIComponent(new URL(audio.src, location.href).pathname);
+      return path.endsWith('/'+filename) || path.endsWith(filename);
+    }catch(_){
+      return audio.src.endsWith(filename);
+    }
+  }
+
+  function loadTrack(idx){
+    if(!queue.length) return;
+    const src='assets/'+queue[idx];
+    if(audioEndsWithTrack(queue[idx])) return;
+    audio.src=src;
+    audio.load();
+  }
+
+  function playNext(){
+    if(!queue.length) return;
+    trackIdx = (trackIdx + 1) % queue.length;
+    if(trackIdx === 0) buildQueue();
+    // 直接设置，不走 loadTrack 的去重判断
+    audio.src = 'assets/' + queue[trackIdx];
+    audio.load();
+    audio.play().catch(()=>{});
+  }
+
+  audio.volume = 0.45;
+  audio.addEventListener('ended', playNext);
+
+  function setPlaying(v){
+    playing = v;
+    btn.classList.toggle('active', v);
+    iconPlay.style.display  = v ? 'none'  : 'block';
+    iconPause.style.display = v ? 'block' : 'none';
+    btn.title = v ? '暂停背景音乐' : '播放背景音乐';
+  }
+
+  // 初始化队列并预加载第一首
+  buildQueue();
+  audio.src = 'assets/' + queue[0];
+  audio.load();
+
+  // 点击音乐按钮：切换播放/暂停
+  btn.addEventListener('click', ()=>{
+    if(playing){
+      audio.pause();
+      setPlaying(false);
+    } else {
+      audio.play().then(()=>setPlaying(true)).catch(()=>{});
+    }
+  });
+})();
+
+// ── Header subtitle carousel ──
+(function(){
+  const MESSAGES=[
+    '四力引擎','同类聚束','层引势阱','二维展开','电磁斥力',
+    '二跳高亮','跨层连边','系统分组','贝塞尔线','多层拓扑',
+    '节点锁定','分组拖拽','捏合缩放','实时搜索','上下游链',
+    '平滑过渡','脉冲呼吸','描边入场','漫游巡游',
+  ];
+  const el=document.getElementById('header-sub-text');
+  const SHOW_MS=2800;
+  const FADE_MS=450;
+  let idx=0;
+
+  function cycle(){
+    el.classList.add('is-hidden');
+    setTimeout(()=>{
+      idx=(idx+1)%MESSAGES.length;
+      el.textContent=MESSAGES[idx];
+      el.classList.remove('is-hidden');
+    }, FADE_MS);
+  }
+
+  setInterval(cycle, SHOW_MS);
+})();
+
+// Hide hint bar after 3s
+setTimeout(()=>{
+  const h=document.getElementById('hint-bar');
+  h.style.opacity='0';
+  setTimeout(()=>h.style.display='none',300);
+},3000);
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+resize();
+render();
+
+// Resize: keep logical world positions, just re-fit zoom to new screen size
+var _lastResizeW=W, _lastResizeH=H;
+window.addEventListener('resize',()=>{
+  var nW=wrap.clientWidth, nH=wrap.clientHeight;
+  if(nW===_lastResizeW && nH===_lastResizeH) return;
+  _lastResizeW=nW; _lastResizeH=nH;
+  W=nW; H=nH;
+  canvas.width=W*DPR; canvas.height=H*DPR;
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  fitView();
+});
+</script>
+</body>
+</html>

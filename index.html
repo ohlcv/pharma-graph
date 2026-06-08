@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cytoscape.js 功能演示 — 药学知识图谱</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div id="app" class="grid grid-rows-[auto_auto_auto_1fr] h-screen overflow-hidden" style="background:var(--bg);color:var(--text)">
+
+  <!-- ── Header ─────────────────────────────────────────────────── -->
+  <header class="flex items-center gap-3 px-5 py-2.5" style="background:var(--panel);border-bottom:1px solid var(--border)">
+    <h1 class="text-sm font-bold" style="color:var(--text)">药学知识图谱</h1>
+    <span id="badge" class="text-xs px-2 py-0.5 rounded" style="background:var(--border);color:var(--muted)">loading…</span>
+  </header>
+
+  <!-- ── Toolbar ─────────────────────────────────────────────── -->
+  <div id="toolbar" class="flex flex-wrap gap-1 px-5 py-1.5 items-center" style="background:var(--panel);border-bottom:1px solid var(--border)">
+
+    <!-- Layout buttons -->
+    <span class="tl text-xs uppercase tracking-wider mr-1" style="color:var(--muted)">布局</span>
+    <button id="btn-cose"          class="btn active" onclick="runLayout('cose')">COSE</button>
+    <button id="btn-concentric"    class="btn" onclick="runLayout('concentric')">同心圆</button>
+    <button id="btn-circle"        class="btn" onclick="runLayout('circle')">环形</button>
+    <button id="btn-grid"          class="btn" onclick="runLayout('grid')">网格</button>
+    <button id="btn-dagre"         class="btn" onclick="runLayout('dagre')">Dagre</button>
+    <button id="btn-breadthfirst"  class="btn" onclick="runLayout('breadthfirst')">广度</button>
+    <button id="btn-euler"         class="btn" onclick="runLayout('euler')">Euler</button>
+
+    <div class="divider mx-1" style="width:1px;height:20px;background:var(--border)"></div>
+
+    <!-- Actions -->
+    <button id="btn-fit"       class="btn" onclick="fitGraph()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+      适应
+    </button>
+    <button id="btn-random"    class="btn" onclick="randomize()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+      随机
+    </button>
+    <button id="btn-pulse"     class="btn" onclick="animatePulse()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+      脉冲
+    </button>
+
+    <div class="divider mx-1" style="width:1px;height:20px;background:var(--border)"></div>
+
+    <button id="btn-reset"     class="btn" onclick="resetAll()">重置</button>
+
+  </div>
+
+  <!-- ── Info bar ─────────────────────────────────────────────── -->
+  <div id="info-bar" class="flex items-center gap-3 px-5 py-1 min-h-[30px] flex-wrap text-xs" style="background:var(--panel);border-bottom:1px solid var(--border);color:var(--muted);font-size:0.76rem">
+    <span><span class="key">点击</span> 选中节点</span>
+    <span><span class="key">右键</span> 删除节点</span>
+    <span><span class="key">双击</span> 锁定节点</span>
+    <span><span class="key">F</span> 适应画布</span>
+    <span><span class="key">R</span> 随机分布</span>
+    <span><span class="key">Esc</span> 重置</span>
+    <span><span class="key">Ctrl+A</span> 全选</span>
+  </div>
+
+  <!-- ── Main area ─────────────────────────────────────────────── -->
+  <div id="main" class="grid grid-cols-[1fr_240px] overflow-hidden" style="grid-template-columns:1fr 240px">
+
+    <!-- ── Canvas ── -->
+    <div id="cy"></div>
+
+    <!-- ── Sidebar ── -->
+    <aside id="sidebar" class="overflow-y-auto flex flex-col gap-0" style="background:var(--panel);border-left:1px solid var(--border)">
+
+      <!-- Node types -->
+      <div class="sidebar-section border-b" style="border-bottom:1px solid var(--border);padding:10px 12px">
+        <div class="section-title">节点类型</div>
+        <div class="shape-grid grid grid-cols-2 gap-1">
+          <div class="shape-item" onclick="highlightShape('ellipse')">
+            <div class="w-3 h-3 rounded-full flex-shrink-0" style="background:#6366f1"></div>
+            <span class="shape-label text-xs" style="color:var(--muted)">概念</span>
+          </div>
+          <div class="shape-item" onclick="highlightShape('round-rectangle')">
+            <div class="w-3 h-2 rounded-sm flex-shrink-0" style="background:#22d3ee"></div>
+            <span class="shape-label text-xs" style="color:var(--muted)">药物</span>
+          </div>
+          <div class="shape-item" onclick="highlightShape('diamond')">
+            <div class="w-2.5 h-2.5 rotate-45 flex-shrink-0" style="background:#f87171"></div>
+            <span class="shape-label text-xs" style="color:var(--muted)">疾病</span>
+          </div>
+          <div class="shape-item" onclick="highlightShape('barrel')">
+            <div class="w-2.5 h-3 rounded-sm flex-shrink-0" style="background:#a78bfa"></div>
+            <span class="shape-label text-xs" style="color:var(--muted)">成分</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="sidebar-section border-b" style="border-bottom:1px solid var(--border);padding:10px 12px">
+        <div class="section-title">图谱统计</div>
+        <div class="stat-row"><span>节点</span><span id="stat-nodes">—</span></div>
+        <div class="stat-row"><span>边</span><span id="stat-edges">—</span></div>
+        <div class="stat-row"><span>选中</span><span id="stat-selected">0</span></div>
+        <div class="stat-row"><span>布局</span><span id="stat-layout">COSE</span></div>
+      </div>
+
+      <!-- Layout description -->
+      <div class="sidebar-section border-b" style="border-bottom:1px solid var(--border);padding:10px 12px">
+        <div class="section-title">布局说明</div>
+        <p id="layout-desc" class="layout-desc text-sm leading-relaxed" style="color:var(--muted);font-size:0.72rem;line-height:1.5">
+          COSE — 力学弹簧布局，模拟物理排斥与吸引，自动产生紧凑聚类结构。
+        </p>
+      </div>
+
+      <!-- Layout parameters -->
+      <div class="sidebar-section border-b" style="border-bottom:1px solid var(--border);padding:10px 12px">
+        <div class="section-title">布局参数</div>
+        <div id="layout-params" class="layout-params"></div>
+        <button id="apply-params-btn" class="btn mt-2 text-xs w-full justify-center"
+          onclick="applyLayoutParams()" style="display:none">应用参数</button>
+      </div>
+
+      <!-- Shape highlight -->
+      <div class="sidebar-section border-b" style="border-bottom:1px solid var(--border);padding:10px 12px">
+        <div class="section-title">形状筛选</div>
+        <div class="flex flex-col gap-1">
+          <div class="shape-item" onclick="highlightShape('ellipse')">
+            <div class="w-3 h-3 rounded-full flex-shrink-0" style="background:var(--accent)"></div>
+            <span class="shape-label text-xs" style="color:var(--muted)">椭圆 ellipse</span>
+          </div>
+          <div class="shape-item" onclick="highlightShape('round-rectangle')">
+            <div class="w-3 h-2 rounded-sm flex-shrink-0" style="background:#22d3ee"></div>
+            <span class="shape-label text-xs" style="color:var(--muted)">圆角矩形</span>
+          </div>
+          <div class="shape-item" onclick="highlightShape('rectangle')">
+            <div class="w-3 h-2 rounded-sm flex-shrink-0" style="background:#9C27B0"></div>
+            <span class="shape-label text-xs" style="color:var(--muted)">矩形</span>
+          </div>
+          <div class="shape-item" onclick="highlightShape('diamond')">
+            <div class="w-2.5 h-2.5 rotate-45 flex-shrink-0" style="background:#f87171"></div>
+            <span class="shape-label text-xs" style="color:var(--muted)">菱形 diamond</span>
+          </div>
+          <div class="shape-item" onclick="highlightShape('barrel')">
+            <div class="w-2.5 h-3 rounded-sm flex-shrink-0" style="background:#7C3AED"></div>
+            <span class="shape-label text-xs" style="color:var(--muted)">六边形 barrel</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Color swatches -->
+      <div class="sidebar-section border-b" style="border-bottom:1px solid var(--border);padding:10px 12px">
+        <div class="section-title">高亮颜色</div>
+        <div class="flex gap-1.5 flex-wrap color-row">
+          <div class="color-swatch" style="background:#fbbf24" onclick="setHighlightColor('#fbbf24')" title="琥珀"></div>
+          <div class="color-swatch" style="background:#f87171" onclick="setHighlightColor('#f87171')" title="珊瑚"></div>
+          <div class="color-swatch" style="background:#34d399" onclick="setHighlightColor('#34d399')" title="翡翠"></div>
+          <div class="color-swatch" style="background:#60a5fa" onclick="setHighlightColor('#60a5fa')" title="天蓝"></div>
+          <div class="color-swatch" style="background:#a78bfa" onclick="setHighlightColor('#a78bfa')" title="紫罗兰"></div>
+          <div class="color-swatch" style="background:#fb923c" onclick="setHighlightColor('#fb923c')" title="橙色"></div>
+          <div class="color-swatch" style="background:#22d3ee" onclick="setHighlightColor('#22d3ee')" title="青色"></div>
+          <div class="color-swatch" style="background:#f472b6" onclick="setHighlightColor('#f472b6')" title="粉色"></div>
+        </div>
+      </div>
+
+      <!-- Node detail -->
+      <div class="sidebar-section" style="padding:10px 12px">
+        <div class="section-title">节点详情</div>
+        <div id="detail-panel">
+          <div class="mb-1.5">
+            <div class="text-[0.73rem]" style="color:var(--muted)">名称</div>
+            <div id="detail-name" class="font-semibold text-sm" style="color:var(--text)">—</div>
+          </div>
+          <div class="detail-field mb-1"><span>类型</span> <strong id="detail-type">—</strong></div>
+          <div class="detail-field mb-1"><span>分类</span> <strong id="detail-cat">—</strong></div>
+          <div class="detail-field mb-1"><span>度数</span> <strong id="detail-degree">—</strong></div>
+          <div class="detail-field mb-1"><span>路径</span> <strong id="detail-loc" style="word-break:break-all;font-size:0.68rem">—</strong></div>
+          <div class="detail-field mb-1"><span>摘要</span> <strong id="detail-sum">—</strong></div>
+          <div id="detail-adj-label" class="detail-field" style="display:none"><span>邻居</span></div>
+          <div id="detail-adj" class="detail-tags flex flex-wrap gap-1 mt-1"></div>
+        </div>
+      </div>
+
+      <!-- Shortcuts reference -->
+      <div class="sidebar-section border-t" style="border-top:1px solid var(--border);padding:10px 12px">
+        <div class="section-title">快捷键</div>
+        <div class="shortcut-item text-sm py-0.5 flex gap-1.5 items-center" style="color:var(--muted);font-size:0.72rem">
+          <span class="key">F</span><span>适应画布</span>
+        </div>
+        <div class="shortcut-item text-sm py-0.5 flex gap-1.5 items-center" style="color:var(--muted);font-size:0.72rem">
+          <span class="key">R</span><span>随机分布</span>
+        </div>
+        <div class="shortcut-item text-sm py-0.5 flex gap-1.5 items-center" style="color:var(--muted);font-size:0.72rem">
+          <span class="key">Del</span><span>删除选中</span>
+        </div>
+        <div class="shortcut-item text-sm py-0.5 flex gap-1.5 items-center" style="color:var(--muted);font-size:0.72rem">
+          <span class="key">Esc</span><span>重置视图</span>
+        </div>
+      </div>
+
+    </aside><!-- /sidebar -->
+
+  </div><!-- /main -->
+
+</div><!-- /app -->
+
+<script type="module" src="/src/ui/main.ts"></script>
+</body>
+</html>

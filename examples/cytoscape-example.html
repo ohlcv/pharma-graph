@@ -1,0 +1,1348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cytoscape.js 功能演示 — 药学知识图谱</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0f1117;
+      --panel:   #1a1d27;
+      --border:  #2a2e3f;
+      --accent:  #6366f1;
+      --accent2: #22d3ee;
+      --text:    #e2e8f0;
+      --muted:   #64748b;
+      --green:   #34d399;
+      --yellow:  #fbbf24;
+      --red:     #f87171;
+      --blue:    #60a5fa;
+      --purple:  #a78bfa;
+    }
+
+    html, body { height: 100%; overflow: hidden; }
+
+    body {
+      font-family: 'Noto Sans SC', 'DM Sans', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    #app {
+      display: grid;
+      grid-template-rows: auto auto auto 1fr;
+      height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    header span {
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--border);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    /* ── Toolbar ── */
+    #toolbar {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      padding: 7px 20px;
+      align-items: center;
+    }
+    .tl {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-right: 3px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 11px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      font-size: 0.78rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .btn:hover { background: #252836; border-color: var(--accent); }
+    .btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn svg { width: 12px; height: 12px; flex-shrink: 0; }
+    .divider { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+
+    /* ── Info bar ── */
+    #info-bar {
+      padding: 5px 20px;
+      font-size: 0.76rem;
+      color: var(--muted);
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      min-height: 30px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .key {
+      background: var(--border);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.7rem;
+      color: var(--text);
+    }
+
+    /* ── Main area ── */
+    #main {
+      display: grid;
+      grid-template-columns: 1fr 240px;
+      overflow: hidden;
+    }
+
+    /* ── Canvas ── */
+    #cy {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: radial-gradient(ellipse at 50% 40%, #131a24 0%, #0f1117 100%);
+    }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      background: var(--panel);
+      border-left: 1px solid var(--border);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .sidebar-section {
+      border-bottom: 1px solid var(--border);
+      padding: 10px 12px;
+    }
+    .sidebar-section:last-child { border-bottom: none; }
+
+    .section-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    /* Shape grid */
+    .shape-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px;
+    }
+    .shape-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: var(--text);
+      padding: 4px 6px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.12s;
+      user-select: none;
+    }
+    .shape-item:hover { background: #252836; }
+    .shape-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .shape-label {
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+
+    /* Stats */
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.78rem;
+      padding: 3px 0;
+      color: var(--muted);
+    }
+    .stat-row span { color: var(--text); font-weight: 600; }
+
+    /* Node detail panel */
+    #detail-panel {
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 10px;
+      display: none;
+    }
+    #detail-panel.visible { display: block; }
+    .detail-field {
+      font-size: 0.73rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .detail-field strong { color: var(--text); }
+    .detail-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px;
+      margin-top: 4px;
+    }
+    .tag {
+      background: var(--border);
+      color: var(--text);
+      font-size: 0.68rem;
+      padding: 1px 6px;
+      border-radius: 3px;
+    }
+
+    /* Shortcuts */
+    .shortcut-item {
+      font-size: 0.72rem;
+      color: var(--muted);
+      padding: 2px 0;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .shortcut-item .key { font-size: 0.68rem; }
+
+    /* Layout descriptions */
+    .layout-desc {
+      font-size: 0.72rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    /* Color swatches */
+    .color-row {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+    .color-swatch {
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.1);
+      transition: transform 0.12s, box-shadow 0.12s;
+    }
+    .color-swatch:hover { transform: scale(1.15); box-shadow: 0 0 8px rgba(255,255,255,0.2); }
+
+    /* Scrollbar styling */
+    #sidebar::-webkit-scrollbar { width: 4px; }
+    #sidebar::-webkit-scrollbar-track { background: transparent; }
+    #sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* ── Layout params panel ── */
+    .layout-params {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .param-row {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .param-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+    .param-label span {
+      color: var(--text);
+      font-family: monospace;
+      font-size: 0.68rem;
+      background: var(--bg);
+      padding: 1px 5px;
+      border-radius: 3px;
+      min-width: 40px;
+      text-align: right;
+    }
+    .param-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 3px;
+      border-radius: 2px;
+      background: var(--border);
+      outline: none;
+      cursor: pointer;
+    }
+    .param-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      border: 2px solid var(--panel);
+      box-shadow: 0 0 4px rgba(99,102,241,0.5);
+    }
+    .param-slider::-moz-range-thumb {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      border: 2px solid var(--panel);
+    }
+    .param-slider:focus { outline: none; }
+    .apply-btn {
+      margin-top: 4px;
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.75rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .apply-btn:hover { background: #4f52d9; }
+    .no-params {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-style: italic;
+    }
+    .param-select {
+      -webkit-appearance: none;
+      appearance: none;
+      background: var(--bg) !important;
+      color: var(--text) !important;
+      border: 1px solid var(--border) !important;
+      border-radius: 4px;
+      padding: 3px 6px;
+      font-size: 0.72rem;
+      width: 100%;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .param-select:focus { outline: 1px solid var(--accent); }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2">
+      <circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/>
+      <line x1="12" y1="7" x2="5" y2="17"/><line x1="12" y1="7" x2="19" y2="17"/>
+    </svg>
+    <h1>Cytoscape.js 功能演示</h1>
+    <span>pharma-graph</span>
+  </header>
+
+  <div id="toolbar">
+    <span class="tl">布局</span>
+
+    <button class="btn active" id="btn-cose" onclick="runLayout('cose')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="6" r="2.5"/><circle cx="17" cy="5" r="2"/><circle cx="4" cy="15" r="2"/><circle cx="12" cy="12" r="2.5"/><circle cx="19" cy="14" r="2"/><line x1="8" y1="6" x2="17" y2="5"/><line x1="8" y1="6" x2="4" y2="15"/><line x1="8" y1="6" x2="12" y2="12"/><line x1="17" y1="5" x2="19" y2="14"/><line x1="4" y1="15" x2="12" y2="12"/><line x1="12" y1="12" x2="19" y2="14"/></svg>
+      COSE
+    </button>
+
+    <button class="btn" id="btn-concentric" onclick="runLayout('concentric')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7" stroke-dasharray="4 2"/><circle cx="12" cy="12" r="11" stroke-dasharray="4 2"/></svg>
+      同心圆
+    </button>
+
+    <button class="btn" id="btn-circle" onclick="runLayout('circle')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="3" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="21"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
+      环形
+    </button>
+
+    <button class="btn" id="btn-grid" onclick="runLayout('grid')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      网格
+    </button>
+
+    <button class="btn" id="btn-dagre" onclick="runLayout('dagre')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="3" r="2"/><circle cx="6" cy="10" r="2"/><circle cx="18" cy="10" r="2"/><circle cx="4" cy="18" r="2"/><circle cx="12" cy="18" r="2"/><circle cx="20" cy="18" r="2"/><line x1="12" y1="5" x2="6" y2="8"/><line x1="12" y1="5" x2="18" y2="8"/><line x1="6" y1="12" x2="4" y2="16"/><line x1="6" y1="12" x2="12" y2="16"/><line x1="18" y1="12" x2="12" y2="16"/><line x1="18" y1="12" x2="20" y2="16"/></svg>
+      Dagre
+    </button>
+
+    <button class="btn" id="btn-breadthfirst" onclick="runLayout('breadthfirst')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="4" r="2"/><circle cx="6" cy="11" r="2"/><circle cx="18" cy="11" r="2"/><circle cx="3" cy="18" r="2"/><circle cx="12" cy="18" r="2"/><circle cx="21" cy="18" r="2"/><line x1="12" y1="6" x2="6" y2="9"/><line x1="12" y1="6" x2="18" y2="9"/><line x1="6" y1="13" x2="3" y2="16"/><line x1="6" y1="13" x2="12" y2="16"/><line x1="18" y1="13" x2="12" y2="16"/><line x1="18" y1="13" x2="21" y2="16"/></svg>
+      广度优先
+    </button>
+
+    <button class="btn" id="btn-euler" onclick="runLayout('euler')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="4" r="2"/><circle cx="4" cy="14" r="2"/><circle cx="20" cy="14" r="2"/><circle cx="12" cy="20" r="2"/><line x1="12" y1="6" x2="4" y2="12"/><line x1="12" y1="6" x2="20" y2="12"/><line x1="4" y1="16" x2="12" y2="18"/><line x1="20" y1="16" x2="12" y2="18"/></svg>
+      Euler
+    </button>
+
+    <button class="btn" id="btn-spread" onclick="runLayout('spread')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><line x1="12" y1="7" x2="5" y2="17"/><line x1="12" y1="7" x2="19" y2="17"/></svg>
+      Spread
+    </button>
+
+    <div class="divider"></div>
+
+    <button class="btn" onclick="fitGraph()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+      适应画布
+    </button>
+
+    <button class="btn" onclick="randomize()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>
+      打散
+    </button>
+
+    <button class="btn" onclick="resetAll()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      重置
+    </button>
+
+    <button class="btn" onclick="animatePulse()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      动画脉冲
+    </button>
+  </div>
+
+  <div id="info-bar">
+    <span><span class="key">点击节点</span> 查看详情 &amp; 高亮邻居</span>
+    <span><span class="key">Ctrl+点击</span> 多选</span>
+    <span><span class="key">框选</span> 区域选择</span>
+    <span><span class="key">拖拽节点</span> 移动位置</span>
+    <span><span class="key">拖拽空白</span> 平移画布</span>
+    <span><span class="key">滚轮</span> 缩放</span>
+    <span><span class="key">右击</span> 上下文菜单</span>
+  </div>
+
+  <div id="main">
+    <div id="cy"></div>
+
+    <div id="sidebar">
+
+      <!-- Stats -->
+      <div class="sidebar-section">
+        <div class="section-title">图谱统计</div>
+        <div class="stat-row">节点 <span id="stat-nodes">—</span></div>
+        <div class="stat-row">边 <span id="stat-edges">—</span></div>
+        <div class="stat-row">选中 <span id="stat-selected">0</span></div>
+        <div class="stat-row">当前布局 <span id="stat-layout">—</span></div>
+      </div>
+
+      <!-- Node detail -->
+      <div class="sidebar-section">
+        <div class="section-title">节点详情</div>
+        <div id="detail-panel">
+          <div class="detail-field">名称 <strong id="detail-name">—</strong></div>
+          <div class="detail-field">类型 <strong id="detail-type">—</strong></div>
+          <div class="detail-field">权重 <strong id="detail-weight">—</strong></div>
+          <div class="detail-field">关联边 <strong id="detail-degree">—</strong></div>
+          <div class="detail-field" id="detail-adj-label" style="display:none">邻居</div>
+          <div class="detail-tags" id="detail-adj"></div>
+        </div>
+      </div>
+
+      <!-- Shapes -->
+      <div class="sidebar-section">
+        <div class="section-title">节点形状</div>
+        <div class="shape-grid">
+          <div class="shape-item" onclick="highlightShape('round-rectangle')"><span class="shape-dot" style="background:#6366f1;border-radius:4px"></span>圆角矩形</div>
+          <div class="shape-item" onclick="highlightShape('rectangle')"><span class="shape-dot" style="background:#22d3ee;border-radius:2px"></span>矩形</div>
+          <div class="shape-item" onclick="highlightShape('ellipse')"><span class="shape-dot" style="background:#34d399;border-radius:50%"></span>椭圆</div>
+          <div class="shape-item" onclick="highlightShape('diamond')"><span class="shape-dot" style="background:#fbbf24;border-radius:2px;transform:rotate(45deg)"></span>菱形</div>
+          <div class="shape-item" onclick="highlightShape('triangle')"><span class="shape-dot" style="background:#f87171;border-radius:0 50% 50% 50%"></span>三角形</div>
+          <div class="shape-item" onclick="highlightShape('hexagon')"><span class="shape-dot" style="background:#a78bfa;border-radius:2px"></span>六边形</div>
+          <div class="shape-item" onclick="highlightShape('barrel')"><span class="shape-dot" style="background:#fb923c;border-radius:4px"></span>桶形</div>
+          <div class="shape-item" onclick="highlightShape('tag')"><span class="shape-dot" style="background:#38bdf8;border-radius:2px 8px 2px 2px"></span>标签</div>
+          <div class="shape-item" onclick="highlightShape('round-tag')"><span class="shape-dot" style="background:#e879f9;border-radius:4px 8px 8px 2px"></span>圆角标签</div>
+          <div class="shape-item" onclick="highlightShape('vee')"><span class="shape-dot" style="background:#4ade80;border-radius:0 0 50% 50%"></span>vee</div>
+        </div>
+      </div>
+
+      <!-- Colors -->
+      <div class="sidebar-section">
+        <div class="section-title">高亮颜色</div>
+        <div class="color-row">
+          <div class="color-swatch" style="background:#6366f1" onclick="setHighlightColor('#6366f1')" title="紫"></div>
+          <div class="color-swatch" style="background:#22d3ee" onclick="setHighlightColor('#22d3ee')" title="青"></div>
+          <div class="color-swatch" style="background:#34d399" onclick="setHighlightColor('#34d399')" title="绿"></div>
+          <div class="color-swatch" style="background:#fbbf24" onclick="setHighlightColor('#fbbf24')" title="黄"></div>
+          <div class="color-swatch" style="background:#f87171" onclick="setHighlightColor('#f87171')" title="红"></div>
+          <div class="color-swatch" style="background:#60a5fa" onclick="setHighlightColor('#60a5fa')" title="蓝"></div>
+          <div class="color-swatch" style="background:#a78bfa" onclick="setHighlightColor('#a78bfa')" title="紫"></div>
+          <div class="color-swatch" style="background:#fb923c" onclick="setHighlightColor('#fb923c')" title="橙"></div>
+          <div class="color-swatch" style="background:#e879f9" onclick="setHighlightColor('#e879f9')" title="粉"></div>
+          <div class="color-swatch" style="background:#4ade80" onclick="setHighlightColor('#4ade80')" title="浅绿"></div>
+        </div>
+      </div>
+
+      <!-- Layout params -->
+      <div class="sidebar-section">
+        <div class="section-title">布局参数</div>
+        <div class="layout-params" id="layout-params">
+          <div class="no-params">切换布局后可调节参数</div>
+        </div>
+        <button class="apply-btn" onclick="applyLayoutParams()" style="display:none" id="apply-params-btn">应用参数</button>
+      </div>
+
+      <!-- Layout descriptions -->
+      <div class="sidebar-section">
+        <div class="section-title">布局说明</div>
+        <div class="layout-desc" id="layout-desc">COSE — 力学弹簧布局，模拟物理排斥与吸引，自动产生紧凑聚类结构。</div>
+      </div>
+
+      <!-- Shortcuts -->
+      <div class="sidebar-section">
+        <div class="section-title">快捷键</div>
+        <div class="shortcut-item"><span class="key">Del</span> 删除选中</div>
+        <div class="shortcut-item"><span class="key">Esc</span> 取消选择</div>
+        <div class="shortcut-item"><span class="key">F</span> 适应画布</div>
+        <div class="shortcut-item"><span class="key">R</span> 打散位置</div>
+        <div class="shortcut-item"><span class="key">Ctrl+A</span> 全选</div>
+        <div class="shortcut-item"><span class="key">Ctrl+C</span> 复制选中</div>
+      </div>
+
+    </div><!-- /sidebar -->
+  </div><!-- /main -->
+
+</div><!-- /app -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/layout-base@1.0.0/layout-base.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cose-base@1.0.0/cose-base.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape-cose-bilkent@4.1.0/cytoscape-cose-bilkent.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/weaverjs@1.0.0/dist/weaver.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape-spread@1.0.0/cytoscape-spread.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape-euler@1.0.0/cytoscape-euler.min.js"></script>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   NODE DATA — from pharma-graph.html
+   仅节点名和权重，边由 Cytoscape 自动生成（展示连通性）
+═══════════════════════════════════════════════════════════════ */
+
+const NODES = [
+  { id:'药理毒理学',         weight:90, type:'foundation' },
+  { id:'生命药学',           weight:72, type:'foundation' },
+  { id:'药物化学',           weight:68, type:'foundation' },
+  { id:'药物动力学',         weight:75, type:'foundation' },
+  { id:'药剂学',             weight:68, type:'foundation' },
+  { id:'受体',               weight:85, type:'bridge' },
+  { id:'酶',                 weight:83, type:'bridge' },
+  { id:'离子通道',           weight:80, type:'bridge' },
+  { id:'转运体',             weight:76, type:'bridge' },
+  { id:'激素',               weight:74, type:'bridge' },
+  { id:'病原体',             weight:72, type:'bridge' },
+  { id:'精神与中枢神经用药', weight:76, type:'clinical' },
+  { id:'神经系统常见疾病',   weight:70, type:'clinical' },
+  { id:'呼吸系统用药',       weight:68, type:'clinical' },
+  { id:'呼吸系统常见疾病',   weight:66, type:'clinical' },
+  { id:'消化系统用药',       weight:68, type:'clinical' },
+  { id:'消化系统常见疾病',   weight:66, type:'clinical' },
+  { id:'心血管系统用药',     weight:80, type:'clinical' },
+  { id:'血液系统用药',       weight:72, type:'clinical' },
+  { id:'内分泌系统用药',     weight:78, type:'clinical' },
+  { id:'心血管系统常见疾病', weight:74, type:'clinical' },
+  { id:'内分泌系统常见疾病', weight:72, type:'clinical' },
+  { id:'泌尿系统用药',       weight:66, type:'clinical' },
+  { id:'水电解质营养用药',   weight:64, type:'clinical' },
+  { id:'泌尿系统常见疾病',   weight:62, type:'clinical' },
+  { id:'抗感染药物',         weight:76, type:'clinical' },
+  { id:'解热镇痛抗炎抗风湿', weight:74, type:'clinical' },
+  { id:'皮肤用药及抗过敏',   weight:68, type:'clinical' },
+  { id:'免疫系统常见疾病',   weight:66, type:'clinical' },
+  { id:'抗肿瘤药物',         weight:72, type:'clinical' },
+  { id:'肿瘤',               weight:70, type:'clinical' },
+  { id:'眼科耳鼻喉口腔用药', weight:64, type:'clinical' },
+  { id:'慢性病管理',         weight:74, type:'service' },
+  { id:'用药安全',           weight:76, type:'service' },
+  { id:'处方审核与调剂',     weight:72, type:'service' },
+  { id:'用药咨询与治疗管理', weight:70, type:'service' },
+  { id:'常见病症健康管理',   weight:68, type:'service' },
+  { id:'药学服务与药品管理', weight:68, type:'service' },
+  { id:'急救中毒解救及职业防护', weight:66, type:'service' },
+];
+
+/* Generate edges — build a dense, well-connected graph */
+function generateEdges() {
+  const edges = [];
+  let eid = 0;
+
+  const foundation = NODES.filter(n => n.type === 'foundation').map(n => n.id);
+  const bridge     = NODES.filter(n => n.type === 'bridge').map(n => n.id);
+  const clinical   = NODES.filter(n => n.type === 'clinical').map(n => n.id);
+  const service    = NODES.filter(n => n.type === 'service').map(n => n.id);
+
+  /* Foundation → Bridge (complete bipartite, dense) */
+  foundation.forEach(src => {
+    bridge.forEach(tgt => {
+      edges.push({ id: 'e' + eid++, source: src, target: tgt });
+    });
+  });
+
+  /* Bridge → Clinical (complete bipartite, dense) */
+  bridge.forEach(src => {
+    clinical.forEach(tgt => {
+      edges.push({ id: 'e' + eid++, source: src, target: tgt });
+    });
+  });
+
+  /* Clinical → Service (complete bipartite, dense) */
+  clinical.forEach(src => {
+    service.forEach(tgt => {
+      edges.push({ id: 'e' + eid++, source: src, target: tgt });
+    });
+  });
+
+  /* Foundation → Service shortcuts */
+  foundation.forEach(src => {
+    service.forEach(tgt => {
+      edges.push({ id: 'e' + eid++, source: src, target: tgt });
+    });
+  });
+
+  /* Intra-clinical chain (every node → next) */
+  for (let i = 0; i < clinical.length - 1; i++) {
+    edges.push({ id: 'e' + eid++, source: clinical[i], target: clinical[i+1] });
+  }
+
+  /* Intra-service chain */
+  for (let i = 0; i < service.length - 1; i++) {
+    edges.push({ id: 'e' + eid++, source: service[i], target: service[i+1] });
+  }
+
+  /* Intra-bridge chain */
+  for (let i = 0; i < bridge.length - 1; i++) {
+    edges.push({ id: 'e' + eid++, source: bridge[i], target: bridge[i+1] });
+  }
+
+  /* Bridge → Service cross edges */
+  bridge.forEach(src => {
+    service.forEach(tgt => {
+      edges.push({ id: 'e' + eid++, source: src, target: tgt });
+    });
+  });
+
+  return edges;
+}
+
+const EDGES = generateEdges();
+
+/* Build elements */
+const elements = [
+  ...NODES.map(n => ({
+    data: { id: n.id, label: n.id, type: n.type, weight: n.weight },
+  })),
+  ...EDGES.map(e => ({
+    data: { id: e.id, source: e.source, target: e.target },
+  })),
+];
+
+/* ═══════════════════════════════════════════════════════════════
+   COLOR THEMES
+═══════════════════════════════════════════════════════════════ */
+
+const THEME = {
+  foundation: { color: '#00A5B5', shape: 'round-rectangle' },
+  bridge:     { color: '#9C27B0', shape: 'rectangle' },
+  clinical:   { color: '#6366F1', shape: 'ellipse' },
+  service:    { color: '#7C3AED', shape: 'barrel' },
+};
+
+let highlightColor = '#fbbf24';
+let currentLayout = 'cose';
+
+/* ═══════════════════════════════════════════════════════════════
+   CYTOSCAPE STYLESHEET
+═══════════════════════════════════════════════════════════════ */
+
+const STYLE = [
+  /* Base node */
+  {
+    selector: 'node',
+    style: {
+      'label':               'data(label)',
+      'width':              'mapData(weight, 60, 100, 36, 70)',
+      'height':             'mapData(weight, 60, 100, 36, 70)',
+      'font-size':          'mapData(weight, 60, 100, 8, 13)',
+      'font-family':        "'Noto Sans SC', sans-serif",
+      'font-weight':         600,
+      'color':              '#e2e8f0',
+      'text-valign':        'bottom',
+      'text-halign':        'center',
+      'text-margin-y':      6,
+      'text-background-color': 'rgba(15,17,23,0.82)',
+      'text-background-shape': 'roundrectangle',
+      'text-background-padding': '3px',
+      'border-width':        1.5,
+      'border-color':        'rgba(255,255,255,0.12)',
+      'shape':              'ellipse',
+      'text-events':        'yes',
+      'cursor':             'pointer',
+    }
+  },
+
+  /* Per-type shape + color */
+  ...Object.entries(THEME).map(([type, t]) => [
+    {
+      selector: `node[type = "${type}"]`,
+      style: { 'shape': t.shape }
+    },
+    {
+      selector: `node[type = "${type}"]`,
+      style: {
+        'background-color': t.color,
+        'border-color':     t.color + 'aa',
+        'border-width':     2,
+      }
+    },
+  ]).flat(),
+
+  /* Compound parent nodes (invisible layer containers) */
+  {
+    selector: '.layer-parent',
+    style: {
+      'background-color': 'rgba(0,0,0,0)',
+      'border-width': 0,
+      'label': '',
+      'width': 1,
+      'height': 1,
+      'padding': 0,
+      'shape': 'rectangle',
+    }
+  },
+
+  /* Base edge */
+  {
+    selector: 'edge',
+    style: {
+      'width':             1.5,
+      'line-color':       'rgba(100,116,139,0.45)',
+      'curve-style':       'bezier',
+      'target-arrow-shape':'triangle',
+      'target-arrow-color':'rgba(100,116,139,0.45)',
+      'arrow-scale':       0.7,
+      'opacity':           0.6,
+      'haystack-radius':   0,
+      'transition-property': 'line-color, opacity, width',
+      'transition-duration': '0.15s',
+    }
+  },
+
+  /* Selected state */
+  {
+    selector: ':selected',
+    style: {
+      'border-width':       3,
+      'border-color':       '#ffffff',
+      'overlay-color':     'rgba(99,102,241,0.2)',
+      'overlay-padding':    5,
+      'overlay-opacity':    0,
+    }
+  },
+
+  /* Highlighted node */
+  {
+    selector: '.highlighted',
+    style: {
+      'border-width':  3,
+      'border-color':  'data(highlightColor)',
+      'overlay-color': 'rgba(0,0,0,0)',
+      'overlay-opacity': 0,
+    }
+  },
+
+  /* Dimmed */
+  {
+    selector: '.dimmed',
+    style: { 'opacity': 0.12 }
+  },
+
+  /* Highlighted edge */
+  {
+    selector: '.highlighted-edge',
+    style: {
+      'opacity':    1,
+      'width':      2.5,
+      'line-color': 'data(highlightColor)',
+      'target-arrow-color': 'data(highlightColor)',
+    }
+  },
+
+  /* Shape highlight ring */
+  {
+    selector: '.shape-ring',
+    style: {
+      'border-width':  4,
+      'border-color':  highlightColor,
+      'overlay-color': 'rgba(0,0,0,0)',
+      'overlay-opacity': 0,
+    }
+  },
+
+  /* Animated pulse */
+  {
+    selector: '.pulse',
+    style: {
+      'border-width':  3,
+      'border-color':  highlightColor,
+      'width':         'mapData(weight, 60, 100, 44, 80)',
+      'height':        'mapData(weight, 60, 100, 44, 80)',
+    }
+  },
+];
+
+/* ═══════════════════════════════════════════════════════════════
+   INITIALIZE CYTOSCAPE
+═══════════════════════════════════════════════════════════════ */
+
+const cy = cytoscape({
+  container: document.getElementById('cy'),
+  elements,
+  style: STYLE,
+  layout: { name: 'preset' },
+  minZoom: 0.2,
+  maxZoom: 4.0,
+  wheelSensitivity: 0.25,
+  boxSelectionEnabled: true,
+  autounselectify: false,
+  autoungrabify: false,
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   STATS
+═══════════════════════════════════════════════════════════════ */
+
+function updateStats() {
+  document.getElementById('stat-nodes').textContent = cy.nodes().not('.layer-parent').length;
+  document.getElementById('stat-edges').textContent = cy.edges().length;
+  document.getElementById('stat-selected').textContent = cy.$(':selected').length;
+  document.getElementById('stat-layout').textContent = currentLayout.toUpperCase();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   NODE DETAIL PANEL
+═══════════════════════════════════════════════════════════════ */
+
+function showNodeDetail(node) {
+  if (!node || node.is('.layer-parent')) {
+    document.getElementById('detail-panel').classList.remove('visible');
+    return;
+  }
+
+  const d = node.data();
+  document.getElementById('detail-name').textContent   = d.label || d.id;
+  document.getElementById('detail-type').textContent   = THEME[d.type] ? { foundation:'基础层', bridge:'靶点层', clinical:'临床层', service:'服务层' }[d.type] : d.type;
+  document.getElementById('detail-weight').textContent = d.weight || '—';
+  document.getElementById('detail-degree').textContent = node.degree();
+
+  const adj = node.neighborhood('node').not('.layer-parent');
+  const adjEl = document.getElementById('detail-adj');
+  if (adj.length > 0) {
+    document.getElementById('detail-adj-label').style.display = 'block';
+    adjEl.innerHTML = adj.map(n => `<span class="tag">${n.data('label') || n.id()}</span>`).join('');
+  } else {
+    document.getElementById('detail-adj-label').style.display = 'none';
+    adjEl.innerHTML = '';
+  }
+
+  document.getElementById('detail-panel').classList.add('visible');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HIGHLIGHT
+═══════════════════════════════════════════════════════════════ */
+
+function highlightNode(node) {
+  cy.elements().addClass('dimmed');
+  node.removeClass('dimmed').addClass('highlighted');
+  node.connectedEdges().removeClass('dimmed').addClass('highlighted-edge');
+  node.neighborhood('node').not('.layer-parent').removeClass('dimmed').addClass('highlighted');
+}
+
+function resetAll() {
+  cy.elements().removeClass('dimmed highlighted highlighted-edge');
+  cy.nodes().not('.layer-parent').forEach(node => {
+    const t = THEME[node.data('type')];
+    if (t) node.style('shape', t.shape);
+    node.unlock(); // release any locked nodes so layout can move them
+  });
+  document.getElementById('detail-panel').classList.remove('visible');
+  runLayout('cose');
+  updateStats();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LAYOUTS
+═══════════════════════════════════════════════════════════════ */
+
+const LAYOUT_CONFIGS = {
+  cose: {
+    name: 'cose-bilkent',
+    animate: true,
+    animationDuration: 1200,
+    animationEasing: 'ease-out-cubic',
+    randomize: true,
+    nodeRepulsion: 9000,
+    idealEdgeLength: 130,
+    edgeElasticity: 100,
+    gravity: 0.1,
+    numIter: 1500,
+    tile: true,
+    tilingPaddingVertical: 15,
+    tilingPaddingHorizontal: 15,
+    fit: true,
+    padding: 60,
+    nodeDimensionsIncludeLabels: true,
+    onLayoutStop: () => { updateStats(); fitGraph(); },
+  },
+  concentric: {
+    name: 'concentric',
+    concentric: node => node.data('weight') || 0,
+    levelWidth: () => 1,
+    minNodeSpacing: 50,
+    padding: 50,
+    animate: true,
+    animationDuration: 800,
+    animationEasing: 'ease-out-cubic',
+    fit: true,
+    avoidOverlap: true,
+    onLayoutStop: () => { updateStats(); },
+  },
+  circle: {
+    name: 'circle',
+    radii: 200,
+    divsFactor: 2,
+    padding: 50,
+    animate: true,
+    animationDuration: 700,
+    fit: true,
+    clockwise: true,
+    onLayoutStop: () => { updateStats(); },
+  },
+  grid: {
+    name: 'grid',
+    condense: false,
+    rows: null,
+    cols: null,
+    padding: 50,
+    animate: true,
+    animationDuration: 600,
+    fit: true,
+    onLayoutStop: () => { updateStats(); },
+  },
+  dagre: {
+    name: 'dagre',
+    rankDir: 'TB',
+    rankSep: 100,
+    edgeSep: 50,
+    nodeSep: 50,
+    padding: 60,
+    animate: 'end',
+    animationDuration: 800,
+    fit: true,
+    onLayoutStop: () => { updateStats(); },
+  },
+  breadthfirst: {
+    name: 'breadthfirst',
+    directed: true,
+    padding: 50,
+    animate: true,
+    animationDuration: 700,
+    fit: true,
+    onLayoutStop: () => { updateStats(); },
+  },
+  euler: {
+    name: 'euler',
+    animate: false,
+    fit: true,
+    padding: 40,
+    refresh: 0.3,
+    maxIterations: 500,
+    randomize: true,
+  },
+  spread: {
+    name: 'spread',
+    animate: false,
+    fit: true,
+    randomize: true,
+    expandFactor: 3.5,
+    minDist: 50,
+    padding: 180,
+    maxSimulationTime: 4000,
+  },
+};
+
+const LAYOUT_DESCS = {
+  cose: 'COSE — 力学弹簧布局，模拟物理排斥与吸引，自动产生紧凑聚类结构。',
+  concentric: '同心圆 — 节点按权重从中心向外分层排列，适合展示层次重要性。',
+  circle: '环形 — 所有节点沿圆周均匀分布，适合展示循环关系。',
+  grid: '网格 — 节点按行列整齐排列，适合结构化展示。',
+  dagre: 'Dagre — 有向无环图布局，适合 DAG 结构的层次展示。',
+  breadthfirst: '广度优先 — 从根节点按层级向外扩散，适合树状结构。',
+  euler: 'Euler — 基于图论力学的布局，优化边交叉和长度。',
+  spread: 'Spread — 节点均匀铺开，最大化利用画布空间。',
+};
+
+/* ── Per-layout tunable parameters ── */
+const LAYOUT_PARAMS = {
+  cose: [
+    { key: 'nodeRepulsion',         label: '节点斥力',    min: 1000,   max: 20000, step: 100,  default: 9000  },
+    { key: 'idealEdgeLength',       label: '理想边长',    min: 20,     max: 300,   step: 5,    default: 130  },
+    { key: 'edgeElasticity',        label: '边弹性',      min: 1,      max: 500,   step: 1,    default: 100  },
+    { key: 'gravity',               label: '重力',         min: 0,      max: 1,     step: 0.01, default: 0.1  },
+    { key: 'tile',     label: '平铺',         type: 'bool',  default: 1 },
+    { key: 'animationDuration',     label: '动画时长',    min: 100,    max: 3000,  step: 50,   default: 1200 },
+  ],
+  concentric: [
+    { key: 'minNodeSpacing',        label: '节点间距',    min: 10,     max: 200,   step: 5,    default: 50   },
+    { key: 'animationDuration',     label: '动画时长',    min: 100,    max: 3000,  step: 50,   default: 800  },
+  ],
+  circle: [
+    { key: 'radii',                 label: '圆半径',       min: 50,     max: 600,   step: 10,   default: 200  },
+    { key: 'animationDuration',     label: '动画时长',    min: 100,    max: 3000,  step: 50,   default: 700  },
+  ],
+  grid: [
+    { key: 'padding',               label: '间距',         min: 5,      max: 150,   step: 5,    default: 50   },
+    { key: 'animationDuration',     label: '动画时长',    min: 100,    max: 3000,  step: 50,   default: 600  },
+  ],
+  dagre: [
+    { key: 'rankDir',               label: '方向',         type: 'select', options: ['TB','BT','LR','RL'], default: 'TB' },
+    { key: 'rankSep',               label: '层间距',       min: 20,     max: 300,   step: 5,    default: 100  },
+    { key: 'nodeSep',               label: '节点间距',    min: 5,      max: 150,   step: 5,    default: 50   },
+    { key: 'edgeSep',               label: '边间距',       min: 5,      max: 100,   step: 5,    default: 50   },
+    { key: 'animationDuration',     label: '动画时长',    min: 100,    max: 3000,  step: 50,   default: 800  },
+  ],
+  breadthfirst: [
+    { key: 'padding',               label: '间距',         min: 5,      max: 150,   step: 5,    default: 50   },
+    { key: 'animationDuration',     label: '动画时长',    min: 100,    max: 3000,  step: 50,   default: 700  },
+  ],
+  euler: [
+    { key: 'nodeRepulsion',         label: '节点斥力',    min: 500,    max: 10000, step: 100,  default: 2000 },
+    { key: 'idealEdgeLength',       label: '理想边长',    min: 20,     max: 300,   step: 5,    default: 60   },
+    { key: 'gravity',               label: '重力',         min: 0,      max: 1,     step: 0.01, default: 0.1 },
+    { key: 'refresh',               label: '刷新率',       min: 0.05,   max: 1,     step: 0.05, default: 0.3 },
+  ],
+  spread: [
+    { key: 'expandFactor',          label: '扩展系数',    min: 1,      max: 8,     step: 0.1,  default: 3.5 },
+    { key: 'minDist',               label: '最小距离',    min: 5,      max: 200,   step: 5,    default: 50  },
+    { key: 'padding',               label: '边距',         min: 50,     max: 400,   step: 10,   default: 180 },
+  ],
+};
+
+function runLayout(name) {
+  currentLayout = name;
+  document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('btn-' + name);
+  if (btn) btn.classList.add('active');
+  document.getElementById('layout-desc').textContent = LAYOUT_DESCS[name] || '';
+
+  const cfg = LAYOUT_CONFIGS[name] || { name, fit: true, animate: true, animationDuration: 600 };
+  renderLayoutParams(name, cfg);
+  cy.layout(cfg).run();
+}
+
+function renderLayoutParams(name, cfg) {
+  const container = document.getElementById('layout-params');
+  const applyBtn  = document.getElementById('apply-params-btn');
+  const params    = LAYOUT_PARAMS[name];
+
+  if (!params || params.length === 0) {
+    container.innerHTML = '<div class="no-params">此布局无可调参数</div>';
+    applyBtn.style.display = 'none';
+    return;
+  }
+
+  container.innerHTML = params.map(p => {
+    if (p.type === 'select') {
+      const opts = p.options.map(o =>
+        `<option value="${o}"${(cfg[p.key] || p.default) === o ? ' selected' : ''}>${o}</option>`
+      ).join('');
+      return `<div class="param-row">
+        <div class="param-label">${p.label}</div>
+        <select class="param-select" data-key="${p.key}" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.72rem;width:100%;cursor:pointer">
+          ${opts}
+        </select>
+      </div>`;
+    }
+    if (p.type === 'bool') {
+      const checked = (cfg[p.key] ?? p.default) ? 'checked' : '';
+      return `<div class="param-row">
+        <div class="param-label" style="justify-content:flex-start;gap:8px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" data-key="${p.key}" ${checked} style="accent-color:var(--accent);cursor:pointer">
+            ${p.label}
+          </label>
+        </div>
+      </div>`;
+    }
+    const val = cfg[p.key] ?? p.default;
+    return `<div class="param-row">
+      <div class="param-label">${p.label}<span>${Number.isInteger(p.step) ? val : val.toFixed(p.step < 1 ? 2 : 0)}</span></div>
+      <input type="range" class="param-slider" data-key="${p.key}"
+        min="${p.min}" max="${p.max}" step="${p.step}" value="${val}"
+        oninput="this.previousElementSibling.querySelector('span').textContent = ${p.step < 1 ? 'parseFloat(this.value).toFixed(2)' : 'this.value'}">
+    </div>`;
+  }).join('');
+
+  applyBtn.style.display = '';
+}
+
+function applyLayoutParams() {
+  const container = document.getElementById('layout-params');
+  const overrides = {};
+
+  container.querySelectorAll('.param-slider').forEach(slider => {
+    overrides[slider.dataset.key] = parseFloat(slider.value);
+  });
+  container.querySelectorAll('.param-select').forEach(sel => {
+    overrides[sel.dataset.key] = sel.value;
+  });
+  container.querySelectorAll('.param-row input[type="checkbox"]').forEach(cb => {
+    overrides[cb.dataset.key] = cb.checked;
+  });
+
+  const base = { ...LAYOUT_CONFIGS[currentLayout] };
+  Object.assign(base, overrides);
+  base.name = currentLayout;
+  base.onLayoutStop = () => { updateStats(); fitGraph(); };
+
+  document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('btn-' + currentLayout);
+  if (btn) btn.classList.add('active');
+
+  cy.layout(base).run();
+}
+
+function fitGraph() {
+  cy.fit(undefined, 50);
+}
+
+function randomize() {
+  cy.elements().removeClass('dimmed highlighted highlighted-edge');
+  cy.nodes().not('.layer-parent').forEach(node => {
+    const t = THEME[node.data('type')];
+    if (t) node.style('shape', t.shape);
+    node.unlock();
+  });
+  document.getElementById('detail-panel').classList.remove('visible');
+  cy.nodes().not('.layer-parent').positions(() => ({
+    x: Math.random() * cy.width(),
+    y: Math.random() * cy.height(),
+  }));
+  updateStats();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ANIMATION — PULSE
+═══════════════════════════════════════════════════════════════ */
+
+function animatePulse() {
+  const sel = cy.$(':selected').length > 0 ? cy.$(':selected') : cy.nodes().not('.layer-parent');
+  if (sel.length === 0) return;
+
+  let scale = 1;
+  let dir = 1;
+  let raf;
+
+  function step() {
+    scale += 0.03 * dir;
+    if (scale >= 1.25) dir = -1;
+    if (scale <= 0.95) { scale = 1; sel.removeClass('pulse'); cancelAnimationFrame(raf); updateStats(); return; }
+
+    sel.addClass('pulse');
+    const baseSize = n => (n.data('weight') || 70);
+    sel.style('width', n => baseSize(n) * scale);
+    sel.style('height', n => baseSize(n) * scale);
+
+    raf = requestAnimationFrame(step);
+  }
+
+  raf = requestAnimationFrame(step);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SHAPE HIGHLIGHT
+═══════════════════════════════════════════════════════════════ */
+
+function highlightShape(shape) {
+  resetAll();
+  cy.nodes().not('.layer-parent').forEach(n => {
+    if (n.style('shape') === shape) {
+      n.addClass('highlighted');
+    } else {
+      n.addClass('dimmed');
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   COLOR SWATCH
+═══════════════════════════════════════════════════════════════ */
+
+function setHighlightColor(color) {
+  highlightColor = color;
+  /* Update dynamic style property */
+  cy.style()
+    .selector('.highlighted')
+    .style('border-color', color)
+    .selector('.highlighted-edge')
+    .style({ 'line-color': color, 'target-arrow-color': color })
+    .selector('.pulse')
+    .style('border-color', color)
+    .selector('.shape-ring')
+    .style('border-color', color)
+    .update();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CYTOSCAPE EVENTS
+═══════════════════════════════════════════════════════════════ */
+
+/* Single tap on node */
+cy.on('tap', 'node', function (evt) {
+  const node = evt.target;
+  highlightNode(node);
+  showNodeDetail(node);
+  updateStats();
+});
+
+/* Tap on edge */
+cy.on('tap', 'edge', function (evt) {
+  const edge = evt.target;
+  cy.elements().addClass('dimmed');
+  edge.removeClass('dimmed').addClass('highlighted-edge');
+  edge.source().removeClass('dimmed').addClass('highlighted');
+  edge.target().removeClass('dimmed').addClass('highlighted');
+  updateStats();
+});
+
+/* Tap on background */
+cy.on('tap', function (evt) {
+  if (evt.target === cy) resetAll();
+});
+
+/* Right-click context */
+cy.on('cxtap', 'node', function (evt) {
+  const node = evt.target;
+  node.remove();
+  resetAll();
+  updateStats();
+});
+
+/* Double-click node */
+cy.on('dbltap', 'node', function (evt) {
+  const node = evt.target;
+  node.lock();
+  node.flash('#ffffff', 150, 3);
+});
+
+/* Mouse over */
+cy.on('mouseover', 'node', function (evt) {
+  const node = evt.target;
+  if (!node.hasClass('dimmed')) {
+    node.style('border-color', '#ffffff');
+  }
+});
+
+cy.on('mouseout', 'node', function (evt) {
+  const node = evt.target;
+  if (!node.hasClass('dimmed') && !node.hasClass('highlighted')) {
+    const t = THEME[node.data('type')];
+    node.style('border-color', t ? t.color + 'aa' : 'rgba(255,255,255,0.12)');
+  }
+});
+
+/* Drag end */
+cy.on('dragfree', 'node', function () {
+  updateStats();
+});
+
+/* Layout complete */
+cy.on('layoutstop', () => updateStats());
+
+/* Selection change */
+cy.on('select', () => updateStats());
+cy.on('unselect', () => updateStats());
+
+/* ═══════════════════════════════════════════════════════════════
+   KEYBOARD SHORTCUTS
+═══════════════════════════════════════════════════════════════ */
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+
+  switch (e.key) {
+    case 'Delete':
+    case 'Backspace':
+      cy.$(':selected').remove();
+      resetAll();
+      updateStats();
+      break;
+    case 'Escape':
+      cy.elements().unselect();
+      resetAll();
+      break;
+    case 'f':
+    case 'F':
+      fitGraph();
+      break;
+    case 'r':
+    case 'R':
+      randomize();
+      break;
+    case 'a':
+    case 'A':
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        cy.nodes().not('.layer-parent').select();
+      }
+      break;
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════════ */
+
+/* Run initial layout */
+runLayout('cose');
+updateStats();
+
+/* Resize handler */
+window.addEventListener('resize', () => fitGraph());
+</script>
+</body>
+</html>
