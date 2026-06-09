@@ -17,6 +17,9 @@ const VALID_NODE_TYPES = [
   "mechanism",
   "disease",
   "ingredient",
+  "book",
+  "chapter",
+  "section",
 ];
 
 const VALID_EDGE_TYPES = [

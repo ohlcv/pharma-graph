@@ -53,6 +53,15 @@ export class TourEngine {
     this.cy = cy;
   }
 
+  clearAllNodeInlineStyles(): void {
+    this.cy.nodes().forEach((n: cytoscape.NodeSingular) => {
+      n.style({
+        'border-width': 1.5,
+        'border-color': 'rgba(255,255,255,0.06)',
+      });
+    });
+  }
+
   start(rootId: string, options: TourOptions = { interval: 3000, maxDepth: -1 }): void {
     this.stop();
     this.visited = new Set();
@@ -105,6 +114,7 @@ export class TourEngine {
   stop(): void {
     if (this.timer) { clearTimeout(this.timer); this.timer = null; }
     if (this.pulsingNode) this.stopTourPulse();
+    this.clearAllNodeInlineStyles(); // 清除所有节点的内联白色边框
     this.stopped = true;
     this.paused = false;
   }
@@ -239,12 +249,11 @@ export class TourEngine {
 
     // 停止上一次漫游节点的脉冲动画
     this.stopTourPulse();
+    // 清除残留的内联白色边框（stopTourPulse 已清，但保险起见立即清理）
+    this.clearAllNodeInlineStyles();
 
     // 移除所有高亮态，防止前一个主角的边/邻居残留
     this.cy.elements().removeClass('selected-node highlighted highlighted-edge');
-    // 清除 :selected 状态，防止 .dimmed 与 :selected 冲突导致旧主角仍亮
-    // 用 cy.$(':selected') 逐节点 unselect，避免静默失效 bug
-    this.cy.$(':selected').unselect();
 
     // Dim everything first
     this.cy.elements().addClass('dimmed');
@@ -256,9 +265,6 @@ export class TourEngine {
 
     // 聚光灯脉冲动画：shadow 在节点外围周期性扩散
     this.startTourPulse(node);
-
-    // 白色描边 + 紫色外发光
-    this.cy.container().style.filter = 'drop-shadow(0 0 24px rgba(99,102,241,0.9))';
 
     // Animate to center on node
     this.cy.animate({
@@ -284,9 +290,8 @@ export class TourEngine {
     });
   }
 
-  // 聚光灯脉冲状态
+    // 聚光灯脉冲状态
   private pulseRafId: number | null = null;
-  private pulseGlowRafId: number | null = null;
   private pulsingNode: cytoscape.NodeSingular | null = null;
 
   private startTourPulse(node: cytoscape.NodeSingular): void {
@@ -309,24 +314,6 @@ export class TourEngine {
       this.pulseRafId = requestAnimationFrame(animateBorder);
     };
     this.pulseRafId = requestAnimationFrame(animateBorder);
-
-    // 画布外发光呼吸脉冲（紫色）
-    let glowFrame = 0;
-    const animateGlow = () => {
-      if (!node.cy() || node.removed() || this.pulsingNode !== node) {
-        this.pulseGlowRafId = null;
-        return;
-      }
-      glowFrame++;
-      const t = glowFrame / 60;
-      const pulse = (Math.sin(t * Math.PI * 2) + 1) / 2; // 0→1→0
-      const spread = 24 + pulse * 24;   // 24px → 48px
-      const alpha = 0.4 + pulse * 0.6; // 0.4 → 1.0
-      const host = document.getElementById('glow-host');
-      if (host) host.style.boxShadow = `0 0 ${spread}px rgba(99,102,241,${alpha}), 0 0 ${spread * 1.5}px rgba(99,102,241,${alpha * 0.4})`;
-      this.pulseGlowRafId = requestAnimationFrame(animateGlow);
-    };
-    this.pulseGlowRafId = requestAnimationFrame(animateGlow);
   }
 
   private stopTourPulse(): void {
@@ -334,20 +321,12 @@ export class TourEngine {
       cancelAnimationFrame(this.pulseRafId);
       this.pulseRafId = null;
     }
-    if (this.pulseGlowRafId !== null) {
-      cancelAnimationFrame(this.pulseGlowRafId);
-      this.pulseGlowRafId = null;
-      const host = document.getElementById('glow-host');
-      if (host) host.style.boxShadow = '';
-    }
     if (this.pulsingNode && !this.pulsingNode.removed()) {
       this.pulsingNode.style({
-        'border-width': 3,
-        'border-color': '#ffffff',
+        'border-width': null,
+        'border-color': null,
       });
     }
     this.pulsingNode = null;
-    // 清除外发光
-    this.cy.container().style.filter = 'none';
   }
 }

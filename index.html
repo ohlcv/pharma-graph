@@ -20,12 +20,6 @@
   <!-- SVG Favicon: indigo→cyan 渐变三角形图腾 -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%236366f1'/><stop offset='100%25' stop-color='%2306b6d4'/></linearGradient></defs><polygon points='16,3 3,28 29,28' fill='url(%23g)'/></svg>">
 
-  <!-- Font loading: preconnect first, then async load with font-display:swap -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-  <noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
 </head>
 <body>
 
@@ -98,7 +92,7 @@
 
     <div class="toolbar__sep"></div>
 
-    <button id="btn-tour" class="btn" onclick="toggleTour()" title="漫游探索">
+    <button id="btn-tour" class="btn" title="漫游探索">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="10"/>
         <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/>
@@ -145,9 +139,6 @@
     </div>
 
     <div id="cy">
-      <div id="glow-host">
-        <svg id="tour-path-svg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1" aria-hidden="true"></svg>
-      </div>
     </div>
 
     <!-- ── Left floating node detail ─────────────────────────────────── -->
@@ -161,15 +152,60 @@
         </button>
       </div>
       <div class="node-panel__body">
-        <div class="node-panel__hero">
-          <span id="lp-type-badge" class="lp-type-badge"></span>
-          <span id="lp-node-name" class="lp-node-name"></span>
+
+        <!-- 标题区 -->
+        <div class="np-hero">
+          <div class="np-hero__badges">
+            <span id="lp-type-badge" class="np-badge np-badge--type"></span>
+            <span id="lp-layer-badge" class="np-badge np-badge--layer"></span>
+            <span id="lp-category-badge" class="np-badge np-badge--category"></span>
+          </div>
+          <div id="lp-node-name" class="np-hero__name"></div>
+          <div id="lp-location" class="np-hero__location"></div>
         </div>
-        <div id="lp-fields" class="lp-fields"></div>
-        <div id="lp-adj-label" class="lp-adj-label" style="display:none">
-          <span class="lp-field-key">邻居</span>
+
+        <!-- 摘要（可折叠） -->
+        <div id="lp-summary-section" class="np-section np-summary-section">
+          <div class="np-section__toggle" id="lp-summary-toggle">
+            <span class="np-section__label">摘要</span>
+            <svg class="np-section__toggle-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+          <div id="lp-summary" class="np-summary"></div>
         </div>
-        <div id="lp-adj" class="lp-adj"></div>
+
+        <!-- 标签（可折叠） -->
+        <div id="lp-tags-section" class="np-section" style="display:none">
+          <div id="lp-tags-toggle" class="np-section__toggle">
+            <span class="np-section__label">标签</span>
+            <svg class="np-section__toggle-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+          <div id="lp-tags" class="np-tags"></div>
+        </div>
+
+        <!-- 连出边 -->
+        <div id="lp-edges-section" class="np-section" style="display:none">
+          <div id="lp-edges-toggle" class="np-section__toggle">
+            <span class="np-section__label">关联</span>
+            <svg class="np-section__toggle-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+          <div id="lp-edges" class="np-edges"></div>
+        </div>
+
+        <!-- 邻居 -->
+        <div id="lp-neighbors-section" class="np-section" style="display:none">
+          <div class="np-section__label">邻居节点</div>
+          <div id="lp-neighbors" class="np-neighbors"></div>
+        </div>
+
+        <!-- 正文 -->
+        <div id="lp-body-section" class="np-section" style="display:none">
+          <div id="lp-body-toggle" class="np-section__toggle">
+            <span class="np-section__label">正文</span>
+            <svg class="np-section__toggle-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+          <div id="lp-body-content" class="np-body-content"></div>
+        </div>
+
       </div>
     </div>
 
@@ -345,7 +381,7 @@
           </svg>
           <span>音乐</span>
         </button>
-        <button class="bs-quick-btn" id="bs-btn-tour" title="漫游探索" onclick="toggleTour()">
+        <button class="bs-quick-btn" id="bs-btn-tour" title="漫游探索">
           <svg id="bs-tour-icon-stop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
             <rect x="6" y="6" width="12" height="12" rx="1" fill="currentColor" stroke="none"/>
           </svg>
@@ -427,8 +463,22 @@
 
   <!-- ── Tour panel ─────────────────────────────────────────────────── -->
   <!-- ── Tour status bar ───────────────────────────────────────────────── -->
+  <!-- 漫游状态条 -->
   <div id="tour-status" class="tour-status" style="display:none">
-    <div class="tour-status__left">
+    <!-- 拖动把手（仅移动端） -->
+    <div class="tour-bar-drag-handle" id="tour-status-handle">
+      <div class="tour-bar-drag-handle__dots">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+    <!-- 内容行 -->
+    <div class="tour-status__inner">
+      <button class="tour-status__close" id="tour-close-btn" onclick="tourStop()" title="停止漫游">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
       <button class="tour-status__badge" id="tour-badge-btn" onclick="tourPause()" title="暂停/继续 (P)">
         <svg id="tour-badge-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"/>
@@ -447,7 +497,6 @@
         <span class="tour-status__sep">|</span>
         <span id="tour-count-badge">已探索 0 个节点</span>
       </div>
-      <!-- 探索进度条 -->
       <div class="tour-progress">
         <div class="tour-progress__bar" id="tour-progress-bar"></div>
       </div>

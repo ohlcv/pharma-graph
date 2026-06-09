@@ -30,6 +30,8 @@ export interface EdgeDef {
 
 export interface ParsedFrontmatter extends NodeMeta {
   edges_out?: EdgeDef[];
+  tags?: string[];
+  body?: string;   // 正文内容（在 frontmatter 分隔线之后）
 }
 
 function parseFrontmatterRaw(raw: string): { data: Record<string, unknown>; content: string } {
@@ -94,8 +96,8 @@ export function parseFrontmatter(raw: string, filePath: string): ParsedFrontmatt
     (data['summary'] as Record<string, unknown> | string | undefined);
   const summary =
     typeof rawSummary === 'object' && rawSummary !== null
-      ? (getField(rawSummary as Record<string, unknown>, 'full') ??
-         getField(rawSummary as Record<string, unknown>, 'short'))
+      ? (getField(rawSummary as Record<string, unknown>, 'short') ??
+         getField(rawSummary as Record<string, unknown>, 'full'))
       : typeof rawSummary === 'string'
         ? rawSummary.trim()
         : undefined;
@@ -119,6 +121,12 @@ export function parseFrontmatter(raw: string, filePath: string): ParsedFrontmatt
   const location = (rawData['location'] as Record<string, unknown> | undefined) ??
                    (data['location'] as Record<string, unknown> | undefined);
 
+  const tagsRaw = (rawData['tags'] as unknown[] | undefined) ??
+                  (data['tags'] as unknown[] | undefined);
+  const tags: string[] = Array.isArray(tagsRaw)
+    ? tagsRaw.filter((t): t is string => typeof t === 'string')
+    : [];
+
   return {
     id,
     label,
@@ -127,6 +135,7 @@ export function parseFrontmatter(raw: string, filePath: string): ParsedFrontmatt
     layer: typeof rawData['layer'] === 'string' ? (rawData['layer'] as string).trim() : undefined,
     summary,
     edges_out: edges_out.length > 0 ? edges_out : undefined,
+    tags: tags.length > 0 ? tags : undefined,
     location: location
       ? {
           book: getField(location, 'book'),
@@ -138,5 +147,6 @@ export function parseFrontmatter(raw: string, filePath: string): ParsedFrontmatt
           subsection: getField(location, 'subsection'),
         }
       : undefined,
+    body: parseFrontmatterRaw(raw).content.trim(),
   };
 }

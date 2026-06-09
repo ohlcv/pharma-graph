@@ -23,43 +23,53 @@ cytoscape.use(coseBilkent);
 cytoscape.use(dagre);
 cytoscape.use(euler);
 
+// ── CSS class name constants — exposed for external modules ─────────────────────
+
+export const CLASSES = {
+  SELECTED_NODE: 'selected-node',
+  DIMMED: 'dimmed',
+  HIGHLIGHTED: 'highlighted',
+  HIGHLIGHTED_EDGE: 'highlighted-edge',
+  HOVERED: 'hovered',
+  PULSE: 'pulse',
+  ENTERING: 'entering',
+  DRAGGING_SIMPLIFIED: 'dragging-simplified',
+  TOUR_PATH_PREVIEW: 'tour-path-preview',
+  LAYER_PARENT: 'layer-parent',
+} as const;
+
 // ── Stylesheet (computed once at module load) ───────────────────────────────────
 
-const STYLESHEET: any = (() => {
-  const nodeTypeRules = Object.entries(NODE_TYPE_SHAPE).flatMap(([type, shape]) => {
-    const main = nodeColor(type);
-    const dark = nodeColorDark(type);
-    return [
-      {
-        selector: `node[type = "${type}"]`,
-        style: { shape: shape as cytoscape.Css.NodeShape },
-      },
-      {
-        selector: `node[type = "${type}"]`,
-        style: {
-          'background-gradient-stop-colors': [main, dark],
-          'border-width': 1.5,
-        },
-      },
-    ];
-  });
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const STYLESHEET: any[] = (() => {
+  const nodeTypeRules = Object.entries(NODE_TYPE_SHAPE).map(([type, shape]) => ({
+    selector: `node[type = "${type}"]`,
+    style: {
+      shape: shape as cytoscape.Css.NodeShape,
+      'background-gradient-stop-colors': [nodeColor(type), nodeColorDark(type)],
+      'background-gradient-stop-positions': [0, 100],
+      'border-width': 1.5,
+    },
+  }));
 
   const categoryRules = Object.entries(CATEGORY_COLOR).map(([cat, color]) => ({
     selector: `node[category = "${cat}"]`,
     style: {
       'border-color': color,
       'border-width': 2.5,
-    } as any,
+    },
   }));
 
-  const layerRules = Object.entries(NODE_LAYER_STYLE).map(([layer, style]) => ({
-    selector: `node[layer = "${layer}"]`,
-    style: {
+  const layerRules = Object.entries(NODE_LAYER_STYLE).map(([layer, style]) => {
+    const s: Record<string, unknown> = {
       'border-width': style.borderWidth,
       'border-color': style.borderColor,
-      'background-color': style.bgColor === 'transparent' ? undefined : style.bgColor,
-    } as any,
-  }));
+    };
+    if (style.bgColor !== 'transparent') {
+      s['background-color'] = style.bgColor;
+    }
+    return { selector: `node[layer = "${layer}"]`, style: s };
+  });
 
   const edgeTypeRules = Object.entries(EDGE_TYPE_STYLE).map(([type, s]) => ({
     selector: `edge[edgeType = "${type}"]`,
@@ -76,26 +86,25 @@ const STYLESHEET: any = (() => {
       selector: 'node',
       style: {
         label: 'data(label)',
-        width:  'mapData(weight, 40, 100, 32, 64)',
+        width: 'mapData(weight, 40, 100, 32, 64)',
         height: 'mapData(weight, 40, 100, 32, 64)',
-        'font-size':   'mapData(weight, 40, 100, 10, 13)',
+        'font-size': 'mapData(weight, 40, 100, 10, 13)',
         'font-weight': 600,
-        color:         '#e2e8f0',
+        color: '#e2e8f0',
         'text-valign': 'bottom',
         'text-halign': 'center',
         'text-margin-y': 6,
         'text-background-color': 'rgba(15,17,23,0.82)',
         'text-background-shape': 'roundrectangle',
         'text-background-padding': '3px',
-        'border-width': 1.5,
-        'border-color': 'rgba(255,255,255,0.12)',
+        'border-width': 0,
         shape: 'ellipse',
         'text-events': 'yes',
       },
     },
     ...nodeTypeRules,
-    ...categoryRules,
     ...layerRules,
+    ...categoryRules,
     {
       selector: '.layer-parent',
       style: {
@@ -123,54 +132,33 @@ const STYLESHEET: any = (() => {
     },
     ...edgeTypeRules,
     {
-      selector: ':selected',
-      style: {
-        opacity: 1,
-        'border-width': 3,
-        'border-color': '#ffffff',
-        'overlay-color': 'rgba(99,102,241,0)',
-        'overlay-padding': 6,
-        'overlay-opacity': 0,
-      },
-    },
-    {
       selector: '.selected-node',
       style: {
         opacity: 1,
         'border-width': 4,
         'border-color': '#ffffff',
-        'overlay-color': 'rgba(99,102,241,0)',
-        'overlay-padding': 0,
-        'overlay-opacity': 0,
       },
     },
-    { selector: '.dimmed',       style: {
-      opacity: 0.22,
+    { selector: '.dimmed', style: {
+      opacity: 0.0,
       'border-color': 'rgba(255,255,255,0.06)',
       'text-background-color': 'rgba(15,17,23,0.5)',
-      'line-opacity': 0.08,
+      'line-color': 'transparent',
+      'line-opacity': 0.0,
+      'source-arrow-color': 'transparent',
+      'target-arrow-color': 'transparent',
       'color': 'rgba(226,232,240,0.25)',
     }},
-    { selector: '.dimmed:selected', style: {
-      opacity: 0.22,
-      'border-color': 'rgba(255,255,255,0.06)',
-      'border-width': 1.5,
-    }},
-    { selector: '.entering',     style: { opacity: 0 } },
-    { selector: '.hovered',      style: {
+    { selector: '.entering', style: { opacity: 0 } },
+    { selector: '.hovered', style: {
       opacity: 1,
       'border-width': 3,
       'border-color': 'rgba(255,255,255,0.9)',
-      'overlay-color': 'rgba(99,102,241,0)',
-      'overlay-padding': 6,
-      'overlay-opacity': 0,
     }},
-    { selector: '.highlighted',  style: {
+    { selector: '.highlighted', style: {
       opacity: 0.8,
       'border-width': 2.5,
       'border-color': '#fbbf24',
-      'overlay-color': 'rgba(0,0,0,0)',
-      'overlay-opacity': 0,
     }},
     { selector: '.highlighted-edge', style: {
       opacity: 1,
@@ -190,18 +178,27 @@ const STYLESHEET: any = (() => {
       style: {
         'border-width': 2.5,
         'border-color': '#fbbf24',
-        width:  'mapData(weight, 40, 100, 38, 72)',
+        width: 'mapData(weight, 40, 100, 38, 72)',
         height: 'mapData(weight, 40, 100, 38, 72)',
       },
     },
     {
       selector: '.dragging-simplified',
       style: {
-        'background-gradient-stop-colors': 'rgba(0,0,0,0)',
         'border-width': 1,
+        'border-color': 'rgba(255,255,255,0.06)',
         'text-background-color': 'rgba(0,0,0,0)',
-        'text-background-shape': 'none',
-        'overlay-opacity': 0,
+      },
+    },
+    {
+      selector: '.dimmed.dragging-simplified',
+      style: {
+        opacity: 0.22,
+        'border-color': 'rgba(255,255,255,0.06)',
+        'border-width': 1,
+        'text-background-color': 'rgba(15,17,23,0.5)',
+        'line-opacity': 0.08,
+        'color': 'rgba(226,232,240,0.25)',
       },
     },
     {
@@ -216,7 +213,7 @@ const STYLESHEET: any = (() => {
   ];
 })();
 
-// ── Renderer ──────────────────────────────────────────────────────────────────
+// ── Options & Types ────────────────────────────────────────────────────────────
 
 export interface RendererOptions {
   container: HTMLElement;
@@ -225,10 +222,11 @@ export interface RendererOptions {
   layoutConfigs?: Record<string, LayoutConfig>;
   minZoom?: number;
   maxZoom?: number;
-  onEdgeHover?: (edge: cytoscape.EdgeSingular | null, x: number, y: number) => void;
 }
 
 const DEFAULT_LAYOUT = 'cose';
+
+// ── Renderer ──────────────────────────────────────────────────────────────────
 
 export class Renderer {
   private cy: cytoscape.Core;
@@ -259,20 +257,13 @@ export class Renderer {
       boxSelectionEnabled: true,
       autounselectify: false,
       autoungrabify: false,
-      // 启用画布级别优化：减少不必要的像素重绘
       pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
     });
 
     this.runLayout(layoutName);
-    this.attachEdgeTooltip(options.onEdgeHover);
-
-    // 视口缩放节流：限制极端缩放，减少频繁重绘
-    this.cy.on('zoom', () => {
-      const zoom = this.cy.zoom();
-      if (zoom < 0.05) this.cy.zoom(0.05);
-      if (zoom > 5.0) this.cy.zoom(5.0);
-    });
   }
+
+  // ── Public API ──────────────────────────────────────────────────────────────
 
   render(data: GraphData, layoutName?: string): void {
     this.cy.elements().remove();
@@ -292,92 +283,90 @@ export class Renderer {
     return this.cy;
   }
 
-  // 拖拽时简化节点样式，减少重绘成本；结束后恢复
-  setDragMode(on: boolean): void {
-    if (on) {
-      this.cy.nodes().addClass('dragging-simplified');
-    } else {
-      this.cy.nodes().removeClass('dragging-simplified');
-    }
-  }
-
   runLayout(name: string, overrides?: Record<string, unknown>): void {
     this.currentLayout = name;
     const preset = this.layoutConfigs[name]?.cytoscape;
     const base = preset ? { ...preset } : {};
     if (overrides) Object.assign(base, overrides);
-    if (!base.name) (base as any).name = name;
+    if (!base.name) (base as Record<string, unknown>).name = name;
 
-    const nodes = this.cy.nodes().not('.layer-parent');
+    const nodes = this.cy.nodes().not(`.${CLASSES.LAYER_PARENT}`);
 
-    // 入场透明状态
-    nodes.addClass('entering');
-    this.cy.edges().addClass('entering');
+    nodes.addClass(CLASSES.ENTERING);
+    this.cy.edges().addClass(CLASSES.ENTERING);
 
-    // 逐帧 stagger 入场动画
     nodes.forEach((node: cytoscape.NodeSingular, i: number) => {
       const delay = 80 + i * 16;
       setTimeout(() => {
-        node.removeClass('entering');
+        node.removeClass(CLASSES.ENTERING);
       }, delay + 300);
     });
 
     const edgeDelay = 80 + nodes.length * 16 + 150;
     this.cy.edges().forEach((edge: cytoscape.EdgeSingular, i: number) => {
       setTimeout(() => {
-        edge.removeClass('entering');
+        edge.removeClass(CLASSES.ENTERING);
       }, edgeDelay + i * 10 + 200);
     });
 
-    const layout = this.cy.layout(base as unknown as cytoscape.LayoutOptions);
-    layout.run();
+    this.cy.layout(base as unknown as cytoscape.LayoutOptions).run();
   }
+
+  setDragMode(on: boolean): void {
+    if (on) {
+      this.cy.nodes().addClass(CLASSES.DRAGGING_SIMPLIFIED);
+    } else {
+      this.cy.nodes().removeClass(CLASSES.DRAGGING_SIMPLIFIED);
+    }
+  }
+
+  getEdgeReason(edge: cytoscape.EdgeSingular): string | undefined {
+    return edge.data('reason');
+  }
+
+  getEdgeMidpoint(edge: cytoscape.EdgeSingular): { x: number; y: number } {
+    const src = edge.source().renderedPosition();
+    const tgt = edge.target().renderedPosition();
+    if (!src || !tgt) return { x: 0, y: 0 };
+    return {
+      x: (src.x + tgt.x) / 2,
+      y: (src.y + tgt.y) / 2,
+    };
+  }
+
+  currentLayoutName(): string {
+    return this.currentLayout;
+  }
+
+  // ── Element builder ─────────────────────────────────────────────────────────
 
   private buildElements(data: GraphData) {
     return [
       ...data.nodes.map((n) => ({
         data: {
-          id:       n.id,
-          label:    n.label || n.id,
-          type:     n.type,
+          id: n.id,
+          label: n.label || n.id,
+          type: n.type,
           category: n.category ?? 'default',
-          layer:    n.layer,
-          summary:  n.summary,
+          layer: n.layer,
+          summary: n.summary,
           location: n.location,
-          weight:   n.weight ?? 60,
-          color:    nodeColor(n.type),
+          tags: n.tags ?? [],
+          body: n.body,
+          weight: n.weight ?? 60,
+          color: nodeColor(n.type),
           colorDark: nodeColorDark(n.type),
         },
       })),
       ...data.edges.map((e, idx) => ({
         data: {
-          id:       e.id ?? `edge-${idx}`,
-          source:   e.source,
-          target:   e.target,
+          id: e.id ?? `edge-${idx}`,
+          source: e.source,
+          target: e.target,
           edgeType: e.type,
-          reason:   e.reason,
+          reason: e.reason,
         },
       })),
     ];
-  }
-
-  private attachEdgeTooltip(
-    cb: RendererOptions['onEdgeHover']
-  ): void {
-    let tooltip: HTMLElement | null = null;
-
-    this.cy.on('mouseover', 'edge', (evt) => {
-      const edge = evt.target;
-      const reason = edge.data('reason');
-      if (!reason || !cb) return;
-
-      const x = edge.source().renderedPosition().x + (edge.target().renderedPosition().x - edge.source().renderedPosition().x) / 2;
-      const y = edge.source().renderedPosition().y + (edge.target().renderedPosition().y - edge.source().renderedPosition().y) / 2;
-      cb(edge, x, y);
-    });
-
-    this.cy.on('mouseout', 'edge', () => {
-      if (cb) cb(null, 0, 0);
-    });
   }
 }
