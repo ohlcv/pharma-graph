@@ -1,5 +1,6 @@
 // src/parser/frontmatter.ts
 // 纯 JS frontmatter 解析器，浏览器兼容
+import { parse as yamlParse } from 'yaml';
 
 // --- frontmatter 字段类型 ---
 
@@ -31,159 +32,18 @@ export interface ParsedFrontmatter extends NodeMeta {
   edges_out?: EdgeDef[];
 }
 
-// ── YAML subset parser (supports nesting, lists, inline objects) ──────────────
-
-function parseYamlBlock(block: string): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  const lines = block.split('\n');
-  let i = 0;
-
-  while (i < lines.length && !lines[i].trim()) i++;
-
-  const getIndent = (line: string) => line.length - line.trimStart().length;
-
-  while (i < lines.length) {
-    const raw = lines[i];
-    const trimmed = raw.trim();
-
-    if (!trimmed || trimmed.startsWith('#')) { i++; continue; }
-
-    const indent = getIndent(raw);
-
-    if (trimmed.startsWith('- ')) {
-      const content = trimmed.slice(2).trim();
-      const itemIndent = indent;
-
-      if (content.includes(':')) {
-        const item: Record<string, unknown> = {};
-        const colonIdx = content.indexOf(':');
-        item[content.slice(0, colonIdx).trim()] = content.slice(colonIdx + 1).trim();
-        i++;
-
-        while (i < lines.length) {
-          const nextRaw = lines[i];
-          const nextTrimmed = nextRaw.trim();
-          if (!nextTrimmed) { i++; continue; }
-          const nextIndent = getIndent(nextRaw);
-          // Break if dedented to or past the list-marker indent, or if a new key starts at the same indent
-          if (nextIndent < itemIndent || (nextIndent === itemIndent && !nextTrimmed.startsWith('- '))) break;
-          if (nextTrimmed.startsWith('- ')) break;
-          const nextKeyEnd = nextTrimmed.indexOf(':');
-          if (nextKeyEnd > 0) {
-            item[nextTrimmed.slice(0, nextKeyEnd).trim()] = nextTrimmed.slice(nextKeyEnd + 1).trim();
-          }
-          i++;
-        }
-
-        const lastKey = Object.keys(result).at(-1);
-        if (!lastKey) { i++; continue; }
-        const last = result[lastKey];
-        if (Array.isArray(last)) last.push(item);
-        else result[lastKey] = [item];
-      } else {
-        const lastKey = Object.keys(result).at(-1);
-        if (!lastKey) { i++; continue; }
-        const last = result[lastKey];
-        if (Array.isArray(last)) last.push(content);
-        else result[lastKey] = [content];
-        i++;
-      }
-    } else if (trimmed.includes(':')) {
-      const colonIdx = trimmed.indexOf(':');
-      const key = trimmed.slice(0, colonIdx).trim();
-      const rest = trimmed.slice(colonIdx + 1).trim();
-
-      if (rest === '') {
-        i++;
-        while (i < lines.length) {
-          const nextRaw = lines[i];
-          const nextTrimmed = nextRaw.trim();
-          if (!nextTrimmed || nextTrimmed.startsWith('#')) { i++; continue; }
-          const nextIndent = getIndent(nextRaw);
-          const firstIndent = nextIndent;
-          if (nextTrimmed.startsWith('- ')) {
-            const inner = nextTrimmed.slice(2).trim();
-            if (inner.includes(':')) {
-              const subObj: Record<string, unknown> = {};
-              const subColon = inner.indexOf(':');
-              subObj[inner.slice(0, subColon).trim()] = inner.slice(subColon + 1).trim();
-              i++;
-              while (i < lines.length) {
-                const subRaw = lines[i];
-                const subTrimmed = subRaw.trim();
-                if (!subTrimmed) { i++; continue; }
-                const subIndent = getIndent(subRaw);
-                if (subIndent <= firstIndent) break;
-                const subKeyEnd = subTrimmed.indexOf(':');
-                if (subKeyEnd > 0) {
-                  subObj[subTrimmed.slice(0, subKeyEnd).trim()] = subTrimmed.slice(subKeyEnd + 1).trim();
-                }
-                i++;
-              }
-              if (Array.isArray(result[key])) (result[key] as unknown[]).push(subObj);
-              else result[key] = [subObj];
-            } else {
-              if (Array.isArray(result[key])) (result[key] as unknown[]).push(inner);
-              else result[key] = [inner];
-              i++;
-            }
-          } else if (nextIndent > indent) {
-            const subCol = nextTrimmed.indexOf(':');
-            if (subCol > 0) {
-              const subKey = nextTrimmed.slice(0, subCol).trim();
-              const subVal = nextTrimmed.slice(subCol + 1).trim();
-              // It's a nested key-value block → parse as object (not list)
-              if (!result[key] || Array.isArray(result[key])) {
-                result[key] = {};
-              }
-              const obj = result[key] as Record<string, unknown>;
-              obj[subKey] = subVal;
-              i++;
-              while (i < lines.length) {
-                const subRaw = lines[i];
-                const subTrimmed = subRaw.trim();
-                if (!subTrimmed) { i++; continue; }
-                const subIndent = getIndent(subRaw);
-                if (subIndent <= firstIndent) break;
-                const subKeyEnd = subTrimmed.indexOf(':');
-                if (subKeyEnd > 0) {
-                  const k = subTrimmed.slice(0, subKeyEnd).trim();
-                  const v = subTrimmed.slice(subKeyEnd + 1).trim();
-                  if (obj[k] === undefined) obj[k] = v; // first occurrence wins, skip siblings
-                }
-                i++;
-              }
-            } else {
-              i++;
-            }
-          } else {
-            break;
-          }
-        }
-      } else if (rest.startsWith('[') && rest.endsWith(']')) {
-        result[key] = rest.slice(1, -1).split(',').map((s) => s.trim().replace(/^["']|["']$/g, ''));
-        i++;
-      } else {
-        result[key] = rest.replace(/^["']|["']$/g, '');
-        i++;
-      }
-    } else {
-      i++;
-    }
-  }
-
-  return result;
-}
-
-// ── Simple frontmatter parser (no gray-matter dependency) ────────────────────
-
 function parseFrontmatterRaw(raw: string): { data: Record<string, unknown>; content: string } {
   const trimmed = raw.replace(/^\uFEFF/, ''); // Remove BOM
   const match = trimmed.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (!match) return { data: {}, content: trimmed };
   const yamlBlock = match[1];
   const content = match[2];
-  const data = parseYamlBlock(yamlBlock);
+  let data: Record<string, unknown> = {};
+  try {
+    data = yamlParse(yamlBlock) as Record<string, unknown> ?? {};
+  } catch {
+    // fallback: return empty data
+  }
   return { data, content };
 }
 
@@ -229,17 +89,21 @@ export function parseFrontmatter(raw: string, filePath: string): ParsedFrontmatt
     getField(data, 'label') ??
     basename(filePath);
 
-  const rawSummary = rawData['summary'];
+  const rawSummary =
+    (rawData['summary'] as Record<string, unknown> | string | undefined) ??
+    (data['summary'] as Record<string, unknown> | string | undefined);
   const summary =
     typeof rawSummary === 'object' && rawSummary !== null
-      ? (getField(rawData as Record<string, unknown>, 'summary', 'full') ??
-         getField(rawData as Record<string, unknown>, 'summary', 'short'))
+      ? (getField(rawSummary as Record<string, unknown>, 'full') ??
+         getField(rawSummary as Record<string, unknown>, 'short'))
       : typeof rawSummary === 'string'
         ? rawSummary.trim()
         : undefined;
 
-  const edges_out: EdgeDef[] = Array.isArray(rawData['edges_out'])
-    ? (rawData['edges_out'] as unknown[])
+  const edgesRaw = (rawData['edges_out'] as unknown[] | undefined) ??
+                   (data['edges_out'] as unknown[] | undefined);
+  const edges_out: EdgeDef[] = Array.isArray(edgesRaw)
+    ? edgesRaw
         .filter(
           (e): e is Record<string, unknown> =>
             typeof e === 'object' && e !== null && !Array.isArray(e)
@@ -252,7 +116,8 @@ export function parseFrontmatter(raw: string, filePath: string): ParsedFrontmatt
         .filter((e): e is EdgeDef => Boolean(e.target))
     : [];
 
-  const location = rawData['location'] as Record<string, unknown> | undefined;
+  const location = (rawData['location'] as Record<string, unknown> | undefined) ??
+                   (data['location'] as Record<string, unknown> | undefined);
 
   return {
     id,
