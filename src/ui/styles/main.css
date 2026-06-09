@@ -1465,8 +1465,32 @@
       border-color: rgba(99,102,241,0.55);
       box-shadow: 0 0 10px rgba(99,102,241,0.18);
     }
-    /* 显示拖动把手 */
-    .tour-bar-drag-handle { display: flex; }
+    /* 显示拖动把手（扩大化，易于抓握） */
+    .tour-bar-drag-handle {
+      display: flex !important;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 5px 0 3px;
+      cursor: grab;
+      user-select: none;
+      min-height: 24px;
+      position: relative;
+    }
+    .tour-bar-drag-handle__dots {
+      gap: 3px;
+    }
+    .tour-bar-drag-handle__dots span {
+      display: block;
+      width: 24px;
+      height: 3px;
+      border-radius: 2px;
+      background: rgba(255,255,255,0.35);
+    }
+    .tour-bar-drag-handle:active { cursor: grabbing; }
+    .tour-bar-drag-handle:active .tour-bar-drag-handle__dots span {
+      background: rgba(255,255,255,0.6);
+    }
     /* 恢复详情信息显示 */
     .tour-status__info,
     .tour-status__cycle,

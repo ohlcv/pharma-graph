@@ -421,16 +421,17 @@ function startSheetDrag(e: PointerEvent): void {
 // ── Tour bar drag ─────────────────────────────────────────────────────────────
 
 const TOPBAR_H = 72;
-let tourDragState: { startY: number; startTop: number; el: HTMLElement } | null = null;
+let tourDragState: { startX: number; startY: number; startLeft: number; startTop: number; el: HTMLElement } | null = null;
 
 function startTourBarDrag(e: PointerEvent): void {
   const bar = document.getElementById('tour-status');
-  const handle = document.getElementById('tour-status-handle');
-  if (!bar || !handle) return;
+  if (!bar) return;
   if (window.innerWidth > 640) return;
-  if (!handle.contains(e.target as Node) && e.target !== handle) return;
+  const target = e.target as HTMLElement;
+  if (target.closest('button')) return;
   e.preventDefault();
-  tourDragState = { startY: e.clientY, startTop: bar.getBoundingClientRect().top, el: bar };
+  const rect = bar.getBoundingClientRect();
+  tourDragState = { startX: e.clientX, startY: e.clientY, startLeft: rect.left, startTop: rect.top, el: bar };
   bar.style.cursor = 'grabbing';
   bar.style.transition = 'none';
   document.addEventListener('pointermove', onTourDrag, { passive: false });
@@ -440,13 +441,13 @@ function startTourBarDrag(e: PointerEvent): void {
 function onTourDrag(e: PointerEvent): void {
   if (!tourDragState) return;
   e.preventDefault();
-  const { el, startY, startTop } = tourDragState;
-  const delta = e.clientY - startY;
-
-  // Free drag
-  const newTop = Math.max(TOPBAR_H, Math.min(startTop + delta, window.innerHeight - el.offsetHeight - 16));
-  el.style.top = newTop + 'px'; el.style.bottom = 'auto';
-  el.style.left = '50%'; el.style.transform = 'translateX(-50%)';
+  const { el, startX, startY, startLeft, startTop } = tourDragState;
+  const deltaX = e.clientX - startX;
+  const deltaY = e.clientY - startY;
+  const PAD = 8;
+  const newLeft = Math.max(PAD, Math.min(startLeft + deltaX, window.innerWidth - el.offsetWidth - PAD));
+  const newTop = Math.max(TOPBAR_H, Math.min(startTop + deltaY, window.innerHeight - el.offsetHeight - PAD));
+  el.style.left = newLeft + 'px'; el.style.top = newTop + 'px'; el.style.bottom = 'auto'; el.style.transform = 'none';
 }
 
 function stopTourDrag(): void {
@@ -1034,8 +1035,8 @@ try {
   if (bar) bar.addEventListener('click', toggleBottomSheet);
   const sheet = document.getElementById('bottom-sheet');
   if (sheet) sheet.addEventListener('pointerdown', startSheetDrag);
-  const tourHandle = document.getElementById('tour-status-handle');
-  if (tourHandle) tourHandle.addEventListener('pointerdown', startTourBarDrag);
+  const tourBar = document.getElementById('tour-status');
+  if (tourBar) tourBar.addEventListener('pointerdown', startTourBarDrag);
 
 } catch (err) {
   const n = document.getElementById('stat-nodes');

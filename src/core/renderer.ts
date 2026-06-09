@@ -140,11 +140,11 @@ const STYLESHEET: any[] = (() => {
       },
     },
     { selector: '.dimmed', style: {
-      opacity: 0.0,
+      opacity: 0.1,
       'border-color': 'rgba(255,255,255,0.06)',
       'text-background-color': 'rgba(15,17,23,0.5)',
       'line-color': 'transparent',
-      'line-opacity': 0.0,
+      'line-opacity': 0.1,
       'source-arrow-color': 'transparent',
       'target-arrow-color': 'transparent',
       'color': 'rgba(226,232,240,0.25)',
