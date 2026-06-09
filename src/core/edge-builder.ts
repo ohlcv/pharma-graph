@@ -17,6 +17,7 @@ export async function buildEdges(filePaths: string[]): Promise<EdgeData[]> {
 
     for (const edge of fm.edges_out) {
       rawEdges.push({
+        id: `${fm.id}||${edge.target}||${edge.type}`,
         source: fm.id,
         target: edge.target,
         type: edge.type,
@@ -31,9 +32,8 @@ export async function buildEdges(filePaths: string[]): Promise<EdgeData[]> {
 function deduplicateEdges(edges: EdgeData[]): EdgeData[] {
   const seen = new Set<string>();
   return edges.filter((e) => {
-    const key = `${e.source}||${e.target}||${e.type}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
+    if (seen.has(e.id)) return false;
+    seen.add(e.id);
     return true;
   });
 }

@@ -4,6 +4,7 @@
 import './styles/main.css';
 import { Renderer } from '../core/renderer.js';
 import { GraphData } from '../core/graph.js';
+import { TourEngine } from '../core/tour.js';
 
 // ── Theme ────────────────────────────────────────────────────────────────────
 
@@ -706,11 +707,16 @@ function initShortcuts(): void {
         break;
       case 'Escape':
         cy.elements().unselect(); resetAll();
+        if (tourEngine?.isRunning() || tourEngine?.isPaused()) tourStop();
         break;
       case 'f': case 'F': fitGraph(); break;
       case 'r': case 'R': randomize(); break;
+      case 't': case 'T': toggleTour(); break;
       case 'a': case 'A':
         if (e.ctrlKey || e.metaKey) { e.preventDefault(); cy.nodes().not('.layer-parent').select(); }
+        break;
+      case 'p': case 'P':
+        if (tourEngine?.isRunning() || tourEngine?.isPaused()) tourPause();
         break;
     }
   });
@@ -719,6 +725,7 @@ function initShortcuts(): void {
 // ── Boot ────────────────────────────────────────────────────────────────────
 
 let sheetOpen = false;
+let tourEngine: TourEngine | null = null;
 
 function toggleBottomSheet(): void {
   const sheet = document.getElementById('bottom-sheet');
@@ -819,6 +826,9 @@ loadGraphData()
     if (sheet) {
       sheet.addEventListener('pointerdown', startSheetDrag);
     }
+
+    // Init tour sliders after graph loads
+    initTourSlider();
   })
   .catch((err) => {
     const n = document.getElementById('stat-nodes');
@@ -924,3 +934,236 @@ function toggleSidebar(): void {
   }
   if (renderer) renderer.getCy().resize();
 }
+
+// ── Tour ─────────────────────────────────────────────────────────────────────
+
+function initTourSlider(): void {
+  const intervalSlider = document.getElementById('tour-interval') as HTMLInputElement;
+  const depthSlider = document.getElementById('tour-maxdepth') as HTMLInputElement;
+  const intervalVal = document.getElementById('tour-interval-val');
+  const depthVal = document.getElementById('tour-depth-val');
+
+  if (intervalSlider) {
+    intervalSlider.addEventListener('input', () => {
+      const v = parseInt(intervalSlider.value);
+      if (intervalVal) intervalVal.textContent = (v / 1000).toFixed(1) + 's';
+      const pct = ((v - 1000) / (10000 - 1000)) * 100;
+      intervalSlider.style.background = `linear-gradient(to right, var(--accent) ${pct}%, var(--border) ${pct}%)`;
+    });
+    intervalSlider.addEventListener('change', () => {
+      tourEngine?.setInterval(parseInt(intervalSlider.value));
+    });
+  }
+  if (depthSlider) {
+    depthSlider.addEventListener('input', () => {
+      const v = parseInt(depthSlider.value);
+      if (depthVal) depthVal.textContent = v === 10 ? '不限' : `第 ${v} 层`;
+      const pct = ((v - 1) / (10 - 1)) * 100;
+      depthSlider.style.background = `linear-gradient(to right, var(--accent) ${pct}%, var(--border) ${pct}%)`;
+    });
+    depthSlider.addEventListener('change', () => {
+      const v = parseInt(depthSlider.value);
+      tourEngine?.setMaxDepth(v >= 10 ? -1 : v);
+    });
+    depthSlider.style.background = `linear-gradient(to right, var(--accent) 100%, var(--border) 100%)`;
+  }
+}
+
+function startTour(): void {
+  if (!renderer) return;
+
+  const cy = renderer.getCy();
+
+  // Use selected node if one is selected and not a layer-parent; otherwise auto-pick
+  const selected = cy.nodes('.node-selected').not('.layer-parent');
+  let rootId: string;
+  if (selected.length > 0) {
+    rootId = selected[0].id();
+  } else {
+    // Auto-pick the node with highest degree (most connections)
+    const nodes = cy.nodes().not('.layer-parent');
+    let best: cytoscape.NodeSingular = nodes[0];
+    let maxDegree = 0;
+    nodes.forEach((n) => {
+      const d = n.degree();
+      if (d > maxDegree) { maxDegree = d; best = n; }
+    });
+    rootId = best.id();
+  }
+
+  const intervalSlider = document.getElementById('tour-interval') as HTMLInputElement;
+  const depthSlider = document.getElementById('tour-maxdepth') as HTMLInputElement;
+  const interval = parseInt(intervalSlider?.value ?? '3000');
+  const maxDepth = parseInt(depthSlider?.value ?? '10');
+
+  // Mark button active
+  const tourBtn = document.getElementById('btn-tour');
+  if (tourBtn) tourBtn.classList.add('active');
+
+  // Reset badge to "漫游中" (playing) state
+  const playIcon = document.getElementById('tour-badge-play');
+  const pauseIcon = document.getElementById('tour-badge-pause');
+  const badgeText = document.getElementById('tour-badge-text');
+  if (playIcon) playIcon.style.display = '';
+  if (pauseIcon) pauseIcon.style.display = 'none';
+  if (badgeText) badgeText.textContent = '漫游中';
+
+  tourEngine = new TourEngine(cy);
+  tourEngine.start(rootId, {
+    interval,
+    maxDepth: maxDepth >= 10 ? -1 : maxDepth,
+    onStep: (info) => {
+      const status = document.getElementById('tour-status');
+      const depthBadge = document.getElementById('tour-depth-badge');
+      const countBadge = document.getElementById('tour-count-badge');
+      const cycleBadge = document.getElementById('tour-cycle-badge');
+
+      if (status) status.style.display = '';
+
+      if (depthBadge) depthBadge.textContent = `第 ${info.depth} 层`;
+      if (countBadge) countBadge.textContent = `已探索 ${info.totalExplored} 个节点`;
+      if (cycleBadge) {
+        if (info.cycleCount > 0) {
+          cycleBadge.style.display = '';
+          cycleBadge.textContent = `第 ${info.cycleCount + 1} 轮`;
+        } else {
+          cycleBadge.style.display = 'none';
+        }
+      }
+    },
+    onComplete: () => {
+      const depthBadge = document.getElementById('tour-depth-badge');
+      const badgeText = document.getElementById('tour-badge-text');
+      if (depthBadge) depthBadge.textContent = '完成!';
+      if (badgeText) badgeText.textContent = '完成!';
+      const tourBtn = document.getElementById('btn-tour');
+      if (tourBtn) tourBtn.classList.remove('active');
+      const status = document.getElementById('tour-status');
+      if (status && !tourEngine?.isRunning()) {
+        setTimeout(() => { if (status) status.style.display = 'none'; }, 2000);
+      }
+    },
+  });
+
+  const depthBadge = document.getElementById('tour-depth-badge');
+  const countBadge = document.getElementById('tour-count-badge');
+  if (depthBadge) depthBadge.textContent = '第 1 层';
+  if (countBadge) countBadge.textContent = '已探索 1 个节点';
+}
+
+function tourPause(): void {
+  if (!tourEngine) return;
+  const playIcon = document.getElementById('tour-badge-play');
+  const pauseIcon = document.getElementById('tour-badge-pause');
+  const badgeText = document.getElementById('tour-badge-text');
+  if (tourEngine.isPaused()) {
+    tourEngine.resume();
+    if (playIcon) playIcon.style.display = '';
+    if (pauseIcon) pauseIcon.style.display = 'none';
+    if (badgeText) badgeText.textContent = '漫游中';
+  } else {
+    tourEngine.pause();
+    if (playIcon) playIcon.style.display = 'none';
+    if (pauseIcon) pauseIcon.style.display = '';
+    if (badgeText) badgeText.textContent = '已暂停';
+  }
+}
+
+function tourStop(): void {
+  if (!tourEngine) return;
+  tourEngine.stop();
+  tourEngine = null;
+  const tourBtn = document.getElementById('btn-tour');
+  if (tourBtn) tourBtn.classList.remove('active');
+  const status = document.getElementById('tour-status');
+  if (status) status.style.display = 'none';
+}
+
+function toggleTour(): void {
+  if (tourEngine?.isRunning() || tourEngine?.isPaused()) {
+    tourStop();
+  } else {
+    startTour();
+  }
+}
+
+(window as any).toggleTour = toggleTour;
+(window as any).tourPause = tourPause;
+(window as any).tourStop = tourStop;
+
+// ── Music player ─────────────────────────────────────────────────────────────────
+// Audio files go in /public/audio/ — list filenames here.
+// Tracks are shuffled randomly, then looped; reshuffled each full cycle.
+(function () {
+  const btn         = document.getElementById('btn-music');
+  const bsBtn       = document.getElementById('bs-btn-music');
+  const audioEl     = document.getElementById('bgm');
+  const iconPlay    = document.getElementById('music-icon-play');
+  const iconPause   = document.getElementById('music-icon-pause');
+  const bsIconPlay  = document.getElementById('bs-music-icon-play');
+  const bsIconPause = document.getElementById('bs-music-icon-pause');
+
+  if (!audioEl || !btn) return;
+  const audio = audioEl as HTMLAudioElement;
+
+  // ↓ Add audio filenames from /public/audio/ here ↓
+  const TRACKS = [
+    'Echoes of the Eye - Travelers Encore.mp3',
+  ];
+  // ↑ End of track list ↑
+
+  let queue: string[] = [], trackIdx = 0, playing = false;
+
+  function shuffle<T>(arr: T[]): T[] {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function buildQueue() { queue = shuffle(TRACKS); trackIdx = 0; }
+
+  function setPlaying(v: boolean) {
+    playing = v;
+    const musicLabel = document.getElementById('music-label');
+    if (musicLabel) musicLabel.textContent = v ? '暂停' : '播放';
+    const toggle = (b: HTMLElement | null, ip: HTMLElement | null, ipa: HTMLElement | null) => {
+      if (!b || !ip || !ipa) return;
+      b.classList.toggle('active', v);
+      ip.style.display  = v ? 'none'  : 'block';
+      ipa.style.display = v ? 'block' : 'none';
+    };
+    toggle(btn, iconPlay, iconPause);
+    if (bsBtn) toggle(bsBtn, bsIconPlay, bsIconPause);
+  }
+
+  function playNext() {
+    if (!queue.length) return;
+    trackIdx = (trackIdx + 1) % queue.length;
+    if (trackIdx === 0) buildQueue();
+    audio.src = '/audio/' + queue[trackIdx];
+    audio.load();
+    audio.play().catch(() => {});
+  }
+
+  audio.volume = 0.45;
+  audio.addEventListener('ended', playNext);
+
+  buildQueue();
+  audio.src = '/audio/' + queue[0];
+  audio.load();
+
+  function toggleMusic() {
+    if (playing) {
+      audio.pause();
+      setPlaying(false);
+    } else {
+      audio.play().then(() => setPlaying(true)).catch(() => {});
+    }
+  }
+
+  btn.addEventListener('click', toggleMusic);
+  if (bsBtn) bsBtn.addEventListener('click', toggleMusic);
+})();

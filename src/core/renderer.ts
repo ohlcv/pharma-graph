@@ -242,7 +242,7 @@ export class Renderer {
       style: buildStylesheet(),
       layout: { name: 'preset' },
       minZoom, maxZoom,
-      wheelSensitivity: 0.25,
+      wheelSensitivity: 3.0,
       boxSelectionEnabled: true,
       autounselectify: false,
       autoungrabify: false,

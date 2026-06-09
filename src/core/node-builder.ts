@@ -20,6 +20,7 @@ export async function buildNodes(filePaths: string[]): Promise<NodeData[]> {
       category: fm.category,
       summary: fm.summary,
       location: toLocation(fp),
+      weight: 1,
     };
 
     nodes.push(node);

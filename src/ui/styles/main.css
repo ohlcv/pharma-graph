@@ -218,6 +218,7 @@
   background: linear-gradient(135deg, rgba(139,92,246,0.5), rgba(168,85,247,0.2));
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask-composite: exclude;
   pointer-events: none;
 }
@@ -596,9 +597,9 @@
   border-color: var(--border-hi);
 }
 #btn-sidebar-toggle.active {
-  background: rgba(99,102,241,0.18);
-  border-color: rgba(99,102,241,0.5);
-  color: var(--accent);
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 16px var(--accent-glow), 0 2px 8px rgba(0,0,0,0.3);
 }
 
 /* ── Floating sidebar strip ────────────────────────────────────────────── */
@@ -1392,6 +1393,13 @@
 
 .bs-quick-btn:active svg { color: var(--accent); }
 
+.bs-quick-btn.active {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.bs-quick-btn.active svg { color: var(--accent); }
+
 /* Stats row */
 .bs-stats-row {
   display: flex;
@@ -1735,3 +1743,329 @@
 #fab.active svg line:nth-child(1) { transform: translateY(6px) rotate(45deg); }
 #fab.active svg line:nth-child(2) { opacity: 0; }
 #fab.active svg line:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+/* ── Tour ────────────────────────────────────────────────────────────────── */
+
+.tour-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  background: var(--panel);
+  border: 1px solid var(--border-hi);
+  border-radius: 16px;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(99, 102, 241, 0.1);
+  animation: tourPanelIn 0.2s ease-out;
+}
+
+@keyframes tourPanelIn {
+  from { opacity: 0; transform: translate(-50%, -48%); }
+  to   { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+.tour-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tour-panel__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tour-panel__title svg {
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+}
+
+.tour-panel__close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  transition: color 0.15s, background 0.15s;
+}
+
+.tour-panel__close:hover {
+  color: var(--text);
+  background: rgba(255,255,255,0.06);
+}
+
+.tour-panel__close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.tour-panel__body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tour-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tour-field__label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tour-field__val {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.tour-select {
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border-hi);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px;
+  padding-right: 32px;
+  transition: border-color 0.15s;
+}
+
+.tour-select:focus {
+  border-color: var(--accent);
+}
+
+.tour-select option {
+  background: var(--panel);
+  color: var(--text);
+}
+
+.tour-slider {
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.tour-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.tour-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.68rem;
+  color: var(--muted);
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.02);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.tour-panel__footer {
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.tour-btn {
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.tour-btn--primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.tour-btn--primary:hover:not(:disabled) {
+  background: #5558e8;
+}
+
+.tour-btn--primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tour-btn--primary svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ── Tour status bar ─────────────────────────────────────────────────────── */
+
+.tour-status {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 900;
+  background: rgba(12, 18, 34, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-hi);
+  border-radius: 12px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 320px;
+  max-width: calc(100vw - 32px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  animation: tourStatusIn 0.2s ease-out;
+}
+
+@keyframes tourStatusIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.tour-status__left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.tour-status__badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-glow);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.tour-status__badge:hover {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.5);
+}
+
+.tour-status__badge svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.tour-status__info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--text-2);
+}
+
+.tour-status__sliders {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tour-status__sliders label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.tour-status__sliders input[type="range"] {
+  width: 60px;
+  height: 3px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: linear-gradient(to right, var(--accent) 25%, var(--border) 25%);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.tour-status__sliders input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+.tour-status__cycle {
+  font-size: 0.62rem;
+  color: #fbbf24;
+  font-weight: 600;
+  background: rgba(251, 191, 36, 0.15);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  padding: 1px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.tour-status__sep {
+  color: var(--border-hi);
+}
+
+/* ── Tour node entrance animation ────────────────────────────────────────── */
+
+@keyframes tourNodeFlash {
+  0%   { opacity: 0; transform: scale(0.6); }
+  50%  { opacity: 1; }
+  100% { opacity: 1; transform: scale(1); }
+}
+
