@@ -213,6 +213,9 @@ function showNodeDetail(node: cytoscape.NodeSingular): void {
 
   panel.classList.add('visible');
 
+  // Force synchronous layout so getBoundingClientRect is accurate
+  void panel.offsetHeight;
+
   const rect = panel.getBoundingClientRect();
   const W = rect.width;
   const H = rect.height;
@@ -221,14 +224,21 @@ function showNodeDetail(node: cytoscape.NodeSingular): void {
   const TOPBAR_H = 56;
   const PAD = 12;
 
+  // On mobile when the bottom sheet is open, reserve space at the bottom
+  const isMobile = vpW <= 768;
+  const SHEET_H = isMobile && sheetOpen ? 56 : 0;
+  const tourBarH = isMobile ? 48 : 0;
+  const bottomReserve = SHEET_H + tourBarH;
+
   const nodePos = node.renderedPosition();
   let left = nodePos.x + 28;
   let top  = nodePos.y - H / 2;
 
-  if (left + W + PAD > vpW)      left = nodePos.x - W - 16;
-  if (left < PAD)                left = PAD;
-  if (top + H + PAD > vpH)      top  = vpH - H - PAD;
-  if (top  < TOPBAR_H + PAD)     top  = TOPBAR_H + PAD;
+  // Right boundary: keep panel fully within viewport
+  if (left + W + PAD > vpW) left = Math.max(PAD, vpW - W - PAD);
+  if (left < PAD)           left = PAD;
+  if (top + H + PAD > vpH - bottomReserve)  top  = vpH - H - PAD - bottomReserve;
+  if (top  < TOPBAR_H + PAD)                 top  = TOPBAR_H + PAD;
 
   panel.style.left = left + 'px';
   panel.style.top  = top  + 'px';
@@ -736,6 +746,8 @@ function toggleBottomSheet(): void {
   if (backdrop) backdrop.classList.toggle('visible', sheetOpen);
   if (bar) bar.classList.toggle('sheet-open', sheetOpen);
   if (app) app.classList.toggle('sheet-open', sheetOpen);
+  // Sync tour bar position so it sits above the open sheet
+  syncTourBarPosition();
 }
 
 function closeBottomSheet(): void {
@@ -749,6 +761,18 @@ function closeBottomSheet(): void {
   if (backdrop) backdrop.classList.remove('visible');
   if (bar) bar.classList.remove('sheet-open');
   if (app) app.classList.remove('sheet-open');
+  syncTourBarPosition();
+}
+
+function syncTourBarPosition(): void {
+  const tourBar = document.getElementById('tour-status');
+  if (!tourBar) return;
+  const isMobile = window.innerWidth <= 768;
+  if (isMobile) {
+    tourBar.style.bottom = sheetOpen ? '0' : '';
+  } else {
+    tourBar.style.bottom = '';
+  }
 }
 
 // ── Mobile expand bar ─────────────────────────────────────────────────────────
@@ -835,7 +859,7 @@ loadGraphData()
     if (e) e.textContent = err.message;
   });
 
-window.addEventListener('resize', () => { if (renderer) fitGraph(); });
+window.addEventListener('resize', () => { if (renderer) fitGraph(); syncTourBarPosition(); });
 
 // Search input listeners
 const desktopSearch = document.getElementById('toolbar-search') as HTMLInputElement;
