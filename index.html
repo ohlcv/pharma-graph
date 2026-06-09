@@ -48,13 +48,13 @@
   <!-- ── Toolbar ─────────────────────────────────────────────────────── -->
   <div class="toolbar">
     <div class="toolbar__group">
-      <button id="btn-cose"         class="btn active" onclick="runLayout('cose')"><span>COSE</span></button>
-      <button id="btn-concentric"   class="btn" onclick="runLayout('concentric')"><span>同心圆</span></button>
-      <button id="btn-circle"       class="btn" onclick="runLayout('circle')"><span>环形</span></button>
-      <button id="btn-grid"         class="btn" onclick="runLayout('grid')"><span>网格</span></button>
-      <button id="btn-dagre"        class="btn" onclick="runLayout('dagre')"><span>Dagre</span></button>
-      <button id="btn-breadthfirst" class="btn" onclick="runLayout('breadthfirst')"><span>广度</span></button>
-      <button id="btn-euler"        class="btn" onclick="runLayout('euler')"><span>Euler</span></button>
+      <button id="btn-cose"         class="btn layout-btn active" onclick="runLayout('cose')"><span>COSE</span></button>
+      <button id="btn-concentric"   class="btn layout-btn" onclick="runLayout('concentric')"><span>同心圆</span></button>
+      <button id="btn-circle"       class="btn layout-btn" onclick="runLayout('circle')"><span>环形</span></button>
+      <button id="btn-grid"         class="btn layout-btn" onclick="runLayout('grid')"><span>网格</span></button>
+      <button id="btn-dagre"        class="btn layout-btn" onclick="runLayout('dagre')"><span>Dagre</span></button>
+      <button id="btn-breadthfirst" class="btn layout-btn" onclick="runLayout('breadthfirst')"><span>广度</span></button>
+      <button id="btn-euler"        class="btn layout-btn" onclick="runLayout('euler')"><span>Euler</span></button>
     </div>
 
     <div class="toolbar__sep"></div>
@@ -319,6 +319,15 @@
           </svg>
           <span>音乐</span>
         </button>
+        <button class="bs-quick-btn" id="bs-btn-tour" title="漫游探索" onclick="toggleTour()">
+          <svg id="bs-tour-icon-stop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
+            <rect x="6" y="6" width="12" height="12" rx="1" fill="currentColor" stroke="none"/>
+          </svg>
+          <svg id="bs-tour-icon-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 3 19 12 5 21 5 3" fill="currentColor" stroke="none"/>
+          </svg>
+          <span>漫游</span>
+        </button>
       </div>
     </div>
 
@@ -326,12 +335,12 @@
     <div class="bs-section">
       <div class="bs-section__label">图谱布局</div>
       <div class="bs-layout-grid">
-        <button class="bs-layout-btn active" id="bs-btn-cose" onclick="runLayout('cose')">COSE</button>
-        <button class="bs-layout-btn" id="bs-btn-concentric" onclick="runLayout('concentric')">同心圆</button>
-        <button class="bs-layout-btn" id="bs-btn-circle" onclick="runLayout('circle')">环形</button>
-        <button class="bs-layout-btn" id="bs-btn-grid" onclick="runLayout('grid')">网格</button>
-        <button class="bs-layout-btn" id="bs-btn-dagre" onclick="runLayout('dagre')">Dagre</button>
-        <button class="bs-layout-btn" id="bs-btn-breadthfirst" onclick="runLayout('breadthfirst')">广度</button>
+        <button class="bs-layout-btn layout-btn active" id="bs-btn-cose" onclick="runLayout('cose')">COSE</button>
+        <button class="bs-layout-btn layout-btn" id="bs-btn-concentric" onclick="runLayout('concentric')">同心圆</button>
+        <button class="bs-layout-btn layout-btn" id="bs-btn-circle" onclick="runLayout('circle')">环形</button>
+        <button class="bs-layout-btn layout-btn" id="bs-btn-grid" onclick="runLayout('grid')">网格</button>
+        <button class="bs-layout-btn layout-btn" id="bs-btn-dagre" onclick="runLayout('dagre')">Dagre</button>
+        <button class="bs-layout-btn layout-btn" id="bs-btn-breadthfirst" onclick="runLayout('breadthfirst')">广度</button>
         <button class="bs-layout-btn" id="bs-btn-euler" onclick="runLayout('euler')">Euler</button>
       </div>
     </div>

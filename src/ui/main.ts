@@ -308,12 +308,9 @@ function resetAll(): void {
 function runLayout(name: string): void {
   if (!renderer) return;
   currentLayout = name;
-  document.querySelectorAll('.btn').forEach((b) => b.classList.remove('active'));
+  document.querySelectorAll('.layout-btn').forEach((b) => b.classList.remove('active'));
   const btn = document.getElementById('btn-' + name);
   if (btn) btn.classList.add('active');
-
-  // Sync bottom sheet layout buttons
-  document.querySelectorAll('.bs-layout-btn').forEach((b) => b.classList.remove('active'));
   const bsBtn = document.getElementById('bs-btn-' + name);
   if (bsBtn) bsBtn.classList.add('active');
 
@@ -402,7 +399,7 @@ function applyLayoutParams(): void {
   Object.assign(base, overrides);
   base.name = currentLayout;
 
-  document.querySelectorAll('.btn').forEach((b) => b.classList.remove('active'));
+  document.querySelectorAll('.layout-btn').forEach((b) => b.classList.remove('active'));
   const btn = document.getElementById('btn-' + currentLayout);
   if (btn) btn.classList.add('active');
 
@@ -665,6 +662,7 @@ function initEvents(): void {
   cy.on('tap', (evt) => {
     if (evt.target === cy) {
       resetAll();
+      if (tourEngine?.isRunning() || tourEngine?.isPaused()) tourStop();
       const nodePanel = document.getElementById('node-panel');
       if (nodePanel) nodePanel.classList.remove('visible');
     }
@@ -998,7 +996,9 @@ function startTour(): void {
 
   // Mark button active
   const tourBtn = document.getElementById('btn-tour');
+  const bsTourBtn = document.getElementById('bs-btn-tour');
   if (tourBtn) tourBtn.classList.add('active');
+  if (bsTourBtn) bsTourBtn.classList.add('active');
 
   // Reset badge to "漫游中" (playing) state
   const playIcon = document.getElementById('tour-badge-play');
@@ -1007,12 +1007,18 @@ function startTour(): void {
   if (playIcon) playIcon.style.display = '';
   if (pauseIcon) pauseIcon.style.display = 'none';
   if (badgeText) badgeText.textContent = '漫游中';
+  const bsTourPlay = document.getElementById('bs-tour-icon-play');
+  const bsTourStop = document.getElementById('bs-tour-icon-stop');
+  if (bsTourPlay) bsTourPlay.style.display = 'none';
+  if (bsTourStop) bsTourStop.style.display = '';
 
   tourEngine = new TourEngine(cy);
   tourEngine.start(rootId, {
     interval,
     maxDepth: maxDepth >= 10 ? -1 : maxDepth,
     onStep: (info) => {
+      showNodeDetail(cy.getElementById(info.nodeId));
+
       const status = document.getElementById('tour-status');
       const depthBadge = document.getElementById('tour-depth-badge');
       const countBadge = document.getElementById('tour-count-badge');
@@ -1037,7 +1043,9 @@ function startTour(): void {
       if (depthBadge) depthBadge.textContent = '完成!';
       if (badgeText) badgeText.textContent = '完成!';
       const tourBtn = document.getElementById('btn-tour');
+      const bsTourBtn = document.getElementById('bs-btn-tour');
       if (tourBtn) tourBtn.classList.remove('active');
+      if (bsTourBtn) bsTourBtn.classList.remove('active');
       const status = document.getElementById('tour-status');
       if (status && !tourEngine?.isRunning()) {
         setTimeout(() => { if (status) status.style.display = 'none'; }, 2000);
@@ -1056,16 +1064,22 @@ function tourPause(): void {
   const playIcon = document.getElementById('tour-badge-play');
   const pauseIcon = document.getElementById('tour-badge-pause');
   const badgeText = document.getElementById('tour-badge-text');
+  const bsTourPlay = document.getElementById('bs-tour-icon-play');
+  const bsTourStop = document.getElementById('bs-tour-icon-stop');
   if (tourEngine.isPaused()) {
     tourEngine.resume();
     if (playIcon) playIcon.style.display = '';
     if (pauseIcon) pauseIcon.style.display = 'none';
     if (badgeText) badgeText.textContent = '漫游中';
+    if (bsTourPlay) bsTourPlay.style.display = '';
+    if (bsTourStop) bsTourStop.style.display = 'none';
   } else {
     tourEngine.pause();
     if (playIcon) playIcon.style.display = 'none';
     if (pauseIcon) pauseIcon.style.display = '';
     if (badgeText) badgeText.textContent = '已暂停';
+    if (bsTourPlay) bsTourPlay.style.display = 'none';
+    if (bsTourStop) bsTourStop.style.display = '';
   }
 }
 
@@ -1074,7 +1088,13 @@ function tourStop(): void {
   tourEngine.stop();
   tourEngine = null;
   const tourBtn = document.getElementById('btn-tour');
+  const bsTourBtn = document.getElementById('bs-btn-tour');
   if (tourBtn) tourBtn.classList.remove('active');
+  if (bsTourBtn) bsTourBtn.classList.remove('active');
+  const bsTourPlay = document.getElementById('bs-tour-icon-play');
+  const bsTourStop = document.getElementById('bs-tour-icon-stop');
+  if (bsTourPlay) bsTourPlay.style.display = '';
+  if (bsTourStop) bsTourStop.style.display = 'none';
   const status = document.getElementById('tour-status');
   if (status) status.style.display = 'none';
 }
