@@ -47,6 +47,7 @@ export class TourEngine {
   private currentLayerIndex = 0;
   private cycleCount = 0;
   private startNode = '';
+  private bfsParent = new Map<string, string>();
 
   constructor(cy: cytoscape.Core) {
     this.cy = cy;
@@ -72,6 +73,7 @@ export class TourEngine {
     this.currentLayerIndex = 0;
     this.cycleCount = 0;
     this.startNode = rootId;
+    this.bfsParent = new Map();
 
     this.visited.add(rootId);
     this.queue.push({ id: rootId, depth: 0 });
@@ -139,6 +141,8 @@ export class TourEngine {
         this.visited = new Set();
         this.queue = [];
         this.layerCounts = new Map();
+        this.bfsParent = new Map();
+        this.bfsParent.set(rootId, '');
         const rootNode = this.cy.nodes().not('.layer-parent')[0];
         if (rootNode) {
           const rootId = rootNode.id();
@@ -187,12 +191,13 @@ export class TourEngine {
     const path = this.buildPath(id);
     this.highlightAndFocus(id, path, depth, layerSize, this.currentLayerIndex);
 
-    // Enqueue unvisited neighbors
-    const neighbors = node.neighborhood('node').not('.layer-parent');
+    // Enqueue unvisited neighbors — write bfsParent so buildPath is O(path length)
+    const neighbors = node.neighborhood('node').not(node).not('.layer-parent');
     neighbors.forEach((n: cytoscape.NodeSingular) => {
       const nid = n.id();
       if (!this.visited.has(nid)) {
         this.visited.add(nid);
+        this.bfsParent.set(nid, id);
         this.queue.push({ id: nid, depth: depth + 1 });
         this.totalExplored++;
         // Track layer size
@@ -212,39 +217,14 @@ export class TourEngine {
   }
 
   private buildPath(targetId: string): string[] {
-    // BFS to find shortest path from the explicit start node
-    const startId = this.startNode;
-    if (startId === targetId) return [startId];
-
-    const parent = new Map<string, string>();
-    const queue: string[] = [startId];
-    parent.set(startId, '');
-
-    while (queue.length > 0) {
-      const current = queue.shift()!;
-      const node = this.cy.getElementById(current);
-      const neighbors = node.neighborhood('node').not('.layer-parent');
-
-      for (const n of neighbors) {
-        const nid = n.id();
-        if (!parent.has(nid)) {
-          parent.set(nid, current);
-          if (nid === targetId) {
-            // Reconstruct path
-            const path: string[] = [];
-            let cur: string = targetId;
-            while (cur) {
-              path.unshift(cur);
-              cur = parent.get(cur)!;
-            }
-            return path;
-          }
-          queue.push(nid);
-        }
-      }
+    if (!this.bfsParent.has(targetId)) return [targetId];
+    const path: string[] = [];
+    let cur: string = targetId;
+    while (cur) {
+      path.unshift(cur);
+      cur = this.bfsParent.get(cur) ?? '';
     }
-
-    return [targetId];
+    return path;
   }
 
   private highlightAndFocus(
@@ -263,7 +243,8 @@ export class TourEngine {
     // 移除所有高亮态，防止前一个主角的边/邻居残留
     this.cy.elements().removeClass('selected-node highlighted highlighted-edge');
     // 清除 :selected 状态，防止 .dimmed 与 :selected 冲突导致旧主角仍亮
-    this.cy.elements().unselect();
+    // 用 cy.$(':selected') 逐节点 unselect，避免静默失效 bug
+    this.cy.$(':selected').unselect();
 
     // Dim everything first
     this.cy.elements().addClass('dimmed');

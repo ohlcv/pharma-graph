@@ -12,8 +12,8 @@ import {
   NODE_TYPE_LABEL,
   SHAPE_LABEL,
   LAYOUTS,
-  LayoutConfig,
 } from '../core/config.js';
+import { nodeColor, nodeColorDark } from '../core/colors.js';
 
 // ── Vite glob: 打包时把所有 MD 文件内容读进来 ─────────────────────────────────
 const MD_FILES = import.meta.glob('../../content/**/*.md', { query: '?raw', import: 'default', eager: true });
@@ -49,15 +49,6 @@ function fmt(val: number, step: number): string {
   return step < 1 ? val.toFixed(2) : String(val);
 }
 
-function nodeColor(type: string): string {
-  return NODE_TYPE_COLOR[type] ?? NODE_TYPE_COLOR.default;
-}
-
-function nodeColorDark(type: string): string {
-  return NODE_TYPE_COLOR_DARK[type] ?? NODE_TYPE_COLOR_DARK.default;
-}
-
-// 节点点击涟漪效果
 function spawnNodeRipple(x: number, y: number, color: string): void {
   const ripple = document.createElement('div');
   ripple.className = 'node-ripple';
@@ -292,7 +283,7 @@ function showNodeDetail(node: cytoscape.NodeSingular): void {
     `;
   }
 
-  const adj = node.neighborhood('node').not('.layer-parent');
+  const adj = node.neighborhood('node').not(node).not('.layer-parent');
   if (adjLabel) adjLabel.style.display = adj.length > 0 ? 'flex' : 'none';
   if (adjEl) {
     adjEl.innerHTML = adj.map((n: cytoscape.NodeSingular) =>
@@ -379,8 +370,6 @@ function showNodeDetail(node: cytoscape.NodeSingular): void {
 
   panel.style.left = left + 'px';
   panel.style.top  = top  + 'px';
-  panelLastLeft = left;
-  panelLastTop  = top;
 }
 
 function closeNodePanel(): void {
@@ -433,10 +422,14 @@ function highlightNode(node: cytoscape.NodeSingular): void {
   // 移除所有高亮态，防止前一个主角的边/邻居残留
   cy.elements().removeClass('selected-node highlighted highlighted-edge');
   // 清除 :selected 状态，防止 .dimmed 与 :selected 冲突导致旧主角仍亮
-  cy.elements().unselect();
+  // 用 cy.$(':selected') 逐节点 unselect，避免 cy.elements().unselect() 静默失效的 bug
+  cy.$(':selected').unselect();
+  console.log('[DEBUG highlightNode] after unselect selCount=', cy.$(':selected').length);
 
   // 暗淡所有元素（包括当前节点前身），再把当前主角拉亮
   cy.elements().addClass('dimmed');
+
+  // 加类 & 选中
   node.removeClass('dimmed').addClass('selected-node').select();
 
   // 邻居节点拉亮
@@ -445,16 +438,35 @@ function highlightNode(node: cytoscape.NodeSingular): void {
   // 当前主角的所有边拉亮
   node.connectedEdges().removeClass('dimmed').addClass('highlighted-edge');
 
+  // DEBUG 追踪
+  console.log('[DEBUG highlightNode] nodeId=', node.id(),
+    '| classes before=', node.classes(),
+    '| selected()=', node.selected(),
+    '| snode count=', cy.nodes('.selected-node').length,
+    '| dimmed count=', cy.nodes('.dimmed').length);
+
   // 启动呼吸光圈动画
   glowNode = node;
   startGlowBreath();
+
+  // Visual flash: animate dbg-new-name to prove highlightNode ran
+  const dbgNewName = document.getElementById('dbg-new-name');
+  if (dbgNewName) {
+    dbgNewName.style.transition = 'none';
+    dbgNewName.style.background = 'rgba(239,68,68,0.4)';
+    dbgNewName.style.borderRadius = '3px';
+    requestAnimationFrame(() => {
+      dbgNewName.style.transition = 'background 0.6s ease';
+      dbgNewName.style.background = 'transparent';
+    });
+  }
 }
 
 function resetAll(): void {
   if (!renderer) return;
   const cy = renderer.getCy();
   cy.elements().removeClass('dimmed highlighted highlighted-edge selected-node');
-  cy.elements().unselect(); // 清除 :selected，防止残留导致节点仍亮
+  cy.$(':selected').unselect(); // 清除 :selected，防止残留导致节点仍亮
   cy.nodes().not('.layer-parent').forEach((node: cytoscape.NodeSingular) => {
     node.unlock();
   });
@@ -846,6 +858,17 @@ function initEvents(): void {
 
   cy.on('tap', 'node', (evt) => {
     const node = evt.target;
+    const dbgBtn = document.getElementById('debug-toggle');
+    if (dbgBtn) {
+      dbgBtn.style.transition = 'none';
+      dbgBtn.style.background = '#4338ca';
+      dbgBtn.style.color = '#fff';
+      requestAnimationFrame(() => {
+        dbgBtn.style.transition = 'background 0.5s, color 0.5s';
+        dbgBtn.style.background = '';
+        dbgBtn.style.color = '';
+      });
+    }
     const cy_el = evt.target.cy();
     const container = cy_el.container();
     if (!container) return;
@@ -964,7 +987,7 @@ function initShortcuts(): void {
         cy.$(':selected').remove(); resetAll(); updateStats();
         break;
       case 'Escape':
-        cy.elements().unselect(); resetAll();
+        cy.$(':selected').unselect(); resetAll();
         if (tourEngine?.isRunning() || tourEngine?.isPaused()) tourStop();
         break;
       case 'f': case 'F': fitGraph(); break;
@@ -1263,8 +1286,6 @@ function onPanelDrag(e: PointerEvent): void {
 
   el.style.left = left + 'px';
   el.style.top  = top  + 'px';
-  panelLastLeft = left;
-  panelLastTop  = top;
 }
 
 function stopPanelDrag(): void {
@@ -1593,7 +1614,8 @@ function initDebugOverlay(): void {
       if (overlay) overlay.innerHTML = '';
     }
   });
-  document.body.appendChild(btn);
+  const shortcutsList = document.querySelector('.shortcuts-list');
+  shortcutsList?.appendChild(btn);
 
   // Forensics panel
   const panel = document.createElement('div');
@@ -1601,6 +1623,7 @@ function initDebugOverlay(): void {
   panel.style.display = 'none';
   panel.innerHTML = `
     <h4>🔬 取证面板</h4>
+    <div id="dbg-raw-data" style="font-size:9px;color:#fbbf24;background:rgba(251,191,36,0.08);border-radius:4px;padding:4px 6px;margin-bottom:8px;line-height:1.6"></div>
     <div style="margin-bottom:8px">
       <span style="color:#94a3b8;font-size:10px">容器级辉光</span>
       <div id="dbg-glow" style="font-size:10px;color:#e2e8f0;word-break:break-all;max-height:40px;overflow:hidden"></div>
@@ -1609,9 +1632,27 @@ function initDebugOverlay(): void {
       <span style="color:#94a3b8;font-size:10px">容器 filter</span>
       <div id="dbg-filter" style="font-size:10px;color:#e2e8f0;word-break:break-all"></div>
     </div>
-    <div id="dbg-sel-label" style="margin-bottom:4px">
-      <span style="color:#94a3b8;font-size:10px">当前 :selected</span>
-      <span id="dbg-sel-count" style="font-size:10px;color:#818cf8;font-weight:600;margin-left:4px">0 个</span>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;margin-bottom:8px">
+      <div style="text-align:center;background:rgba(99,102,241,0.1);border-radius:6px;padding:4px 6px">
+        <div style="font-size:9px;color:#64748b">:selected</div>
+        <div id="dbg-sel-count" style="font-size:14px;color:#818cf8;font-weight:700">0</div>
+      </div>
+      <div style="text-align:center;background:rgba(239,68,68,0.1);border-radius:6px;padding:4px 6px">
+        <div style="font-size:9px;color:#64748b">.dimmed</div>
+        <div id="dbg-dim-count" style="font-size:14px;color:#f87171;font-weight:700">0</div>
+      </div>
+      <div style="text-align:center;background:rgba(34,197,94,0.1);border-radius:6px;padding:4px 6px">
+        <div style="font-size:9px;color:#64748b">.sel-node</div>
+        <div id="dbg-snode-count" style="font-size:14px;color:#4ade80;font-weight:700">0</div>
+      </div>
+      <div style="text-align:center;background:rgba(251,191,36,0.1);border-radius:6px;padding:4px 6px">
+        <div style="font-size:9px;color:#64748b">.highlight</div>
+        <div id="dbg-hl-count" style="font-size:14px;color:#fbbf24;font-weight:700">0</div>
+      </div>
+    </div>
+    <div style="margin-bottom:8px">
+      <span style="color:#94a3b8;font-size:10px">所有 :selected</span>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px" id="dbg-all-selected"></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
       <!-- 新主角 -->
@@ -1627,8 +1668,9 @@ function initDebugOverlay(): void {
         <div style="font-size:9px;color:#94a3b8;line-height:1.6" id="dbg-old-props"></div>
       </div>
     </div>
-    <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:6px">
-      <div style="display:flex;gap:8px;flex-wrap:wrap" id="dbg-all-selected"></div>
+    <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:6px;margin-bottom:6px">
+      <div style="font-size:10px;color:#64748b;margin-bottom:4px">🔸 所有 .dimmed 节点（逐行）</div>
+      <div id="dbg-all-dimmed" style="font-size:9px;line-height:1.7;max-height:180px;overflow-y:auto"></div>
     </div>
     <div class="debug-conflict" id="dbg-conflict" style="display:none"></div>
   `;
@@ -1643,13 +1685,35 @@ function nodeForensicProps(node: cytoscape.NodeSingular): string {
   const snode = node.hasClass('selected-node');
   const highlight = node.hasClass('highlighted');
   const hovered = node.hasClass('hovered');
-  const rOpacity = node.renderedStyle('opacity') ?? '?';
-  const bWidth = node.renderedStyle('border-width') ?? '?';
-  const bColor = node.renderedStyle('border-color') ?? '?';
-  const bgColor = node.renderedStyle('background-color') ?? '?';
+
+  const rOpacity   = node.renderedStyle('opacity') ?? '?';
+  const bWidth     = node.renderedStyle('border-width') ?? '?';
+  const bColor     = node.renderedStyle('border-color') ?? '?';
+  const bgColor    = node.renderedStyle('background-color') ?? '?';
+  const lineColor  = node.renderedStyle('line-color') ?? '?';
+  const lineWidth  = node.renderedStyle('width') ?? '?';
+  const overlayColor   = node.renderedStyle('overlay-color') ?? '?';
+  const overlayWidth   = node.renderedStyle('overlay-width') ?? '?';
+  const overlayOpacity = node.renderedStyle('overlay-opacity') ?? '?';
+
+  // 完整 class 列表
+  const classes = node.classes();
+
+  // 解析 border-color 是否为白色（判断残留白色边）
+  const isWhiteBorder = bColor === '#ffffff' || bColor === 'rgb(255,255,255)' || bColor === 'rgba(255,255,255,1)' || bColor === 'white';
+
+  // 解析 border-width 是否为选中级别（3或4）
+  const isSelectedBorderWidth = bWidth >= 2.5;
 
   const flag = (cond: boolean, tag: string, ok: string, fail: string) =>
     cond ? `<span style="color:#4ade80">${tag}${ok}</span>` : `<span style="color:#64748b">${tag}${fail}</span>`;
+
+  const borderStatus = isWhiteBorder
+    ? `<span style="color:#f87171">⚠ 白边!</span>`
+    : `<span style="color:#4ade80">✓</span>`;
+  const bwStatus = isSelectedBorderWidth
+    ? `<span style="color:#fbbf24">⚠ 粗边(${bWidth})</span>`
+    : bWidth;
 
   return [
     flag(sel,       'S:', '✓', '✗'),
@@ -1657,10 +1721,14 @@ function nodeForensicProps(node: cytoscape.NodeSingular): string {
     flag(snode,     'N:', '✓', '✗'),
     flag(highlight, 'H:', '✓', '✗'),
     flag(hovered,   'V:', '✓', '✗'),
-    `opacity:${rOpacity}`,
-    `bw:${bWidth}px`,
-    `bc:${bColor}`,
-    `bg:${bgColor}`,
+    `opacity: ${rOpacity}`,
+    `bw: ${bWidth}px ${bwStatus}`,
+    `bc: ${bColor} ${borderStatus}`,
+    `bg: ${bgColor}`,
+    `line-clr: ${lineColor}`,
+    `ov-clr: ${overlayColor}`,
+    `ov-op: ${overlayOpacity}`,
+    `cls: [${classes}]`,
   ].join('<br>');
 }
 
@@ -1673,57 +1741,136 @@ function runDebugUpdate(): void {
   const panel = document.getElementById('debug-panel');
   if (!panel) { debugRafId = null; return; }
 
+  // Throttle: only refresh DOM when state actually changed
+  const selIds = cy.$(':selected').nodes().map((n: cytoscape.NodeSingular) => n.id()).sort().join(',');
+  const dimIds = cy.nodes('.dimmed').not('.layer-parent').map((n: cytoscape.NodeSingular) => n.id()).sort().join(',');
+  const snodeEls = cy.nodes('.selected-node');
+  const currentNodeId = snodeEls.length > 0 ? snodeEls[0].id() : '';
+  const stateKey = `${selIds}||${dimIds}||${currentNodeId}`;
+  if (stateKey === runDebugUpdate._lastState) {
+    // State unchanged — only need to reposition badges (graph may be animating)
+    const overlay = document.getElementById('debug-overlay');
+    if (overlay) {
+      overlay.querySelectorAll<HTMLElement>('.debug-badge').forEach(badge => {
+        const nodeId = badge.dataset.nodeId;
+        if (!nodeId) return;
+        const node = cy.getElementById(nodeId);
+        if (node.empty()) return;
+        const pos = node.renderedPosition();
+        const nodeH = node.renderedHeight();
+        badge.style.left = pos.x + 'px';
+        badge.style.top = (pos.y - nodeH / 2 - 2) + 'px';
+      });
+    }
+    // 即使 state 未变，也要更新计数器 DOM（防止 layout 动画期间数据冻结）
+    const selCountEl = document.getElementById('dbg-sel-count');
+    const dimCountEl = document.getElementById('dbg-dim-count');
+    const snodeCountEl = document.getElementById('dbg-snode-count');
+    if (selCountEl) selCountEl.textContent = String(cy.$(':selected').length);
+    if (dimCountEl) dimCountEl.textContent = String(cy.nodes('.dimmed').not('.layer-parent').length);
+    if (snodeCountEl) snodeCountEl.textContent = String(cy.nodes('.selected-node').length);
+    debugRafId = requestAnimationFrame(runDebugUpdate);
+    return;
+  }
+  runDebugUpdate._lastState = stateKey;
+
   // ── Container glow ────────────────────────────────────────────────
   const glowHost = document.getElementById('glow-host');
   const glowText = glowHost ? glowHost.style.boxShadow || '(无)' : '(无 glow-host)';
   const filterText = cy.container()?.style.filter || '(无)';
+  const glowActive = glowText && glowText !== '(无)' && glowText !== 'none' && glowText !== '';
+
   const glowEl = document.getElementById('dbg-glow');
   const filterEl = document.getElementById('dbg-filter');
-  if (glowEl) glowEl.textContent = glowText;
+  if (glowEl) { glowEl.textContent = glowText; glowEl.style.color = glowActive ? '#4ade80' : '#64748b'; }
   if (filterEl) filterEl.textContent = filterText;
 
-  // ── Container glow active? ────────────────────────────────────────
-  const glowActive = glowText && glowText !== '(无)' && glowText !== 'none' && glowText !== '';
-  if (glowEl) {
-    glowEl.style.color = glowActive ? '#4ade80' : '#64748b';
+  // ── Collect all data upfront ─────────────────────────────────────
+  const allSelected = cy.$(':selected');
+  const snodeEls2 = cy.nodes('.selected-node');
+  const allDimmed = cy.nodes('.dimmed').not('.layer-parent');
+  const allSels = allSelected.nodes();
+
+  // ── Raw data ─────────────────────────────────────────────────────
+  const rawEl = document.getElementById('dbg-raw-data');
+  if (rawEl) {
+    rawEl.innerHTML = [
+      `snodeCnt=${snodeEls2.length}`,
+      `selCnt=${allSelected.length}`,
+      `dimCnt=${allDimmed.length}`,
+      `sel=${allSelected.map((n: cytoscape.NodeSingular) => n.id()).join(',') || '∅'}`,
+      `snode=${snodeEls2.map((n: cytoscape.NodeSingular) => n.id()).join(',') || '∅'}`,
+      `dimIds=${cy.nodes('.dimmed').map((n: cytoscape.NodeSingular) => n.id()).sort().join(',') || '∅'}`,
+    ].join(' | ');
   }
 
-  // ── All :selected nodes ────────────────────────────────────────────
-  const allSelected = cy.$(':selected');
+  // ── 四个计数器 ──────────────────────────────────────────────────
   const selCountEl = document.getElementById('dbg-sel-count');
-  if (selCountEl) selCountEl.textContent = `${allSelected.length} 个`;
+  const dimCountEl = document.getElementById('dbg-dim-count');
+  const snodeCountEl = document.getElementById('dbg-snode-count');
+  const hlCountEl = document.getElementById('dbg-hl-count');
+  if (selCountEl) selCountEl.textContent = String(allSelected.length);
+  if (dimCountEl) dimCountEl.textContent = String(allDimmed.length);
+  if (snodeCountEl) snodeCountEl.textContent = String(snodeEls2.length);
+  if (hlCountEl) hlCountEl.textContent = String(cy.nodes('.highlighted').length);
 
+  // ── All :selected 标签列表 ────────────────────────────────────
   const allSelectedEl = document.getElementById('dbg-all-selected');
   if (allSelectedEl) {
     if (allSelected.length === 0) {
-      allSelectedEl.innerHTML = '<span style="font-size:9px;color:#64748b">无 :selected</span>';
+      allSelectedEl.innerHTML = '<span style="font-size:9px;color:#64748b">无</span>';
     } else {
       allSelectedEl.innerHTML = allSelected.map((n: cytoscape.NodeSingular) => {
         const label = n.data('label') || n.id();
         const dimmed = n.hasClass('dimmed');
         const color = dimmed ? '#f87171' : '#818cf8';
-        return `<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:${dimmed ? 'rgba(239,68,68,0.2)' : 'rgba(99,102,241,0.2)'};color:${color}">${label.slice(0,10)}${dimmed ? ' ⚠' : ''}</span>`;
+        const bg = dimmed ? 'rgba(239,68,68,0.2)' : 'rgba(99,102,241,0.2)';
+        return `<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:${bg};color:${color}">${label.slice(0,10)}${dimmed ? ' ⚠' : ''}</span>`;
       }).join('');
     }
   }
 
-  // ── Find current (new) protagonist ────────────────────────────────
-  const snodeEls = cy.nodes('.selected-node');
-  const currentNode = snodeEls.length > 0 ? snodeEls[0] : null;
+  // ── 所有 .dimmed 节点逐行列表 ──────────────────────────────────
+  // 实时获取 .selected-node 节点（避免 NodeSingular 悬空引用导致 selected()/hasClass() 返回错误）
+  const snodeFirstId = snodeEls2.length > 0 ? snodeEls2[0].id() : null;
+  const currentNode = snodeFirstId ? cy.getElementById(snodeFirstId) : null;
 
-  // ── Find previous protagonist ─────────────────────────────────────
-  const allSels = cy.$(':selected').nodes();
-  // previous = the selected node that is NOT the current protagonist
   let prevNode: cytoscape.NodeSingular | null = null;
-  if (allSels.length > 0) {
-    for (let i = 0; i < allSels.length; i++) {
-      const n = allSels[i];
-      if (currentNode && n.id() === currentNode.id()) continue;
-      prevNode = n;
-      break;
+  for (let i = 0; i < allSels.length; i++) {
+    const n = allSels[i];
+    const nId = n.id();
+    if (snodeFirstId && nId === snodeFirstId) continue;
+    prevNode = n;
+    break;
+  }
+
+  const allDimmedEl = document.getElementById('dbg-all-dimmed');
+  if (allDimmedEl) {
+    if (allDimmed.length === 0) {
+      allDimmedEl.innerHTML = '<span style="color:#64748b">无 dimmed 节点</span>';
+    } else {
+      allDimmedEl.innerHTML = allDimmed.map((n: cytoscape.NodeSingular) => {
+        const label = (n.data('label') || n.id()).slice(0, 10);
+        const isSel = n.selected();
+        const bc = n.renderedStyle('border-color') as string;
+        const bw = n.renderedStyle('border-width') as string;
+        const op = n.renderedStyle('opacity') as string;
+        const isWhite = bc === '#ffffff' || bc === 'rgb(255,255,255)' || bc === 'rgba(255,255,255,1)';
+        const isSelBw = (parseFloat(bw) || 0) >= 2.5;
+        const warn: string[] = [];
+        if (isSel) warn.push('S');
+        if (isWhite) warn.push('白边');
+        if (isSelBw) warn.push('粗边');
+        const warnTag = warn.length > 0 ? `<span style="color:#f87171"> ⚠${warn.join(',')}</span>` : '';
+        const isCurrent = currentNode && n.id() === currentNode.id();
+        const isPrev = prevNode && n.id() === prevNode.id();
+        const tag = isCurrent ? '✨' : isPrev ? '⏮' : '  ';
+        return `<div>${tag}<b>${label}</b> op=${op} bw=${bw} bc=${isWhite ? '⚠白' : 'ok'} ${warnTag}</div>`;
+      }).join('');
     }
   }
 
+  // ── 新/旧主角面板 ───────────────────────────────────────────────
   const newNameEl = document.getElementById('dbg-new-name');
   const newPropsEl = document.getElementById('dbg-new-props');
   const oldNameEl = document.getElementById('dbg-old-name');
@@ -1735,13 +1882,13 @@ function runDebugUpdate(): void {
     if (newPropsEl) newPropsEl.innerHTML = nodeForensicProps(currentNode);
   } else {
     if (newNameEl) newNameEl.textContent = '—';
-    if (newPropsEl) newPropsEl.innerHTML = '<span style="color:#64748b">无主角</span>';
+    if (newPropsEl) newPropsEl.innerHTML = '<span style="color:#f87171">⚠ 无 .selected-node</span><br>' +
+      `<span style="font-size:9px;color:#64748b">snodeEls2=${snodeEls2.length} sel=${allSelected.length} dim=${allDimmed.length}</span>`;
   }
 
   if (prevNode) {
     if (oldNameEl) oldNameEl.textContent = (prevNode.data('label') || prevNode.id()).slice(0, 12);
     if (oldPropsEl) oldPropsEl.innerHTML = nodeForensicProps(prevNode);
-    // Highlight the problem: prev is dimmed BUT glow is still on
     const isDimmed = prevNode.hasClass('dimmed');
     const isSelected = prevNode.selected();
     if (oldPropsEl && isDimmed && isSelected) {
@@ -1799,6 +1946,7 @@ function runDebugUpdate(): void {
 
       const badge = document.createElement('div');
       badge.className = cls;
+      badge.dataset.nodeId = node.id();
       badge.textContent = `${label}[${text}]`;
       badge.style.left = pos.x + 'px';
       badge.style.top = (pos.y - nodeH / 2 - 2) + 'px';
@@ -1817,6 +1965,7 @@ function runDebugUpdate(): void {
 
   debugRafId = requestAnimationFrame(runDebugUpdate);
 }
+runDebugUpdate._lastState = '';
 
 // 暴露所有 HTML onclick/onpointerdown 调用的函数到全局作用域
 (window as any).startPanelDrag  = startPanelDrag;

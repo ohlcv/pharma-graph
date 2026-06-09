@@ -7,19 +7,6 @@ import { join, basename, extname } from 'path';
 
 const CONTENT_DIR = join(process.cwd(), 'content');
 
-const BOOK_NAMES = new Set([
-  '药学专业知识一', '药学专业知识二', '药学综合知识与技能',
-]);
-
-// 判断路径层级（content 下的第几层子目录）
-function getPathDepth(relativePath: string): number {
-  const parts = relativePath.replace(/\\/g, '/').split('/').filter(Boolean);
-  // parts[0] = book folder name (depth 1)
-  // parts[1] = chapter folder name (depth 2)
-  // parts[2] = section folder name (depth 3)
-  return parts.length;
-}
-
 // 去掉 "第X节 " "第X章 " "第X篇 " 前缀
 function stripChapterPrefix(s: string): string {
   // 支持中文数字和阿拉伯数字
@@ -149,32 +136,6 @@ function parseYamlBlock(block: string): Record<string, unknown> {
   return result;
 }
 
-// 纯 YAML block ← object（生成标准格式）
-function stringifyYaml(obj: unknown, indent = 0): string {
-  const pad = '  '.repeat(indent);
-  if (obj === null || obj === undefined) return '';
-  if (typeof obj === 'string') return obj; // inline value only
-  if (typeof obj === 'object') {
-    if (Array.isArray(obj)) return JSON.stringify(obj); // fallback
-    const entries = Object.entries(obj as Record<string, unknown>);
-    if (entries.length === 0) return '{}';
-    const lines: string[] = [];
-    for (const [k, v] of entries) {
-      if (v === undefined || v === null || v === '') continue;
-      if (typeof v === 'object' && !Array.isArray(v)) {
-        // nested object
-        lines.push(`${pad}${k}:`);
-        lines.push(...stringifyYaml(v, indent + 1).split('\n').map(l => `${pad}  ${l}`));
-      } else {
-        const val = typeof v === 'string' ? v : JSON.stringify(v);
-        lines.push(`${pad}${k}: ${val}`);
-      }
-    }
-    return lines.join('\n');
-  }
-  return String(obj);
-}
-
 // 通用 frontmatter 反序列化（从文本中提取 data 块和 top-level 块）
 // 返回 { dataBlock, topBlock, rest } 其中 rest 是 data block 或 top-level 字段
 function parseFrontmatterRaw(text: string): {
@@ -246,11 +207,6 @@ function buildFrontmatter(
 
   lines.push('---');
   return lines.join('\n');
-}
-
-// 判断 file 是否为知识节点（concept/drug/mechanism）
-function isKnowledgeNode(type: string): boolean {
-  return ['concept', 'drug', 'mechanism'].includes(type);
 }
 
 // Dry-run single file

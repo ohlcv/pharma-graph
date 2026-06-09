@@ -66,13 +66,13 @@
   <!-- ── Toolbar ─────────────────────────────────────────────────────── -->
   <div class="toolbar">
     <div class="toolbar__group">
-      <button id="btn-cose"         class="btn layout-btn active" onclick="runLayout('cose')"><span>COSE</span></button>
-      <button id="btn-concentric"   class="btn layout-btn" onclick="runLayout('concentric')"><span>同心圆</span></button>
-      <button id="btn-circle"       class="btn layout-btn" onclick="runLayout('circle')"><span>环形</span></button>
-      <button id="btn-grid"         class="btn layout-btn" onclick="runLayout('grid')"><span>网格</span></button>
-      <button id="btn-dagre"        class="btn layout-btn" onclick="runLayout('dagre')"><span>Dagre</span></button>
-      <button id="btn-breadthfirst" class="btn layout-btn" onclick="runLayout('breadthfirst')"><span>广度</span></button>
-      <button id="btn-euler"        class="btn layout-btn" onclick="runLayout('euler')"><span>Euler</span></button>
+      <button id="btn-cose"         class="btn layout-btn active" onclick="runLayout('cose')"     aria-pressed="true"><span>COSE</span></button>
+      <button id="btn-concentric"   class="btn layout-btn" onclick="runLayout('concentric')"  aria-pressed="false"><span>同心圆</span></button>
+      <button id="btn-circle"       class="btn layout-btn" onclick="runLayout('circle')"      aria-pressed="false"><span>环形</span></button>
+      <button id="btn-grid"         class="btn layout-btn" onclick="runLayout('grid')"        aria-pressed="false"><span>网格</span></button>
+      <button id="btn-dagre"        class="btn layout-btn" onclick="runLayout('dagre')"       aria-pressed="false"><span>Dagre</span></button>
+      <button id="btn-breadthfirst" class="btn layout-btn" onclick="runLayout('breadthfirst')" aria-pressed="false"><span>广度</span></button>
+      <button id="btn-euler"        class="btn layout-btn" onclick="runLayout('euler')"       aria-pressed="false"><span>Euler</span></button>
     </div>
 
     <div class="toolbar__sep"></div>
@@ -151,7 +151,7 @@
     </div>
 
     <!-- ── Left floating node detail ─────────────────────────────────── -->
-    <div id="node-panel" class="node-panel" role="complementary" aria-label="节点详情">
+    <div id="node-panel" class="node-panel" role="dialog" aria-label="节点详情">
       <div class="node-panel__header" id="node-panel-header" onpointerdown="startPanelDrag(event)">
         <span class="node-panel__title">节点详情</span>
         <button class="node-panel__close" onclick="closeNodePanel()" aria-label="关闭">
@@ -178,7 +178,7 @@
 
       <!-- Node types -->
       <div class="sidebar-section" data-section="types" data-section-state="open">
-        <div class="sidebar-section__head" onclick="toggleSection('types')">
+        <div class="sidebar-section__head" onclick="toggleSection('types')" aria-expanded="true" aria-controls="body-types">
           <span class="sidebar-section__title">节点类型</span>
           <svg class="sidebar-section__chevron open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
@@ -211,7 +211,7 @@
       <!-- Stats -->
       <!-- Stats + Layout description merged -->
       <div class="sidebar-section" data-section="stats" data-section-state="open">
-        <div class="sidebar-section__head" onclick="toggleSection('stats')">
+        <div class="sidebar-section__head" onclick="toggleSection('stats')" aria-expanded="true" aria-controls="body-stats">
           <span class="sidebar-section__title">图谱与布局</span>
           <svg class="sidebar-section__chevron open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
@@ -242,7 +242,7 @@
 
       <!-- Layout parameters -->
       <div class="sidebar-section" data-section="params">
-        <div class="sidebar-section__head" onclick="toggleSection('params')">
+        <div class="sidebar-section__head" onclick="toggleSection('params')" aria-expanded="false" aria-controls="body-params">
           <span class="sidebar-section__title">布局参数</span>
           <svg class="sidebar-section__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
@@ -259,7 +259,7 @@
 
       <!-- Shortcuts -->
       <div class="sidebar-section" data-section="shortcuts">
-        <div class="sidebar-section__head" onclick="toggleSection('shortcuts')">
+        <div class="sidebar-section__head" onclick="toggleSection('shortcuts')" aria-expanded="false" aria-controls="body-shortcuts">
           <span class="sidebar-section__title">快捷键</span>
           <svg class="sidebar-section__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
@@ -276,8 +276,6 @@
           </div>
         </div>
       </div>
-
-      <div class="sidebar-credit">by meow</div>
 
     </aside><!-- /desktop sidebar -->
 

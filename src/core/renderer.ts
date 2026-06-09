@@ -17,24 +17,15 @@ import {
   LAYOUTS,
   LayoutConfig,
 } from './config.js';
+import { nodeColor, nodeColorDark } from './colors.js';
 
 cytoscape.use(coseBilkent);
 cytoscape.use(dagre);
 cytoscape.use(euler);
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Stylesheet (computed once at module load) ───────────────────────────────────
 
-function nodeColor(type: string): string {
-  return NODE_TYPE_COLOR[type] ?? NODE_TYPE_COLOR.default;
-}
-
-function nodeColorDark(type: string): string {
-  return NODE_TYPE_COLOR_DARK[type] ?? NODE_TYPE_COLOR_DARK.default;
-}
-
-// ── Stylesheet ────────────────────────────────────────────────────────────────
-
-function buildStylesheet(): any {
+const STYLESHEET: any = (() => {
   const nodeTypeRules = Object.entries(NODE_TYPE_SHAPE).flatMap(([type, shape]) => {
     const main = nodeColor(type);
     const dark = nodeColorDark(type);
@@ -53,7 +44,6 @@ function buildStylesheet(): any {
     ];
   });
 
-  // Category → colored border overlay (applied on top of type rules)
   const categoryRules = Object.entries(CATEGORY_COLOR).map(([cat, color]) => ({
     selector: `node[category = "${cat}"]`,
     style: {
@@ -62,7 +52,6 @@ function buildStylesheet(): any {
     } as any,
   }));
 
-  // Layer → border thickness + background tint (overrides type default border-width)
   const layerRules = Object.entries(NODE_LAYER_STYLE).map(([layer, style]) => ({
     selector: `node[layer = "${layer}"]`,
     style: {
@@ -144,7 +133,6 @@ function buildStylesheet(): any {
         'overlay-opacity': 0,
       },
     },
-    // 选中节点（主角）：白色粗描边 + 紫色外发光（由 CSS drop-shadow 在 canvas 容器层实现）
     {
       selector: '.selected-node',
       style: {
@@ -156,7 +144,6 @@ function buildStylesheet(): any {
         'overlay-opacity': 0,
       },
     },
-    // 暗淡节点：背景 + 文字都压暗（opacity 影响整节点含文字）
     { selector: '.dimmed',       style: {
       opacity: 0.22,
       'border-color': 'rgba(255,255,255,0.06)',
@@ -164,13 +151,12 @@ function buildStylesheet(): any {
       'line-opacity': 0.08,
       'color': 'rgba(226,232,240,0.25)',
     }},
-    // 当 .dimmed 与 :selected 冲突时（切换主角时旧主角仍有 :selected），dimmed 优先
     { selector: '.dimmed:selected', style: {
       opacity: 0.22,
+      'border-color': 'rgba(255,255,255,0.06)',
+      'border-width': 1.5,
     }},
-    // 入场动画：布局开始前设为透明，配合 runLayout 中的 stagger 淡入
     { selector: '.entering',     style: { opacity: 0 } },
-    // Hover 态：描边变亮（overlay 关闭避免遮盖标签文字）
     { selector: '.hovered',      style: {
       opacity: 1,
       'border-width': 3,
@@ -179,7 +165,6 @@ function buildStylesheet(): any {
       'overlay-padding': 6,
       'overlay-opacity': 0,
     }},
-    // 关联节点（配角）：橙色描边，opacity 0.8
     { selector: '.highlighted',  style: {
       opacity: 0.8,
       'border-width': 2.5,
@@ -209,7 +194,6 @@ function buildStylesheet(): any {
         height: 'mapData(weight, 40, 100, 38, 72)',
       },
     },
-    // 拖拽时简化：关闭渐变/阴影，移除文字背景，减少 GPU 绘制成本
     {
       selector: '.dragging-simplified',
       style: {
@@ -220,7 +204,6 @@ function buildStylesheet(): any {
         'overlay-opacity': 0,
       },
     },
-    // 漫游路径预览：hover 节点时高亮整条路径边
     {
       selector: '.tour-path-preview',
       style: {
@@ -231,7 +214,7 @@ function buildStylesheet(): any {
       },
     },
   ];
-}
+})();
 
 // ── Renderer ──────────────────────────────────────────────────────────────────
 
@@ -268,7 +251,7 @@ export class Renderer {
     this.cy = cytoscape({
       container,
       elements: this.buildElements(data),
-      style: buildStylesheet(),
+      style: STYLESHEET,
       layout: { name: 'preset' },
       minZoom,
       maxZoom,

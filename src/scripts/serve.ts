@@ -23,7 +23,8 @@ const MIME: Record<string, string> = {
 async function buildGraphData(): Promise<GraphData> {
   const files = await scanContentDir(path.join(ROOT, 'content'));
   const nodes = await buildNodes(files);
-  const edges = await buildEdges(files);
+  const knownNodeIds = new Set(nodes.map((n) => n.id));
+  const edges = await buildEdges(files, knownNodeIds);
   return { nodes, edges };
 }
 
