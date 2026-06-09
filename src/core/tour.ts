@@ -19,6 +19,8 @@ export interface TourStepInfo {
   layerSize: number;
   layerIndex: number;
   totalExplored: number;
+  totalToExplore: number;
+  currentStep: number;
   maxDepthReached: number;
   cycleCount: number;
 }
@@ -39,9 +41,12 @@ export class TourEngine {
   private queue: Array<{ id: string; depth: number }> = [];
   private layerCounts: Map<number, number> = new Map();
   private totalExplored = 0;
+  private totalToExplore = 0;
+  private currentStep = 0;
   private currentDepth = 0;
   private currentLayerIndex = 0;
   private cycleCount = 0;
+  private startNode = '';
 
   constructor(cy: cytoscape.Core) {
     this.cy = cy;
@@ -61,9 +66,12 @@ export class TourEngine {
     this.paused = false;
     this.stopped = false;
     this.totalExplored = 0;
+    this.totalToExplore = this.cy.nodes().size();
+    this.currentStep = 0;
     this.currentDepth = 0;
     this.currentLayerIndex = 0;
     this.cycleCount = 0;
+    this.startNode = rootId;
 
     this.visited.add(rootId);
     this.queue.push({ id: rootId, depth: 0 });
@@ -77,18 +85,24 @@ export class TourEngine {
     if (this.paused || this.stopped) return;
     this.paused = true;
     if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+    this.stopTourPulse();
     this.onPause?.();
   }
 
   resume(): void {
     if (!this.paused || this.stopped) return;
     this.paused = false;
+    // 恢复当前节点的脉冲
+    if (this.pulsingNode && !this.pulsingNode.removed()) {
+      this.startTourPulse(this.pulsingNode);
+    }
     this.onResume?.();
     this.scheduleNext();
   }
 
   stop(): void {
     if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+    if (this.pulsingNode) this.stopTourPulse();
     this.stopped = true;
     this.paused = false;
   }
@@ -144,6 +158,7 @@ export class TourEngine {
     }
 
     const { id, depth } = next;
+    this.currentStep++;
     const node = this.cy.getElementById(id);
 
     // Skip if node no longer exists in graph
@@ -197,9 +212,8 @@ export class TourEngine {
   }
 
   private buildPath(targetId: string): string[] {
-    // BFS to find shortest path from any visited node
-    // Start from root (first in queue before this node)
-    const startId = Array.from(this.visited)[0];
+    // BFS to find shortest path from the explicit start node
+    const startId = this.startNode;
     if (startId === targetId) return [startId];
 
     const parent = new Map<string, string>();
@@ -243,13 +257,27 @@ export class TourEngine {
     const node = this.cy.getElementById(nodeId);
     const pathLabels = path.map((id) => this.cy.getElementById(id).data('label') || id);
 
+    // 停止上一次漫游节点的脉冲动画
+    this.stopTourPulse();
+
+    // 移除所有高亮态，防止前一个主角的边/邻居残留
+    this.cy.elements().removeClass('selected-node highlighted highlighted-edge');
+    // 清除 :selected 状态，防止 .dimmed 与 :selected 冲突导致旧主角仍亮
+    this.cy.elements().unselect();
+
     // Dim everything first
     this.cy.elements().addClass('dimmed');
 
     // Highlight current node and its direct neighborhood
-    node.removeClass('dimmed').addClass('highlighted');
+    node.removeClass('dimmed highlighted').addClass('selected-node');
     node.connectedEdges().removeClass('dimmed').addClass('highlighted-edge');
-    node.neighborhood('node').not('.layer-parent').removeClass('dimmed').addClass('highlighted');
+    node.connectedEdges().targets().not('.layer-parent').removeClass('dimmed').addClass('highlighted');
+
+    // 聚光灯脉冲动画：shadow 在节点外围周期性扩散
+    this.startTourPulse(node);
+
+    // 白色描边 + 紫色外发光
+    this.cy.container().style.filter = 'drop-shadow(0 0 24px rgba(99,102,241,0.9))';
 
     // Animate to center on node
     this.cy.animate({
@@ -268,8 +296,77 @@ export class TourEngine {
       layerSize,
       layerIndex: layerIdx,
       totalExplored: this.totalExplored,
+      totalToExplore: this.totalToExplore,
+      currentStep: this.currentStep,
       maxDepthReached: depth,
       cycleCount: this.cycleCount,
     });
+  }
+
+  // 聚光灯脉冲状态
+  private pulseRafId: number | null = null;
+  private pulseGlowRafId: number | null = null;
+  private pulsingNode: cytoscape.NodeSingular | null = null;
+
+  private startTourPulse(node: cytoscape.NodeSingular): void {
+    this.pulsingNode = node;
+    let frame = 0;
+
+    // 节点边框脉冲（金色）
+    const animateBorder = () => {
+      if (!node.cy() || node.removed() || this.pulsingNode !== node) {
+        this.pulseRafId = null;
+        return;
+      }
+      frame++;
+      const t = frame / 60;
+      const pulse = (Math.sin(t * Math.PI * 2) + 1) / 2; // 0→1→0
+      node.style({
+        'border-width': 2.5 + pulse * 2,
+        'border-color': `rgba(251,191,36,${0.5 + pulse * 0.5})`,
+      });
+      this.pulseRafId = requestAnimationFrame(animateBorder);
+    };
+    this.pulseRafId = requestAnimationFrame(animateBorder);
+
+    // 画布外发光呼吸脉冲（紫色）
+    let glowFrame = 0;
+    const animateGlow = () => {
+      if (!node.cy() || node.removed() || this.pulsingNode !== node) {
+        this.pulseGlowRafId = null;
+        return;
+      }
+      glowFrame++;
+      const t = glowFrame / 60;
+      const pulse = (Math.sin(t * Math.PI * 2) + 1) / 2; // 0→1→0
+      const spread = 24 + pulse * 24;   // 24px → 48px
+      const alpha = 0.4 + pulse * 0.6; // 0.4 → 1.0
+      const host = document.getElementById('glow-host');
+      if (host) host.style.boxShadow = `0 0 ${spread}px rgba(99,102,241,${alpha}), 0 0 ${spread * 1.5}px rgba(99,102,241,${alpha * 0.4})`;
+      this.pulseGlowRafId = requestAnimationFrame(animateGlow);
+    };
+    this.pulseGlowRafId = requestAnimationFrame(animateGlow);
+  }
+
+  private stopTourPulse(): void {
+    if (this.pulseRafId !== null) {
+      cancelAnimationFrame(this.pulseRafId);
+      this.pulseRafId = null;
+    }
+    if (this.pulseGlowRafId !== null) {
+      cancelAnimationFrame(this.pulseGlowRafId);
+      this.pulseGlowRafId = null;
+      const host = document.getElementById('glow-host');
+      if (host) host.style.boxShadow = '';
+    }
+    if (this.pulsingNode && !this.pulsingNode.removed()) {
+      this.pulsingNode.style({
+        'border-width': 3,
+        'border-color': '#ffffff',
+      });
+    }
+    this.pulsingNode = null;
+    // 清除外发光
+    this.cy.container().style.filter = 'none';
   }
 }

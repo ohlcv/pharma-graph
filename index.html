@@ -3,9 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>药学知识图谱</title>
+  <title>药学知识图谱 — 药学专业知识可视化</title>
+  <meta name="description" content="基于药学专业知识的交互式知识图谱，支持节点探索、关系推理与漫游学习。">
+
+  <!-- Open Graph -->
+  <meta property="og:type"        content="website">
+  <meta property="og:title"       content="药学知识图谱">
+  <meta property="og:description"  content="基于药学专业知识的交互式知识图谱，支持节点探索、关系推理与漫游学习。">
+  <meta property="og:site_name"    content="药学知识图谱">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card"        content="summary">
+  <meta name="twitter:title"       content="药学知识图谱">
+  <meta name="twitter:description"  content="基于药学专业知识的交互式知识图谱，支持节点探索、关系推理与漫游学习。">
+
+  <!-- SVG Favicon: indigo→cyan 渐变三角形图腾 -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%236366f1'/><stop offset='100%25' stop-color='%2306b6d4'/></linearGradient></defs><polygon points='16,3 3,28 29,28' fill='url(%23g)'/></svg>">
+
+  <!-- Font loading: preconnect first, then async load with font-display:swap -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
 </head>
@@ -41,7 +59,7 @@
     </div>
     <span class="topbar__badge">
       <span class="topbar__badge-dot topbar__badge-dot--loading" id="badge-dot"></span>
-      <span id="badge-text">loading…</span>
+      <span class="badge-by">by</span><span class="badge-meow">meow</span>
     </span>
   </header>
 
@@ -111,7 +129,7 @@
 
   <!-- ── Mobile: expand bar ─────────────────────────────────────────────── -->
   <div id="sheet-expand-bar">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
       <polyline points="6 9 12 15 18 9"/>
     </svg>
   </div>
@@ -121,19 +139,23 @@
 
     <!-- Floating edge strip (inside #main so it can be controlled by .sidebar-hidden) -->
     <div id="sidebar-strip" class="sidebar-strip" onclick="toggleSidebar()" title="展开侧栏">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="9 18 15 12 9 6"/>
       </svg>
     </div>
 
-    <div id="cy"></div>
+    <div id="cy">
+      <div id="glow-host">
+        <svg id="tour-path-svg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1" aria-hidden="true"></svg>
+      </div>
+    </div>
 
     <!-- ── Left floating node detail ─────────────────────────────────── -->
     <div id="node-panel" class="node-panel" role="complementary" aria-label="节点详情">
       <div class="node-panel__header" id="node-panel-header" onpointerdown="startPanelDrag(event)">
         <span class="node-panel__title">节点详情</span>
         <button class="node-panel__close" onclick="closeNodePanel()" aria-label="关闭">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
         </button>
@@ -155,28 +177,32 @@
     <aside id="sidebar">
 
       <!-- Node types -->
-      <div class="sidebar-section" data-section="types">
+      <div class="sidebar-section" data-section="types" data-section-state="open">
         <div class="sidebar-section__head" onclick="toggleSection('types')">
           <span class="sidebar-section__title">节点类型</span>
-          <svg class="sidebar-section__chevron open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          <svg class="sidebar-section__chevron open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
         <div class="sidebar-section__body" id="body-types">
           <div class="node-type-grid">
             <div class="node-type-item" onclick="highlightShape('ellipse')">
               <div class="node-type-item__dot" style="background:#818cf8"></div>
               <span class="node-type-item__label">概念</span>
+              <span class="node-type-item__count" id="count-ellipse"></span>
             </div>
             <div class="node-type-item" onclick="highlightShape('round-rectangle')">
               <div class="node-type-item__dot" style="background:#67e8f9"></div>
               <span class="node-type-item__label">药物</span>
+              <span class="node-type-item__count" id="count-round-rectangle"></span>
             </div>
             <div class="node-type-item" onclick="highlightShape('diamond')">
               <div class="node-type-item__dot" style="background:#fca5a5;transform:rotate(45deg);border-radius:2px;width:9px;height:9px"></div>
               <span class="node-type-item__label">疾病</span>
+              <span class="node-type-item__count" id="count-diamond"></span>
             </div>
             <div class="node-type-item" onclick="highlightShape('barrel')">
               <div class="node-type-item__dot" style="background:#c4b5fd"></div>
               <span class="node-type-item__label">成分</span>
+              <span class="node-type-item__count" id="count-barrel"></span>
             </div>
           </div>
         </div>
@@ -184,10 +210,10 @@
 
       <!-- Stats -->
       <!-- Stats + Layout description merged -->
-      <div class="sidebar-section" data-section="stats">
+      <div class="sidebar-section" data-section="stats" data-section-state="open">
         <div class="sidebar-section__head" onclick="toggleSection('stats')">
           <span class="sidebar-section__title">图谱与布局</span>
-          <svg class="sidebar-section__chevron open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          <svg class="sidebar-section__chevron open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
         <div class="sidebar-section__body" id="body-stats">
           <div class="stat-list">
@@ -218,14 +244,16 @@
       <div class="sidebar-section" data-section="params">
         <div class="sidebar-section__head" onclick="toggleSection('params')">
           <span class="sidebar-section__title">布局参数</span>
-          <svg class="sidebar-section__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          <svg class="sidebar-section__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
-        <div class="sidebar-section__body" id="body-params" style="display:none">
-          <div id="layout-params" class="layout-params"></div>
-          <button id="apply-params-btn" class="btn btn--apply" onclick="applyLayoutParams()" style="display:none">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            <span>应用参数</span>
-          </button>
+        <div class="sidebar-section__body" id="body-params">
+          <div id="layout-params">
+            <div id="layout-params-rows"></div>
+            <button id="apply-params-btn" class="btn btn--apply" onclick="applyLayoutParams()" style="display:none">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>应用参数</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -233,9 +261,9 @@
       <div class="sidebar-section" data-section="shortcuts">
         <div class="sidebar-section__head" onclick="toggleSection('shortcuts')">
           <span class="sidebar-section__title">快捷键</span>
-          <svg class="sidebar-section__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          <svg class="sidebar-section__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
-        <div class="sidebar-section__body" id="body-shortcuts" style="display:none">
+        <div class="sidebar-section__body" id="body-shortcuts">
           <div class="shortcuts-list">
             <div class="shortcut-item"><span class="key">点击</span><span class="shortcut-item__label">选中节点</span></div>
             <div class="shortcut-item"><span class="key">右键</span><span class="shortcut-item__label">删除节点</span></div>
@@ -257,7 +285,7 @@
 
   <!-- ── Mobile: always-visible close handle (outside sheet so it's visible when closed) -->
   <div id="sheet-close-bar" onclick="closeBottomSheet()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
       <polyline points="6 9 12 15 18 9"/>
     </svg>
   </div>
@@ -379,6 +407,26 @@
     </svg>
   </button>
 
+  <!-- ── Zoom level indicator ──────────────────────────────────────────────── -->
+  <div id="zoom-indicator" class="zoom-indicator" style="display:none">100%</div>
+
+  <!-- ── Toast notification container ─────────────────────────────────────── -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- ── Empty state ─────────────────────────────────────────────────────── -->
+  <div id="empty-state" class="empty-state" style="display:none">
+    <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" class="empty-state__icon">
+      <circle cx="40" cy="40" r="36" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.3"/>
+      <circle cx="30" cy="35" r="6" fill="currentColor" opacity="0.4"/>
+      <circle cx="50" cy="35" r="4" fill="currentColor" opacity="0.3"/>
+      <circle cx="40" cy="52" r="5" fill="currentColor" opacity="0.35"/>
+      <line x1="30" y1="35" x2="40" y2="52" stroke="currentColor" stroke-width="1.5" opacity="0.25"/>
+      <line x1="50" y1="35" x2="40" y2="52" stroke="currentColor" stroke-width="1.5" opacity="0.25"/>
+    </svg>
+    <p class="empty-state__title">图谱为空</p>
+    <p class="empty-state__hint">请选择或添加节点以开始探索</p>
+  </div>
+
   <!-- ── Tour panel ─────────────────────────────────────────────────── -->
   <!-- ── Tour status bar ───────────────────────────────────────────────── -->
   <div id="tour-status" class="tour-status" style="display:none">
@@ -388,7 +436,7 @@
           <circle cx="12" cy="12" r="10"/>
           <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/>
         </svg>
-        <svg id="tour-badge-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+        <svg id="tour-badge-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="display:none">
           <circle cx="12" cy="12" r="10"/>
           <rect x="6" y="4" width="4" height="16" fill="currentColor" stroke="none"/>
           <rect x="14" y="4" width="4" height="16" fill="currentColor" stroke="none"/>
@@ -400,6 +448,10 @@
         <span id="tour-depth-badge">第 0 层</span>
         <span class="tour-status__sep">|</span>
         <span id="tour-count-badge">已探索 0 个节点</span>
+      </div>
+      <!-- 探索进度条 -->
+      <div class="tour-progress">
+        <div class="tour-progress__bar" id="tour-progress-bar"></div>
       </div>
       <div class="tour-status__sliders">
         <label id="tour-interval-lbl"><span id="tour-interval-val">3.0s</span>

@@ -1,13 +1,18 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { scanContentDir } from '../parser/content-manager.js';
+import { buildNodes } from '../core/node-builder.js';
+import { buildEdges } from '../core/edge-builder.js';
+import type { GraphData } from '../core/graph.js';
 
 const ROOT = path.resolve(process.cwd());
 const PORT = Number(process.env.PORT) || 4173;
 
-const MIME = {
+const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'application/javascript',
+  '.mjs': 'application/javascript',
   '.css': 'text/css',
   '.json': 'application/json',
   '.png': 'image/png',
@@ -15,9 +20,32 @@ const MIME = {
   '.ico': 'image/x-icon',
 };
 
-const server = http.createServer((req, res) => {
+async function buildGraphData(): Promise<GraphData> {
+  const files = await scanContentDir(path.join(ROOT, 'content'));
+  const nodes = await buildNodes(files);
+  const edges = await buildEdges(files);
+  return { nodes, edges };
+}
+
+const server = http.createServer(async (req, res) => {
+  const urlPath = req.url!.split('?')[0];
+
+  // ── /api/graph ────────────────────────────────────────────────────────────
+  if (urlPath === '/api/graph') {
+    try {
+      const data = await buildGraphData();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(data));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end(`Graph build error: ${msg}`);
+    }
+    return;
+  }
+
+  // ── Static files ──────────────────────────────────────────────────────────
   try {
-    const urlPath = req.url!.split('?')[0];
     let filePath = path.join(ROOT, decodeURIComponent(urlPath));
 
     if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
@@ -26,18 +54,13 @@ const server = http.createServer((req, res) => {
       filePath += '.html';
     }
 
-    fs.readFile(filePath, (err, data) => {
-      if (err) {
-        res.statusCode = err.code === 'ENOENT' ? 404 : 500;
-        res.end(err.code === 'ENOENT' ? 'Not found' : 'Server error');
-        return;
-      }
-      res.setHeader('content-type', (MIME as Record<string, string>)[path.extname(filePath)] || 'application/octet-stream');
-      res.end(data);
-    });
+    const data = fs.readFileSync(filePath);
+    const ext = path.extname(filePath);
+    res.writeHead(200, { 'Content-Type': MIME[ext] ?? 'application/octet-stream' });
+    res.end(data);
   } catch {
-    res.statusCode = 400;
-    res.end('Bad request');
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not found');
   }
 });
 

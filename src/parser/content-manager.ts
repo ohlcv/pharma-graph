@@ -15,6 +15,7 @@ export async function scanContentDir(dir?: string): Promise<string[]> {
   const rootDir = dir ?? path.resolve(__dirname, "../../content");
   const files = await glob("**/*.md", { cwd: rootDir, absolute: false });
   return files
+    .filter((f) => !f.startsWith("dist/"))
     .map((f) => path.join(rootDir, f))
     .sort();
 }

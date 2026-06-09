@@ -1,8 +1,8 @@
 // src/scripts/validate.ts
 // 校验 content/ 下所有 Markdown 文件的 frontmatter 格式和跨文件引用
+import fs from 'fs/promises';
 import { scanContentDir } from "../parser/content-manager.js";
 import { parseFrontmatter } from "../parser/frontmatter.js";
-import { parseMarkdown } from "../parser/markdown-parser.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
@@ -54,12 +54,12 @@ export async function validate(): Promise<void> {
 
   // Pass 1: collect all node IDs and validate structural fields
   for (const fp of files) {
-    const meta = await parseMarkdown(fp);
+    const raw = await fs.readFile(fp, 'utf-8');
     const relPath = toRelativePath(fp);
 
     let fm: ReturnType<typeof parseFrontmatter>;
     try {
-      fm = parseFrontmatter(meta.rawContent, fp);
+      fm = parseFrontmatter(raw, fp);
     } catch (err: any) {
       errors.push({ file: relPath, message: err.message, severity: "error" });
       continue;
@@ -116,11 +116,11 @@ export async function validate(): Promise<void> {
 
   // Pass 2: cross-reference — check that all edges_out.target 指向已存在的节点
   for (const fp of files) {
-    const meta = await parseMarkdown(fp);
+    const raw = await fs.readFile(fp, 'utf-8');
     const relPath = toRelativePath(fp);
 
     try {
-      const fm = parseFrontmatter(meta.rawContent, fp);
+      const fm = parseFrontmatter(raw, fp);
       if (!fm.edges_out) continue;
 
       for (let i = 0; i < fm.edges_out.length; i++) {

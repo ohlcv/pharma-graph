@@ -7,6 +7,7 @@ export interface NodeData {
   label: string;
   type: string;
   category: string;
+  layer?: string;  // knowledge layer: foundation / system / clinical / service
   summary?: string;
   location: string; // 相对 content/ 的路径，如 "药学专业知识一/药剂学/第七章/口服固体制剂/缓释剂.md"
 }

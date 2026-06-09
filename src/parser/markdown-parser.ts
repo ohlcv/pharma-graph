@@ -18,9 +18,12 @@ export async function parseMarkdown(filePath: string): Promise<MarkdownMeta> {
   const fileName = filePath.split(/[/\\]/).pop() ?? "untitled";
   const title = fileName.replace(/\.md$/, "");
 
+  const fmIdx = raw.indexOf('\n---');
+  const rawContent = fmIdx >= 0 ? raw.slice(fmIdx + 4) : raw;
+
   return {
     title,
-    rawContent: raw,
+    rawContent,
     filePath,
   };
 }

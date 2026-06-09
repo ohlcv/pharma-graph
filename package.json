@@ -4,18 +4,15 @@
   "description": "Knowledge graph for pharmaceutical science",
   "type": "module",
   "scripts": {
-    "scan": "tsx src/scripts/scan.ts",
-    "build": "vite build",
     "validate": "tsx src/scripts/validate.ts",
     "dev": "vite",
     "preview": "vite preview",
-    "start": "npm run scan && npm run dev",
+    "start": "npm run dev",
     "view": "node --import tsx src/scripts/serve.ts"
   },
   "dependencies": {
     "cytoscape": "^3.34.0",
-    "glob": "^11.0.0",
-    "gray-matter": "^4.0.3"
+    "glob": "^11.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

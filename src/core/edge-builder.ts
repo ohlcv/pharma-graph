@@ -1,6 +1,6 @@
 // src/core/edge-builder.ts
+import fs from 'fs/promises';
 import { parseFrontmatter } from "../parser/frontmatter.js";
-import { parseMarkdown } from "../parser/markdown-parser.js";
 import { EdgeData } from "./graph.js";
 
 /**
@@ -10,8 +10,8 @@ export async function buildEdges(filePaths: string[]): Promise<EdgeData[]> {
   const rawEdges: EdgeData[] = [];
 
   for (const fp of filePaths) {
-    const meta = await parseMarkdown(fp);
-    const fm = parseFrontmatter(meta.rawContent, fp);
+    const raw = await fs.readFile(fp, 'utf-8');
+    const fm = parseFrontmatter(raw, fp);
 
     if (!fm.edges_out || fm.edges_out.length === 0) continue;
 

@@ -1,6 +1,6 @@
 // src/core/node-builder.ts
-import { parseFrontmatter, ParsedFrontmatter } from "../parser/frontmatter.js";
-import { parseMarkdown } from "../parser/markdown-parser.js";
+import fs from 'fs/promises';
+import { parseFrontmatter } from "../parser/frontmatter.js";
 import { NodeData } from "./graph.js";
 
 /**
@@ -10,14 +10,15 @@ export async function buildNodes(filePaths: string[]): Promise<NodeData[]> {
   const nodes: NodeData[] = [];
 
   for (const fp of filePaths) {
-    const meta = await parseMarkdown(fp);
-    const fm = parseFrontmatter(meta.rawContent, fp);
+    const raw = await fs.readFile(fp, 'utf-8');
+    const fm = parseFrontmatter(raw, fp);
 
     const node: NodeData = {
       id: fm.id,
       label: fm.label,
       type: fm.type,
       category: fm.category,
+      layer: fm.layer,
       summary: fm.summary,
       location: toLocation(fp),
       weight: 1,
