@@ -29,7 +29,6 @@ const SHAPE_LABELS: Record<string, string> = {
   diamond: '菱形', barrel: '六边形',
 };
 
-let highlightColor = '#fbbf24';
 let currentLayout = 'cose';
 
 // ── Layout configs ──────────────────────────────────────────────────────────
@@ -409,6 +408,104 @@ function applyLayoutParams(): void {
   renderer.getCy().layout(base as unknown as cytoscape.LayoutOptions).run();
 }
 
+// ── Mobile bottom sheet: collapsible layout params ──────────────────────────────
+
+function renderBsLayoutParams(name: string): void {
+  const container = document.getElementById('bs-layout-params');
+  const applyBtn = document.getElementById('bs-apply-btn');
+  const params = LAYOUT_PARAMS[name];
+  if (!container) return;
+
+  if (!params || params.length === 0) {
+    container.innerHTML = '<div style="font-size:0.7rem;color:var(--muted);padding:4px 0">此布局无可调参数</div>';
+    if (applyBtn) applyBtn.style.display = 'none';
+    return;
+  }
+
+  const cfg = { ...(LAYOUT_CONFIGS[name] ?? {}) };
+  const valToPercent = (key: string, p: typeof params[0]) => {
+    const v = cfg[key] ?? p.default;
+    const min = p.min ?? 0, max = p.max ?? 100;
+    return ((Number(v) - min) / (max - min)) * 100 + '%';
+  };
+  const fmt = (val: number, step: number) => step < 1 ? val.toFixed(2) : String(val);
+
+  container.innerHTML = params.map((p) => {
+    if (p.type === 'select') {
+      const opts = (p.options ?? []).map((o) =>
+        `<option value="${o}" ${(cfg[p.key] ?? p.default) === o ? 'selected' : ''}>${o}</option>`
+      ).join('');
+      return `<div class="bs-param-row">
+        <div class="bs-param-label">${p.label}</div>
+        <select class="bs-param-slider param-select" data-key="${p.key}" style="height:32px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text-2);font-size:0.72rem">${opts}</select>
+      </div>`;
+    }
+    if (p.type === 'bool') {
+      const checked = (cfg[p.key] ?? p.default) ? 'checked' : '';
+      return `<div class="bs-param-row">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.7rem;color:var(--text-2)">
+          <input type="checkbox" data-key="${p.key}" ${checked} style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer">
+          ${p.label}
+        </label>
+      </div>`;
+    }
+    const val = cfg[p.key] ?? p.default;
+    const fill = valToPercent(p.key, p);
+    return `<div class="bs-param-row">
+      <div class="bs-param-label">${p.label}<span class="bs-param-label__val" id="bs-pv-${p.key}">${fmt(Number(val), p.step ?? 1)}</span></div>
+      <input type="range" class="bs-param-slider" data-key="${p.key}"
+        min="${p.min}" max="${p.max}" step="${p.step}" value="${val}"
+        style="background:linear-gradient(to right, var(--accent) ${fill}, var(--border) ${fill})">
+    </div>`;
+  }).join('');
+
+  container.querySelectorAll<HTMLInputElement>('.bs-param-slider:not(.param-select)').forEach((slider) => {
+    slider.addEventListener('input', () => {
+      const key = slider.dataset.key ?? '';
+      const p = params.find((x) => x.key === key);
+      if (!p) return;
+      const span = document.getElementById(`bs-pv-${key}`);
+      if (span) span.textContent = fmt(parseFloat(slider.value), p.step ?? 1);
+      const min = p.min ?? 0, max = p.max ?? 100;
+      const pct = ((parseFloat(slider.value) - min) / (max - min)) * 100;
+      slider.style.background = `linear-gradient(to right, var(--accent) ${pct}%, var(--border) ${pct}%)`;
+    });
+  });
+
+  if (applyBtn) applyBtn.style.display = '';
+}
+
+function toggleBsParams(): void {
+  const block = document.getElementById('bs-params-block');
+  const body = document.getElementById('bs-params-body');
+  if (!block || !body) return;
+  const open = block.classList.toggle('open');
+  body.style.display = open ? '' : 'none';
+  if (open) renderBsLayoutParams(currentLayout);
+}
+
+function applyBsParams(): void {
+  if (!renderer) return;
+  const container = document.getElementById('bs-layout-params');
+  if (!container) return;
+
+  const overrides: Record<string, unknown> = {};
+  container.querySelectorAll<HTMLInputElement>('.bs-param-slider:not(.param-select)').forEach((s) => {
+    overrides[s.dataset.key ?? ''] = parseFloat(s.value);
+  });
+  container.querySelectorAll<HTMLSelectElement>('.param-select').forEach((s) => {
+    overrides[s.dataset.key ?? ''] = s.value;
+  });
+  container.querySelectorAll<HTMLInputElement>('.bs-param-row input[type="checkbox"]').forEach((cb) => {
+    overrides[cb.dataset.key ?? ''] = cb.checked;
+  });
+
+  const base = { ...(LAYOUT_CONFIGS[currentLayout] ?? {}) };
+  Object.assign(base, overrides);
+  base.name = currentLayout;
+  renderer.getCy().layout(base as unknown as cytoscape.LayoutOptions).run();
+}
+
 function fitGraph(): void { if (renderer) renderer.fit(); }
 
 function randomize(): void {
@@ -456,6 +553,23 @@ function animatePulse(): void {
     raf = requestAnimationFrame(step);
   }
   raf = requestAnimationFrame(step);
+}
+
+// ── Search ────────────────────────────────────────────────────────────────────
+
+function searchNodes(query: string): void {
+  if (!renderer) return;
+  const cy = renderer.getCy();
+  cy.elements().removeClass('dimmed highlighted highlighted-edge');
+  if (!query.trim()) { updateStats(); return; }
+  const q = query.toLowerCase();
+  let matched = false;
+  cy.nodes().not('.layer-parent').forEach((n: cytoscape.NodeSingular) => {
+    const label = (n.data('label') ?? '').toLowerCase();
+    if (label.includes(q)) { n.addClass('highlighted'); matched = true; }
+    else n.addClass('dimmed');
+  });
+  if (matched) updateStats();
 }
 
 // ── Shape / type highlight ──────────────────────────────────────────────────
@@ -525,18 +639,6 @@ function highlightShape(shape: string): void {
   });
 }
 
-// ── Color swatch ────────────────────────────────────────────────────────────
-
-function setHighlightColor(color: string): void {
-  if (!renderer) return;
-  highlightColor = color;
-  renderer.getCy().style()
-    .selector('.highlighted')       .style('border-color', color).style('border-width', 3)
-    .selector('.highlighted-edge')  .style({ 'line-color': color, 'target-arrow-color': color })
-    .selector('.pulse')             .style('border-color', color)
-    .update();
-}
-
 // ── Events ──────────────────────────────────────────────────────────────────
 
 function initEvents(): void {
@@ -545,9 +647,6 @@ function initEvents(): void {
   cy.on('tap', 'node', (evt) => {
     highlightNode(evt.target);
     showNodeDetail(evt.target);
-    if (window.innerWidth <= 1024) {
-      showBottomSheetDetail(evt.target);
-    }
     updateStats();
     syncBottomSheetStats();
   });
@@ -567,8 +666,6 @@ function initEvents(): void {
       resetAll();
       const nodePanel = document.getElementById('node-panel');
       if (nodePanel) nodePanel.classList.remove('visible');
-      const bsDetail = document.getElementById('bs-detail');
-      if (bsDetail) bsDetail.style.display = 'none';
     }
   });
 
@@ -625,116 +722,47 @@ let sheetOpen = false;
 
 function toggleBottomSheet(): void {
   const sheet = document.getElementById('bottom-sheet');
-  const fab = document.getElementById('fab');
-  const fabIcon = document.getElementById('fab-icon');
-  const pullZone = document.getElementById('sheet-pull-zone');
-  const handle = document.getElementById('sheet-handle');
-  if (!sheet || !fab) return;
+  const backdrop = document.getElementById('sheet-backdrop');
+  const bar = document.getElementById('sheet-expand-bar');
+  const app = document.getElementById('app');
+  if (!sheet) return;
   sheetOpen = !sheetOpen;
   sheet.classList.toggle('open', sheetOpen);
-  fab.classList.toggle('active', sheetOpen);
-  if (pullZone) {
-    pullZone.style.pointerEvents = sheetOpen ? 'none' : 'auto';
-    pullZone.style.height = sheetOpen ? '0' : '24px';
-  }
-  if (handle) {
-    handle.classList.toggle('visible', !sheetOpen);
-  }
+  if (backdrop) backdrop.classList.toggle('visible', sheetOpen);
+  if (bar) bar.classList.toggle('sheet-open', sheetOpen);
+  if (app) app.classList.toggle('sheet-open', sheetOpen);
 }
 
 function closeBottomSheet(): void {
   const sheet = document.getElementById('bottom-sheet');
-  const fab = document.getElementById('fab');
-  const pullZone = document.getElementById('sheet-pull-zone');
-  const handle = document.getElementById('sheet-handle');
-  if (!sheet || !fab) return;
+  const backdrop = document.getElementById('sheet-backdrop');
+  const bar = document.getElementById('sheet-expand-bar');
+  const app = document.getElementById('app');
+  if (!sheet) return;
   sheetOpen = false;
   sheet.classList.remove('open');
-  fab.classList.remove('active');
-  if (pullZone) {
-    pullZone.style.pointerEvents = 'auto';
-    pullZone.style.height = '24px';
-  }
-  if (handle) {
-    handle.classList.add('visible');
-  }
+  if (backdrop) backdrop.classList.remove('visible');
+  if (bar) bar.classList.remove('sheet-open');
+  if (app) app.classList.remove('sheet-open');
 }
 
-// ── Drag to open/close bottom sheet (slides down from top) ───────────────────
+// ── Mobile expand bar ─────────────────────────────────────────────────────────
+
+// ── Drag on close-bar to close sheet ───────────────────────────────────────
 function startSheetDrag(e: PointerEvent): void {
   const sheet = document.getElementById('bottom-sheet');
-  if (!sheet) return;
-
-  const startY = e.clientY;
-  const isOpen = sheet.classList.contains('open');
-
-  const onMove = (me: PointerEvent) => {
-    const delta = me.clientY - startY;
-    if (isOpen) {
-      // Open: drag down to close (delta > 0), drag up to keep open
-      if (delta > 0) {
-        sheet.style.transform = `translateY(${delta}px)`;
-        sheet.style.transition = 'none';
-      } else {
-        sheet.style.transform = `translateY(${delta}px)`;
-        sheet.style.transition = 'none';
-      }
-    } else {
-      // Closed: drag down from top to open (delta > 0)
-      if (delta > 0) {
-        sheet.style.transform = `translateY(calc(-100% + ${delta}px))`;
-        sheet.style.transition = 'none';
-      }
-    }
-  };
-
-  const onUp = (ue: PointerEvent) => {
-    document.removeEventListener('pointermove', onMove);
-    document.removeEventListener('pointerup', onUp);
-    const delta = ue.clientY - startY;
-    sheet.style.transform = '';
-    sheet.style.transition = '';
-
-    if (isOpen) {
-      if (delta > 80) {
-        closeBottomSheet();
-      }
-    } else {
-      if (delta > 80) {
-        toggleBottomSheet();
-      }
-    }
-  };
-
-  document.addEventListener('pointermove', onMove);
-  document.addEventListener('pointerup', onUp);
-}
-
-// Pull-zone / handle: drag down to open when sheet is closed
-document.addEventListener('pointerdown', (e: PointerEvent) => {
-  const pullZone = document.getElementById('sheet-pull-zone');
-  const handle = document.getElementById('sheet-handle');
-  const sheet = document.getElementById('bottom-sheet');
-  if (!sheet || sheet.classList.contains('open')) return;
-
-  const target = e.target as HTMLElement;
-  const inZone = pullZone && pullZone.contains(target);
-  const inHandle = handle && handle.contains(target);
-
-  if (!inZone && !inHandle) return;
-  e.preventDefault();
-  startSheetDrag(e);
-});
-
-// Bottom half: drag up to close when sheet is open
-document.addEventListener('pointerdown', (e: PointerEvent) => {
-  const sheet = document.getElementById('bottom-sheet');
+  const closeBar = document.getElementById('sheet-close-bar');
   if (!sheet || !sheet.classList.contains('open')) return;
+
+  // Only allow drag from the close bar (top strip of the sheet)
+  if (closeBar && !closeBar.contains(e.target as Node) && e.target !== closeBar) return;
+
+  e.preventDefault();
   const startY = e.clientY;
 
   const onMove = (me: PointerEvent) => {
     const delta = me.clientY - startY;
-    if (delta < 0) {
+    if (delta > 0) {
       sheet.style.transform = `translateY(${delta}px)`;
       sheet.style.transition = 'none';
     }
@@ -746,53 +774,11 @@ document.addEventListener('pointerdown', (e: PointerEvent) => {
     const delta = ue.clientY - startY;
     sheet.style.transform = '';
     sheet.style.transition = '';
-    if (delta < -80) {
-      closeBottomSheet();
-    }
+    if (delta > 60) closeBottomSheet();
   };
 
   document.addEventListener('pointermove', onMove);
   document.addEventListener('pointerup', onUp);
-});
-
-// ── Bottom sheet: show node detail ─────────────────────────────────────────
-function showBottomSheetDetail(node: cytoscape.NodeSingular): void {
-  const d = node.data();
-  const typeLabel = TYPE_LABELS[d.type] || d.type || '—';
-  const color = nodeColor(d.type);
-
-  const badge = document.getElementById('bs-type-badge');
-  const name = document.getElementById('bs-node-name');
-  const info = document.getElementById('bs-node-info');
-  const container = document.getElementById('bs-detail');
-
-  if (badge) {
-    badge.textContent = typeLabel;
-    badge.style.color = color;
-    badge.style.borderColor = color + '66';
-    badge.style.background = color + '1a';
-  }
-  if (name) name.textContent = d.label || d.id;
-
-  const adj = node.neighborhood('node').not('.layer-parent');
-  const adjHtml = adj.length > 0
-    ? adj.map((n: cytoscape.NodeSingular) =>
-        `<span class="tag">${n.data('label') || n.id()}</span>`
-      ).join('')
-    : '';
-
-  if (info) {
-    info.innerHTML = `
-      <div class="bs-node-info-row"><span class="bs-node-info-row__key">分类</span><span class="bs-node-info-row__val">${d.category || '—'}</span></div>
-      <div class="bs-node-info-row"><span class="bs-node-info-row__key">度数</span><span class="bs-node-info-row__val">${node.degree()}</span></div>
-      ${d.summary ? `<div class="bs-node-info-row" style="flex-direction:column;gap:2px"><span class="bs-node-info-row__key" style="margin-bottom:2px">摘要</span><span class="bs-node-info-row__val">${d.summary}</span></div>` : ''}
-      ${adjHtml ? `<div class="bs-tag-list">${adjHtml}</div>` : ''}
-    `;
-  }
-
-  if (container) {
-    container.style.display = '';
-  }
 }
 
 // ── Bottom sheet: sync stats ────────────────────────────────────────────────
@@ -817,15 +803,21 @@ loadGraphData()
     initShortcuts();
     updateStats();
     syncBottomSheetStats();
-    // Init sheet pull-zone and handle visibility
-    const pullZone = document.getElementById('sheet-pull-zone');
-    const handle = document.getElementById('sheet-handle');
-    if (pullZone) {
-      pullZone.style.pointerEvents = 'auto';
-      pullZone.style.height = '24px';
+
+    // Sync sidebar toggle button state with actual sidebar class
+    const sidebar = document.getElementById('sidebar');
+    const btn = document.getElementById('btn-sidebar-toggle');
+    if (sidebar && btn) {
+      btn.classList.toggle('active', !sidebar.classList.contains('hidden'));
     }
-    if (handle) {
-      handle.classList.add('visible');
+
+    // Mobile expand bar & sheet drag
+    const bar = document.getElementById('sheet-expand-bar');
+    if (bar) bar.addEventListener('click', toggleBottomSheet);
+
+    const sheet = document.getElementById('bottom-sheet');
+    if (sheet) {
+      sheet.addEventListener('pointerdown', startSheetDrag);
     }
   })
   .catch((err) => {
@@ -837,6 +829,22 @@ loadGraphData()
 
 window.addEventListener('resize', () => { if (renderer) fitGraph(); });
 
+// Search input listeners
+const desktopSearch = document.getElementById('toolbar-search') as HTMLInputElement;
+if (desktopSearch) {
+  desktopSearch.addEventListener('input', () => searchNodes(desktopSearch.value));
+  desktopSearch.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { desktopSearch.value = ''; searchNodes(''); }
+  });
+}
+const mobileSearch = document.getElementById('bs-search-input') as HTMLInputElement;
+if (mobileSearch) {
+  mobileSearch.addEventListener('input', () => searchNodes(mobileSearch.value));
+  mobileSearch.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { mobileSearch.value = ''; searchNodes(''); }
+  });
+}
+
 // Expose inline onclick handlers
 (window as any).runLayout = runLayout;
 (window as any).fitGraph = fitGraph;
@@ -844,10 +852,12 @@ window.addEventListener('resize', () => { if (renderer) fitGraph(); });
 (window as any).animatePulse = animatePulse;
 (window as any).resetAll = resetAll;
 (window as any).highlightShape = highlightShape;
-(window as any).setHighlightColor = setHighlightColor;
 (window as any).applyLayoutParams = applyLayoutParams;
 (window as any).toggleSection = toggleSection;
 (window as any).toggleBottomSheet = toggleBottomSheet;
+(window as any).closeBottomSheet = closeBottomSheet;
+(window as any).toggleBsParams = toggleBsParams;
+(window as any).applyBsParams = applyBsParams;
 (window as any).startSheetDrag = startSheetDrag;
 (window as any).startPanelDrag = startPanelDrag;
 (window as any).closeNodePanel = closeNodePanel;
@@ -855,7 +865,7 @@ window.addEventListener('resize', () => { if (renderer) fitGraph(); });
 
 let dragState: { startX: number; startY: number; startLeft: number; startTop: number; el: HTMLElement } | null = null;
 
-function startPanelDrag(e: MouseEvent): void {
+function startPanelDrag(e: PointerEvent): void {
   const panel = document.getElementById('node-panel');
   if (!panel || !panel.classList.contains('visible')) return;
   dragState = {
@@ -866,11 +876,11 @@ function startPanelDrag(e: MouseEvent): void {
     el: panel,
   };
   panel.classList.add('dragging');
-  document.addEventListener('mousemove', onPanelDrag);
-  document.addEventListener('mouseup', stopPanelDrag);
+  document.addEventListener('pointermove', onPanelDrag);
+  document.addEventListener('pointerup', stopPanelDrag);
 }
 
-function onPanelDrag(e: MouseEvent): void {
+function onPanelDrag(e: PointerEvent): void {
   if (!dragState) return;
   const { el } = dragState;
   const W = el.offsetWidth;
@@ -897,8 +907,8 @@ function stopPanelDrag(): void {
     dragState.el.classList.remove('dragging');
     dragState = null;
   }
-  document.removeEventListener('mousemove', onPanelDrag);
-  document.removeEventListener('mouseup', stopPanelDrag);
+  document.removeEventListener('pointermove', onPanelDrag);
+  document.removeEventListener('pointerup', stopPanelDrag);
 }
 
 function toggleSidebar(): void {

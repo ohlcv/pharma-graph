@@ -4,7 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>药学知识图谱</title>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
 </head>
 <body>
 
@@ -28,7 +31,14 @@
         <span class="topbar__brand-sub">PHARMA KNOWLEDGE GRAPH</span>
       </div>
     </div>
-    <div class="topbar__divider"></div>
+    <div class="topbar__search-center">
+      <div class="topbar__search-wrap">
+        <svg class="topbar__search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input id="toolbar-search" class="topbar__search-input" type="text" placeholder="搜索节点…" autocomplete="off" spellcheck="false"/>
+      </div>
+    </div>
     <span class="topbar__badge">
       <span class="topbar__badge-dot topbar__badge-dot--loading" id="badge-dot"></span>
       <span id="badge-text">loading…</span>
@@ -37,7 +47,6 @@
 
   <!-- ── Toolbar ─────────────────────────────────────────────────────── -->
   <div class="toolbar">
-    <span class="toolbar__label">布局</span>
     <div class="toolbar__group">
       <button id="btn-cose"         class="btn active" onclick="runLayout('cose')"><span>COSE</span></button>
       <button id="btn-concentric"   class="btn" onclick="runLayout('concentric')"><span>同心圆</span></button>
@@ -59,6 +68,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
         <span>随机</span>
       </button>
+      <button id="btn-reset" class="btn" onclick="resetAll()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
+        <span>重置</span>
+      </button>
       <button id="btn-pulse"  class="btn" onclick="animatePulse()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
         <span>脉冲</span>
@@ -67,7 +80,6 @@
 
     <div class="toolbar__sep"></div>
 
-    <button id="btn-reset" class="btn" onclick="resetAll()"><span>重置</span></button>
     <button id="btn-sidebar-toggle" class="btn btn--icon" onclick="toggleSidebar()" title="切换侧栏">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -76,14 +88,28 @@
     </button>
   </div>
 
+  <!-- ── Mobile: expand bar ─────────────────────────────────────────────── -->
+  <div id="sheet-expand-bar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="6 9 12 15 18 9"/>
+    </svg>
+  </div>
+
   <!-- ── Main ───────────────────────────────────────────────────────── -->
   <div id="main">
+
+    <!-- Floating edge strip (inside #main so it can be controlled by .sidebar-hidden) -->
+    <div id="sidebar-strip" class="sidebar-strip" onclick="toggleSidebar()" title="展开侧栏">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="9 18 15 12 9 6"/>
+      </svg>
+    </div>
 
     <div id="cy"></div>
 
     <!-- ── Left floating node detail ─────────────────────────────────── -->
     <div id="node-panel" class="node-panel" role="complementary" aria-label="节点详情">
-      <div class="node-panel__header" id="node-panel-header" onmousedown="startPanelDrag(event)">
+      <div class="node-panel__header" id="node-panel-header" onpointerdown="startPanelDrag(event)">
         <span class="node-panel__title">节点详情</span>
         <button class="node-panel__close" onclick="closeNodePanel()" aria-label="关闭">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -136,9 +162,10 @@
       </div>
 
       <!-- Stats -->
+      <!-- Stats + Layout description merged -->
       <div class="sidebar-section" data-section="stats">
         <div class="sidebar-section__head" onclick="toggleSection('stats')">
-          <span class="sidebar-section__title">图谱统计</span>
+          <span class="sidebar-section__title">图谱与布局</span>
           <svg class="sidebar-section__chevron open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
         <div class="sidebar-section__body" id="body-stats">
@@ -155,24 +182,14 @@
               <span class="stat-card__label">选中</span>
               <span class="stat-card__value stat-card__value--amber" id="stat-selected">0</span>
             </div>
-            <div class="stat-card">
-              <span class="stat-card__label">布局</span>
-              <span class="stat-card__value" id="stat-layout">COSE</span>
-            </div>
           </div>
-        </div>
-      </div>
-
-      <!-- Layout description -->
-      <div class="sidebar-section" data-section="layout-desc">
-        <div class="sidebar-section__head" onclick="toggleSection('layout-desc')">
-          <span class="sidebar-section__title">布局说明</span>
-          <svg class="sidebar-section__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-        </div>
-        <div class="sidebar-section__body" id="body-layout-desc" style="display:none">
-          <p id="layout-desc" class="layout-desc">
-            COSE — 力学弹簧布局，模拟物理排斥与吸引，自动产生紧凑聚类结构。
-          </p>
+          <div class="layout-info">
+            <div class="layout-info__header">
+              <span class="layout-info__label">布局</span>
+              <span class="layout-info__badge" id="stat-layout">COSE</span>
+            </div>
+            <span id="layout-desc" class="layout-info__desc">COSE — 力学弹簧布局，模拟物理排斥与吸引，自动产生紧凑聚类结构。</span>
+          </div>
         </div>
       </div>
 
@@ -188,58 +205,6 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             <span>应用参数</span>
           </button>
-        </div>
-      </div>
-
-      <!-- Shape filter -->
-      <div class="sidebar-section" data-section="shapes">
-        <div class="sidebar-section__head" onclick="toggleSection('shapes')">
-          <span class="sidebar-section__title">形状筛选</span>
-          <svg class="sidebar-section__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-        </div>
-        <div class="sidebar-section__body" id="body-shapes" style="display:none">
-          <div class="shape-filter-list">
-            <div class="shape-filter-item" onclick="highlightShape('ellipse')">
-              <div class="shape-filter-item__shape"><div style="width:10px;height:10px;border-radius:50%;background:#818cf8"></div></div>
-              <span class="shape-filter-item__label">椭圆 ellipse</span>
-            </div>
-            <div class="shape-filter-item" onclick="highlightShape('round-rectangle')">
-              <div class="shape-filter-item__shape"><div style="width:14px;height:9px;border-radius:3px;background:#67e8f9"></div></div>
-              <span class="shape-filter-item__label">圆角矩形</span>
-            </div>
-            <div class="shape-filter-item" onclick="highlightShape('rectangle')">
-              <div class="shape-filter-item__shape"><div style="width:14px;height:9px;border-radius:2px;background:#f59e0b"></div></div>
-              <span class="shape-filter-item__label">矩形</span>
-            </div>
-            <div class="shape-filter-item" onclick="highlightShape('diamond')">
-              <div class="shape-filter-item__shape"><div style="width:9px;height:9px;background:#fca5a5;transform:rotate(45deg);border-radius:1px"></div></div>
-              <span class="shape-filter-item__label">菱形 diamond</span>
-            </div>
-            <div class="shape-filter-item" onclick="highlightShape('barrel')">
-              <div class="shape-filter-item__shape"><div style="width:12px;height:9px;border-radius:3px;background:#c4b5fd"></div></div>
-              <span class="shape-filter-item__label">六边形 barrel</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Color swatches -->
-      <div class="sidebar-section" data-section="colors">
-        <div class="sidebar-section__head" onclick="toggleSection('colors')">
-          <span class="sidebar-section__title">高亮颜色</span>
-          <svg class="sidebar-section__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-        </div>
-        <div class="sidebar-section__body" id="body-colors" style="display:none">
-          <div class="color-grid">
-            <div class="color-swatch" style="background:#fbbf24" onclick="setHighlightColor('#fbbf24')" title="琥珀"></div>
-            <div class="color-swatch" style="background:#f87171" onclick="setHighlightColor('#f87171')" title="珊瑚"></div>
-            <div class="color-swatch" style="background:#34d399" onclick="setHighlightColor('#34d399')" title="翡翠"></div>
-            <div class="color-swatch" style="background:#60a5fa" onclick="setHighlightColor('#60a5fa')" title="天蓝"></div>
-            <div class="color-swatch" style="background:#a78bfa" onclick="setHighlightColor('#a78bfa')" title="紫罗兰"></div>
-            <div class="color-swatch" style="background:#fb923c" onclick="setHighlightColor('#fb923c')" title="橙色"></div>
-            <div class="color-swatch" style="background:#22d3ee" onclick="setHighlightColor('#22d3ee')" title="青色"></div>
-            <div class="color-swatch" style="background:#f472b6" onclick="setHighlightColor('#f472b6')" title="粉色"></div>
-          </div>
         </div>
       </div>
 
@@ -263,57 +228,86 @@
         </div>
       </div>
 
+      <div class="sidebar-credit">by meow</div>
+
     </aside><!-- /desktop sidebar -->
-    <div class="sidebar-credit">by meow</div>
 
   </div><!-- /main -->
 
-  <!-- ── Mobile bottom sheet ────────────────────────────────────────────── -->
-  <!-- Pull zone at top captures drag-to-open gesture when sheet is closed -->
-  <div id="sheet-pull-zone"></div>
-
-  <!-- Handle bar fixed at top edge when sheet is closed -->
-  <div id="sheet-handle" style="display:none" onpointerdown="startSheetDrag(event)">
-    <div id="sheet-handle-bar"></div>
+  <!-- ── Mobile: always-visible close handle (outside sheet so it's visible when closed) -->
+  <div id="sheet-close-bar" onclick="closeBottomSheet()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <polyline points="6 9 12 15 18 9"/>
+    </svg>
   </div>
 
+  <!-- ── Mobile bottom sheet ────────────────────────────────────────────── -->
+  <!-- Backdrop dims the graph when sheet is open -->
+  <div id="sheet-backdrop" onclick="closeBottomSheet()"></div>
+
   <div id="bottom-sheet" class="bottom-sheet" role="dialog" aria-label="控制面板">
-    <!-- Inner handle (visible when open, also draggable to close) -->
-    <div class="bottom-sheet__handle" id="sheet-handle-inner" onpointerdown="startSheetDrag(event)">
-      <div class="bottom-sheet__handle-bar"></div>
+
+    <!-- ── Search ──────────────────────────────────────────── -->
+    <div class="bs-section">
+      <div class="bs-search-wrap">
+        <svg class="bs-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input id="bs-search-input" class="bs-search-input" type="text" placeholder="搜索节点…" autocomplete="off" spellcheck="false"/>
+      </div>
     </div>
 
-    <!-- Quick actions row -->
-    <div class="bottom-sheet__actions">
-      <button class="bs-action-btn" onclick="fitGraph()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-        <span>适应</span>
-      </button>
-      <button class="bs-action-btn" onclick="randomize()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
-        <span>随机</span>
-      </button>
-      <button class="bs-action-btn" onclick="animatePulse()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-        <span>脉冲</span>
-      </button>
-      <button class="bs-action-btn" onclick="resetAll()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
-        <span>重置</span>
-      </button>
+    <!-- ── Stats row ──────────────────────────────────────── -->
+    <div class="bs-section">
+      <div class="bs-section__label">图谱信息</div>
+      <div class="bs-stats-row">
+        <div class="bs-stat"><span class="bs-stat__val bs-stat__val--accent" id="bs-stat-nodes">—</span><span class="bs-stat__label">节点</span></div>
+        <div class="bs-stat"><span class="bs-stat__val bs-stat__val--cyan" id="bs-stat-edges">—</span><span class="bs-stat__label">边</span></div>
+        <div class="bs-stat"><span class="bs-stat__val bs-stat__val--amber" id="bs-stat-selected">0</span><span class="bs-stat__label">选中</span></div>
+        <div class="bs-stat"><span class="bs-stat__val" id="bs-stat-layout">COSE</span><span class="bs-stat__label">布局</span></div>
+      </div>
     </div>
 
-    <!-- Stats row -->
-    <div class="bottom-sheet__stats">
-      <div class="bs-stat"><span class="bs-stat__val bs-stat__val--accent" id="bs-stat-nodes">—</span><span class="bs-stat__label">节点</span></div>
-      <div class="bs-stat"><span class="bs-stat__val bs-stat__val--cyan" id="bs-stat-edges">—</span><span class="bs-stat__label">边</span></div>
-      <div class="bs-stat"><span class="bs-stat__val bs-stat__val--amber" id="bs-stat-selected">0</span><span class="bs-stat__label">选中</span></div>
-      <div class="bs-stat"><span class="bs-stat__val" id="bs-stat-layout">COSE</span><span class="bs-stat__label">布局</span></div>
+    <!-- ── Quick action row ─────────────────────────────────── -->
+    <div class="bs-section">
+      <div class="bs-section__label">快捷操作</div>
+      <div class="bs-quick-row">
+        <button class="bs-quick-btn" onclick="fitGraph()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+          <span>适应</span>
+        </button>
+        <button class="bs-quick-btn" onclick="randomize()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+          <span>随机</span>
+        </button>
+        <button class="bs-quick-btn" onclick="animatePulse()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+          <span>脉冲</span>
+        </button>
+        <button class="bs-quick-btn" onclick="resetAll()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
+          <span>重置</span>
+        </button>
+      </div>
     </div>
 
-    <!-- Node type chips -->
-    <div class="bottom-sheet__section">
-      <div class="bottom-sheet__section-label">节点类型</div>
+    <!-- ── Layout buttons ─────────────────────────────── -->
+    <div class="bs-section">
+      <div class="bs-section__label">图谱布局</div>
+      <div class="bs-layout-grid">
+        <button class="bs-layout-btn active" id="bs-btn-cose" onclick="runLayout('cose')">COSE</button>
+        <button class="bs-layout-btn" id="bs-btn-concentric" onclick="runLayout('concentric')">同心圆</button>
+        <button class="bs-layout-btn" id="bs-btn-circle" onclick="runLayout('circle')">环形</button>
+        <button class="bs-layout-btn" id="bs-btn-grid" onclick="runLayout('grid')">网格</button>
+        <button class="bs-layout-btn" id="bs-btn-dagre" onclick="runLayout('dagre')">Dagre</button>
+        <button class="bs-layout-btn" id="bs-btn-breadthfirst" onclick="runLayout('breadthfirst')">广度</button>
+        <button class="bs-layout-btn" id="bs-btn-euler" onclick="runLayout('euler')">Euler</button>
+      </div>
+    </div>
+
+    <!-- ── Node type chips ───────────────────────────── -->
+    <div class="bs-section">
+      <div class="bs-section__label">节点类型</div>
       <div class="bs-chips">
         <div class="bs-chip" onclick="highlightShape('ellipse')">
           <div class="bs-chip__dot" style="background:#818cf8;border-radius:50%"></div>
@@ -334,49 +328,9 @@
       </div>
     </div>
 
-    <!-- Color palette -->
-    <div class="bottom-sheet__section">
-      <div class="bottom-sheet__section-label">高亮颜色</div>
-      <div class="bs-colors">
-        <div class="bs-color" style="background:#fbbf24" onclick="setHighlightColor('#fbbf24')"></div>
-        <div class="bs-color" style="background:#f87171" onclick="setHighlightColor('#f87171')"></div>
-        <div class="bs-color" style="background:#34d399" onclick="setHighlightColor('#34d399')"></div>
-        <div class="bs-color" style="background:#60a5fa" onclick="setHighlightColor('#60a5fa')"></div>
-        <div class="bs-color" style="background:#a78bfa" onclick="setHighlightColor('#a78bfa')"></div>
-        <div class="bs-color" style="background:#fb923c" onclick="setHighlightColor('#fb923c')"></div>
-        <div class="bs-color" style="background:#22d3ee" onclick="setHighlightColor('#22d3ee')"></div>
-        <div class="bs-color" style="background:#f472b6" onclick="setHighlightColor('#f472b6')"></div>
-      </div>
-    </div>
-
-    <!-- Node detail (shown when node selected) -->
-    <div class="bottom-sheet__detail" id="bs-detail" style="display:none">
-      <div class="bottom-sheet__detail-header">
-        <span id="bs-type-badge" class="bs-type-badge"></span>
-        <span id="bs-node-name" class="bs-node-name"></span>
-      </div>
-      <div id="bs-node-info" class="bs-node-info"></div>
-    </div>
-
-    <!-- Layout selector -->
-    <div class="bottom-sheet__section">
-      <div class="bottom-sheet__section-label">布局</div>
-      <div class="bs-layout-grid">
-        <button class="bs-layout-btn active" id="bs-btn-cose" onclick="runLayout('cose')">COSE</button>
-        <button class="bs-layout-btn" id="bs-btn-concentric" onclick="runLayout('concentric')">同心圆</button>
-        <button class="bs-layout-btn" id="bs-btn-circle" onclick="runLayout('circle')">环形</button>
-        <button class="bs-layout-btn" id="bs-btn-grid" onclick="runLayout('grid')">网格</button>
-        <button class="bs-layout-btn" id="bs-btn-dagre" onclick="runLayout('dagre')">Dagre</button>
-        <button class="bs-layout-btn" id="bs-btn-breadthfirst" onclick="runLayout('breadthfirst')">广度</button>
-        <button class="bs-layout-btn" id="bs-btn-euler" onclick="runLayout('euler')">Euler</button>
-      </div>
-    </div>
-
-    <!-- Bottom padding for scroll -->
-    <div style="height:20px"></div>
   </div>
 
-  <!-- ── Mobile FAB (layout toggle) ─────────────────────────────────── -->
+  <!-- ── Mobile FAB (hidden — expand bar replaces it) ─────────────────────── -->
   <button id="fab" class="fab" onclick="toggleBottomSheet()" aria-label="打开面板">
     <svg id="fab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <line x1="3" y1="12" x2="21" y2="12"/>
@@ -386,13 +340,6 @@
   </button>
 
 </div><!-- /app -->
-
-<!-- ── Sidebar floating edge strip ─────────────────────────────────────── -->
-  <div id="sidebar-strip" class="sidebar-strip" onclick="toggleSidebar()" title="展开侧栏">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-      <polyline points="9 18 15 12 9 6"/>
-    </svg>
-  </div>
 
 <script type="module" src="/src/ui/main.ts"></script>
 </body>
