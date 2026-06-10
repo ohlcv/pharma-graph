@@ -48,7 +48,7 @@
         <svg class="topbar__search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
         </svg>
-        <input id="toolbar-search" class="topbar__search-input" type="text" placeholder="搜索节点…" autocomplete="off" spellcheck="false"/>
+        <input id="bs-search-input" class="topbar__search-input" type="text" placeholder="搜索节点…" autocomplete="off" spellcheck="false"/>
       </div>
     </div>
     <span class="topbar__badge">
@@ -100,6 +100,10 @@
         <circle cx="12" cy="12" r="10"/>
         <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/>
       </svg>
+      <svg id="tour-icon-stop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+        <circle cx="12" cy="12" r="10"/>
+        <rect x="8" y="8" width="8" height="8" rx="1" fill="currentColor" stroke="none"/>
+      </svg>
       <span>漫游</span>
     </button>
 
@@ -124,13 +128,6 @@
     </button>
   </div>
 
-  <!-- ── Mobile: expand bar ─────────────────────────────────────────────── -->
-  <div id="sheet-expand-bar">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-      <polyline points="6 9 12 15 18 9"/>
-    </svg>
-  </div>
-
   <!-- ── Main ───────────────────────────────────────────────────────── -->
   <div id="main">
 
@@ -148,6 +145,17 @@
     <div id="node-panel" class="node-panel" role="dialog" aria-label="节点详情">
       <div class="node-panel__header" id="node-panel-header" onpointerdown="startPanelDrag(event)">
         <span class="node-panel__title">节点详情</span>
+        <div class="node-panel__tabs">
+          <button class="node-panel__tab active" id="lp-tab-overview" aria-label="概述">概</button>
+          <button class="node-panel__tab" id="lp-tab-body" aria-label="正文">文</button>
+        </div>
+        <button class="node-panel__pin" id="lp-btn-pin" aria-label="固定位置" title="固定位置">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 4v6l-2 4v2h10v-2l-2 -4v-6"/>
+            <path d="M12 16l0 5"/>
+            <path d="M8 4l8 0"/>
+          </svg>
+        </button>
         <button class="node-panel__close" onclick="closeNodePanel()" aria-label="关闭">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -155,60 +163,8 @@
         </button>
       </div>
       <div class="node-panel__body">
-
-        <!-- 标题区 -->
-        <div class="np-hero">
-          <div class="np-hero__badges">
-            <span id="lp-type-badge" class="np-badge np-badge--type"></span>
-            <span id="lp-layer-badge" class="np-badge np-badge--layer"></span>
-            <span id="lp-category-badge" class="np-badge np-badge--category"></span>
-          </div>
-          <div id="lp-node-name" class="np-hero__name"></div>
-          <div id="lp-location" class="np-hero__location"></div>
-        </div>
-
-        <!-- 摘要（可折叠） -->
-        <div id="lp-summary-section" class="np-section np-summary-section">
-          <div class="np-section__toggle" id="lp-summary-toggle">
-            <span class="np-section__label">摘要</span>
-            <svg class="np-section__toggle-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-          </div>
-          <div id="lp-summary" class="np-summary"></div>
-        </div>
-
-        <!-- 标签（可折叠） -->
-        <div id="lp-tags-section" class="np-section" style="display:none">
-          <div id="lp-tags-toggle" class="np-section__toggle">
-            <span class="np-section__label">标签</span>
-            <svg class="np-section__toggle-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-          </div>
-          <div id="lp-tags" class="np-tags"></div>
-        </div>
-
-        <!-- 连出边 -->
-        <div id="lp-edges-section" class="np-section" style="display:none">
-          <div id="lp-edges-toggle" class="np-section__toggle">
-            <span class="np-section__label">关联</span>
-            <svg class="np-section__toggle-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-          </div>
-          <div id="lp-edges" class="np-edges"></div>
-        </div>
-
-        <!-- 邻居 -->
-        <div id="lp-neighbors-section" class="np-section" style="display:none">
-          <div class="np-section__label">邻居节点</div>
-          <div id="lp-neighbors" class="np-neighbors"></div>
-        </div>
-
-        <!-- 正文 -->
-        <div id="lp-body-section" class="np-section" style="display:none">
-          <div id="lp-body-toggle" class="np-section__toggle">
-            <span class="np-section__label">正文</span>
-            <svg class="np-section__toggle-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-          </div>
-          <div id="lp-body-content" class="np-body-content"></div>
-        </div>
-
+        <div id="lp-overview-page" class="np-page"></div>
+        <div id="lp-body-page" class="np-page" style="display:none"></div>
       </div>
     </div>
 
@@ -323,7 +279,7 @@
   <!-- ── Mobile: always-visible close handle (outside sheet so it's visible when closed) -->
   <div id="sheet-close-bar" onclick="closeBottomSheet()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
-      <polyline points="6 9 12 15 18 9"/>
+      <polyline points="6 15 12 9 18 15"/>
     </svg>
   </div>
 
@@ -331,15 +287,42 @@
   <!-- Backdrop dims the graph when sheet is open -->
   <div id="sheet-backdrop" onclick="closeBottomSheet()"></div>
 
+  <!-- ── Peek tab (always visible at bottom when sheet is closed) ──────────── -->
+  <div id="sheet-peek-tab" onclick="toggleBottomSheet()" title="展开面板">
+    <div class="sheet-peek-tab__handle"></div>
+    <div class="sheet-peek-tab__label">控制面板</div>
+  </div>
+
   <div id="bottom-sheet" class="bottom-sheet" role="dialog" aria-label="控制面板">
 
-    <!-- ── Search ──────────────────────────────────────────── -->
+    <!-- ── Drag handle ─────────────────────────────────────── -->
+    <div class="bs-drag-handle" aria-hidden="true">
+      <div class="bs-drag-handle__bar"></div>
+    </div>
+
+    <!-- ── Scroll body ────────────────────────────────────── -->
+    <div class="bs-scroll">
+
+    <!-- ── Node type chips ───────────────────────────────── -->
     <div class="bs-section">
-      <div class="bs-search-wrap">
-        <svg class="bs-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-        </svg>
-        <input id="bs-search-input" class="bs-search-input" type="text" placeholder="搜索节点…" autocomplete="off" spellcheck="false"/>
+      <div class="bs-section__label">节点类型</div>
+      <div class="bs-chips">
+        <div class="bs-chip" onclick="highlightShape('ellipse')">
+          <div class="bs-chip__dot" style="background:#818cf8;border-radius:50%"></div>
+          <span>概念</span>
+        </div>
+        <div class="bs-chip" onclick="highlightShape('round-rectangle')">
+          <div class="bs-chip__dot" style="background:#67e8f9"></div>
+          <span>药物</span>
+        </div>
+        <div class="bs-chip" onclick="highlightShape('diamond')">
+          <div class="bs-chip__dot" style="background:#fca5a5;transform:rotate(45deg);border-radius:2px;width:9px;height:9px"></div>
+          <span>疾病</span>
+        </div>
+        <div class="bs-chip" onclick="highlightShape('barrel')">
+          <div class="bs-chip__dot" style="background:#c4b5fd"></div>
+          <span>成分</span>
+        </div>
       </div>
     </div>
 
@@ -410,30 +393,19 @@
       </div>
     </div>
 
-    <!-- ── Node type chips ───────────────────────────── -->
-    <div class="bs-section">
-      <div class="bs-section__label">节点类型</div>
-      <div class="bs-chips">
-        <div class="bs-chip" onclick="highlightShape('ellipse')">
-          <div class="bs-chip__dot" style="background:#818cf8;border-radius:50%"></div>
-          <span>概念</span>
-        </div>
-        <div class="bs-chip" onclick="highlightShape('round-rectangle')">
-          <div class="bs-chip__dot" style="background:#67e8f9"></div>
-          <span>药物</span>
-        </div>
-        <div class="bs-chip" onclick="highlightShape('diamond')">
-          <div class="bs-chip__dot" style="background:#fca5a5;transform:rotate(45deg);border-radius:2px;width:9px;height:9px"></div>
-          <span>疾病</span>
-        </div>
-        <div class="bs-chip" onclick="highlightShape('barrel')">
-          <div class="bs-chip__dot" style="background:#c4b5fd"></div>
-          <span>成分</span>
-        </div>
-      </div>
+    <!-- ── Layout parameters ────────────────────────── -->
+    <div class="bs-params-block" id="bs-params-block">
+      <button class="bs-params-toggle" id="bs-params-toggle" onclick="toggleBsParams()">
+        <span>布局参数</span>
+        <svg class="bs-params-toggle__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <div class="bs-params-body" id="bs-layout-params" style="display:none"></div>
+      <button id="bs-apply-btn" class="bs-apply-btn" onclick="applyBsParams()" style="display:none;margin:0 14px 12px;width:calc(100% - 28px)">应用参数</button>
     </div>
 
-  </div>
+    </div><!-- /bs-scroll -->
+
+  </div><!-- /bottom-sheet -->
 
   <!-- ── Mobile FAB (hidden — expand bar replaces it) ─────────────────────── -->
   <button id="fab" class="fab" onclick="toggleBottomSheet()" aria-label="打开面板">
@@ -464,65 +436,165 @@
     <p class="empty-state__hint">请选择或添加节点以开始探索</p>
   </div>
 
-  <!-- ── Tour panel ─────────────────────────────────────────────────── -->
-  <!-- ── Tour status bar ───────────────────────────────────────────────── -->
-  <!-- 漫游状态条 -->
-  <div id="tour-status" class="tour-status" style="display:none">
-    <!-- 拖动把手（仅移动端） -->
-    <div class="tour-bar-drag-handle" id="tour-status-handle">
-      <div class="tour-bar-drag-handle__dots">
+  <!-- 漫游状态条：桌面端浮动底部，移动端独立卡片 -->
+  <div id="tour-status" class="tour-status tour-mob" style="display:none">
+    <!-- 拖动把手（移动端专属） -->
+    <div class="tour-mob__handle" id="tour-status-handle">
+      <div class="tour-mob__grip">
         <span></span><span></span><span></span>
       </div>
     </div>
-    <!-- 内容 -->
-    <div class="tour-status__inner">
-      <!-- 控制按钮行 -->
-      <div class="tour-status__ctrl">
-        <button class="tour-status__close" id="tour-close-btn" onclick="tourStop()">
+    <!-- 内容区 -->
+    <div class="tour-mob__inner">
+      <!-- 控制按钮 -->
+      <div class="tour-mob__ctrl">
+        <button class="tour-mob__close" id="tour-close-btn" onclick="tourStop()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
         </button>
-        <button class="tour-status__badge" id="tour-badge-btn" onclick="tourPause()">
+        <button class="tour-mob__badge" id="tour-badge-btn" onclick="tourPause()">
           <svg id="tour-badge-play" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><polygon points="9,7 17,12 9,17" fill="currentColor"/></svg>
           <svg id="tour-badge-pause" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><rect x="7" y="6" width="3.5" height="12" fill="currentColor"/><rect x="13.5" y="6" width="3.5" height="12" fill="currentColor"/></svg>
         </button>
       </div>
-      <!-- 进度数字（图标+数字，同一行，无背景色） -->
-      <div class="tour-status__stats">
-        <span id="tour-stat-cycle" class="tour-stat" title="循环轮次">
+      <!-- 数字统计 -->
+      <div class="tour-mob__stats">
+        <span id="tour-stat-cycle" class="tour-mob__stat" title="循环轮次">
           <svg viewBox="0 0 24 24"><path d="M17 2.4l2.1-2.1M20 12a8 8 0 1 1-2-5.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><polyline points="20 4 20 10 14 10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span id="tour-cycle-num">1</span>
         </span>
-        <span class="tour-stat" title="当前层">
+        <span class="tour-mob__stat" title="当前层">
           <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><line x1="2" y1="8" x2="22" y2="8" stroke="currentColor" stroke-width="1.8"/><line x1="2" y1="14" x2="22" y2="14" stroke="currentColor" stroke-width="1.8"/></svg>
           <span id="tour-depth-badge">1</span>
         </span>
-        <span class="tour-stat" title="已探索节点">
+        <span class="tour-mob__stat" title="已探索节点">
           <svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="16" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><line x1="8" y1="11" x2="12" y2="13" stroke="currentColor" stroke-width="1.5"/><line x1="16" y1="11" x2="12" y2="13" stroke="currentColor" stroke-width="1.5"/></svg>
           <span id="tour-count-badge">0</span>
         </span>
       </div>
+      <!-- 竖向参数调节（移动端） -->
+      <div class="tour-mob__sliders">
+        <!-- 间隔滑块 -->
+        <div class="tour-mob__slider-cell">
+          <div class="tour-mob__track">
+            <div class="tour-mob__fill" id="tour-interval-fill"></div>
+          </div>
+          <input type="range" class="tour-mob__range" id="tour-interval" min="1000" max="10000" step="500" value="3000" orient="vertical">
+          <span class="tour-mob__val" id="tour-interval-val">3s</span>
+        </div>
+        <!-- 深度滑块 -->
+        <div class="tour-mob__slider-cell">
+          <div class="tour-mob__track">
+            <div class="tour-mob__fill" id="tour-depth-fill"></div>
+          </div>
+          <input type="range" class="tour-mob__range" id="tour-maxdepth" min="1" max="10" step="1" value="10" orient="vertical">
+          <span class="tour-mob__val" id="tour-depth-val">&infin;</span>
+        </div>
+      </div>
+    </div>
+    <!-- 内容区（桌面端）：横向宽条，像音乐播放器 -->
+    <div class="tour-dt" id="tour-dt">
+      <!-- 左侧：状态指示 -->
+      <div class="tour-dt__status">
+        <span class="tour-dt__dot" id="tour-dt-dot"></span>
+        <span class="tour-dt__label" id="tour-dt-label">漫游</span>
+      </div>
+      <!-- 左侧：当前节点 -->
+      <div class="tour-dt__node">
+        <svg class="tour-dt__node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="9" fill="none"/></svg>
+        <span class="tour-dt__node-name" id="tour-dt-node-name">—</span>
+      </div>
+      <!-- 左侧分隔线 -->
+      <div class="tour-dt__sep"></div>
+      <!-- 左侧：统计数字 -->
+      <div class="tour-dt__stats">
+        <span class="tour-dt__stat" title="循环轮次">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 2.4l2.1-2.1M20 12a8 8 0 1 1-2-5.6"/><polyline points="20 4 20 10 14 10"/></svg>
+          <span class="tour-dt__stat-label">轮次</span>
+          <span class="tour-dt__stat-val" id="tour-cycle-num-dt">1</span>
+        </span>
+        <span class="tour-dt__stat" title="当前层">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="20" height="20" rx="3"/><line x1="2" y1="8" x2="22" y2="8"/><line x1="2" y1="14" x2="22" y2="14"/></svg>
+          <span class="tour-dt__stat-label">层</span>
+          <span class="tour-dt__stat-val" id="tour-depth-badge-dt">0</span>
+        </span>
+        <span class="tour-dt__stat" title="已探索节点">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="3.5"/><circle cx="16" cy="8" r="3.5"/><circle cx="12" cy="16" r="3.5"/><line x1="8" y1="11" x2="12" y2="13"/><line x1="16" y1="11" x2="12" y2="13"/></svg>
+          <span class="tour-dt__stat-label">节点</span>
+          <span class="tour-dt__stat-val" id="tour-count-badge-dt">0</span>
+        </span>
+      </div>
       <!-- 进度条 -->
-      <div class="tour-progress"><div class="tour-progress__bar" id="tour-progress-bar"></div></div>
-      <!-- 竖向滑块 -->
-      <div class="tour-status__sliders">
-        <div class="tour-slider-cell">
-          <div class="tour-slider-track"><div class="tour-slider-fill" id="tour-interval-fill"></div></div>
-          <div class="tour-slider-input-wrap"><input type="range" id="tour-interval" min="1000" max="10000" step="500" value="3000"></div>
-          <span class="tour-slider-val" id="tour-interval-val">3s</span>
+      <div class="tour-dt__progress">
+        <div class="tour-dt__progress-track">
+          <div class="tour-dt__progress-fill" id="tour-progress-fill-dt"></div>
         </div>
-        <div class="tour-slider-cell">
-          <div class="tour-slider-track"><div class="tour-slider-fill" id="tour-depth-fill"></div></div>
-          <div class="tour-slider-input-wrap"><input type="range" id="tour-maxdepth" min="1" max="10" step="1" value="10"></div>
-          <span class="tour-slider-val" id="tour-depth-val">&infin;</span>
-        </div>
+        <span class="tour-dt__progress-label" id="tour-progress-label-dt">0 / 0</span>
+      </div>
+      <!-- 分隔线 -->
+      <div class="tour-dt__sep"></div>
+      <!-- 参数滑块 -->
+      <div class="tour-dt__params">
+        <span class="tour-dt__param-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          间隔
+        </span>
+        <input type="range" class="tour-dt__range" id="tour-interval-dt" min="1000" max="10000" step="500" value="3000">
+        <span class="tour-dt__param-val" id="tour-interval-val-dt">3s</span>
+      </div>
+      <div class="tour-dt__sep"></div>
+      <div class="tour-dt__params">
+        <span class="tour-dt__param-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="3"/><line x1="2" y1="8" x2="22" y2="8"/><line x1="2" y1="14" x2="22" y2="14"/></svg>
+          深度
+        </span>
+        <input type="range" class="tour-dt__range" id="tour-maxdepth-dt" min="1" max="10" step="1" value="10">
+        <span class="tour-dt__param-val" id="tour-depth-val-dt">&infin;</span>
+      </div>
+      <!-- 分隔线 -->
+      <div class="tour-dt__sep"></div>
+      <!-- 控制按钮 -->
+      <div class="tour-dt__ctrl">
+        <button class="tour-dt__btn tour-dt__btn--play" id="tour-badge-btn-dt" onclick="tourPause()" title="暂停">
+          <svg id="tour-badge-play-dt" viewBox="0 0 24 24"><polygon points="6,4 20,12 6,20" fill="currentColor"/></svg>
+          <svg id="tour-badge-pause-dt" viewBox="0 0 24 24" style="display:none"><rect x="5" y="4" width="4" height="16" fill="currentColor"/><rect x="15" y="4" width="4" height="16" fill="currentColor"/></svg>
+        </button>
+        <button class="tour-dt__btn tour-dt__btn--close" onclick="tourStop()" title="停止">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
       </div>
     </div>
   </div>
 
 </div><!-- /app -->
+
+<!-- ── Mobile node drawer ─────────────────────────────────────────── -->
+<div id="mobile-node-panel" role="dialog" aria-label="节点详情">
+  <div id="mnp-backdrop"></div>
+  <div id="mnp-sheet">
+    <div id="mnp-handle"></div>
+    <div id="mnp-header">
+      <span class="mnp-title">节点详情</span>
+      <div class="mnp-tabs">
+        <button class="mnp-tab-btn active" id="mnp-tab-overview" aria-label="概述">概</button>
+        <button class="mnp-tab-btn" id="mnp-tab-body" aria-label="正文">文</button>
+      </div>
+      <button id="mnp-close-btn" class="mnp-close-btn" onclick="closeMobileNodePanel()" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div id="mnp-body">
+      <div id="mnp-overview-page" class="mnp-tab-page active"></div>
+      <div id="mnp-body-page" class="mnp-tab-page" style="display:none"></div>
+    </div>
+  </div>
+</div>
 
 <!-- BGM playlist -->
 <audio id="bgm" preload="none"></audio>

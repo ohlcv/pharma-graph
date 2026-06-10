@@ -8,6 +8,7 @@ export interface TourOptions {
   onComplete?: () => void;
   onPause?: () => void;
   onResume?: () => void;
+  onAfterCenter?: (pan: { x: number; y: number }) => { x: number; y: number };
 }
 
 export interface TourStepInfo {
@@ -36,6 +37,7 @@ export class TourEngine {
   private onComplete?: TourOptions['onComplete'];
   private onPause?: TourOptions['onPause'];
   private onResume?: TourOptions['onResume'];
+  private onAfterCenter?: TourOptions['onAfterCenter'];
 
   private visited = new Set<string>();
   private queue: Array<{ id: string; depth: number }> = [];
@@ -73,6 +75,7 @@ export class TourEngine {
     this.onComplete = options.onComplete;
     this.onPause = options.onPause;
     this.onResume = options.onResume;
+    this.onAfterCenter = options.onAfterCenter;
     this.paused = false;
     this.stopped = false;
     this.totalExplored = 0; // count starts at 0; visitNext increments before its first onStep call
@@ -271,12 +274,20 @@ export class TourEngine {
     // 聚光灯脉冲动画：shadow 在节点外围周期性扩散
     this.startTourPulse(node);
 
-    // Animate to center on node
+    // Animate to center on node, then apply optional pan offset (mobile)
     this.cy.animate({
       center: { eles: node },
       zoom: depth === 0 ? 1.5 : 1.3,
       duration: 600,
       easing: 'ease-out-cubic',
+    }, {
+      done: () => {
+        if (this.onAfterCenter) {
+          const currentPan = this.cy.pan();
+          const adjusted = this.onAfterCenter(currentPan);
+          this.cy.pan(adjusted);
+        }
+      },
     });
 
     if (!silent) {
