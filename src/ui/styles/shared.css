@@ -1,0 +1,57 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   shared.css — Global Animations · Utility Classes
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@layer shared {
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.85); }
+}
+@keyframes badge-shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50%       { background-position: 100% 50%; }
+}
+@keyframes carousel-shimmer {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes np-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(16px) scale(0.95); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+@keyframes nodeRipple {
+  0%   { opacity: 0.7; transform: translate(-50%, -50%) scale(0); }
+  100% { opacity: 0;   transform: translate(-50%, -50%) scale(3); }
+}
+@keyframes tourMobIn {
+  from { opacity: 0; transform: translateY(-8px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Keyboard key badge ─────────────────────────────────────────────────── */
+.key {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.58rem; font-weight: 700;
+  color: var(--text-2); background: var(--border);
+  border: 1px solid var(--border-hi); border-bottom-width: 2px;
+  padding: 1px 5px; border-radius: 4px;
+  line-height: 1.5; letter-spacing: 0.02em;
+  white-space: nowrap; flex-shrink: 0;
+}
+
+}

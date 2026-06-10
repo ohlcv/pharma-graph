@@ -113,17 +113,23 @@ export function runDebugUpdate(renderer: Renderer, highlight: HighlightEngine): 
   const stateKey = `${selIds}||${dimIds}||${currentNodeId}`;
 
   if (stateKey === debugLastState) {
+    // Only update badge positions — skip expensive DOM rebuild when nothing changed
     const overlay = document.getElementById('debug-overlay');
     if (overlay) {
-      overlay.querySelectorAll<HTMLElement>('.debug-badge').forEach((badge) => {
+      const batch: Array<{ el: HTMLElement; x: number; y: number }> = [];
+      overlay.querySelectorAll<HTMLElement>('.debug-badge[data-node-id]').forEach((badge) => {
         const nodeId = badge.dataset.nodeId;
         if (!nodeId) return;
         const node = cy.getElementById(nodeId);
         if (node.empty()) return;
         const pos = node.renderedPosition();
         const nodeH = node.renderedHeight();
-        badge.style.left = pos.x + 'px';
-        badge.style.top = (pos.y - nodeH / 2 - 2) + 'px';
+        batch.push({ el: badge, x: pos.x, y: pos.y - nodeH / 2 - 2 });
+      });
+      // Batch-apply positions in a single reflow
+      batch.forEach(({ el, x, y }) => {
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
       });
     }
     const el = (id: string) => document.getElementById(id) as HTMLElement | null;
@@ -223,8 +229,15 @@ export function runDebugUpdate(renderer: Renderer, highlight: HighlightEngine): 
 
   const overlay = document.getElementById('debug-overlay');
   if (overlay) {
-    overlay.innerHTML = '';
+    // Build all badges into a fragment, then do one replaceChild — O(1) reflow
+    const fragment = document.createDocumentFragment();
+    const existingBadges = new Map<string, HTMLElement>();
+    overlay.querySelectorAll<HTMLElement>('.debug-badge[data-node-id]').forEach((b) => {
+      existingBadges.set(b.dataset.nodeId!, b);
+    });
+
     cy.nodes().not('.layer-parent').forEach((node: NodeSingular) => {
+      const nid = node.id();
       const pos = node.renderedPosition();
       if (!pos) return;
       const nodeH = node.renderedHeight();
@@ -239,7 +252,7 @@ export function runDebugUpdate(renderer: Renderer, highlight: HighlightEngine): 
       if (hasSNode) parts.push('N');
       if (hasHighlight) parts.push('H');
       if (hasHovered) parts.push('V');
-      const text = parts.length > 0 ? parts.join('+') : '·';
+      const text = parts.length > 0 ? parts.join('+') : '\u00b7';
       const label = (node.data('label') || node.id()).slice(0, 6);
       let cls = 'debug-badge debug-badge--none';
       if (hasSelected && hasDimmed) cls = 'debug-badge debug-badge--selected';
@@ -248,22 +261,46 @@ export function runDebugUpdate(renderer: Renderer, highlight: HighlightEngine): 
       else if (hasSNode) cls = 'debug-badge debug-badge--sel-node';
       else if (hasHighlight) cls = 'debug-badge debug-badge--highlight';
       else if (hasHovered) cls = 'debug-badge debug-badge--hovered';
-      const badge = document.createElement('div');
-      badge.className = cls;
-      badge.dataset.nodeId = node.id();
-      badge.textContent = `${label}[${text}]`;
-      badge.style.left = pos.x + 'px';
-      badge.style.top = (pos.y - nodeH / 2 - 2) + 'px';
-      overlay.appendChild(badge);
+
+      const existing = existingBadges.get(nid);
+      if (existing && existing.className === cls) {
+        existing.style.left = pos.x + 'px';
+        existing.style.top = (pos.y - nodeH / 2 - 2) + 'px';
+        existing.textContent = `${label}[${text}]`;
+        fragment.appendChild(existing);
+        existingBadges.delete(nid);
+      } else {
+        const badge = document.createElement('div');
+        badge.className = cls;
+        badge.dataset.nodeId = nid;
+        badge.textContent = `${label}[${text}]`;
+        badge.style.left = pos.x + 'px';
+        badge.style.top = (pos.y - nodeH / 2 - 2) + 'px';
+        fragment.appendChild(badge);
+      }
+
       if (hasSelected && hasDimmed) {
-        const c = document.createElement('div');
-        c.className = 'debug-badge debug-badge--selected';
-        c.textContent = 'CONFLICT!';
-        c.style.left = pos.x + 'px';
-        c.style.top = (pos.y - nodeH / 2 - 28) + 'px';
-        overlay.appendChild(c);
+        const existingC = existingBadges.get(`__conflict_${nid}`);
+        if (existingC) {
+          existingC.style.left = pos.x + 'px';
+          existingC.style.top = (pos.y - nodeH / 2 - 28) + 'px';
+          fragment.appendChild(existingC);
+          existingBadges.delete(`__conflict_${nid}`);
+        } else {
+          const c = document.createElement('div');
+          c.className = 'debug-badge debug-badge--selected';
+          c.textContent = 'CONFLICT!';
+          c.style.left = pos.x + 'px';
+          c.style.top = (pos.y - nodeH / 2 - 28) + 'px';
+          fragment.appendChild(c);
+        }
       }
     });
+
+    // Remove stale badges no longer in graph
+    existingBadges.forEach((el) => el.remove());
+    overlay.innerHTML = '';
+    overlay.appendChild(fragment);
   }
 
   debugRafId = requestAnimationFrame(() => runDebugUpdate(renderer, highlight));

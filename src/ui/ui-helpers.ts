@@ -44,18 +44,23 @@ export function spawnNodeRipple(x: number, y: number, color: string): void {
 // ── Zoom indicator ────────────────────────────────────────────────────────────
 
 let zoomIndicatorTimer: ReturnType<typeof setTimeout> | null = null;
+let zoomIndicatorDebounce: ReturnType<typeof setTimeout> | null = null;
 
 export function showZoomIndicator(cy: import('cytoscape').Core): void {
-  const el = document.getElementById('zoom-indicator');
-  if (!el) return;
-  const pct = Math.round(cy.zoom() * 100);
-  el.textContent = `${pct}%`;
-  el.style.display = '';
-  el.style.opacity = '1';
-  if (zoomIndicatorTimer) clearTimeout(zoomIndicatorTimer);
-  zoomIndicatorTimer = setTimeout(() => {
-    if (el) { el.style.opacity = '0'; setTimeout(() => { if (el) el.style.display = 'none'; }, 400); }
-  }, 2500);
+  if (zoomIndicatorDebounce !== null) clearTimeout(zoomIndicatorDebounce);
+  zoomIndicatorDebounce = setTimeout(() => {
+    const el = document.getElementById('zoom-indicator');
+    if (!el) return;
+    const pct = Math.round(cy.zoom() * 100);
+    el.textContent = `${pct}%`;
+    el.style.display = '';
+    el.style.opacity = '1';
+    if (zoomIndicatorTimer) clearTimeout(zoomIndicatorTimer);
+    zoomIndicatorTimer = setTimeout(() => {
+      if (el) { el.style.opacity = '0'; setTimeout(() => { if (el) el.style.display = 'none'; }, 400); }
+    }, 2500);
+    zoomIndicatorDebounce = null;
+  }, 50);
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────

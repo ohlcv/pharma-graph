@@ -4,6 +4,16 @@ import { Renderer } from '../core/renderer.js';
 import { HighlightEngine } from './highlight-engine.js';
 import { LAYOUTS, SHAPE_LABEL } from '../core/config.js';
 
+// ── Debounce utility ────────────────────────────────────────────────────────────
+
+function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  return ((...args: unknown[]) => {
+    if (timer !== null) clearTimeout(timer);
+    timer = setTimeout(() => { fn(...args); timer = null; }, ms);
+  }) as unknown as T;
+}
+
 // ── Current layout state ────────────────────────────────────────────────────────
 
 let _currentLayout = 'cose';
@@ -18,29 +28,52 @@ export function setCurrentLayout(name: string): void {
 
 // ── Stats ──────────────────────────────────────────────────────────────────────
 
-export function updateStats(cy: Core): void {
-  const set = (id: string, val: string) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-  const nodes = cy.nodes().not('.layer-parent');
-  set('stat-nodes', String(nodes.length));
-  set('stat-edges', String(cy.edges().length));
-  set('stat-selected', String(cy.$(':selected').length));
-  set('stat-layout', _currentLayout.toUpperCase());
-  const countShape = (shape: string, elId: string) => {
-    const el = document.getElementById(elId);
-    if (el) { const count = nodes.filter(`[type = "${shape}"]`).length; el.textContent = count > 0 ? `${count}` : ''; }
-  };
-  countShape('concept', 'count-ellipse');
-  countShape('drug', 'count-round-rectangle');
-  countShape('disease', 'count-diamond');
-  countShape('ingredient', 'count-barrel');
+// RAF-gated + debounced stats update — prevents layout thrashing from frequent events
+let _statsRaf: number | null = null;
+let _statsDebounce: ReturnType<typeof setTimeout> | null = null;
+let _statsPending = false;
+
+function doUpdateStats(cy: Core): void {
+  _statsPending = true;
+  if (_statsRaf !== null) return;
+  _statsRaf = requestAnimationFrame(() => {
+    _statsRaf = null;
+    if (!_statsPending) return;
+    _statsPending = false;
+    const set = (id: string, val: string) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    const nodes = cy.nodes().not('.layer-parent');
+    set('stat-nodes', String(nodes.length));
+    set('stat-edges', String(cy.edges().length));
+    set('stat-selected', String(cy.$(':selected').length));
+    set('stat-layout', _currentLayout.toUpperCase());
+    const countShape = (shape: string, elId: string) => {
+      const el = document.getElementById(elId);
+      if (el) { const count = nodes.filter(`[type = "${shape}"]`).length; el.textContent = count > 0 ? `${count}` : ''; }
+    };
+    countShape('concept', 'count-ellipse');
+    countShape('drug', 'count-round-rectangle');
+    countShape('disease', 'count-diamond');
+    countShape('ingredient', 'count-barrel');
+  });
 }
 
+export function updateStats(cy: Core): void {
+  if (_statsDebounce !== null) clearTimeout(_statsDebounce);
+  _statsDebounce = setTimeout(() => { doUpdateStats(cy); _statsDebounce = null; }, 100);
+}
+
+let _sheetStatsDebounce: ReturnType<typeof setTimeout> | null = null;
+
 export function syncBottomSheetStats(cy: Core): void {
-  const set = (id: string, val: string) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-  set('bs-stat-nodes', String(cy.nodes().not('.layer-parent').length));
-  set('bs-stat-edges', String(cy.edges().length));
-  set('bs-stat-selected', String(cy.$(':selected').length));
-  set('bs-stat-layout', _currentLayout.toUpperCase());
+  if (_sheetStatsDebounce !== null) clearTimeout(_sheetStatsDebounce);
+  _sheetStatsDebounce = setTimeout(() => {
+    const set = (id: string, val: string) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    set('bs-stat-nodes', String(cy.nodes().not('.layer-parent').length));
+    set('bs-stat-edges', String(cy.edges().length));
+    set('bs-stat-selected', String(cy.$(':selected').length));
+    set('bs-stat-layout', _currentLayout.toUpperCase());
+    _sheetStatsDebounce = null;
+  }, 100);
 }
 
 // ── Layout ──────────────────────────────────────────────────────────────────────
@@ -199,7 +232,9 @@ export function animatePulse(renderer: Renderer): void {
   if (sel.length === 0) return;
   let scale = 1, dir = 1;
   let raf: number;
+  let frame = 0;
   const step = () => {
+    frame++;
     scale += 0.03 * dir;
     if (scale >= 1.25) dir = -1;
     if (scale <= 0.95) {
@@ -211,8 +246,11 @@ export function animatePulse(renderer: Renderer): void {
       return;
     }
     sel.addClass('pulse');
-    sel.style('width', (n: cytoscape.NodeSingular) => String((n.data('weight') || 70) * scale));
-    sel.style('height', (n: cytoscape.NodeSingular) => String((n.data('weight') || 70) * scale));
+    // Throttle style computation: only update every other frame
+    if (frame % 2 === 0) {
+      sel.style('width', (n: cytoscape.NodeSingular) => String((n.data('weight') || 70) * scale));
+      sel.style('height', (n: cytoscape.NodeSingular) => String((n.data('weight') || 70) * scale));
+    }
     raf = requestAnimationFrame(step);
   };
   raf = requestAnimationFrame(step);

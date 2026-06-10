@@ -1435,14 +1435,6 @@ touch-action: none;
 --tour-accent: #6366f1; --tour-accent-2: #a78bfa;
 }
 
-/* Desktop bar hidden by default; shown on ≥641px via media query below */
-.tour-dt { display: none; }
-
-@keyframes tourStatusIn {
-from { opacity: 0; transform: translateY(12px) scale(0.95); }
-to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-
 /* ── Inner content row ─────────────────────────────────────────────────── */
 .tour-status__inner {
 display: flex; align-items: center; gap: 8px;
@@ -1843,9 +1835,6 @@ box-shadow: 0 0 12px rgba(99,102,241,0.35);
 /* ── Responsive: large desktop (≥ 769px) ──────────────────────────────── */
 @media (min-width: 769px) {
 /* Show desktop bar, hide mobile bar */
-.tour-dt { display: flex; }
-.tour-mob { display: none; }
-}
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1856,8 +1845,6 @@ from desktop styles.
 @layer tour-mobile {
 /* ── Mobile (≤ 640px) ──────────────────────────────────────────── */
 @media (max-width: 640px) {
-/* Hide desktop bar on mobile */
-.tour-dt { display: none; }
 
 /* Show mobile tour bar */
 .tour-mob {

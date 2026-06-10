@@ -24,6 +24,14 @@ export class HighlightEngine {
     const node = this.cy.getElementById(nodeId);
     if (node.empty()) return prev;
 
+    // Clear inline border styles from the previously selected node only
+    if (prev.prevNodeId) {
+      const prevNode = this.cy.getElementById(prev.prevNodeId);
+      if (!prevNode.empty()) {
+        prevNode.style({ 'border-width': null, 'border-color': null });
+      }
+    }
+
     node.addClass(CLASSES.SELECTED_NODE);
     node.neighborhood('node').not(`.${CLASSES.LAYER_PARENT}`).addClass(CLASSES.HIGHLIGHTED);
     node.connectedEdges().addClass(CLASSES.HIGHLIGHTED_EDGE);
@@ -95,7 +103,6 @@ export class HighlightEngine {
     this.cy.elements().removeClass(
       [CLASSES.DIMMED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED, CLASSES.HIGHLIGHTED_EDGE].join(' '),
     );
-    this.clearAllNodeInlineStyles();
   }
 
   clearAllNodeInlineStyles(): void {

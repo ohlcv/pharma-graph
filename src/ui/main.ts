@@ -1,7 +1,7 @@
 // src/ui/main.ts
 // Application entry — assembles all modules and wires up event handlers.
 
-import './styles/main.css';
+import './styles/index.css';
 import cytoscape from 'cytoscape';
 import { Renderer } from '../core/renderer.js';
 import { GraphManager } from '../core/graph-manager.js';
@@ -329,8 +329,12 @@ function startTour(): void {
       if (badgeBtnDt) badgeBtnDt.classList.remove('tour-active');
       // Hide the bar after 2s
       const status = document.getElementById('tour-status');
+      const dtBar = document.getElementById('tour-dt');
       if (status && !uiState.tour.engine?.isRunning()) {
-        setTimeout(() => { if (status) status.style.display = 'none'; }, 2000);
+        setTimeout(() => {
+          if (status) status.style.display = 'none';
+          if (dtBar) dtBar.style.display = 'none';
+        }, 2000);
       }
     },
   });
@@ -340,6 +344,8 @@ function startTour(): void {
   syncTourBadgeUI(true, false);
   const status = document.getElementById('tour-status');
   if (status) status.style.display = '';
+  const dtBar = document.getElementById('tour-dt');
+  if (dtBar) dtBar.style.setProperty('display', 'flex', 'important');
 }
 
 function tourPause(): void {
@@ -367,6 +373,8 @@ function tourStop(): void {
   if (bsTourStop) bsTourStop.style.display = 'none';
   const status = document.getElementById('tour-status');
   if (status) status.style.display = 'none';
+  const dtBar = document.getElementById('tour-dt');
+  if (dtBar) dtBar.style.setProperty('display', 'none', 'important');
   syncTourBadgeUI(false, false);
 }
 

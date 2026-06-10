@@ -446,7 +446,7 @@
   </div>
 
   <!-- 漫游状态条：桌面端浮动底部，移动端独立卡片 -->
-  <div id="tour-status" class="tour-status tour-mob" style="display:none">
+  <div id="tour-status" class="tour-status tour-mob">
     <!-- 拖动把手（移动端专属） -->
     <div class="tour-mob__handle" id="tour-status-handle">
       <div class="tour-mob__grip">
@@ -508,8 +508,10 @@
         </div>
       </div>
     </div>
-    <!-- 内容区（桌面端）：横向宽条，像音乐播放器 -->
-    <div class="tour-dt" id="tour-dt">
+  </div>
+
+  <!-- 桌面版漫游条（和移动版平级，独立控制显示） -->
+  <div class="tour-dt" id="tour-dt">
       <!-- 左侧：状态指示 -->
       <div class="tour-dt__status">
         <span class="tour-dt__dot" id="tour-dt-dot"></span>
@@ -582,9 +584,10 @@
         </button>
       </div>
     </div>
-  </div>
+  </div><!-- /.tour-dt -->
+</div><!-- /#tour-status -->
 
-</div><!-- /app -->
+</div><!-- /#app -->
 
 <!-- ── Mobile node drawer ─────────────────────────────────────────── -->
 <div id="mobile-node-panel" role="dialog" aria-label="节点详情">
