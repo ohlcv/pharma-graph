@@ -255,10 +255,8 @@ export class TourEngine {
     const node = this.cy.getElementById(nodeId);
     const pathLabels = path.map((id) => this.cy.getElementById(id).data('label') || id);
 
-    // 停止上一次漫游节点的脉冲动画
+    // 停止上一次漫游节点的脉冲动画（已重置其内联边框样式）
     this.stopTourPulse();
-    // 清除残留的内联白色边框（stopTourPulse 已清，但保险起见立即清理）
-    this.clearAllNodeInlineStyles();
 
     // 移除所有高亮态，防止前一个主角的边/邻居残留
     this.cy.elements().removeClass('selected-node highlighted highlighted-edge');
@@ -314,17 +312,16 @@ export class TourEngine {
 
   private startTourPulse(node: cytoscape.NodeSingular): void {
     this.pulsingNode = node;
-    let frame = 0;
+    let startTime: number | null = null;
 
-    // 节点边框脉冲（金色）
-    const animateBorder = () => {
+    const animateBorder = (timestamp: number) => {
       if (!node.cy() || node.removed() || this.pulsingNode !== node) {
         this.pulseRafId = null;
         return;
       }
-      frame++;
-      const t = frame / 60;
-      const pulse = (Math.sin(t * Math.PI * 2) + 1) / 2; // 0→1→0
+      if (startTime === null) startTime = timestamp;
+      const t = (timestamp - startTime) / 1000; // seconds
+      const pulse = (Math.sin(t * Math.PI * 2) + 1) / 2; // 0→1→0, 1Hz
       node.style({
         'border-width': 2.5 + pulse * 2,
         'border-color': `rgba(251,191,36,${0.5 + pulse * 0.5})`,

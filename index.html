@@ -288,9 +288,10 @@
   <div id="sheet-backdrop" onclick="closeBottomSheet()"></div>
 
   <!-- ── Peek tab (always visible at bottom when sheet is closed) ──────────── -->
-  <div id="sheet-peek-tab" onclick="toggleBottomSheet()" title="展开面板">
-    <div class="sheet-peek-tab__handle"></div>
-    <div class="sheet-peek-tab__label">控制面板</div>
+  <div id="sheet-peek-tab" title="展开面板">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="18 15 12 9 6 15"/>
+    </svg>
   </div>
 
   <div id="bottom-sheet" class="bottom-sheet" role="dialog" aria-label="控制面板">
@@ -298,6 +299,14 @@
     <!-- ── Drag handle ─────────────────────────────────────── -->
     <div class="bs-drag-handle" aria-hidden="true">
       <div class="bs-drag-handle__bar"></div>
+    </div>
+
+    <!-- ── Mobile search (fixed at top of sheet, outside scroll) ─────── -->
+    <div class="bs-mobile-search">
+      <svg class="bs-mobile-search__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <input id="bs-mobile-search-input" class="bs-mobile-search__input" type="text" placeholder="搜索节点…" autocomplete="off" spellcheck="false"/>
     </div>
 
     <!-- ── Scroll body ────────────────────────────────────── -->
@@ -459,38 +468,43 @@
           <svg id="tour-badge-pause" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><rect x="7" y="6" width="3.5" height="12" fill="currentColor"/><rect x="13.5" y="6" width="3.5" height="12" fill="currentColor"/></svg>
         </button>
       </div>
-      <!-- 数字统计 -->
+      <!-- 数字统计：按钮与滑动条之间，竖向堆叠带标签 -->
       <div class="tour-mob__stats">
-        <span id="tour-stat-cycle" class="tour-mob__stat" title="循环轮次">
+        <div class="tour-mob__stat-item" title="循环轮次">
+          <span class="tour-mob__stat-num" id="tour-cycle-num">1</span>
           <svg viewBox="0 0 24 24"><path d="M17 2.4l2.1-2.1M20 12a8 8 0 1 1-2-5.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><polyline points="20 4 20 10 14 10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span id="tour-cycle-num">1</span>
-        </span>
-        <span class="tour-mob__stat" title="当前层">
+          <span class="tour-mob__stat-lbl">轮次</span>
+        </div>
+        <div class="tour-mob__stat-item" title="当前层">
+          <span class="tour-mob__stat-num" id="tour-depth-badge">1</span>
           <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><line x1="2" y1="8" x2="22" y2="8" stroke="currentColor" stroke-width="1.8"/><line x1="2" y1="14" x2="22" y2="14" stroke="currentColor" stroke-width="1.8"/></svg>
-          <span id="tour-depth-badge">1</span>
-        </span>
-        <span class="tour-mob__stat" title="已探索节点">
+          <span class="tour-mob__stat-lbl">层</span>
+        </div>
+        <div class="tour-mob__stat-item" title="已探索节点">
+          <span class="tour-mob__stat-num" id="tour-count-badge">0</span>
           <svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="16" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><line x1="8" y1="11" x2="12" y2="13" stroke="currentColor" stroke-width="1.5"/><line x1="16" y1="11" x2="12" y2="13" stroke="currentColor" stroke-width="1.5"/></svg>
-          <span id="tour-count-badge">0</span>
-        </span>
+          <span class="tour-mob__stat-lbl">节点</span>
+        </div>
       </div>
-      <!-- 竖向参数调节（移动端） -->
+      <!-- 竖向滑动条列 -->
       <div class="tour-mob__sliders">
-        <!-- 间隔滑块 -->
-        <div class="tour-mob__slider-cell">
+        <!-- 间隔滑块：数值在上，track在中，标签在下 -->
+        <div class="tour-mob__cell">
+          <span class="tour-mob__val" id="tour-interval-val">3s</span>
           <div class="tour-mob__track">
             <div class="tour-mob__fill" id="tour-interval-fill"></div>
           </div>
-          <input type="range" class="tour-mob__range" id="tour-interval" min="1000" max="10000" step="500" value="3000" orient="vertical">
-          <span class="tour-mob__val" id="tour-interval-val">3s</span>
+          <span class="tour-mob__lbl">间隔</span>
+          <input type="range" class="tour-mob__range" id="tour-interval" min="1000" max="10000" step="500" value="3000">
         </div>
-        <!-- 深度滑块 -->
-        <div class="tour-mob__slider-cell">
+        <!-- 深度滑块：数值在上，track在中，标签在下 -->
+        <div class="tour-mob__cell">
+          <span class="tour-mob__val" id="tour-depth-val">&infin;</span>
           <div class="tour-mob__track">
             <div class="tour-mob__fill" id="tour-depth-fill"></div>
           </div>
-          <input type="range" class="tour-mob__range" id="tour-maxdepth" min="1" max="10" step="1" value="10" orient="vertical">
-          <span class="tour-mob__val" id="tour-depth-val">&infin;</span>
+          <span class="tour-mob__lbl">深度</span>
+          <input type="range" class="tour-mob__range" id="tour-maxdepth" min="1" max="10" step="1" value="10">
         </div>
       </div>
     </div>

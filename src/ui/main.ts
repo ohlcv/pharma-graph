@@ -60,17 +60,17 @@ const MD_FILES = import.meta.glob('../../content/**/*.md', { query: '?raw', impo
 // ── Tour ───────────────────────────────────────────────────────────────────────
 
 function updateSliderFills(): void {
-  // ── Mobile: update .tour-mob__fill height in vertical tracks ───────────────
-  const iFillMob = document.getElementById('tour-interval-fill');
-  const dFillMob = document.getElementById('tour-depth-fill');
-  if (iFillMob) {
+  // ── Mobile: update fill height in vertical tracks ───────────────────────
+  const iFill = document.getElementById('tour-interval-fill');
+  if (iFill) {
     const pct = ((parseInt((document.getElementById('tour-interval') as HTMLInputElement)?.value ?? '3000') - 1000) / (10000 - 1000)) * 100;
-    iFillMob.style.height = pct + '%';
+    iFill.style.height = pct + '%';
   }
-  if (dFillMob) {
+  const dFill = document.getElementById('tour-depth-fill');
+  if (dFill) {
     const v = parseInt((document.getElementById('tour-maxdepth') as HTMLInputElement)?.value ?? '10');
     const pct = ((v - 1) / (10 - 1)) * 100;
-    dFillMob.style.height = pct + '%';
+    dFill.style.height = pct + '%';
   }
 
   // ── Desktop: paint linear-gradient on range input background ─────────────
@@ -87,13 +87,12 @@ function updateSliderFills(): void {
 }
 
 function initTourSlider(): void {
-  // ── Mobile sliders ────────────────────────────────────────────────────────
+  // ── Mobile sliders ───────────────────────────────────────────────────────
   const intervalSliderMob = document.getElementById('tour-interval') as HTMLInputElement;
-  const depthSliderMob   = document.getElementById('tour-maxdepth')   as HTMLInputElement;
-  const intervalValMob   = document.getElementById('tour-interval-val');
-  const depthValMob     = document.getElementById('tour-depth-val');
+  const depthSliderMob    = document.getElementById('tour-maxdepth')  as HTMLInputElement;
+  const intervalValMob    = document.getElementById('tour-interval-val');
+  const depthValMob       = document.getElementById('tour-depth-val');
 
-  // Initial fill
   updateSliderFills();
 
   if (intervalSliderMob) {
@@ -230,8 +229,8 @@ function startTour(): void {
   }
   const rootId = best?.id() ?? '';
 
-  const intervalSlider = document.getElementById('tour-interval') as HTMLInputElement;
-  const depthSlider = document.getElementById('tour-maxdepth') as HTMLInputElement;
+  const intervalSlider = (document.getElementById('tour-interval') ?? document.getElementById('tour-interval-dt')) as HTMLInputElement;
+  const depthSlider    = (document.getElementById('tour-maxdepth') ?? document.getElementById('tour-maxdepth-dt')) as HTMLInputElement;
   const interval = parseInt(intervalSlider?.value ?? '3000');
   const maxDepth = parseInt(depthSlider?.value ?? '10');
 
@@ -597,6 +596,7 @@ function initSearchUI(
   }
 
   attachSearchHandlers(document.getElementById('bs-search-input') as HTMLInputElement);
+  attachSearchHandlers(document.getElementById('bs-mobile-search-input') as HTMLInputElement);
 }
 
 // ── Keyboard shortcuts ─────────────────────────────────────────────────────────

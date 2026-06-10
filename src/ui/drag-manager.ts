@@ -6,7 +6,6 @@ import { uiState } from './state.js';
 const SHEET_SNAP_VELOCITY = 0.4; // px/ms — threshold for velocity snap
 
 let _sheetOpen = false;
-let _peekDragging = false; // true when user dragged on peek tab (suppresses click toggle)
 
 export function toggleBottomSheet(): void {
   _sheetOpen = !_sheetOpen;
@@ -71,29 +70,9 @@ export function initSheetDrag(): void {
   const peekTab = document.getElementById('sheet-peek-tab');
   if (!sheetEl) return;
 
-  // Tap peek tab → toggle sheet (only if not a drag)
+  // Tap peek tab → toggle sheet
   peekTab?.addEventListener('click', () => {
-    if (_peekDragging) { _peekDragging = false; return; }
     toggleBottomSheet();
-  });
-
-  // Peek tab → drag up to open
-  peekTab?.addEventListener('pointerdown', (e: PointerEvent) => {
-    e.preventDefault();
-    _peekDragging = false;
-    const now = performance.now();
-    sheetDrag = {
-      startY: e.clientY,
-      startTime: now,
-      lastY: e.clientY,
-      lastTime: now,
-      startOffset: sheetFullOffset(),
-      startedOpen: false,
-    };
-    sheetEl.style.transition = 'none';
-    sheetEl.style.overflowY = 'hidden';
-    document.addEventListener('pointermove', onSheetMove, { passive: false });
-    document.addEventListener('pointerup', onSheetUp);
   });
 
   // Drag handle → start drag
@@ -118,7 +97,6 @@ export function initSheetDrag(): void {
     if (!sheetDrag) return;
     e.preventDefault();
     const delta = e.clientY - sheetDrag.startY; // + = down, - = up
-    if (!_peekDragging && Math.abs(delta) > 5) _peekDragging = true;
     const fullOffset = sheetFullOffset();
 
     let translate: number;
@@ -197,6 +175,9 @@ export function initSheetDrag(): void {
 
     sheetDrag = null;
   }
+
+  // Initialize sheet to closed state (show peek tab, hide backdrop)
+  applySheetState(false);
 }
 
 // ── Tour bar drag ─────────────────────────────────────────────────────────────
@@ -260,6 +241,8 @@ export function initPanelDrag(): void {
 
   panel.addEventListener('pointerdown', (e: PointerEvent) => {
     if (!panel.classList.contains('visible')) return;
+    const closeBtn = panel.querySelector('.node-panel__close');
+    if (closeBtn?.contains(e.target as Node)) return;
     dragState = { startX: e.clientX, startY: e.clientY, startLeft: panel.offsetLeft, startTop: panel.offsetTop, el: panel };
     panel.classList.add('dragging');
     document.addEventListener('pointermove', onPanelDrag);
