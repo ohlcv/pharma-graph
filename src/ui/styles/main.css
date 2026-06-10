@@ -418,32 +418,32 @@
 #cy:active { cursor: grabbing; }
 /* ── Left floating node panel ────────────────────────────────────────────── */
 /* ── Node detail panel ──────────────────────────────────────────────────── */
-#node-panel {
-  position: fixed;
-  top: 72px;
-  left: 16px;
-  z-index: 20;
-  width: 320px;
-  max-width: min(320px, calc(100vw - 24px));
-  background: rgba(10, 14, 28, 0.92);
-  backdrop-filter: blur(32px) saturate(180%);
-  -webkit-backdrop-filter: blur(32px) saturate(180%);
-  border-radius: 14px;
-  border: 1px solid rgba(99, 102, 241, 0.18);
-  box-shadow:
-    0 20px 60px rgba(0, 0, 0, 0.55),
-    0 0 0 1px rgba(255,255,255,0.05) inset,
-    0 0 40px rgba(99,102,241,0.06);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  visibility: hidden;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.22s ease, visibility 0.22s;
-}
+  #node-panel {
+    position: fixed;
+    top: 72px;
+    left: 16px;
+    z-index: 20;
+    width: 320px;
+    max-width: min(320px, calc(100vw - 24px));
+    background: rgba(10, 14, 28, 0.92);
+    backdrop-filter: blur(32px) saturate(180%);
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
+    border-radius: 14px;
+    border: 1px solid rgba(99, 102, 241, 0.18);
+    box-shadow:
+      0 20px 60px rgba(0, 0, 0, 0.55),
+      0 0 0 1px rgba(255,255,255,0.05) inset,
+      0 0 40px rgba(99,102,241,0.06);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease, visibility 0.22s;
+  }
 
-/* Mobile: bottom drawer, full-width */
+/* Mobile: bottom drawer, slide-in from bottom */
 @media (max-width: 640px) {
   #node-panel {
     top: auto;
@@ -474,6 +474,26 @@
 
   .node-panel__body {
     padding-bottom: max(14px, env(safe-area-inset-bottom));
+  }
+
+  /* Slide-in from bottom on open */
+  #node-panel.visible {
+    animation: np-slide-up 0.38s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  }
+
+  /* Slide-out to bottom on close */
+  #node-panel.closing {
+    animation: np-slide-out-bottom 0.32s cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+
+  @keyframes np-slide-up {
+    from { transform: translateY(100%); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  @keyframes np-slide-out-bottom {
+    from { transform: translateY(0);    opacity: 1; }
+    to   { transform: translateY(100%); opacity: 0; }
   }
 }
 
@@ -1418,10 +1438,9 @@
     box-shadow: 0 -4px 24px rgba(0,0,0,0.4);
   }
 
-  /* 641–768px: pill bar, hide detail info */
-  .tour-status__info,
-  .tour-status__cycle,
-  .tour-status__sep { display: none !important; }
+  /* 641–768px: pill bar, show minimal info */
+  .tour-status__stats,
+  .tour-status__sliders { display: none; }
 
   /* Sub-640px: vertical strip on left top, all elements visible */
   @media (max-width: 640px) {
@@ -1449,47 +1468,85 @@
       overflow-y: auto;
       height: fit-content;
     }
-    /* 关闭 + 漫游按钮：统一玻璃风格 */
-    .tour-status__close,
-    .tour-status__badge {
-      width: 100%;
-      justify-content: center;
+    /* 手机端专属布局 */
+    .tour-status__ctrl { display: flex !important; }
+    .tour-status__stats { display: flex !important; }
+    /* 桌面端元素手机端隐藏 */
+    .tour-status__close { display: none !important; }
+    .tour-status__badge { display: none !important; }
+    .tour-status__info { display: none !important; }
+    .tour-status__sep { display: none !important; }
+    /* 关闭按钮和暂停按钮纵向排列 */
+    .tour-status__ctrl {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      gap: 5px !important;
+      padding: 0 !important;
+      background: transparent !important;
+      border: none !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      width: 34px !important;
+      flex-shrink: 0 !important;
+    }
+    .tour-status__ctrl .tour-status__close,
+    .tour-status__ctrl .tour-status__badge {
+      width: 30px !important;
+      height: 30px !important;
+      padding: 0 !important;
+      justify-content: center !important;
+      align-items: center !important;
+      border-radius: 8px !important;
+      background: rgba(239,68,68,0.12) !important;
+      border: 1px solid rgba(239,68,68,0.3) !important;
+      color: #f87171 !important;
+      font-size: 0 !important;
+      flex-shrink: 0 !important;
+    }
+    .tour-status__ctrl .tour-status__close:hover {
+      background: rgba(239,68,68,0.25) !important;
+      border-color: rgba(239,68,68,0.5) !important;
+      box-shadow: 0 0 8px rgba(239,68,68,0.25) !important;
+    }
+    .tour-status__ctrl .tour-status__close svg,
+    .tour-status__ctrl .tour-status__badge svg {
+      width: 13px !important;
+      height: 13px !important;
+      stroke: currentColor !important;
+    }
+    .tour-status__ctrl .tour-status__badge {
+      background: rgba(99,102,241,0.12) !important;
+      border-color: rgba(99,102,241,0.3) !important;
+      color: #a78bfa !important;
+    }
+    .tour-status__ctrl .tour-status__badge:hover {
+      background: rgba(99,102,241,0.22) !important;
+      border-color: rgba(99,102,241,0.5) !important;
+      box-shadow: 0 0 8px rgba(99,102,241,0.2) !important;
+    }
+    /* 进度数字（图标+数字，一行，无背景色） */
+    .tour-status__stats {
+      display: flex;
       align-items: center;
-      gap: 5px;
-      border-radius: 8px;
-      padding: 7px 10px;
-      box-sizing: border-box;
+      justify-content: center;
+      gap: 12px;
+    }
+    .tour-stat {
+      display: flex;
+      align-items: center;
+      gap: 3px;
       font-size: 0.72rem;
-      font-weight: 600;
+      color: rgba(226,232,240,0.65);
+      font-variant-numeric: tabular-nums;
     }
-    .tour-status__close {
-      width: 28px;
-      height: 28px;
-      padding: 0;
-      justify-content: center;
-      align-items: center;
-      border-radius: 6px;
-      color: #f87171;
-      background: rgba(239,68,68,0.12);
-      border: 1px solid rgba(239,68,68,0.3);
+    .tour-stat svg {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+      stroke: currentColor;
     }
-    .tour-status__close:hover {
-      background: rgba(239,68,68,0.25);
-      border-color: rgba(239,68,68,0.5);
-      box-shadow: 0 0 8px rgba(239,68,68,0.25);
-    }
-    .tour-status__close svg { width: 10px; height: 10px; }
-    .tour-status__badge {
-      background: rgba(99,102,241,0.14);
-      border: 1px solid rgba(99,102,241,0.32);
-      color: rgba(167,139,250,0.95);
-    }
-    .tour-status__badge svg { width: 13px; height: 13px; }
-    .tour-status__badge:hover {
-      background: rgba(99,102,241,0.22);
-      border-color: rgba(99,102,241,0.55);
-      box-shadow: 0 0 10px rgba(99,102,241,0.18);
-    }
+    .tour-stat span { line-height: 1; }
     /* 显示拖动把手（扩大化，易于抓握） */
     .tour-bar-drag-handle {
       display: flex !important;
@@ -1516,34 +1573,87 @@
     .tour-bar-drag-handle:active .tour-bar-drag-handle__dots span {
       background: rgba(255,255,255,0.6);
     }
-    /* 恢复详情信息显示 */
-    .tour-status__info,
-    .tour-status__cycle,
-    .tour-status__sep { display: flex !important; }
     /* 进度条全宽 */
     .tour-progress { width: 100%; }
-    /* 信息区纵向堆叠 */
-    .tour-status__info {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 2px;
-    }
-    .tour-status__sep { display: none !important; }
-    /* 轮次标签 */
-    .tour-status__cycle {
-      display: inline-flex !important;
-      width: 100%;
-      justify-content: center;
-      font-size: 0.65rem;
-    }
-    /* 滑块纵向全宽 */
+    /* 竖向滑块：仅手机端生效，旋转 -90deg */
     .tour-status__sliders {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 5px;
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 14px !important;
+      padding: 8px 0 2px !important;
     }
-    .tour-status__sliders label { justify-content: space-between; }
-    .tour-status__sliders input[type="range"] { width: 100%; }
+    .tour-slider-cell {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      gap: 5px !important;
+    }
+    .tour-slider-track {
+      width: 5px !important;
+      height: 52px !important;
+      background: rgba(255,255,255,0.1) !important;
+      border-radius: 3px !important;
+      position: relative !important;
+      overflow: hidden !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: flex-end !important;
+    }
+    .tour-slider-fill {
+      position: absolute !important;
+      left: 0 !important;
+      width: 100% !important;
+      background: linear-gradient(to top, var(--tour-accent), var(--tour-accent-2)) !important;
+      border-radius: 3px !important;
+      transition: height 0.15s ease !important;
+    }
+    .tour-slider-input-wrap {
+      width: 52px !important;
+      height: 28px !important;
+      overflow: visible !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+    .tour-status__sliders input[type="range"] {
+      width: 28px !important;
+      height: 52px !important;
+      -webkit-appearance: none !important;
+      appearance: none !important;
+      background: transparent !important;
+      cursor: pointer !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      transform: rotate(-90deg) !important;
+      transform-origin: center center !important;
+    }
+    .tour-status__sliders input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none !important;
+      width: 18px !important;
+      height: 18px !important;
+      border-radius: 50% !important;
+      background: #fff !important;
+      box-shadow: 0 0 8px rgba(99,102,241,0.8) !important;
+      cursor: pointer !important;
+      border: none !important;
+      margin-top: -9px !important;
+    }
+    .tour-status__sliders input[type="range"]::-moz-range-thumb {
+      width: 18px !important;
+      height: 18px !important;
+      border: none !important;
+      border-radius: 50% !important;
+      background: #fff !important;
+      box-shadow: 0 0 8px rgba(99,102,241,0.8) !important;
+      cursor: pointer !important;
+    }
+    .tour-slider-val {
+      font-size: 0.6rem !important;
+      color: rgba(226,232,240,0.45) !important;
+      font-variant-numeric: tabular-nums !important;
+    }
   }
 
   .tour-status__badge { font-size: 0.68rem; padding: 3px 7px; }
@@ -1746,7 +1856,7 @@
     left: 0;
     right: 0;
     bottom: auto;
-    transform: translateY(-100vh);
+    transform: translateY(-100%);
     pointer-events: none;
     background: rgba(12, 18, 34, 0.30);
     backdrop-filter: blur(32px) saturate(180%);
@@ -1764,6 +1874,15 @@
   #bottom-sheet.open {
     transform: translateY(0);
     pointer-events: auto;
+  }
+
+  @keyframes sheet-slide-down {
+    from { transform: translateY(-100%); opacity: 0.6; }
+    to   { transform: translateY(0);     opacity: 1;   }
+  }
+
+  #bottom-sheet.open {
+    animation: sheet-slide-down 0.38s cubic-bezier(0.34, 1.4, 0.64, 1) both;
   }
 
   /* Backdrop dims graph when sheet is open */
@@ -2305,7 +2424,95 @@
   .tour-status__inner {
     width: auto;
   }
+  /* 手机端竖向滑块结构在桌面端隐藏 */
+  .tour-slider-input-wrap { display: none !important; }
+  /* 桌面版滑块横向布局 */
+  .tour-status__sliders {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 8px !important;
+    flex-shrink: 0 !important;
+    padding: 0 !important;
+  }
+  /* 桌面版滑块单元：内容横向排列 */
+  .tour-slider-cell {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 5px !important;
+  }
+  .tour-slider-cell:first-child .tour-slider-track,
+  .tour-slider-cell:last-child .tour-slider-track { display: none !important; }
+  .tour-slider-fill { display: none !important; }
+  .tour-slider-val {
+    display: block !important;
+    font-size: 0.68rem !important;
+    color: rgba(226,232,240,0.55) !important;
+    font-variant-numeric: tabular-nums !important;
+    cursor: pointer !important;
+  }
+  .tour-status__sliders input[type="range"] {
+    width: 52px !important;
+    height: 3px !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    background: rgba(255,255,255,0.1) !important;
+    border-radius: 2px !important;
+    outline: none !important;
+    cursor: pointer !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+  }
+  .tour-status__sliders input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none !important;
+    width: 10px !important;
+    height: 10px !important;
+    border-radius: 50% !important;
+    background: var(--tour-accent) !important;
+    box-shadow: 0 0 6px rgba(99,102,241,0.5) !important;
+    cursor: pointer !important;
+    border: none !important;
+    margin-top: 0 !important;
+    transition: transform 0.1s !important;
+  }
+  .tour-status__sliders input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.2) !important;
+  }
+  .tour-status__sliders input[type="range"]::-moz-range-thumb {
+    width: 10px !important;
+    height: 10px !important;
+    border: none !important;
+    border-radius: 50% !important;
+    background: var(--tour-accent) !important;
+    box-shadow: 0 0 6px rgba(99,102,241,0.5) !important;
+    cursor: pointer !important;
+  }
 }
+
+/* ── Tour stats (generic, shared by mobile override + desktop) ────────── */
+.tour-status__stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.tour-stat {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.72rem;
+  color: rgba(226, 232, 240, 0.65);
+  font-variant-numeric: tabular-nums;
+}
+.tour-stat svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+.tour-stat span { line-height: 1; }
 
 /* ── Badge button ───────────────────────────────────────────────────── */
 .tour-status__badge {
@@ -2422,13 +2629,11 @@
   flex-shrink: 0;
 }
 
-.tour-status__sliders label {
-  display: flex;
-  align-items: center;
-  gap: 3px;
+.tour-slider-val {
   font-size: 0.68rem;
   color: rgba(226, 232, 240, 0.55);
   cursor: pointer;
+  font-variant-numeric: tabular-nums;
 }
 
 .tour-status__sliders input[type="range"] {

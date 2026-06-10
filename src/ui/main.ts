@@ -417,7 +417,11 @@ function startSheetDrag(e: PointerEvent): void {
     const velocity = Math.abs((ue.clientY - lastY) / (performance.now() - lastTime || 1));
     sheet.style.transform = '';
     sheet.style.overflowY = '';
-    if (delta > 80 || (delta > 0 && velocity > 0.5)) { sheet.style.transition = ''; closeBottomSheet(); }
+    if (delta > 80 || (delta > 0 && velocity > 0.5)) {
+      sheet.style.transition = '';
+      sheet.style.transform = 'translateY(-100%)';
+      closeBottomSheet();
+    }
     else { sheet.style.transition = 'transform 0.35s cubic-bezier(0.34,1.4,0.64,1)'; void sheet.offsetHeight; sheet.style.transform = ''; }
   };
 
@@ -500,6 +504,56 @@ function stopPanelDrag(): void {
   document.removeEventListener('pointerup', stopPanelDrag);
 }
 
+// ── Node detail panel mobile drag-to-close ─────────────────────────────────────
+
+let nodePanelDragState: { startY: number; lastY: number; lastTime: number } | null = null;
+
+function startNodePanelDrag(e: PointerEvent): void {
+  if (window.innerWidth > 640) return;
+  const panel = document.getElementById('node-panel');
+  if (!panel || !panel.classList.contains('visible')) return;
+  const rect = panel.getBoundingClientRect();
+  // Only draggable from the handle bar area (top 60px of panel)
+  if (e.clientY > rect.top + 60) return;
+  e.preventDefault();
+  const now = performance.now();
+  nodePanelDragState = { startY: e.clientY, lastY: e.clientY, lastTime: now };
+  panel.style.overflowY = 'hidden';
+
+  const onMove = (me: PointerEvent) => {
+    if (!nodePanelDragState) return;
+    const delta = me.clientY - nodePanelDragState.startY;
+    // Dragging DOWN (delta > 0) slides panel down (positive Y, rubber-band)
+    const rubberDelta = delta > 0 ? delta * 0.5 : delta;
+    panel.style.transform = `translateY(${Math.max(0, rubberDelta)}px)`;
+    panel.style.transition = 'none';
+    nodePanelDragState.lastY = me.clientY;
+    nodePanelDragState.lastTime = performance.now();
+  };
+
+  const onUp = (ue: PointerEvent) => {
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+    if (!nodePanelDragState) return;
+    const { startY, lastY, lastTime } = nodePanelDragState;
+    nodePanelDragState = null;
+    panel.style.transform = '';
+    panel.style.overflowY = '';
+    const delta = ue.clientY - startY;
+    const velocity = Math.abs((ue.clientY - lastY) / (performance.now() - lastTime || 1));
+    if (delta > 80 || (delta > 0 && velocity > 0.5)) {
+      closeNodePanelAnimated();
+    } else {
+      panel.style.transition = 'transform 0.35s cubic-bezier(0.34,1.4,0.64,1)';
+      void panel.offsetHeight;
+      panel.style.transform = '';
+    }
+  };
+
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp);
+}
+
 // ── Section collapse ───────────────────────────────────────────────────────────
 
 function toggleSection(name: string): void {
@@ -513,17 +567,37 @@ function toggleSection(name: string): void {
 
 // ── Tour ───────────────────────────────────────────────────────────────────────
 
+function updateSliderFills(): void {
+  const intervalSlider = document.getElementById('tour-interval') as HTMLInputElement;
+  const depthSlider = document.getElementById('tour-maxdepth') as HTMLInputElement;
+  const iFill = document.getElementById('tour-interval-fill');
+  const dFill = document.getElementById('tour-depth-fill');
+  if (intervalSlider && iFill) {
+    const pct = ((parseInt(intervalSlider.value) - 1000) / (10000 - 1000)) * 100;
+    iFill.style.height = pct + '%';
+    iFill.style.bottom = '0';
+    (iFill as HTMLElement).style.top = '';
+  }
+  if (depthSlider && dFill) {
+    const v = parseInt(depthSlider.value);
+    const pct = ((v - 1) / (10 - 1)) * 100;
+    dFill.style.height = pct + '%';
+    dFill.style.top = '';
+    dFill.style.bottom = '0';
+  }
+}
+
 function initTourSlider(): void {
   const intervalSlider = document.getElementById('tour-interval') as HTMLInputElement;
   const depthSlider = document.getElementById('tour-maxdepth') as HTMLInputElement;
   const intervalVal = document.getElementById('tour-interval-val');
   const depthVal = document.getElementById('tour-depth-val');
+  updateSliderFills();
   if (intervalSlider) {
     intervalSlider.addEventListener('input', () => {
       const v = parseInt(intervalSlider.value);
-      if (intervalVal) intervalVal.textContent = (v / 1000).toFixed(1) + 's';
-      const pct = ((v - 1000) / (10000 - 1000)) * 100;
-      intervalSlider.style.background = `linear-gradient(to right,var(--accent)${pct}%,var(--border)${pct}%)`;
+      if (intervalVal) intervalVal.textContent = Math.round(v / 1000) + 's';
+      updateSliderFills();
     });
     intervalSlider.addEventListener('change', () => { tourEngine?.setInterval(parseInt(intervalSlider.value)); });
   }
@@ -531,12 +605,10 @@ function initTourSlider(): void {
     depthSlider.value = '10';
     depthSlider.addEventListener('input', () => {
       const v = parseInt(depthSlider.value);
-      if (depthVal) depthVal.textContent = v === 10 ? '不限' : `第 ${v} 层`;
-      const pct = ((v - 1) / (10 - 1)) * 100;
-      depthSlider.style.background = `linear-gradient(to right,var(--accent)${pct}%,var(--border)${pct}%)`;
+      if (depthVal) depthVal.textContent = v >= 10 ? '\u221e' : String(v);
+      updateSliderFills();
     });
     depthSlider.addEventListener('change', () => { const v = parseInt(depthSlider.value); tourEngine?.setMaxDepth(v >= 10 ? -1 : v); });
-    depthSlider.style.background = `linear-gradient(to right,var(--accent)100%,var(--border)100%)`;
   }
 }
 
@@ -589,20 +661,19 @@ function startTour(): void {
       const status = document.getElementById('tour-status');
       const depthBadge = document.getElementById('tour-depth-badge');
       const countBadge = document.getElementById('tour-count-badge');
-      const cycleBadge = document.getElementById('tour-cycle-badge');
       if (status) status.style.display = '';
-      if (depthBadge) depthBadge.textContent = `第 ${info.depth + 1} 层`;
-      if (countBadge) countBadge.textContent = `已探索 ${info.totalExplored} 个节点`;
+      if (depthBadge) depthBadge.textContent = String(info.depth + 1);
+      if (countBadge) countBadge.textContent = String(info.totalExplored);
       const progressBar = document.getElementById('tour-progress-bar');
       if (progressBar && info.totalToExplore > 0) { const pct = Math.round((info.totalExplored / info.totalToExplore) * 100); progressBar.style.width = `${pct}%`; }
-      if (cycleBadge) { cycleBadge.style.display = info.cycleCount > 0 ? '' : 'none'; if (info.cycleCount > 0) cycleBadge.textContent = `第 ${info.cycleCount + 1} 轮`; }
+      const cycleNum = document.getElementById('tour-cycle-num');
+      const statCycle = document.getElementById('tour-stat-cycle');
+      if (statCycle) { statCycle.style.display = info.cycleCount > 0 ? '' : 'none'; if (cycleNum) cycleNum.textContent = String(info.cycleCount + 1); }
     },
     onComplete: () => {
       clearTourPath();
       const depthBadge = document.getElementById('tour-depth-badge');
-      const badgeText = document.getElementById('tour-badge-text');
-      if (depthBadge) depthBadge.textContent = '完成!';
-      if (badgeText) badgeText.textContent = '完成!';
+      if (depthBadge) depthBadge.textContent = '\u2713';
       const tourBtn = document.getElementById('btn-tour');
       const bsTourBtn = document.getElementById('bs-btn-tour');
       if (tourBtn) tourBtn.classList.remove('active');
@@ -620,21 +691,18 @@ function tourPause(): void {
   if (!tourEngine) return;
   const playIcon = document.getElementById('tour-badge-play');
   const pauseIcon = document.getElementById('tour-badge-pause');
-  const badgeText = document.getElementById('tour-badge-text');
   const bsTourPlay = document.getElementById('bs-tour-icon-play');
   const bsTourStop = document.getElementById('bs-tour-icon-stop');
   if (tourEngine.isPaused()) {
     tourEngine.resume();
     if (playIcon) playIcon.style.display = '';
     if (pauseIcon) pauseIcon.style.display = 'none';
-    if (badgeText) badgeText.textContent = '漫游中';
     if (bsTourPlay) bsTourPlay.style.display = '';
     if (bsTourStop) bsTourStop.style.display = 'none';
   } else {
     tourEngine.pause();
     if (playIcon) playIcon.style.display = 'none';
     if (pauseIcon) pauseIcon.style.display = '';
-    if (badgeText) badgeText.textContent = '已暂停';
     if (bsTourPlay) bsTourPlay.style.display = 'none';
     if (bsTourStop) bsTourStop.style.display = '';
   }
@@ -670,7 +738,7 @@ function initShortcuts(): void {
     if ((e.target as HTMLElement).tagName === 'INPUT') return;
     switch (e.key) {
       case 'Delete': case 'Backspace': cy.$(':selected').remove(); highlight.reset(); updateStats(); break;
-      case 'Escape': cy.$(':selected').unselect(); highlight.reset(); detailPanel.close(); if (tourEngine?.isRunning() || tourEngine?.isPaused()) tourStop(); break;
+      case 'Escape': cy.$(':selected').unselect(); highlight.reset(); closeNodePanelAnimated(); if (tourEngine?.isRunning() || tourEngine?.isPaused()) tourStop(); break;
       case 'f': case 'F': fitGraph(); break;
       case 'r': case 'R': randomize(); break;
       case 't': case 'T': toggleTour(); break;
@@ -971,7 +1039,7 @@ try {
   cy.on('tap', (evt) => {
     if (evt.target === cy) {
       highlight.reset();
-      detailPanel.close();
+      closeNodePanelAnimated();
       if (tourEngine?.isRunning() || tourEngine?.isPaused()) tourStop();
     }
   });
@@ -1048,6 +1116,8 @@ try {
   if (sheet) sheet.addEventListener('pointerdown', startSheetDrag);
   const tourBar = document.getElementById('tour-status');
   if (tourBar) tourBar.addEventListener('pointerdown', startTourBarDrag);
+  const nodePanel = document.getElementById('node-panel');
+  if (nodePanel) nodePanel.addEventListener('pointerdown', startNodePanelDrag);
 
 } catch (err) {
   const n = document.getElementById('stat-nodes');
@@ -1105,11 +1175,27 @@ function toggleSidebar(): void {
 (window as any).tourPause = tourPause;
 (window as any).tourStop = tourStop;
 (window as any).startPanelDrag = startPanelDrag;
-(window as any).closeNodePanel = () => detailPanel?.close();
+(window as any).closeNodePanel = closeNodePanelAnimated;
+function closeNodePanelAnimated(): void {
+  const panel = document.getElementById('node-panel');
+  if (window.innerWidth <= 640 && panel) {
+    panel.classList.add('closing');
+    panel.style.transition = 'transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.32s ease';
+    panel.style.transform = 'translateY(100%)';
+    setTimeout(() => {
+      panel.classList.remove('closing', 'visible');
+      panel.style.transition = '';
+      panel.style.transform = '';
+      detailPanel.onClose();
+    }, 350);
+  } else {
+    detailPanel.close();
+  }
+}
 (window as any).startSheetDrag = startSheetDrag;
 (window as any).fitGraph = fitGraph;
 (window as any).randomize = randomize;
-(window as any).resetAll = () => { highlight?.reset(); detailPanel?.close(); if (renderer) renderer.runLayout('cose'); updateStats(); syncBottomSheetStats(); };
+(window as any).resetAll = () => { highlight?.reset(); closeNodePanelAnimated(); if (renderer) renderer.runLayout('cose'); updateStats(); syncBottomSheetStats(); };
 (window as any).animatePulse = animatePulse;
 (window as any).toggleSidebar = toggleSidebar;
 (window as any).closeBottomSheet = closeBottomSheet;

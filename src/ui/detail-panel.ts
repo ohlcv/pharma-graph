@@ -89,6 +89,10 @@ export class DetailPanel {
   close(): void {
     const panel = document.getElementById('node-panel');
     if (panel) panel.classList.remove('visible');
+    this.onClose();
+  }
+
+  onClose(): void {
     this.highlight.reset();
     this.callbacks?.onClose?.();
   }
