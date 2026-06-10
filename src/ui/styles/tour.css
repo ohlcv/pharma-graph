@@ -28,13 +28,17 @@
       to   { opacity: 1; transform: translateY(0)    scale(1);    }
     }
     
+    /* JS 通过添加 .tour-visible class 来显示，配合 CSS 媒体查询的默认隐藏 */
+    .tour-dt.tour-visible { display: flex; }
+    .tour-mob.tour-visible { display: flex; }
+
     /* ─────────────────────────────────────────────────────────────────────────
        桌面版 .tour-dt
        - 默认 display:none，JS 设 display:flex 显示
        - position:fixed，定位由 JS 决定（原版在底部居中）
        ───────────────────────────────────────────────────────────────────────── */
     .tour-dt {
-      display: none; /* JS 控制 */
+      display: none;
       position: fixed;
       bottom: 16px;
       left: 50%;
@@ -55,16 +59,16 @@
       touch-action: none;
     }
     
-    /* 手机上强制隐藏桌面版，不管 JS 怎么设 */
+    /* 桌面版在手机视口隐藏，由 JS 控制 mobile 下该显示哪个 */
     @media (max-width: 640px) {
-      .tour-dt { display: none !important; }
+      .tour-dt { display: none; }
     }
     
     /* ── 桌面版内部组件样式 ─────────────────────────────────────────────────── */
     .tour-dt__status { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding-right: 4px; }
     .tour-dt__dot {
       width: 7px; height: 7px; border-radius: 50%;
-      background: var(--green); box-shadow: 0 0 6px var(--green);
+      background: var(--tour-accent); box-shadow: 0 0 6px var(--tour-accent);
       animation: dot-pulse 2s ease-in-out infinite; flex-shrink: 0;
     }
     .tour-dt__dot.paused  { background: #fbbf24; box-shadow: 0 0 6px #fbbf24; animation: none; }
@@ -127,13 +131,14 @@
       display: none; /* JS 控制 */
     }
     
-    /* 桌面上强制隐藏手机版，不管 JS 怎么设 */
+    /* 手机版在桌面视口隐藏，由 JS 控制 desktop 下该显示哪个 */
     @media (min-width: 641px) {
-      .tour-mob { display: none !important; }
+      .tour-mob { display: none; }
     }
     
     /* 手机版外观（只在 ≤640px 生效） */
     @media (max-width: 640px) {
+      .tour-mob.tour-visible { display: flex; }
       .tour-mob {
         /* 注意：不写 display，由 JS 控制 */
         flex-direction: column;
@@ -231,5 +236,8 @@
         box-shadow: 0 0 8px rgba(99,102,241,0.9); cursor: pointer;
       }
     }
-    
+
+    /* ── Desktop display rule (>640px) ──────────────────────────────────────── */
+    /* tour-dt 默认隐藏，JS 通过 .tour-visible class 控制显示 */
+
     }

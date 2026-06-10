@@ -262,12 +262,9 @@ function startTour(): void {
       if (progressBar && info.totalToExplore > 0) {
         progressBar.style.width = Math.round((info.totalExplored / info.totalToExplore) * 100) + '%';
       }
-      const statCycle  = document.getElementById('tour-stat-cycle');
-      const cycleNum   = document.getElementById('tour-cycle-num');
-      if (statCycle) {
-        statCycle.style.display = info.cycleCount > 0 ? '' : 'none';
-        if (cycleNum) cycleNum.textContent = String(info.cycleCount + 1);
-      }
+      // Desktop: update cycle count on mobile bar (tour-cycle-num exists in HTML)
+      const cycleNum = document.getElementById('tour-cycle-num');
+      if (cycleNum) cycleNum.textContent = String(info.cycleCount + 1);
 
       // ── Desktop badges ────────────────────────────────────────────────────
       const depthBadgeDt = document.getElementById('tour-depth-badge-dt');
@@ -332,8 +329,8 @@ function startTour(): void {
       const dtBar = document.getElementById('tour-dt');
       if (status && !uiState.tour.engine?.isRunning()) {
         setTimeout(() => {
-          if (status) status.style.display = 'none';
-          if (dtBar) dtBar.style.display = 'none';
+          if (status) status.classList.remove('tour-visible');
+          if (dtBar) dtBar.classList.remove('tour-visible');
         }, 2000);
       }
     },
@@ -342,14 +339,15 @@ function startTour(): void {
   uiState.tour.running = true;
   uiState.tour.paused = false;
   syncTourBadgeUI(true, false);
+  // CSS 媒体查询控制默认显示，JS class 控制动态显示
   const status = document.getElementById('tour-status');
   const dtBar = document.getElementById('tour-dt');
   if (window.innerWidth <= 640) {
-    if (status) status.style.display = 'flex';
-    if (dtBar)  dtBar.style.display  = 'none';
+    if (status) status.classList.add('tour-visible');
+    if (dtBar) dtBar.classList.remove('tour-visible');
   } else {
-    if (dtBar)  dtBar.style.display  = 'flex';
-    if (status) status.style.display = 'none';
+    if (dtBar) dtBar.classList.add('tour-visible');
+    if (status) status.classList.remove('tour-visible');
   }
 }
 
@@ -377,9 +375,9 @@ function tourStop(): void {
   if (bsTourPlay) bsTourPlay.style.display = '';
   if (bsTourStop) bsTourStop.style.display = 'none';
   const status = document.getElementById('tour-status');
-  if (status) status.style.display = 'none';
   const dtBar = document.getElementById('tour-dt');
-  if (dtBar)  dtBar.style.display  = 'none';
+  if (status) status.classList.remove('tour-visible');
+  if (dtBar) dtBar.classList.remove('tour-visible');
   syncTourBadgeUI(false, false);
 }
 

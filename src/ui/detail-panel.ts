@@ -50,6 +50,13 @@ export class DetailPanel {
   private sheetOpen = false;
   private _currentNodeId: string | null = null;
 
+  private panel!: HTMLElement;
+  private overviewPage!: HTMLElement;
+  private bodyPage!: HTMLElement;
+  private overviewTab!: HTMLElement;
+  private bodyTab!: HTMLElement;
+  private pinBtn!: HTMLElement;
+
   constructor(
     private cy: cytoscape.Core,
     private highlight: HighlightEngine,
@@ -57,7 +64,47 @@ export class DetailPanel {
       onNodeClick?: (nodeId: string) => void;
       onClose?: () => void;
     }
-  ) {}
+  ) {
+    this.panel = document.getElementById('node-panel') as HTMLElement;
+    this.overviewPage = document.getElementById('lp-overview-page') as HTMLElement;
+    this.bodyPage = document.getElementById('lp-body-page') as HTMLElement;
+    this.overviewTab = document.getElementById('lp-tab-overview') as HTMLElement;
+    this.bodyTab = document.getElementById('lp-tab-body') as HTMLElement;
+    this.pinBtn = document.getElementById('lp-btn-pin') as HTMLElement;
+
+    this.overviewTab.addEventListener('click', () => switchDesktopTab('overview'));
+    this.bodyTab.addEventListener('click', () => switchDesktopTab('body'));
+
+    this.pinBtn.addEventListener('click', () => {
+      uiState.isPanelPinned = !uiState.isPanelPinned;
+      this.pinBtn.classList.toggle('active', uiState.isPanelPinned);
+    });
+
+    this.panel.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      const item = target.closest<HTMLElement>('.np-edge-item, .np-neighbor');
+      if (!item) return;
+      const targetId = item.dataset['target'] ?? item.dataset['id'];
+      if (!targetId) return;
+      this.callbacks?.onNodeClick?.(targetId);
+    });
+
+    this.panel.addEventListener('click', (e) => {
+      const toggle = (e.target as HTMLElement).closest<HTMLElement>('.np-section__toggle');
+      if (!toggle) return;
+      const section = toggle.closest('.np-section');
+      if (!section) return;
+      const label = toggle.querySelector('.np-section__label')?.textContent;
+      if (!label) return;
+      const key = label === '摘要' ? 'summary' : label === '标签' ? 'tags' : label === '关联' ? 'edges' : null;
+      if (!key) return;
+      uiState.sectionState[key] = !uiState.sectionState[key];
+      const arrow = toggle.querySelector<HTMLElement>('.np-section__toggle-arrow');
+      const content = section.querySelector<HTMLElement>('.np-section__content');
+      if (arrow) arrow.classList.toggle('rotated', uiState.sectionState[key]);
+      if (content) content.style.display = uiState.sectionState[key] ? '' : 'none';
+    });
+  }
 
   show(nodeId: string): void {
     const node = this.cy.getElementById(nodeId);
@@ -65,77 +112,24 @@ export class DetailPanel {
 
     this._currentNodeId = nodeId;
     const d = node.data();
-    const panel = document.getElementById('node-panel');
-    if (!panel) return;
 
-    // Build page contents
-    const overviewPage = document.getElementById('lp-overview-page');
-    const bodyPage = document.getElementById('lp-body-page');
-    if (overviewPage) {
-      overviewPage.innerHTML =
-        buildHeroHtml(d) +
-        buildSummaryHtml(d) +
-        buildTagsHtml(d) +
-        buildEdgesHtml(node, this.cy);
+    this.overviewPage.innerHTML =
+      buildHeroHtml(d) + buildSummaryHtml(d) + buildTagsHtml(d) + buildEdgesHtml(node, this.cy);
+    this.bodyPage.innerHTML = buildBodyHtml(d);
+
+    this.applySectionState();
+
+    this.panel.classList.add('visible');
+
+    if (!uiState.isPanelPinned) {
+      const W = this.panel.offsetWidth;
+      const H = this.panel.offsetHeight;
+      this.reposition(nodeId, W, H);
     }
-    if (bodyPage) bodyPage.innerHTML = buildBodyHtml(d);
-
-    // Wire tabs
-    const overviewTab = document.getElementById('lp-tab-overview');
-    const bodyTab = document.getElementById('lp-tab-body');
-    overviewTab?.addEventListener('click', () => switchDesktopTab('overview'));
-    bodyTab?.addEventListener('click', () => switchDesktopTab('body'));
-    switchDesktopTab(uiState.activeTab);
-
-    // Wire collapsible toggles (读/写 uiState.sectionState)
-    overviewPage.querySelectorAll<HTMLElement>('.np-section__toggle').forEach((toggle) => {
-      toggle.addEventListener('click', () => {
-        const section = toggle.closest('.np-section');
-        if (!section) return;
-        const label = toggle.querySelector('.np-section__label')?.textContent;
-        if (!label) return;
-        const key = label === '摘要' ? 'summary' : label === '标签' ? 'tags' : label === '关联' ? 'edges' : null;
-        if (!key) return;
-        uiState.sectionState[key] = !uiState.sectionState[key];
-        const arrow = toggle.querySelector('.np-section__toggle-arrow');
-        const content = section.querySelector<HTMLElement>('.np-section__content');
-        if (arrow) arrow.classList.toggle('rotated', uiState.sectionState[key]);
-        if (content) content.style.display = uiState.sectionState[key] ? '' : 'none';
-      });
-    });
-
-    // Apply persisted section state
-    overviewPage.querySelectorAll<HTMLElement>('.np-section__toggle').forEach((toggle) => {
-      const label = toggle.querySelector('.np-section__label')?.textContent;
-      if (!label) return;
-      const key = label === '摘要' ? 'summary' : label === '标签' ? 'tags' : label === '关联' ? 'edges' : null;
-      if (!key) return;
-      const arrow = toggle.closest('.np-section')?.querySelector<HTMLElement>('.np-section__toggle-arrow');
-      const content = toggle.closest('.np-section')?.querySelector<HTMLElement>('.np-section__content');
-      if (arrow) arrow.classList.toggle('rotated', uiState.sectionState[key]);
-      if (content) content.style.display = uiState.sectionState[key] ? '' : 'none';
-    });
-
-    // Wire pin button
-    const pinBtn = document.getElementById('lp-btn-pin');
-    pinBtn?.addEventListener('click', () => {
-      uiState.isPanelPinned = !uiState.isPanelPinned;
-      pinBtn.classList.toggle('active', uiState.isPanelPinned);
-    });
-
-    // Wire edge/neighbor clicks
-    this.attachEdgeClickHandlers();
-
-    panel.classList.add('visible');
-    panel.style.display = 'flex';
-    void panel.offsetHeight;
-
-    if (!uiState.isPanelPinned) this.reposition(nodeId);
   }
 
   close(): void {
-    const panel = document.getElementById('node-panel');
-    if (panel) panel.classList.remove('visible');
+    this.panel.classList.remove('visible');
     this._currentNodeId = null;
     this.onClose();
   }
@@ -145,15 +139,14 @@ export class DetailPanel {
     this.callbacks?.onClose?.();
   }
 
-  reposition(nodeId: string): void {
-    const panel = document.getElementById('node-panel');
-    if (!panel || !panel.classList.contains('visible') || uiState.isPanelPinned) return;
+  reposition(nodeId: string, W?: number, H?: number): void {
+    if (!this.panel.classList.contains('visible') || uiState.isPanelPinned) return;
 
     const node = this.cy.getElementById(nodeId);
     if (node.empty()) return;
 
-    const W = panel.offsetWidth;
-    const H = panel.offsetHeight;
+    const pW = W ?? this.panel.offsetWidth;
+    const pH = H ?? this.panel.offsetHeight;
     const vpW = window.innerWidth;
     const vpH = window.innerHeight;
     const TOPBAR_H = 56;
@@ -170,25 +163,25 @@ export class DetailPanel {
     const spaceAbove = nodePos.y - TOPBAR_H - nodeHalfH;
     const spaceBelow = vpH - nodePos.y - nodeHalfH - bottomReserve;
 
-    const canRight = spaceRight - GAP >= W;
-    const canLeft = spaceLeft - GAP >= W;
-    const canAbove = spaceAbove - GAP >= H;
-    const canBelow = spaceBelow - GAP >= H;
+    const canRight = spaceRight - GAP >= pW;
+    const canLeft = spaceLeft - GAP >= pW;
+    const canAbove = spaceAbove - GAP >= pH;
+    const canBelow = spaceBelow - GAP >= pH;
 
     let left: number;
     let top: number;
 
     if (canRight && spaceRight >= spaceLeft) {
       left = nodePos.x + nodeHalfW + GAP;
-      top = Math.max(TOPBAR_H + PAD, Math.min(nodePos.y - H / 2, vpH - bottomReserve - H - PAD));
+      top = Math.max(TOPBAR_H + PAD, Math.min(nodePos.y - pH / 2, vpH - bottomReserve - pH - PAD));
     } else if (canLeft) {
-      left = nodePos.x - nodeHalfW - GAP - W;
-      top = Math.max(TOPBAR_H + PAD, Math.min(nodePos.y - H / 2, vpH - bottomReserve - H - PAD));
+      left = nodePos.x - nodeHalfW - GAP - pW;
+      top = Math.max(TOPBAR_H + PAD, Math.min(nodePos.y - pH / 2, vpH - bottomReserve - pH - PAD));
     } else if (canAbove && spaceAbove >= spaceBelow) {
-      left = Math.max(PAD, Math.min(nodePos.x - W / 2, vpW - W - PAD));
-      top = nodePos.y - nodeHalfH - GAP - H;
+      left = Math.max(PAD, Math.min(nodePos.x - pW / 2, vpW - pW - PAD));
+      top = nodePos.y - nodeHalfH - GAP - pH;
     } else if (canBelow) {
-      left = Math.max(PAD, Math.min(nodePos.x - W / 2, vpW - W - PAD));
+      left = Math.max(PAD, Math.min(nodePos.x - pW / 2, vpW - pW - PAD));
       top = nodePos.y + nodeHalfH + GAP;
     } else {
       const scores = [
@@ -203,24 +196,24 @@ export class DetailPanel {
       if (best === 'right') {
         left = nodePos.x + nodeHalfW + GAP;
       } else if (best === 'left') {
-        left = nodePos.x - nodeHalfW - GAP - W;
+        left = nodePos.x - nodeHalfW - GAP - pW;
       } else {
-        left = Math.max(PAD, Math.min(nodePos.x - W / 2, vpW - W - PAD));
+        left = Math.max(PAD, Math.min(nodePos.x - pW / 2, vpW - pW - PAD));
       }
       top = best === 'above'
-        ? nodePos.y - nodeHalfH - GAP - H
+        ? nodePos.y - nodeHalfH - GAP - pH
         : best === 'below'
           ? nodePos.y + nodeHalfH + GAP
-          : Math.max(TOPBAR_H + PAD, Math.min(nodePos.y - H / 2, vpH - bottomReserve - H - PAD));
+          : Math.max(TOPBAR_H + PAD, Math.min(nodePos.y - pH / 2, vpH - bottomReserve - pH - PAD));
     }
 
     if (left < PAD) left = PAD;
-    if (left + W + PAD > vpW) left = vpW - W - PAD;
+    if (left + pW + PAD > vpW) left = vpW - pW - PAD;
     if (top < TOPBAR_H + PAD) top = TOPBAR_H + PAD;
-    if (top + H + PAD > vpH - bottomReserve) top = vpH - H - PAD - bottomReserve;
+    if (top + pH + PAD > vpH - bottomReserve) top = vpH - pH - PAD - bottomReserve;
 
-    panel.style.left = left + 'px';
-    panel.style.top = top + 'px';
+    this.panel.style.left = left + 'px';
+    this.panel.style.top = top + 'px';
   }
 
   repositionCurrent(): void {
@@ -231,17 +224,16 @@ export class DetailPanel {
     this.sheetOpen = open;
   }
 
-  // ── Private helpers ────────────────────────────────────────────────────────
-
-  private attachEdgeClickHandlers(): void {
-    const el = document.getElementById('lp-edges');
-    if (!el) return;
-    el.querySelectorAll<HTMLElement>('.np-edge-item, .np-neighbor').forEach((item) => {
-      item.addEventListener('click', () => {
-        const targetId = item.dataset['target'] ?? item.dataset['id'];
-        if (!targetId) return;
-        this.callbacks?.onNodeClick?.(targetId);
-      });
+  private applySectionState(): void {
+    this.overviewPage.querySelectorAll<HTMLElement>('.np-section__toggle').forEach((toggle) => {
+      const label = toggle.querySelector('.np-section__label')?.textContent;
+      if (!label) return;
+      const key = label === '摘要' ? 'summary' : label === '标签' ? 'tags' : label === '关联' ? 'edges' : null;
+      if (!key) return;
+      const arrow = toggle.closest('.np-section')?.querySelector<HTMLElement>('.np-section__toggle-arrow');
+      const content = toggle.closest('.np-section')?.querySelector<HTMLElement>('.np-section__content');
+      if (arrow) arrow.classList.toggle('rotated', uiState.sectionState[key]);
+      if (content) content.style.display = uiState.sectionState[key] ? '' : 'none';
     });
   }
 }

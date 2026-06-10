@@ -2,6 +2,16 @@
    components.css — Topbar · Toolbar · Sidebar · Node Panel · Bottom Sheet
    ══════════════════════════════════════════════════════════════════════════ */
 
+/*
+ * 显示控制规范 (Display Control Contract)
+ * ============================================
+ * - 显示/隐藏统一由 JS 通过 class 驱动（.visible, .hidden, .open）
+ * - CSS 只负责外观样式（颜色、尺寸、布局方向）
+ * - 媒体查询不设置 display，只改外观属性
+ * - 严禁使用 !important 控制显示逻辑
+ * - JS 绝不直接操作 style.display，改用 class 切换
+ */
+
 /* ── Topbar ─────────────────────────────────────────────────────────────── */
 @layer topbar {
 
@@ -138,7 +148,7 @@
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.28s ease, width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   will-change: transform;
 }
-#sidebar.hidden { transform: translateX(100%); opacity: 0; pointer-events: none; }
+#sidebar.hidden { transform: translateX(100%); opacity: 0; pointer-events: none; display: none; }
 
 .sidebar-strip {
   position: absolute; right: 0; top: 50%; transform: translateY(-50%);
@@ -451,7 +461,6 @@
 
 /* ── Mobile responsive ──────────────────────────────────────────────────── */
 @media (max-width: 768px) {
-  #sidebar { display: none; }
   #main    { grid-template-columns: 1fr; }
   .topbar  { z-index: 60; }
   #app.sheet-open { z-index: 60; }
