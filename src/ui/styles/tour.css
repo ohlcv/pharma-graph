@@ -1,218 +1,235 @@
 /* ══════════════════════════════════════════════════════════════════════════
    tour.css — 漫游条：桌面版 (.tour-dt) + 手机版 (.tour-mob)
-   断点：≥ 641px 显示桌面版，≤ 640px 显示手机版
-   注意：.tour-status 旧套已完全移除
+   
+   核心逻辑：
+   - 两个元素默认全部 display:none
+   - JS 负责显示/隐藏，CSS 只负责外观样式
+   - 桌面(>640px)：JS 显示 #tour-dt
+   - 手机(≤640px)：JS 显示 #tour-status(.tour-mob)
    ══════════════════════════════════════════════════════════════════════════ */
 
-@layer tour {
+   @layer tour {
 
-/* ─────────────────────────────────────────────────────────────────────────
-   共用 CSS 变量
-   ───────────────────────────────────────────────────────────────────────── */
-:root {
-  --tour-accent:   #818cf8;
-  --tour-accent-2: #a78bfa;
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
-   桌面版漫游条 .tour-dt
-   默认 display:none，JS 设置 display:flex 时显示
-   浮动圆角卡片，不使用 fixed 定位
-   ───────────────────────────────────────────────────────────────────────── */
-.tour-dt {
-  display: none;
-  align-items: center;
-  gap: 0;
-  background: #1a1f35;
-  border: 1px solid rgba(99, 102, 241, 0.25);
-  border-radius: 14px;
-  padding: 6px 10px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06);
-  white-space: nowrap;
-  overflow: hidden;
-  min-width: 0;
-  height: 44px;
-  animation: tourStatusIn 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
-}
-
-@keyframes tourStatusIn {
-  from { opacity: 0; transform: translateY(12px) scale(0.95); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-/* 桌面：≥ 641px，手机隐藏 */
-@media (max-width: 640px) {
-  .tour-dt { display: none !important; }
-}
-
-.tour-dt__status { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding-right: 4px; }
-.tour-dt__dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: var(--green); box-shadow: 0 0 6px var(--green);
-  animation: dot-pulse 2s ease-in-out infinite; flex-shrink: 0;
-}
-.tour-dt__dot.paused  { background: #fbbf24; box-shadow: 0 0 6px #fbbf24; animation: none; }
-.tour-dt__dot.stopped { background: rgba(148,163,184,0.5); box-shadow: none; animation: none; }
-.tour-dt__label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--tour-accent); }
-
-.tour-dt__node      { display: flex; align-items: center; gap: 5px; flex-shrink: 0; padding: 0 4px; min-width: 0; max-width: 160px; }
-.tour-dt__node-icon { width: 15px; height: 15px; stroke: var(--tour-accent); flex-shrink: 0; }
-.tour-dt__node-name { font-size: 0.72rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-.tour-dt__sep { width: 1px; height: 20px; background: rgba(255,255,255,0.08); margin: 0 8px; flex-shrink: 0; }
-
-.tour-dt__stats     { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.tour-dt__stat      { display: flex; align-items: center; gap: 4px; font-size: 0.68rem; }
-.tour-dt__stat svg  { width: 14px; height: 14px; stroke: currentColor; flex-shrink: 0; }
-.tour-dt__stat-label { color: rgba(226,232,240,0.4); }
-.tour-dt__stat-val   { font-weight: 700; color: rgba(226,232,240,0.9); font-variant-numeric: tabular-nums; }
-
-.tour-dt__progress       { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 80px; max-width: 200px; }
-.tour-dt__progress-track { flex: 1; height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
-.tour-dt__progress-fill  { height: 100%; background: linear-gradient(90deg, var(--tour-accent), var(--tour-accent-2)); border-radius: 2px; transition: width 0.3s ease; width: 0%; }
-.tour-dt__progress-label { font-size: 0.6rem; color: rgba(226,232,240,0.4); font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
-
-.tour-dt__params      { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
-.tour-dt__param-label { display: flex; align-items: center; gap: 3px; font-size: 0.6rem; color: rgba(226,232,240,0.4); white-space: nowrap; }
-.tour-dt__param-label svg { width: 12px; height: 12px; stroke: currentColor; flex-shrink: 0; }
-.tour-dt__range {
-  width: 60px; height: 3px; -webkit-appearance: none; appearance: none;
-  border-radius: 2px; outline: none; cursor: pointer; background: rgba(255,255,255,0.15);
-}
-.tour-dt__range::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%;
-  background: var(--tour-accent); box-shadow: 0 0 6px rgba(99,102,241,0.5);
-  cursor: pointer; border: none; transition: transform 0.1s;
-}
-.tour-dt__range::-webkit-slider-thumb:hover { transform: scale(1.2); }
-.tour-dt__range::-moz-range-thumb { width: 10px; height: 10px; border: none; border-radius: 50%; background: var(--tour-accent); box-shadow: 0 0 6px rgba(99,102,241,0.5); cursor: pointer; }
-.tour-dt__param-val { font-size: 0.6rem; color: rgba(226,232,240,0.55); font-variant-numeric: tabular-nums; min-width: 20px; }
-
-.tour-dt__ctrl { display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: auto; }
-.tour-dt__btn  {
-  display: flex; align-items: center; justify-content: center;
-  width: 28px; height: 28px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.05); color: var(--text-2); cursor: pointer;
-  transition: background 0.12s, transform 0.1s, box-shadow 0.12s;
-}
-.tour-dt__btn:hover  { background: rgba(255,255,255,0.12); transform: scale(1.05); }
-.tour-dt__btn:active { transform: scale(0.95); }
-.tour-dt__btn--play  { background: rgba(99,102,241,0.2); color: var(--tour-accent); box-shadow: 0 0 8px rgba(99,102,241,0.2); }
-.tour-dt__btn--play:hover { background: rgba(99,102,241,0.35); box-shadow: 0 0 12px rgba(99,102,241,0.35); }
-.tour-dt__btn--close:hover { background: rgba(239,68,68,0.2); color: #f87171; }
-.tour-dt__btn svg { width: 12px; height: 12px; }
-
-/* 桌面：≥ 641px */
-@media (min-width: 641px) {
-  .tour-dt { display: flex; }
-}
-
-/* 手机版漫游条 .tour-mob */
-.tour-mob { display: none; }
-
-@media (max-width: 640px) {
-  .tour-mob {
-    display: flex;
-    flex-direction: column;
-    position: fixed;
-    top: 72px; left: 12px; right: auto; bottom: auto;
-    z-index: 900;
-    border-radius: 16px;
-    background: #1a1f35;
-    border: 1px solid rgba(99, 102, 241, 0.25);
-    box-shadow: 0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(99,102,241,0.12);
-    animation: tourMobIn 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
-    touch-action: none;
-    user-select: none;
-    overflow: visible;
-  }
-
-  /* ── 拖拽把手 ──────────────────────────────────────────────────────── */
-  .tour-mob__handle {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding: 10px 0 8px; cursor: grab; min-height: 36px; flex-shrink: 0;
-  }
-  .tour-mob__handle:active { cursor: grabbing; }
-  .tour-mob__grip { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-  .tour-mob__grip span { display: block; width: 32px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.3); transition: background 0.12s; }
-  .tour-mob__handle:hover .tour-mob__grip span,
-  .tour-mob__handle:active .tour-mob__grip span { background: rgba(255,255,255,0.6); }
-
-  /* ── 内容区 ────────────────────────────────────────────────────────── */
-  .tour-mob__inner {
-    display: flex; flex-direction: column; align-items: stretch;
-    padding: 4px 12px 12px; gap: 8px;
-    max-height: calc(100vh - 180px); overflow-y: auto; height: auto;
-  }
-  .tour-mob__inner::-webkit-scrollbar { width: 3px; }
-  .tour-mob__inner::-webkit-scrollbar-track { background: transparent; }
-  .tour-mob__inner::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
-
-  /* ── 控制按钮区（关闭 + 播放/暂停） ───────────────────────────────── */
-  .tour-mob__ctrl {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 8px; padding: 2px 0 4px;
-  }
-  .tour-mob__close {
-    display: flex; align-items: center; justify-content: center;
-    width: 32px; height: 32px; padding: 0;
-    background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3);
-    border-radius: 8px; color: #f87171; cursor: pointer; flex-shrink: 0;
-    transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
-  }
-  .tour-mob__close:hover { background: rgba(239,68,68,0.25); border-color: rgba(239,68,68,0.5); box-shadow: 0 0 10px rgba(239,68,68,0.3); }
-  .tour-mob__close svg { width: 13px; height: 13px; stroke: currentColor; }
-
-  .tour-mob__badge {
-    display: flex; align-items: center; justify-content: center;
-    width: 32px; height: 32px; padding: 0;
-    background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.3);
-    border-radius: 8px; color: #a78bfa; cursor: pointer; flex-shrink: 0;
-    transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
-  }
-  .tour-mob__badge:hover { background: rgba(99,102,241,0.22); border-color: rgba(99,102,241,0.5); box-shadow: 0 0 10px rgba(99,102,241,0.25); }
-  .tour-mob__badge.tour-active { background: rgba(99,102,241,0.25) !important; border-color: rgba(99,102,241,0.6) !important; box-shadow: 0 0 12px rgba(99,102,241,0.4); }
-  .tour-mob__badge svg { width: 14px; height: 14px; stroke: currentColor; }
-
-  /* ── 统计数字区（轮次 / 层 / 节点） ───────────────────────────────── */
-  .tour-mob__stats { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 0; }
-  .tour-mob__stat-item { display: flex; flex-direction: column; align-items: center; gap: 1px; }
-  .tour-mob__stat-num  { font-size: 0.82rem; font-weight: 600; color: rgba(226,232,240,0.9); font-variant-numeric: tabular-nums; line-height: 1; }
-  .tour-mob__stat-item svg { width: 11px; height: 11px; stroke: currentColor; color: rgba(226,232,240,0.35); flex-shrink: 0; }
-  .tour-mob__stat-lbl  { font-size: 0.48rem; color: rgba(226,232,240,0.28); user-select: none; letter-spacing: 0.02em; }
-
-  /* ── 滑块区（间隔 + 深度） ─────────────────────────────────────────── */
-  .tour-mob__sliders { display: flex; flex-direction: column; align-items: center; gap: 10px; flex-shrink: 0; }
-
-  /* 单个滑块 cell：数值（上）→ track（中）→ 标签（下） */
-  .tour-mob__cell { display: flex; flex-direction: column; align-items: center; gap: 3px; position: relative; }
-
-  .tour-mob__val { font-size: 0.65rem; font-weight: 600; color: rgba(167,139,250,0.9); font-variant-numeric: tabular-nums; user-select: none; line-height: 1; }
-  .tour-mob__lbl { font-size: 0.48rem; color: rgba(226,232,240,0.28); user-select: none; letter-spacing: 0.02em; }
-
-  /* 轨道 */
-  .tour-mob__track { width: 6px; height: 56px; background: rgba(255,255,255,0.08); border-radius: 3px; position: relative; overflow: visible; display: flex; flex-direction: column; justify-content: flex-end; }
-  .tour-mob__fill  { position: absolute; left: 0; bottom: 0; width: 100%; height: 0%; background: linear-gradient(to top, #6366f1, #a78bfa); border-radius: 3px; transition: height 0.08s ease; box-shadow: 0 0 6px rgba(99,102,241,0.6); }
-
-  /* input range 旋转为竖向，圆点居中对齐轨道 */
-  .tour-mob__range {
-    position: absolute; top: 50%; left: 50%;
-    transform: translateX(-50%) translateY(-50%) rotate(-90deg);
-    transform-origin: center center;
-    width: 56px; height: 20px; margin: 0; padding: 0;
-    -webkit-appearance: none; appearance: none;
-    background: transparent; cursor: pointer;
-  }
-  .tour-mob__range::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
-    background: #fff; border: none;
-    box-shadow: 0 0 8px rgba(99,102,241,0.9), 0 1px 4px rgba(0,0,0,0.4); cursor: pointer;
-  }
-  .tour-mob__range::-moz-range-thumb {
-    width: 18px; height: 18px; border-radius: 50%;
-    background: #fff; border: none;
-    box-shadow: 0 0 8px rgba(99,102,241,0.9); cursor: pointer;
-  }
-}
-
-}
+    /* ─────────────────────────────────────────────────────────────────────────
+       共用变量 & 动画
+       ───────────────────────────────────────────────────────────────────────── */
+    :root {
+      --tour-accent:   #818cf8;
+      --tour-accent-2: #a78bfa;
+    }
+    
+    @keyframes tourStatusIn {
+      from { opacity: 0; transform: translateY(12px) scale(0.95); }
+      to   { opacity: 1; transform: translateY(0)    scale(1);    }
+    }
+    
+    @keyframes tourMobIn {
+      from { opacity: 0; transform: translateY(-8px) scale(0.95); }
+      to   { opacity: 1; transform: translateY(0)    scale(1);    }
+    }
+    
+    /* ─────────────────────────────────────────────────────────────────────────
+       桌面版 .tour-dt
+       - 默认 display:none，JS 设 display:flex 显示
+       - position:fixed，定位由 JS 决定（原版在底部居中）
+       ───────────────────────────────────────────────────────────────────────── */
+    .tour-dt {
+      display: none; /* JS 控制 */
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 900;
+      align-items: center;
+      gap: 0;
+      background: #1a1f35;
+      border: 1px solid rgba(99, 102, 241, 0.25);
+      border-radius: 14px;
+      padding: 6px 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06);
+      white-space: nowrap;
+      overflow: hidden;
+      min-width: 0;
+      height: 44px;
+      animation: tourStatusIn 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
+      touch-action: none;
+    }
+    
+    /* 手机上强制隐藏桌面版，不管 JS 怎么设 */
+    @media (max-width: 640px) {
+      .tour-dt { display: none !important; }
+    }
+    
+    /* ── 桌面版内部组件样式 ─────────────────────────────────────────────────── */
+    .tour-dt__status { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding-right: 4px; }
+    .tour-dt__dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green); box-shadow: 0 0 6px var(--green);
+      animation: dot-pulse 2s ease-in-out infinite; flex-shrink: 0;
+    }
+    .tour-dt__dot.paused  { background: #fbbf24; box-shadow: 0 0 6px #fbbf24; animation: none; }
+    .tour-dt__dot.stopped { background: rgba(148,163,184,0.5); box-shadow: none; animation: none; }
+    .tour-dt__label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--tour-accent); }
+    
+    .tour-dt__node      { display: flex; align-items: center; gap: 5px; flex-shrink: 0; padding: 0 4px; min-width: 0; max-width: 160px; }
+    .tour-dt__node-icon { width: 15px; height: 15px; stroke: var(--tour-accent); flex-shrink: 0; }
+    .tour-dt__node-name { font-size: 0.72rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    
+    .tour-dt__sep { width: 1px; height: 20px; background: rgba(255,255,255,0.08); margin: 0 8px; flex-shrink: 0; }
+    
+    .tour-dt__stats     { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .tour-dt__stat      { display: flex; align-items: center; gap: 4px; font-size: 0.68rem; }
+    .tour-dt__stat svg  { width: 14px; height: 14px; stroke: currentColor; flex-shrink: 0; }
+    .tour-dt__stat-label { color: rgba(226,232,240,0.4); }
+    .tour-dt__stat-val   { font-weight: 700; color: rgba(226,232,240,0.9); font-variant-numeric: tabular-nums; }
+    
+    .tour-dt__progress       { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 80px; max-width: 200px; }
+    .tour-dt__progress-track { flex: 1; height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+    .tour-dt__progress-fill  { height: 100%; background: linear-gradient(90deg, var(--tour-accent), var(--tour-accent-2)); border-radius: 2px; transition: width 0.3s ease; width: 0%; }
+    .tour-dt__progress-label { font-size: 0.6rem; color: rgba(226,232,240,0.4); font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
+    
+    .tour-dt__params      { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+    .tour-dt__param-label { display: flex; align-items: center; gap: 3px; font-size: 0.6rem; color: rgba(226,232,240,0.4); white-space: nowrap; }
+    .tour-dt__param-label svg { width: 12px; height: 12px; stroke: currentColor; flex-shrink: 0; }
+    .tour-dt__range {
+      width: 60px; height: 3px; -webkit-appearance: none; appearance: none;
+      border-radius: 2px; outline: none; cursor: pointer; background: rgba(255,255,255,0.15);
+    }
+    .tour-dt__range::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%;
+      background: var(--tour-accent); box-shadow: 0 0 6px rgba(99,102,241,0.5);
+      cursor: pointer; border: none; transition: transform 0.1s;
+    }
+    .tour-dt__range::-webkit-slider-thumb:hover { transform: scale(1.2); }
+    .tour-dt__range::-moz-range-thumb { width: 10px; height: 10px; border: none; border-radius: 50%; background: var(--tour-accent); box-shadow: 0 0 6px rgba(99,102,241,0.5); cursor: pointer; }
+    .tour-dt__param-val { font-size: 0.6rem; color: rgba(226,232,240,0.55); font-variant-numeric: tabular-nums; min-width: 20px; }
+    
+    .tour-dt__ctrl { display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: auto; }
+    .tour-dt__btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.05); color: var(--text-2); cursor: pointer;
+      transition: background 0.12s, transform 0.1s, box-shadow 0.12s;
+    }
+    .tour-dt__btn:hover  { background: rgba(255,255,255,0.12); transform: scale(1.05); }
+    .tour-dt__btn:active { transform: scale(0.95); }
+    .tour-dt__btn--play  { background: rgba(99,102,241,0.2); color: var(--tour-accent); box-shadow: 0 0 8px rgba(99,102,241,0.2); }
+    .tour-dt__btn--play:hover  { background: rgba(99,102,241,0.35); box-shadow: 0 0 12px rgba(99,102,241,0.35); }
+    .tour-dt__btn--close:hover { background: rgba(239,68,68,0.2); color: #f87171; }
+    .tour-dt__btn svg { width: 12px; height: 12px; }
+    
+    /* ─────────────────────────────────────────────────────────────────────────
+       手机版 .tour-mob
+       - 默认 display:none，JS 设 display:flex 显示
+       - 媒体查询只负责外观，不控制显示/隐藏
+       ───────────────────────────────────────────────────────────────────────── */
+    .tour-mob {
+      display: none; /* JS 控制 */
+    }
+    
+    /* 桌面上强制隐藏手机版，不管 JS 怎么设 */
+    @media (min-width: 641px) {
+      .tour-mob { display: none !important; }
+    }
+    
+    /* 手机版外观（只在 ≤640px 生效） */
+    @media (max-width: 640px) {
+      .tour-mob {
+        /* 注意：不写 display，由 JS 控制 */
+        flex-direction: column;
+        position: fixed;
+        top: 72px; left: 12px; right: auto; bottom: auto;
+        z-index: 900;
+        border-radius: 16px;
+        background: #1a1f35;
+        border: 1px solid rgba(99, 102, 241, 0.25);
+        box-shadow: 0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(99,102,241,0.12);
+        touch-action: none;
+        user-select: none;
+        overflow: visible;
+      }
+    
+      /* 拖拽把手 */
+      .tour-mob__handle {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        padding: 10px 0 8px; cursor: grab; min-height: 36px; flex-shrink: 0;
+      }
+      .tour-mob__handle:active { cursor: grabbing; }
+      .tour-mob__grip { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+      .tour-mob__grip span { display: block; width: 32px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.3); transition: background 0.12s; }
+      .tour-mob__handle:hover .tour-mob__grip span,
+      .tour-mob__handle:active .tour-mob__grip span { background: rgba(255,255,255,0.6); }
+    
+      /* 内容区 */
+      .tour-mob__inner {
+        display: flex; flex-direction: column; align-items: stretch;
+        padding: 4px 12px 12px; gap: 8px;
+        max-height: calc(100vh - 180px); overflow-y: auto; height: auto;
+      }
+      .tour-mob__inner::-webkit-scrollbar { width: 3px; }
+      .tour-mob__inner::-webkit-scrollbar-track { background: transparent; }
+      .tour-mob__inner::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+    
+      /* 控制按钮 */
+      .tour-mob__ctrl {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 8px; padding: 2px 0 4px;
+      }
+      .tour-mob__close {
+        display: flex; align-items: center; justify-content: center;
+        width: 32px; height: 32px; padding: 0;
+        background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3);
+        border-radius: 8px; color: #f87171; cursor: pointer; flex-shrink: 0;
+        transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+      }
+      .tour-mob__close:hover { background: rgba(239,68,68,0.25); border-color: rgba(239,68,68,0.5); box-shadow: 0 0 10px rgba(239,68,68,0.3); }
+      .tour-mob__close svg { width: 13px; height: 13px; stroke: currentColor; }
+    
+      .tour-mob__badge {
+        display: flex; align-items: center; justify-content: center;
+        width: 32px; height: 32px; padding: 0;
+        background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.3);
+        border-radius: 8px; color: #a78bfa; cursor: pointer; flex-shrink: 0;
+        transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+      }
+      .tour-mob__badge:hover { background: rgba(99,102,241,0.22); border-color: rgba(99,102,241,0.5); box-shadow: 0 0 10px rgba(99,102,241,0.25); }
+      .tour-mob__badge.tour-active { background: rgba(99,102,241,0.25) !important; border-color: rgba(99,102,241,0.6) !important; box-shadow: 0 0 12px rgba(99,102,241,0.4); }
+      .tour-mob__badge svg { width: 14px; height: 14px; stroke: currentColor; }
+    
+      /* 统计数字 */
+      .tour-mob__stats { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 0; }
+      .tour-mob__stat-item { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+      .tour-mob__stat-num  { font-size: 0.82rem; font-weight: 600; color: rgba(226,232,240,0.9); font-variant-numeric: tabular-nums; line-height: 1; }
+      .tour-mob__stat-item svg { width: 11px; height: 11px; stroke: currentColor; color: rgba(226,232,240,0.35); flex-shrink: 0; }
+      .tour-mob__stat-lbl  { font-size: 0.48rem; color: rgba(226,232,240,0.28); user-select: none; letter-spacing: 0.02em; }
+    
+      /* 滑块区 */
+      .tour-mob__sliders { display: flex; flex-direction: column; align-items: center; gap: 10px; flex-shrink: 0; }
+      .tour-mob__cell { display: flex; flex-direction: column; align-items: center; gap: 3px; position: relative; }
+      .tour-mob__val { font-size: 0.65rem; font-weight: 600; color: rgba(167,139,250,0.9); font-variant-numeric: tabular-nums; user-select: none; line-height: 1; }
+      .tour-mob__lbl { font-size: 0.48rem; color: rgba(226,232,240,0.28); user-select: none; letter-spacing: 0.02em; }
+    
+      .tour-mob__track { width: 6px; height: 56px; background: rgba(255,255,255,0.08); border-radius: 3px; position: relative; overflow: visible; display: flex; flex-direction: column; justify-content: flex-end; }
+      .tour-mob__fill  { position: absolute; left: 0; bottom: 0; width: 100%; height: 0%; background: linear-gradient(to top, #6366f1, #a78bfa); border-radius: 3px; transition: height 0.08s ease; box-shadow: 0 0 6px rgba(99,102,241,0.6); }
+    
+      .tour-mob__range {
+        position: absolute; top: 50%; left: 50%;
+        transform: translateX(-50%) translateY(-50%) rotate(-90deg);
+        transform-origin: center center;
+        width: 56px; height: 20px; margin: 0; padding: 0;
+        -webkit-appearance: none; appearance: none;
+        background: transparent; cursor: pointer;
+      }
+      .tour-mob__range::-webkit-slider-thumb {
+        -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
+        background: #fff; border: none;
+        box-shadow: 0 0 8px rgba(99,102,241,0.9), 0 1px 4px rgba(0,0,0,0.4); cursor: pointer;
+      }
+      .tour-mob__range::-moz-range-thumb {
+        width: 18px; height: 18px; border-radius: 50%;
+        background: #fff; border: none;
+        box-shadow: 0 0 8px rgba(99,102,241,0.9); cursor: pointer;
+      }
+    }
+    
+    }

@@ -343,9 +343,14 @@ function startTour(): void {
   uiState.tour.paused = false;
   syncTourBadgeUI(true, false);
   const status = document.getElementById('tour-status');
-  if (status) status.style.display = '';
   const dtBar = document.getElementById('tour-dt');
-  if (dtBar) dtBar.style.setProperty('display', 'flex', 'important');
+  if (window.innerWidth <= 640) {
+    if (status) status.style.display = 'flex';
+    if (dtBar)  dtBar.style.display  = 'none';
+  } else {
+    if (dtBar)  dtBar.style.display  = 'flex';
+    if (status) status.style.display = 'none';
+  }
 }
 
 function tourPause(): void {
@@ -374,7 +379,7 @@ function tourStop(): void {
   const status = document.getElementById('tour-status');
   if (status) status.style.display = 'none';
   const dtBar = document.getElementById('tour-dt');
-  if (dtBar) dtBar.style.setProperty('display', 'none', 'important');
+  if (dtBar)  dtBar.style.display  = 'none';
   syncTourBadgeUI(false, false);
 }
 

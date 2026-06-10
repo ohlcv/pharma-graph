@@ -41,6 +41,10 @@
   from { opacity: 0; transform: translateY(-8px) scale(0.95); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
+@keyframes tourStatusIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px) scale(0.95); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1);    }
+}
 
 /* ── Keyboard key badge ─────────────────────────────────────────────────── */
 .key {
