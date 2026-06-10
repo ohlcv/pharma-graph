@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>药学知识图谱 — 药学专业知识可视化</title>
+  <title>药学家族关系网 — 药学专业知识可视化</title>
   <meta name="description" content="基于药学专业知识的交互式知识图谱，支持节点探索、关系推理与漫游学习。">
 
   <!-- Open Graph -->
@@ -14,7 +14,7 @@
 
   <!-- Twitter Card -->
   <meta name="twitter:card"        content="summary">
-  <meta name="twitter:title"       content="药学知识图谱">
+  <meta name="twitter:title"       content="药学家族关系网">
   <meta name="twitter:description"  content="基于药学专业知识的交互式知识图谱，支持节点探索、关系推理与漫游学习。">
 
   <!-- SVG Favicon: indigo→cyan 渐变三角形图腾 -->
@@ -39,7 +39,7 @@
         </svg>
       </div>
       <div class="topbar__brand">
-        <span class="topbar__brand-name">药学知识图谱</span>
+        <span class="topbar__brand-name">药学家族关系网</span>
         <span class="topbar__brand-sub">PHARMA KNOWLEDGE GRAPH</span>
       </div>
     </div>
@@ -53,6 +53,9 @@
     </div>
     <span class="topbar__badge">
       <span class="topbar__badge-dot topbar__badge-dot--loading" id="badge-dot"></span>
+      <span class="topbar__badge-carousel" aria-live="polite">
+        <span id="carousel-text">信息熵</span>
+      </span>
       <span class="badge-by">by</span><span class="badge-meow">meow</span>
     </span>
   </header>
@@ -113,7 +116,7 @@
 
     <div class="toolbar__sep"></div>
 
-    <button id="btn-sidebar-toggle" class="btn" onclick="toggleSidebar()" title="切换侧栏">
+    <button id="btn-sidebar-toggle" class="btn layout-btn" onclick="toggleSidebar()" title="切换侧栏">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <rect x="3" y="3" width="18" height="18" rx="2"/>
         <line x1="15" y1="3" x2="15" y2="21"/>
@@ -403,7 +406,7 @@
         <button class="bs-layout-btn layout-btn" id="bs-btn-grid" onclick="runLayout('grid')">网格</button>
         <button class="bs-layout-btn layout-btn" id="bs-btn-dagre" onclick="runLayout('dagre')">Dagre</button>
         <button class="bs-layout-btn layout-btn" id="bs-btn-breadthfirst" onclick="runLayout('breadthfirst')">广度</button>
-        <button class="bs-layout-btn" id="bs-btn-euler" onclick="runLayout('euler')">Euler</button>
+        <button class="bs-layout-btn layout-btn" id="bs-btn-euler" onclick="runLayout('euler')">Euler</button>
       </div>
     </div>
 

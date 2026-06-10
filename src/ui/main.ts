@@ -16,6 +16,7 @@ import { HighlightEngine } from './highlight-engine.js';
 import { DetailPanel } from './detail-panel.js';
 import { Search } from './search.js';
 import { LAYOUTS, SHAPE_LABEL } from '../core/config.js';
+import { brandCarousel } from './carousel.js';
 
 const MD_FILES = import.meta.glob('../../content/**/*.md', { query: '?raw', import: 'default', eager: true });
 
@@ -173,6 +174,8 @@ function applyLayoutParams(): void {
   document.querySelectorAll('.layout-btn').forEach((b) => b.classList.remove('active'));
   const btn = document.getElementById('btn-' + currentLayout);
   if (btn) btn.classList.add('active');
+  const bsBtn = document.getElementById('bs-btn-' + currentLayout);
+  if (bsBtn) bsBtn.classList.add('active');
   const l = renderer.getCy().layout(base as unknown as cytoscape.LayoutOptions);
   l.run();
 }
@@ -284,12 +287,12 @@ function animatePulse(): void {
 function highlightShape(shape: string): void {
   if (activeShapeFilter === shape) {
     activeShapeFilter = null;
-    document.querySelectorAll('.node-type-item, .shape-filter-item').forEach((el) => el.classList.remove('active'));
+    document.querySelectorAll('.node-type-item, .shape-filter-item, .bs-chip').forEach((el) => el.classList.remove('active'));
     highlight.reset();
     return;
   }
   activeShapeFilter = shape;
-  document.querySelectorAll('.node-type-item, .shape-filter-item').forEach((el) => { el.classList.remove('active'); });
+  document.querySelectorAll('.node-type-item, .shape-filter-item, .bs-chip').forEach((el) => { el.classList.remove('active'); });
   highlight.highlightShape(shape);
   document.querySelectorAll('.shape-filter-item').forEach((el) => {
     const label = el.querySelector('.shape-filter-item__label')?.textContent ?? '';
@@ -308,6 +311,10 @@ function highlightShape(shape: string): void {
       (shape === 'rectangle' && bg.includes('f59e0b'))
     );
     if (matchesShape) el.classList.add('active');
+  });
+  document.querySelectorAll('.bs-chip').forEach((el) => {
+    const chipShape = (el as HTMLElement).dataset.shape ?? '';
+    if (chipShape === shape) el.classList.add('active');
   });
 }
 
@@ -458,7 +465,8 @@ function stopTourDrag(): void {
   el.style.transition = 'top 0.3s cubic-bezier(0.34,1.4,0.64,1),left 0.3s cubic-bezier(0.34,1.4,0.64,1),transform 0.3s cubic-bezier(0.34,1.4,0.64,1)';
   document.removeEventListener('pointermove', onTourDrag);
   document.removeEventListener('pointerup', stopTourDrag);
-  setTimeout(() => { el.style.transition = ''; }, 350);
+  const elRef = el;
+  setTimeout(() => { elRef.style.transition = ''; }, 350);
 }
 
 // ── Panel drag ────────────────────────────────────────────────────────────────
@@ -583,7 +591,7 @@ function startTour(): void {
       const countBadge = document.getElementById('tour-count-badge');
       const cycleBadge = document.getElementById('tour-cycle-badge');
       if (status) status.style.display = '';
-      if (depthBadge) depthBadge.textContent = `第 ${info.depth} 层`;
+      if (depthBadge) depthBadge.textContent = `第 ${info.depth + 1} 层`;
       if (countBadge) countBadge.textContent = `已探索 ${info.totalExplored} 个节点`;
       const progressBar = document.getElementById('tour-progress-bar');
       if (progressBar && info.totalToExplore > 0) { const pct = Math.round((info.totalExplored / info.totalToExplore) * 100); progressBar.style.width = `${pct}%`; }
@@ -603,8 +611,9 @@ function startTour(): void {
       if (status && !tourEngine?.isRunning()) setTimeout(() => { if (status) status.style.display = 'none'; }, 2000);
     },
   });
-  if (document.getElementById('tour-depth-badge')) (document.getElementById('tour-depth-badge') as HTMLElement).textContent = '第 1 层';
-  if (document.getElementById('tour-count-badge')) (document.getElementById('tour-count-badge') as HTMLElement).textContent = '已探索 1 个节点';
+  // 立即显示 tour bar，不等第一次 onStep
+  const status = document.getElementById('tour-status');
+  if (status) status.style.display = '';
 }
 
 function tourPause(): void {
@@ -1027,6 +1036,8 @@ try {
   const badgeDot = document.getElementById('badge-dot');
   if (badgeDot) badgeDot.classList.remove('topbar__badge-dot--loading');
 
+  brandCarousel.start();
+
   const sidebar = document.getElementById('sidebar');
   const btn = document.getElementById('btn-sidebar-toggle');
   if (sidebar && btn) btn.classList.toggle('active', !sidebar.classList.contains('hidden'));
@@ -1112,4 +1123,5 @@ function toggleSidebar(): void {
   node: (id: string) => { const cy = renderer?.getCy(); if (!cy) return 'no renderer'; const n = cy.getElementById(id); if (n.empty()) return `节点 "${id}" 不存在`; return { id: n.id(), label: n.data('label'), selected: n.selected(), dimmed: n.hasClass('dimmed'), selectedNode: n.hasClass('selected-node'), highlighted: n.hasClass('highlighted'), hovered: n.hasClass('hovered'), opacity: n.renderedStyle('opacity'), borderWidth: n.renderedStyle('border-width'), borderColor: n.renderedStyle('border-color'), backgroundColor: n.renderedStyle('background-color') }; },
   filter: () => { return renderer?.getCy().container()?.style.filter || '(无)'; },
   selected: () => { const cy = renderer?.getCy(); if (!cy) return []; return cy.$(':selected').nodes().map((n: cytoscape.NodeSingular) => ({ id: n.id(), label: n.data('label'), dimmed: n.hasClass('dimmed') })); },
+  carousel: brandCarousel,
 };

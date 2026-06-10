@@ -284,10 +284,13 @@ export const LAYOUTS: Record<string, LayoutConfig> = {
     name: 'euler',
     description: 'Euler — 基于图论力学的布局，优化边交叉和长度。',
     params: [
-      { key: 'refresh',            label: '刷新率',     min: 1,    max: 50,    step: 1,    default: 10 },
-      { key: 'maxIterations',     label: '最大迭代',   min: 100,  max: 5000,  step: 50,   default: 1000 },
-      { key: 'maxSimulationTime', label: '模拟时长',   min: 500,  max: 10000, step: 100,  default: 4000 },
-      { key: 'animationDuration', label: '动画时长',   min: 100,  max: 3000,  step: 50,   default: 600 },
+      { key: 'springLength',      label: '弹簧长度',    min: 50,   max: 500,  step: 5,    default: 250 },
+      { key: 'springStrength',    label: '弹簧强度',    min: 0.001,max: 0.5,  step: 0.001,default: 0.02 },
+      { key: 'gravity',            label: '重力',        min: 0,    max: 0.5,  step: 0.005,default: 0.01 },
+      { key: 'refresh',            label: '刷新间隔',    min: 1,    max: 100,  step: 1,    default: 30 },
+      { key: 'maxIterations',     label: '最大迭代',    min: 100,  max: 5000, step: 50,   default: 2000 },
+      { key: 'maxSimulationTime', label: '模拟时长',    min: 500,  max: 10000,step: 100,  default: 4000 },
+      { key: 'animationDuration', label: '动画时长',    min: 0,    max: 3000, step: 50,   default: 0 },
     ],
     cytoscape: {
       name: 'euler',
@@ -296,9 +299,6 @@ export const LAYOUTS: Record<string, LayoutConfig> = {
       fit: true,
       padding: 30,
       randomize: true,
-      maxIterations: 1000,
-      maxSimulationTime: 4000,
-      refresh: 10,
     },
   },
 };

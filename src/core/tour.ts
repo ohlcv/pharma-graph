@@ -75,7 +75,7 @@ export class TourEngine {
     this.onResume = options.onResume;
     this.paused = false;
     this.stopped = false;
-    this.totalExplored = 0;
+    this.totalExplored = 0; // count starts at 0; visitNext increments before its first onStep call
     this.totalToExplore = this.cy.nodes().size();
     this.currentStep = 0;
     this.currentDepth = 0;
@@ -88,7 +88,7 @@ export class TourEngine {
     this.queue.push({ id: rootId, depth: 0 });
     this.layerCounts.set(0, 1);
 
-    this.highlightAndFocus(rootId, [rootId], 0, 1, 1);
+    this.highlightAndFocus(rootId, [rootId], 0, 1, 1, true);
     this.scheduleNext();
   }
 
@@ -152,13 +152,15 @@ export class TourEngine {
         this.queue = [];
         this.layerCounts = new Map();
         this.bfsParent = new Map();
-        this.bfsParent.set(rootId, '');
         const rootNode = this.cy.nodes().not('.layer-parent')[0];
         if (rootNode) {
-          const rootId = rootNode.id();
-          this.visited.add(rootId);
-          this.queue.push({ id: rootId, depth: 0 });
+          const rid = rootNode.id();
+          this.visited.add(rid);
+          this.bfsParent.set(rid, '');
+          this.queue.push({ id: rid, depth: 0 });
           this.layerCounts.set(0, 1);
+          this.currentLayerIndex = 0;
+          this.currentStep = 0;
           this.visitNext();
         } else {
           this.stopped = true;
@@ -175,27 +177,30 @@ export class TourEngine {
     this.currentStep++;
     const node = this.cy.getElementById(id);
 
+    // 强制同步 currentDepth，防止 cycle restart 或数据异常时 depth 后退
+    this.currentDepth = depth;
+
     // Skip if node no longer exists in graph
     if (node.empty()) {
+      this.totalExplored++;
       this.visitNext();
       return;
     }
 
     // Skip layer-parent meta nodes
     if (node.hasClass('layer-parent')) {
+      this.totalExplored++;
       this.visitNext();
       return;
     }
 
-    // Update layer tracking
-    if (depth !== this.currentDepth) {
-      this.currentDepth = depth;
-      this.currentLayerIndex = 1;
-    } else {
-      this.currentLayerIndex++;
-    }
+    // BFS queue 保证同层节点连续出队，layerIndex 始终递增即可
+    this.currentLayerIndex++;
 
     const layerSize = this.layerCounts.get(depth) || 1;
+
+    // Count this node as explored — before onStep fires so the UI sees the correct number
+    this.totalExplored++;
 
     // Build path: find shortest path from root
     const path = this.buildPath(id);
@@ -209,7 +214,6 @@ export class TourEngine {
         this.visited.add(nid);
         this.bfsParent.set(nid, id);
         this.queue.push({ id: nid, depth: depth + 1 });
-        this.totalExplored++;
         // Track layer size
         const count = this.layerCounts.get(depth + 1) || 0;
         this.layerCounts.set(depth + 1, count + 1);
@@ -242,7 +246,8 @@ export class TourEngine {
     path: string[],
     depth: number,
     layerSize: number,
-    layerIdx: number
+    layerIdx: number,
+    silent = false
   ): void {
     const node = this.cy.getElementById(nodeId);
     const pathLabels = path.map((id) => this.cy.getElementById(id).data('label') || id);
@@ -274,20 +279,22 @@ export class TourEngine {
       easing: 'ease-out-cubic',
     });
 
-    this.onStep?.({
-      nodeId,
-      label: node.data('label') || nodeId,
-      depth,
-      path,
-      pathLabels,
-      layerSize,
-      layerIndex: layerIdx,
-      totalExplored: this.totalExplored,
-      totalToExplore: this.totalToExplore,
-      currentStep: this.currentStep,
-      maxDepthReached: depth,
-      cycleCount: this.cycleCount,
-    });
+    if (!silent) {
+      this.onStep?.({
+        nodeId,
+        label: node.data('label') || nodeId,
+        depth,
+        path,
+        pathLabels,
+        layerSize,
+        layerIndex: layerIdx,
+        totalExplored: this.totalExplored,
+        totalToExplore: this.totalToExplore,
+        currentStep: this.currentStep,
+        maxDepthReached: depth,
+        cycleCount: this.cycleCount,
+      });
+    }
   }
 
     // 聚光灯脉冲状态

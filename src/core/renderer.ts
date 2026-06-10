@@ -232,6 +232,7 @@ export class Renderer {
   private cy: cytoscape.Core;
   private currentLayout = DEFAULT_LAYOUT;
   private layoutConfigs: Record<string, LayoutConfig>;
+  private currentLayoutInstance: cytoscape.Layouts | null = null;
 
   constructor(options: RendererOptions) {
     const {
@@ -309,7 +310,10 @@ export class Renderer {
       }, edgeDelay + i * 10 + 200);
     });
 
-    this.cy.layout(base as unknown as cytoscape.LayoutOptions).run();
+    this.currentLayoutInstance?.stop();
+    const layoutInstance = this.cy.layout(base as unknown as cytoscape.LayoutOptions);
+    this.currentLayoutInstance = layoutInstance;
+    layoutInstance.run();
   }
 
   setDragMode(on: boolean): void {
