@@ -53,6 +53,8 @@ import {
   runDebugUpdate,
   setDebugActive,
   setPrevSelectedNode,
+  debugOverlayActive,
+  updateForensicPanel,
 } from './app-debug.js';
 
 const MD_FILES = import.meta.glob('../../content/**/*.md', { query: '?raw', import: 'default', eager: true });
@@ -504,6 +506,11 @@ function initGraphEvents(
     detailPanel.show(node.id());
     updateStats(cy);
     syncBottomSheetStats(cy);
+
+    // Update forensic panel if debug mode is active
+    if (debugOverlayActive) {
+      updateForensicPanel(renderer);
+    }
   });
 
   cy.on('tap', 'edge', (evt) => {
@@ -673,25 +680,15 @@ function exposeGlobals(renderer: Renderer, highlight: HighlightEngine, detailPan
   (window as any).applyLayoutParams = () => applyLayoutParams(renderer);
   (window as any).applyBsParams = () => applyBsParams(renderer);
   (window as any).runLayout = (name: string) => runLayout(name, renderer);
-(window as any)._dbg = {
+  (window as any)._dbg = {
     overlay: () => {
-      const dbg = (window as any)._dbg as { _active: boolean; _raf: number | null };
-      setDebugActive(!dbg._active);
+      setDebugActive(!debugOverlayActive);
       const btn = document.getElementById('debug-toggle');
-      if (btn) btn.classList.toggle('active', dbg._active);
+      if (btn) btn.classList.toggle('active', debugOverlayActive);
       const panel = document.getElementById('debug-panel');
-      if (panel) panel.style.display = dbg._active ? '' : 'none';
-      if (dbg._active) {
-        if (!document.getElementById('debug-overlay')) {
-          const ov = document.createElement('div');
-          ov.id = 'debug-overlay';
-          renderer?.getCy().container()?.appendChild(ov);
-        }
-        runDebugUpdate(renderer, highlight);
-      } else {
-        if (dbg._raf) { cancelAnimationFrame(dbg._raf); dbg._raf = null; }
-        const ov = document.getElementById('debug-overlay');
-        if (ov) ov.innerHTML = '';
+      if (panel) panel.style.display = debugOverlayActive ? '' : 'none';
+      if (debugOverlayActive) {
+        updateForensicPanel(renderer);
       }
     },
     _active: false,
@@ -756,7 +753,7 @@ try {
   initGraphEvents(cy, uiState.renderer, uiState.highlight, uiState.detailPanel);
 
   initEdgeTooltip();
-  initDebugOverlay();
+  initDebugOverlay(uiState.renderer);
   initTourSlider();
   updateStats(cy);
   syncBottomSheetStats(cy);
@@ -782,11 +779,13 @@ try {
   console.error('[pharma-graph] Boot error:', err);
 }
 
-// These init functions need cy — we know renderer is set if we reach here
-const cy = uiState.renderer!.getCy();
-initKeyboardShortcuts(uiState.renderer!);
-initSearchUI(cy, uiState.highlight!, uiState.search!, uiState.detailPanel!);
-initResizeHandler(uiState.renderer!);
-initTourButtonBinding();
-initMusicPlayer();
-exposeGlobals(uiState.renderer!, uiState.highlight!, uiState.detailPanel!);
+// These init functions need cy — only proceed if renderer was created successfully
+if (uiState.renderer) {
+  const cy = uiState.renderer.getCy();
+  initKeyboardShortcuts(uiState.renderer);
+  initSearchUI(cy, uiState.highlight!, uiState.search!, uiState.detailPanel!);
+  initResizeHandler(uiState.renderer);
+  initTourButtonBinding();
+  initMusicPlayer();
+  exposeGlobals(uiState.renderer, uiState.highlight!, uiState.detailPanel!);
+}

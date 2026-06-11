@@ -1,13 +1,16 @@
+// src/ui/app-debug.ts
+// 取证面板：节点样式诊断工具。
+// 每次点击节点时更新，实时显示该节点的 shape/border/size/weight/category，
+// 帮助判断为什么视觉样式没有按预期生效。
+
 import cytoscape from 'cytoscape';
-import type { NodeSingular, EdgeSingular } from 'cytoscape';
+import type { NodeSingular } from 'cytoscape';
 import { Renderer } from '../core/renderer.js';
 import { HighlightEngine } from './highlight-engine.js';
 
-let debugOverlayActive = false;
-let debugRafId: number | null = null;
+export let debugOverlayActive = false;
 let _prevSelectedNodeId: string | null = null;
 let _prevSelectedNodeName: string | null = null;
-let debugLastState = '';
 
 export function isDebugActive(): boolean {
   return debugOverlayActive;
@@ -26,282 +29,266 @@ export function setPrevSelectedNode(id: string | null, name: string | null): voi
   _prevSelectedNodeName = name;
 }
 
-export function initDebugOverlay(): void {
+export function initDebugOverlay(renderer: Renderer): void {
+  // ── Inject button into shortcuts sidebar ──────────────────────────────
   const btn = document.createElement('button');
   btn.id = 'debug-toggle';
-  btn.textContent = '调试状态 🔍';
+  btn.textContent = '取证面板 🔍';
   btn.addEventListener('click', () => {
     const active = btn.classList.toggle('active');
     const panel = document.getElementById('debug-panel');
     if (panel) panel.style.display = active ? '' : 'none';
     if (active) {
       debugOverlayActive = true;
-        if (!document.getElementById('debug-overlay')) {
-          const overlay = document.createElement('div');
-          overlay.id = 'debug-overlay';
-          renderer?.getCy().container()?.appendChild(overlay);
-        }
+      updateForensicPanel(renderer);
     } else {
       debugOverlayActive = false;
-      if (debugRafId !== null) { cancelAnimationFrame(debugRafId); debugRafId = null; }
-      const ov = document.getElementById('debug-overlay');
-      if (ov) ov.innerHTML = '';
     }
   });
   document.querySelector('.shortcuts-list')?.appendChild(btn);
+
+  // ── Build the forensic panel ────────────────────────────────────────
   const panel = document.createElement('div');
   panel.id = 'debug-panel';
+  // Positioned via CSS in index.css
   panel.style.display = 'none';
   panel.innerHTML = `
-    <h4>🔬 取证面板</h4>
-    <div id="dbg-raw-data" style="font-size:9px;color:#fbbf24;background:rgba(251,191,36,0.08);border-radius:4px;padding:4px 6px;margin-bottom:8px;line-height:1.6"></div>
-    <div style="margin-bottom:8px"><span style="color:#94a3b8;font-size:10px">容器 filter</span><div id="dbg-filter" style="font-size:10px;color:#e2e8f0;word-break:break-all"></div></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;margin-bottom:8px">
-      <div style="text-align:center;background:rgba(99,102,241,0.1);border-radius:6px;padding:4px 6px"><div style="font-size:9px;color:#64748b">:selected</div><div id="dbg-sel-count" style="font-size:14px;color:#818cf8;font-weight:700">0</div></div>
-      <div style="text-align:center;background:rgba(239,68,68,0.1);border-radius:6px;padding:4px 6px"><div style="font-size:9px;color:#64748b">.dimmed</div><div id="dbg-dim-count" style="font-size:14px;color:#f87171;font-weight:700">0</div></div>
-      <div style="text-align:center;background:rgba(34,197,94,0.1);border-radius:6px;padding:4px 6px"><div style="font-size:9px;color:#64748b">.sel-node</div><div id="dbg-snode-count" style="font-size:14px;color:#4ade80;font-weight:700">0</div></div>
-      <div style="text-align:center;background:rgba(251,191,36,0.1);border-radius:6px;padding:4px 6px"><div style="font-size:9px;color:#64748b">.highlight</div><div id="dbg-hl-count" style="font-size:14px;color:#fbbf24;font-weight:700">0</div></div>
+    <div class="dbg-header">
+      <span class="dbg-header__title">🔬 节点取证</span>
+      <span class="dbg-header__hint">点击任意节点自动更新</span>
     </div>
-    <div style="margin-bottom:8px"><span style="color:#94a3b8;font-size:10px">所有 :selected</span><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px" id="dbg-all-selected"></div></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
-      <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:6px;padding:6px 8px"><div style="font-size:10px;color:#4ade80;font-weight:700;margin-bottom:4px">✨ 新主角</div><div id="dbg-new-name" style="font-size:10px;color:#e2e8f0;font-weight:700;margin-bottom:4px">—</div><div style="font-size:9px;color:#94a3b8;line-height:1.6" id="dbg-new-props"></div></div>
-      <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:6px 8px"><div style="font-size:10px;color:#f87171;font-weight:700;margin-bottom:4px">⏮ 旧主角</div><div id="dbg-old-name" style="font-size:10px;color:#e2e8f0;font-weight:700;margin-bottom:4px">—</div><div style="font-size:9px;color:#94a3b8;line-height:1.6" id="dbg-old-props"></div></div>
+
+    <!-- 当前选中节点 -->
+    <div class="dbg-section" id="dbg-current-section">
+      <div class="dbg-section__label">当前主角</div>
+      <div class="dbg-node-card" id="dbg-current-card">
+        <div class="dbg-node-card__name" id="dbg-node-name">—</div>
+        <div class="dbg-node-card__meta" id="dbg-node-meta"></div>
+        <div class="dbg-node-card__props" id="dbg-node-props"></div>
+      </div>
     </div>
-    <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:6px;margin-bottom:6px"><div style="font-size:10px;color:#64748b;margin-bottom:4px">🔸 所有 .dimmed 节点（逐行）</div><div id="dbg-all-dimmed" style="font-size:9px;line-height:1.7;max-height:180px;overflow-y:auto"></div></div>
-    <div class="debug-conflict" id="dbg-conflict" style="display:none"></div>`;
+
+    <!-- 前一个主角 -->
+    <div class="dbg-section" id="dbg-prev-section">
+      <div class="dbg-section__label">前一个主角</div>
+      <div class="dbg-node-card dbg-node-card--muted" id="dbg-prev-card">
+        <div class="dbg-node-card__name" id="dbg-prev-name">—</div>
+        <div class="dbg-node-card__props" id="dbg-prev-props"></div>
+      </div>
+    </div>
+
+    <!-- 全局统计 -->
+    <div class="dbg-section">
+      <div class="dbg-section__label">图谱状态</div>
+      <div class="dbg-stats-grid" id="dbg-stats-grid">
+        <div class="dbg-stat">
+          <div class="dbg-stat__val dbg-stat__val--accent" id="dbg-sel-count">0</div>
+          <div class="dbg-stat__key">:selected</div>
+        </div>
+        <div class="dbg-stat">
+          <div class="dbg-stat__val dbg-stat__val--red" id="dbg-dim-count">0</div>
+          <div class="dbg-stat__key">.dimmed</div>
+        </div>
+        <div class="dbg-stat">
+          <div class="dbg-stat__val dbg-stat__val--green" id="dbg-snode-count">0</div>
+          <div class="dbg-stat__key">.sel-node</div>
+        </div>
+        <div class="dbg-stat">
+          <div class="dbg-stat__val dbg-stat__val--yellow" id="dbg-hl-count">0</div>
+          <div class="dbg-stat__key">.highlight</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 样式规则对照表 -->
+    <div class="dbg-section">
+      <div class="dbg-section__label">type → shape 对照</div>
+      <div class="dbg-rules-table" id="dbg-rules-table"></div>
+    </div>
+
+    <!-- 容器 filter -->
+    <div class="dbg-section">
+      <div class="dbg-section__label">容器 CSS filter</div>
+      <div class="dbg-filter" id="dbg-filter">(无)</div>
+    </div>
+
+    <!-- 类型覆盖率 -->
+    <div class="dbg-section">
+      <div class="dbg-section__label">字段覆盖率</div>
+      <div class="dbg-coverage" id="dbg-coverage"></div>
+    </div>
+
+    <!-- 冲突警告 -->
+    <div class="dbg-conflict" id="dbg-conflict" style="display:none"></div>
+
+    <!-- 帮助文字 -->
+    <div class="dbg-help">
+      <div class="dbg-help__row"><span class="dbg-help__key">S</span><span>= :selected</span></div>
+      <div class="dbg-help__row"><span class="dbg-help__key">D</span><span>= .dimmed</span></div>
+      <div class="dbg-help__row"><span class="dbg-help__key">N</span><span>= .selected-node</span></div>
+      <div class="dbg-help__row"><span class="dbg-help__key">H</span><span>= .highlighted</span></div>
+    </div>
+  `;
   document.body.appendChild(panel);
 }
 
-function isDimmedAndSelected(node: NodeSingular): boolean {
-  return node.hasClass('dimmed') && node.selected();
+function styleChip(label: string, value: string, ok: boolean): string {
+  const color = ok ? '#4ade80' : '#f87171';
+  return `<span class="dbg-chip" style="border-color:${color}"><span class="dbg-chip__k">${label}</span><span class="dbg-chip__v" style="color:${color}">${value}</span></span>`;
 }
 
-function nodeForensicProps(node: NodeSingular): string {
-  if (node.removed()) return '<span style="color:#64748b">⚠ 节点已移除</span>';
-  const bc = node.renderedStyle('border-color') as string;
-  const bw = node.renderedStyle('border-width') as string;
-  const isWhite = bc === '#ffffff' || bc === 'rgb(255,255,255)' || bc === 'rgba(255,255,255,1)' || bc === 'white';
-  const isSelectedBorderWidth = typeof bw === 'number' && bw >= 2.5;
-  const flag = (cond: boolean, t: string, ok: string, fail: string) =>
-    cond ? `<span style="color:#4ade80">${t}${ok}</span>` : `<span style="color:#64748b">${t}${fail}</span>`;
-  const borderStatus = isWhite ? `<span style="color:#f87171">⚠ 白边!</span>` : `<span style="color:#4ade80">✓</span>`;
-  const bwStatus = isSelectedBorderWidth ? `<span style="color:#fbbf24">⚠ 粗边(${bw})</span>` : bw;
+function classBadge(cls: string, active: boolean): string {
+  const color = active ? '#4ade80' : '#475569';
+  return `<span class="dbg-class-badge" style="color:${color};border-color:${color}">${cls}</span>`;
+}
+
+function buildRulesTable(cy: cytoscape.Core): string {
+  const rows: string[] = [];
+  cy.nodes().not('.layer-parent').forEach((n: NodeSingular) => {
+    const t = n.data('type') ?? '?';
+    const shape = n.style('shape') as string;
+    const bc = n.style('border-color') as string;
+    const bw = n.style('border-width') as string;
+    const w = n.data('weight') ?? '?';
+    const rw = n.renderedWidth().toFixed(1);
+    const label = (n.data('label') || n.id()).slice(0, 12);
+    const isSelected = n.hasClass('selected-node');
+    rows.push(`<tr class="${isSelected ? 'dbg-rules-table__tr--active' : ''}">
+      <td class="dbg-rules-table__td">${label}</td>
+      <td class="dbg-rules-table__td dbg-rules-table__td--type">${t}</td>
+      <td class="dbg-rules-table__td dbg-rules-table__td--shape">${shape}</td>
+      <td class="dbg-rules-table__td dbg-rules-table__td--w">wt=${w} rw=${rw}</td>
+      <td class="dbg-rules-table__td">${bc}</td>
+    </tr>`);
+  });
+  return `<table class="dbg-rules-table__table">
+    <thead><tr><th>节点</th><th>type</th><th>shape</th><th>weight</th><th>border-color</th></tr></thead>
+    <tbody>${rows.join('')}</tbody>
+  </table>
+  <div class="dbg-rules-table__count">共 ${rows.length} 个节点</div>`;
+}
+
+function nodeProps(node: NodeSingular): string {
+  const shape = node.style('shape') as string;
+  const bc = node.style('border-color') as string;
+  const bw = node.style('border-width') as string;
+  const bg = node.style('background-color') as string;
+  const w = node.data('weight') ?? '?';
+  const rw = node.renderedWidth().toFixed(1);
+  const rh = node.renderedHeight().toFixed(1);
+  const type = node.data('type') ?? '?';
+  const cat = node.data('category') ?? '?';
+  const layer = node.data('layer') ?? '?';
+  const opacity = node.renderedStyle('opacity') as string;
   const classes = (node.classes() as string[]).join(' ');
+
+  const shapeOk = shape !== 'ellipse' || type === 'concept';
+  const bcOk = !bc.includes('255,255,255') && !bc.includes('#ffffff');
+
   return [
-    flag(node.selected(), 'S:', '✓', '✗'),
-    flag(node.hasClass('dimmed'), 'D:', '✓', '✗'),
-    flag(node.hasClass('selected-node'), 'N:', '✓', '✗'),
-    flag(node.hasClass('highlighted'), 'H:', '✓', '✗'),
-    flag(node.hasClass('hovered'), 'V:', '✓', '✗'),
-    `opacity:${node.renderedStyle('opacity')}`,
-    `bw:${bwStatus}`,
-    `bc:${bc} ${borderStatus}`,
-    `cls:[${classes}]`,
-  ].join(' | ');
+    styleChip('shape', shape, shapeOk),
+    styleChip('border', `${bc} / bw=${bw}`, bcOk),
+    styleChip('bgColor', bg, bg !== 'rgba(0,0,0,1)'),
+    styleChip('weight', `${w} → rw=${rw}`, true),
+    styleChip('rendered', `${rw}×${rh}`, true),
+    `<div class="dbg-props-row">`,
+    classBadge('S', node.selected()),
+    classBadge('D', node.hasClass('dimmed')),
+    classBadge('N', node.hasClass('selected-node')),
+    classBadge('H', node.hasClass('highlighted')),
+    classBadge('V', node.hasClass('hovered')),
+    `</div>`,
+    `<div class="dbg-props-meta">type=${type} | category=${cat} | layer=${layer} | opacity=${opacity}</div>`,
+    `<div class="dbg-props-classes">cls:[${classes || '∅'}]</div>`,
+  ].join('');
+}
+
+export function updateForensicPanel(renderer: Renderer): void {
+  if (!debugOverlayActive) return;
+  const cy = renderer.getCy();
+  const panel = document.getElementById('debug-panel');
+  if (!panel) return;
+
+  // ── Stats ──────────────────────────────────────────────────────────
+  const el = (id: string) => document.getElementById(id) as HTMLElement | null;
+  const setEl = (id: string, val: string) => { const e = el(id); if (e) e.textContent = val; };
+
+  setEl('dbg-sel-count', String(cy.$(':selected').length));
+  setEl('dbg-dim-count', String(cy.nodes('.dimmed').not('.layer-parent').length));
+  setEl('dbg-snode-count', String(cy.nodes('.selected-node').length));
+  setEl('dbg-hl-count', String(cy.nodes('.highlighted').length));
+
+  // ── Filter ────────────────────────────────────────────────────────
+  const filterEl = el('dbg-filter');
+  if (filterEl) filterEl.textContent = cy.container()?.style.filter || '(无)';
+
+  // ── Rules table ───────────────────────────────────────────────────
+  const rulesEl = el('dbg-rules-table');
+  if (rulesEl) rulesEl.innerHTML = buildRulesTable(cy);
+
+  // ── Current node ───────────────────────────────────────────────────
+  const snodeEls = cy.nodes('.selected-node');
+  const currentNodeId = snodeEls.length > 0 ? snodeEls[0].id() : null;
+  const currentNode = currentNodeId ? cy.getElementById(currentNodeId) : null;
+
+  setEl('dbg-node-name', currentNode
+    ? (currentNode.data('label') || currentNode.id()).slice(0, 20)
+    : '— (无 .selected-node)');
+
+  const metaEl = el('dbg-node-meta');
+  if (metaEl) metaEl.innerHTML = currentNode
+    ? `id: <code>${currentNode.id()}</code>`
+    : '';
+
+  const propsEl = el('dbg-node-props');
+  if (propsEl) propsEl.innerHTML = currentNode ? nodeProps(currentNode) : '<span style="color:#64748b">点击图谱中的节点以启动取证</span>';
+
+  // ── Prev node ─────────────────────────────────────────────────────
+  const prevNode = _prevSelectedNodeId ? cy.getElementById(_prevSelectedNodeId) : null;
+  setEl('dbg-prev-name', prevNode
+    ? (prevNodeName(_prevSelectedNodeId) || _prevSelectedNodeId!).slice(0, 20)
+    : '—');
+
+  const prevPropsEl = el('dbg-prev-props');
+  if (prevPropsEl) prevPropsEl.innerHTML = prevNode
+    ? nodeProps(prevNode)
+    : '';
+
+  // ── Conflict ───────────────────────────────────────────────────────
+  const conflictNodes = cy.nodes('.dimmed').filter(':selected');
+  const conflictEl = el('dbg-conflict');
+  if (conflictEl) {
+    conflictEl.style.display = conflictNodes.length > 0 ? '' : 'none';
+    if (conflictNodes.length > 0) {
+      conflictEl.textContent = `⚠ 冲突: .dimmed+:selected = ${conflictNodes.length} 个`;
+    }
+  }
+
+  // ── Field coverage ─────────────────────────────────────────────────
+  const coverageEl = el('dbg-coverage');
+  if (coverageEl) {
+    const allNodes = cy.nodes().not('.layer-parent');
+    const noType   = allNodes.filter((n: NodeSingular) => !n.data('type') || n.data('type') === 'default').length;
+    const noCat    = allNodes.filter((n: NodeSingular) => !n.data('category') || n.data('category') === 'default').length;
+    const noLayer  = allNodes.filter((n: NodeSingular) => !n.data('layer')).length;
+    const total    = allNodes.length;
+    const typeWarn = noType > 0 ? `<span style="color:#f87171">⚠ type 缺失: ${noType}/${total}</span>` : `<span style="color:#4ade80">✓ type 全覆盖</span>`;
+    const catWarn  = noCat  > 0 ? `<span style="color:#f87171">⚠ category 缺失: ${noCat}/${total}</span>`  : `<span style="color:#4ade80">✓ category 全覆盖</span>`;
+    const layerWarn= noLayer> 0 ? `<span style="color:#f87171">⚠ layer 缺失: ${noLayer}/${total}</span>` : `<span style="color:#4ade80">✓ layer 全覆盖</span>`;
+    coverageEl.innerHTML = `<div style="font-size:9px;line-height:1.8">${typeWarn}<br>${catWarn}<br>${layerWarn}</div>`;
+  }
+
+  _prevSelectedNodeId = null;
+  _prevSelectedNodeName = null;
+}
+
+function prevNodeName(id: string | null): string | null {
+  if (!id) return null;
+  // accessed via renderer cy below — this fn is only called after renderer's cy is available
+  return null; // name is stored in the closure via _prevSelectedNodeName
 }
 
 export function runDebugUpdate(renderer: Renderer, highlight: HighlightEngine): void {
-  if (!debugOverlayActive || !renderer) { debugRafId = null; return; }
-  const cy = renderer.getCy();
-  const panel = document.getElementById('debug-panel');
-  if (!panel) { debugRafId = null; return; }
-
-  const selIds = cy.$(':selected').nodes().map((n: NodeSingular) => n.id()).sort().join(',');
-  const dimIds = cy.nodes('.dimmed').not('.layer-parent').map((n: NodeSingular) => n.id()).sort().join(',');
-  const snodeEls = cy.nodes('.selected-node');
-  const currentNodeId = snodeEls.length > 0 ? snodeEls[0].id() : '';
-  const stateKey = `${selIds}||${dimIds}||${currentNodeId}`;
-
-  if (stateKey === debugLastState) {
-    // Only update badge positions — skip expensive DOM rebuild when nothing changed
-    const overlay = document.getElementById('debug-overlay');
-    if (overlay) {
-      const batch: Array<{ el: HTMLElement; x: number; y: number }> = [];
-      overlay.querySelectorAll<HTMLElement>('.debug-badge[data-node-id]').forEach((badge) => {
-        const nodeId = badge.dataset.nodeId;
-        if (!nodeId) return;
-        const node = cy.getElementById(nodeId);
-        if (node.empty()) return;
-        const pos = node.renderedPosition();
-        const nodeH = node.renderedHeight();
-        batch.push({ el: badge, x: pos.x, y: pos.y - nodeH / 2 - 2 });
-      });
-      // Batch-apply positions in a single reflow
-      batch.forEach(({ el, x, y }) => {
-        el.style.left = x + 'px';
-        el.style.top = y + 'px';
-      });
-    }
-    const el = (id: string) => document.getElementById(id) as HTMLElement | null;
-    if (el('dbg-sel-count')) el('dbg-sel-count')!.textContent = String(cy.$(':selected').length);
-    if (el('dbg-dim-count')) el('dbg-dim-count')!.textContent = String(cy.nodes('.dimmed').not('.layer-parent').length);
-    if (el('dbg-snode-count')) el('dbg-snode-count')!.textContent = String(cy.nodes('.selected-node').length);
-    debugRafId = requestAnimationFrame(() => runDebugUpdate(renderer, highlight));
-    return;
-  }
-  debugLastState = stateKey;
-
-  const filterText = cy.container()?.style.filter || '(无)';
-  const filterEl = document.getElementById('dbg-filter');
-  if (filterEl) filterEl.textContent = filterText;
-
-  const allSelected = cy.$(':selected');
-  const allDimmed = cy.nodes('.dimmed').not('.layer-parent');
-
-  const rawEl = document.getElementById('dbg-raw-data');
-  if (rawEl) rawEl.innerHTML = [
-    `snodeCnt=${snodeEls.length}`, `selCnt=${allSelected.length}`, `dimCnt=${allDimmed.length}`,
-    `sel=${allSelected.map((n: NodeSingular) => n.id()).join(',') || '∅'}`,
-    `snode=${snodeEls.map((n: NodeSingular) => n.id()).join(',') || '∅'}`,
-    `dimIds=${cy.nodes('.dimmed').map((n: NodeSingular) => n.id()).sort().join(',') || '∅'}`,
-  ].join(' | ');
-
-  const el = (id: string) => document.getElementById(id) as HTMLElement | null;
-  if (el('dbg-sel-count')) el('dbg-sel-count')!.textContent = String(allSelected.length);
-  if (el('dbg-dim-count')) el('dbg-dim-count')!.textContent = String(allDimmed.length);
-  if (el('dbg-snode-count')) el('dbg-snode-count')!.textContent = String(snodeEls.length);
-  if (el('dbg-hl-count')) el('dbg-hl-count')!.textContent = String(cy.nodes('.highlighted').length);
-
-  const allSelectedEl = document.getElementById('dbg-all-selected');
-  if (allSelectedEl) {
-    allSelectedEl.innerHTML = allSelected.length === 0
-      ? '<span style="font-size:9px;color:#64748b">无</span>'
-      : allSelected.map((n: NodeSingular) => {
-          const label = n.data('label') || n.id();
-          const dimmed = n.hasClass('dimmed');
-          const color = dimmed ? '#f87171' : '#818cf8';
-          const bg = dimmed ? 'rgba(239,68,68,0.2)' : 'rgba(99,102,241,0.2)';
-          return `<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:${bg};color:${color}">${label.slice(0, 10)}${dimmed ? ' ⚠' : ''}</span>`;
-        }).join('');
-  }
-
-  const snodeFirstId = snodeEls.length > 0 ? snodeEls[0].id() : null;
-  const currentNode = snodeFirstId ? cy.getElementById(snodeFirstId) : null;
-  const prevNodeId = _prevSelectedNodeId;
-  const prevNodeName = _prevSelectedNodeName;
-  const prevNode = prevNodeId ? cy.getElementById(prevNodeId) : null;
-  _prevSelectedNodeId = null;
-  _prevSelectedNodeName = null;
-
-  const allDimmedEl = document.getElementById('dbg-all-dimmed');
-  if (allDimmedEl) {
-    allDimmedEl.innerHTML = allDimmed.length === 0
-      ? '<span style="color:#64748b">无 dimmed 节点</span>'
-      : allDimmed.map((n: NodeSingular) => {
-          const label = (n.data('label') || n.id()).slice(0, 10);
-          const bc = n.renderedStyle('border-color') as string;
-          const bw = n.renderedStyle('border-width') as string;
-          const isWhite = bc === '#ffffff' || bc === 'rgb(255,255,255)' || bc === 'rgba(255,255,255,1)';
-          const warn: string[] = [];
-          if (n.selected()) warn.push('S');
-          if (isWhite) warn.push('白边');
-          if ((parseFloat(bw) || 0) >= 2.5) warn.push('粗边');
-          const warnTag = warn.length > 0 ? `<span style="color:#f87171"> ⚠${warn.join(',')}</span>` : '';
-          const isCurrent = currentNode && n.id() === currentNode.id();
-          const isPrev = prevNode && n.id() === prevNode.id();
-          const tag = isCurrent ? '✨' : isPrev ? '⏮' : '  ';
-          return `<div>${tag}<b>${label}</b> bw=${bw} bc=${isWhite ? '⚠白' : 'ok'} ${warnTag}</div>`;
-        }).join('');
-  }
-
-  if (el('dbg-new-name')) {
-    el('dbg-new-name')!.textContent = currentNode ? (currentNode.data('label') || currentNode.id()).slice(0, 12) : '—';
-  }
-  if (el('dbg-new-props')) {
-    el('dbg-new-props')!.innerHTML = currentNode
-      ? nodeForensicProps(currentNode)
-      : '<span style="color:#f87171">⚠ 无 .selected-node</span>';
-  }
-  if (el('dbg-old-name')) {
-    el('dbg-old-name')!.textContent = prevNode ? (prevNodeName || prevNode.id()).slice(0, 12) : '—';
-  }
-  if (el('dbg-old-props') && prevNode) {
-    const props = nodeForensicProps(prevNode);
-    el('dbg-old-props')!.innerHTML = props + (isDimmedAndSelected(prevNode) ? '<br><span style="color:#f87171;font-weight:700">⚠ dimmed+:selected 冲突!</span>' : '');
-  }
-
-  const conflictNodes = cy.nodes('.dimmed').filter(':selected');
-  const conflictEl = document.getElementById('dbg-conflict');
-  if (conflictEl) {
-    conflictEl.style.display = conflictNodes.length > 0 ? '' : 'none';
-    if (conflictNodes.length > 0) conflictEl.textContent = `⚠ 冲突: .dimmed+:selected = ${conflictNodes.length} 个`;
-  }
-
-  const overlay = document.getElementById('debug-overlay');
-  if (overlay) {
-    // Build all badges into a fragment, then do one replaceChild — O(1) reflow
-    const fragment = document.createDocumentFragment();
-    const existingBadges = new Map<string, HTMLElement>();
-    overlay.querySelectorAll<HTMLElement>('.debug-badge[data-node-id]').forEach((b) => {
-      existingBadges.set(b.dataset.nodeId!, b);
-    });
-
-    cy.nodes().not('.layer-parent').forEach((node: NodeSingular) => {
-      const nid = node.id();
-      const pos = node.renderedPosition();
-      if (!pos) return;
-      const nodeH = node.renderedHeight();
-      const hasSelected = node.selected();
-      const hasDimmed = node.hasClass('dimmed');
-      const hasSNode = node.hasClass('selected-node');
-      const hasHighlight = node.hasClass('highlighted');
-      const hasHovered = node.hasClass('hovered');
-      const parts: string[] = [];
-      if (hasSelected) parts.push('S');
-      if (hasDimmed) parts.push('D');
-      if (hasSNode) parts.push('N');
-      if (hasHighlight) parts.push('H');
-      if (hasHovered) parts.push('V');
-      const text = parts.length > 0 ? parts.join('+') : '\u00b7';
-      const label = (node.data('label') || node.id()).slice(0, 6);
-      let cls = 'debug-badge debug-badge--none';
-      if (hasSelected && hasDimmed) cls = 'debug-badge debug-badge--selected';
-      else if (hasDimmed) cls = 'debug-badge debug-badge--dimmed';
-      else if (hasSelected) cls = 'debug-badge debug-badge--selected';
-      else if (hasSNode) cls = 'debug-badge debug-badge--sel-node';
-      else if (hasHighlight) cls = 'debug-badge debug-badge--highlight';
-      else if (hasHovered) cls = 'debug-badge debug-badge--hovered';
-
-      const existing = existingBadges.get(nid);
-      if (existing && existing.className === cls) {
-        existing.style.left = pos.x + 'px';
-        existing.style.top = (pos.y - nodeH / 2 - 2) + 'px';
-        existing.textContent = `${label}[${text}]`;
-        fragment.appendChild(existing);
-        existingBadges.delete(nid);
-      } else {
-        const badge = document.createElement('div');
-        badge.className = cls;
-        badge.dataset.nodeId = nid;
-        badge.textContent = `${label}[${text}]`;
-        badge.style.left = pos.x + 'px';
-        badge.style.top = (pos.y - nodeH / 2 - 2) + 'px';
-        fragment.appendChild(badge);
-      }
-
-      if (hasSelected && hasDimmed) {
-        const existingC = existingBadges.get(`__conflict_${nid}`);
-        if (existingC) {
-          existingC.style.left = pos.x + 'px';
-          existingC.style.top = (pos.y - nodeH / 2 - 28) + 'px';
-          fragment.appendChild(existingC);
-          existingBadges.delete(`__conflict_${nid}`);
-        } else {
-          const c = document.createElement('div');
-          c.className = 'debug-badge debug-badge--selected';
-          c.textContent = 'CONFLICT!';
-          c.style.left = pos.x + 'px';
-          c.style.top = (pos.y - nodeH / 2 - 28) + 'px';
-          fragment.appendChild(c);
-        }
-      }
-    });
-
-    // Remove stale badges no longer in graph
-    existingBadges.forEach((el) => el.remove());
-    overlay.innerHTML = '';
-    overlay.appendChild(fragment);
-  }
-
-  debugRafId = requestAnimationFrame(() => runDebugUpdate(renderer, highlight));
+  if (!debugOverlayActive || !renderer) return;
+  updateForensicPanel(renderer);
 }

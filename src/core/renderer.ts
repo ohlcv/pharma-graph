@@ -352,6 +352,7 @@ export class Renderer {
   // ── Element builder ─────────────────────────────────────────────────────────
 
   private buildElements(data: GraphData) {
+    const nodeIds = new Set(data.nodes.map((n) => n.id));
     return [
       ...data.nodes.map((n) => ({
         data: {
@@ -369,15 +370,17 @@ export class Renderer {
           colorDark: nodeColorDark(n.type),
         },
       })),
-      ...data.edges.map((e, idx) => ({
-        data: {
-          id: e.id ?? `edge-${idx}`,
-          source: e.source,
-          target: e.target,
-          edgeType: e.type,
-          reason: e.reason,
-        },
-      })),
+      ...data.edges
+        .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
+        .map((e, idx) => ({
+          data: {
+            id: e.id ?? `edge-${idx}`,
+            source: e.source,
+            target: e.target,
+            edgeType: e.type,
+            reason: e.reason,
+          },
+        })),
     ];
   }
 }
