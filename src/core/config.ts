@@ -54,6 +54,7 @@ export const CATEGORY_COLOR: Record<string, string> = {
   nutrition:           '#6b7280',  // 灰绿 — 营养与维生素
   diagnostic:          '#9ca3af',  // 灰 — 诊断与检验
   pharmacy_practice:   '#94a3b8',  // 灰蓝 — 药学综合知识与技能
+  pharmacy_service:   '#94a3b8',  // 灰蓝 — 药学服务（与 pharmacy_practice 同色）
   // 向后兼容旧值
   '第一篇 药剂学':    '#fb923c',
   '第二篇 药理与毒理学': '#a78bfa',

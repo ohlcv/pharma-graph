@@ -46,8 +46,7 @@ const STYLESHEET: any[] = (() => {
     selector: `node[type = "${type}"]`,
     style: {
       shape: shape as cytoscape.Css.NodeShape,
-      'background-gradient-stop-colors': [nodeColor(type), nodeColorDark(type)],
-      'background-gradient-stop-positions': [0, 100],
+      'background-color': nodeColor(type),
       'border-width': 1.5,
     },
   }));
@@ -136,7 +135,6 @@ const STYLESHEET: any[] = (() => {
       style: {
         opacity: 1,
         'border-width': 4,
-        'border-color': '#ffffff',
       },
     },
     { selector: '.dimmed', style: {
@@ -153,7 +151,6 @@ const STYLESHEET: any[] = (() => {
     { selector: '.hovered', style: {
       opacity: 1,
       'border-width': 3,
-      'border-color': 'rgba(255,255,255,0.9)',
     }},
     { selector: '.highlighted', style: {
       opacity: 0.8,

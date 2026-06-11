@@ -130,6 +130,8 @@
 #btn-sidebar-toggle:hover  { background: rgba(255,255,255,0.08); color: var(--text); border-color: var(--border-hi); }
 #btn-sidebar-toggle.active { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 16px var(--accent-glow), 0 2px 8px rgba(0,0,0,0.3); }
 
+.layout-btn.active { background: rgba(99,102,241,0.18); border-color: var(--accent); color: var(--accent); box-shadow: 0 0 12px rgba(99,102,241,0.25); }
+
 #btn-tour.active  { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 16px var(--accent-glow), 0 2px 8px rgba(0,0,0,0.3); }
 #btn-tour.active svg { stroke: #fff; }
 #btn-music.active { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 16px var(--accent-glow), 0 2px 8px rgba(0,0,0,0.3); }
