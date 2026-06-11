@@ -12,9 +12,9 @@ const EDGE_TYPE_LABELS: Record<string, string> = {
   mechanism: '机制',
   causes: '致因',
   treats: '治疗',
-  has: '含',
+  has: '包含',
   relates: '关联',
-  isa: '是个',
+  isa: '属于',
 };
 
 // ── Public API ────────────────────────────────────────────────────────────────

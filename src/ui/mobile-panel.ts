@@ -9,7 +9,7 @@ import { uiState } from './state.js';
 
 const EDGE_TYPE_LABELS: Record<string, string> = {
   part_of: '包含', mechanism: '机制', causes: '致因',
-  treats: '治疗', has: '含', relates: '关联', isa: '是个',
+  treats: '治疗', has: '包含', relates: '关联', isa: '属于',
 };
 
 let currentCy: cytoscape.Core | null = null;
