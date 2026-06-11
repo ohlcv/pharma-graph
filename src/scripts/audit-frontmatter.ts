@@ -51,7 +51,7 @@ function extractFrontmatter(content: string): Record<string, unknown> {
     // Strip CR if present
     const line = rawLine.replace(/\r$/, '');
 
-    // Top-level key
+    // Top-level key (including when nested under data:)
     const topMatch = line.match(/^(\w+):\s*(.*)$/);
     if (topMatch) {
       if (currentKey !== null) {
@@ -65,7 +65,9 @@ function extractFrontmatter(content: string): Record<string, unknown> {
       // Check if this line is indented (belongs to current key) or new top-level
       const leading = line.match(/^(\s*)/)?.[1] ?? '';
       const isIndented = leading.length >= indentUnit;
-      if (isIndented && currentKey !== null) {
+      // Special case: 'data:' may be indented with 2 spaces — treat it as top-level
+      const isDataKey = /^data:$/.test(line.trim());
+      if ((isIndented && currentKey !== null) && !isDataKey) {
         currentValLines.push(line.trimStart());
       }
       // else: blank line or top-level blank — ignore

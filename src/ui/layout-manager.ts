@@ -57,19 +57,11 @@ function doUpdateStats(cy: Core): void {
     set('stat-selected', String(cy.$(':selected').length));
     set('stat-layout', _currentLayout.toUpperCase());
 
-    // Node type counts (按 type 字段计数，而非 shape)
-    const countType = (type: string, elId: string) => {
-      const el = document.getElementById(elId);
-      if (el) { const count = nodes.filter(`[type = "${type}"]`).length; el.textContent = count > 0 ? `${count}` : ''; }
-    };
-    countType('concept',    'count-type-concept');
-    countType('drug',      'count-type-drug');
-    countType('disease',   'count-type-disease');
-    countType('ingredient','count-type-ingredient');
-    countType('pathway',   'count-type-pathway');
-
-    // Category legend — populate from CATEGORY_COLOR config
-    populateCategoryLegend(cy);
+    // Essence counts (按 essence 字段计数)
+    Object.entries(ESSENCE_LABEL).forEach(([essence, _label]) => {
+      const el = document.getElementById(`count-type-${essence}`);
+      if (el) { const count = nodes.filter(`[essence = "${essence}"]`).length; el.textContent = count > 0 ? `${count}` : ''; }
+    });
 
     // Three orthogonal visual legends (Essence→shape, Field→border, Tier→fill)
     populateEssenceLegend(cy);
@@ -211,7 +203,7 @@ export function populateEssenceLegend(cy: Core): void {
 
   // Update counts
   Object.keys(ESSENCE_LABEL).forEach((key) => {
-    const count = cy.nodes().not('.layer-parent').filter(`[type = "${key}"]`).length;
+    const count = cy.nodes().not('.layer-parent').filter(`[essence = "${key}"]`).length;
     const dEl = document.getElementById(`legend-essence-count-${key}`);
     const mEl = document.getElementById(`bs-essence-count-${key}`);
     if (dEl) dEl.textContent = count > 0 ? `${count}` : '';
