@@ -697,16 +697,20 @@ function exposeGlobals(renderer: Renderer, highlight: HighlightEngine, detailPan
     _active: false,
     _raf: null,
     node: (id: string) => {
-      const cy = renderer?.getCy();
-      if (!cy) return 'no renderer';
-      const n = cy.getElementById(id);
+      const n = renderer?.getCy().getElementById(id);
       if (n.empty()) return `节点 "${id}" 不存在`;
       return {
-        id: n.id(), label: n.data('label'), selected: n.selected(),
-        dimmed: n.hasClass('dimmed'), selectedNode: n.hasClass('selected-node'),
-        highlighted: n.hasClass('highlighted'), hovered: n.hasClass('hovered'),
-        opacity: n.renderedStyle('opacity'), borderWidth: n.renderedStyle('border-width'),
-        borderColor: n.renderedStyle('border-color'), backgroundColor: n.renderedStyle('background-color'),
+        id: n.id(), label: n.data('label'),
+        type: n.data('type'), category: n.data('category'),
+        layer: n.data('layer'),
+        weight: n.data('weight'),
+        // 实际渲染样式（供调试 shape/border/size 是否生效）
+        shape: n.style('shape'),
+        borderColor: n.style('border-color'),
+        borderWidth: n.style('border-width'),
+        backgroundColor: n.style('background-color'),
+        bgGradientStops: n.style('background-gradient-stop-colors'),
+        width: n.renderedWidth(), height: n.renderedHeight(),
       };
     },
     filter: () => renderer?.getCy().container()?.style.filter || '(无)',

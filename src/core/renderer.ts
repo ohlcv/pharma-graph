@@ -86,9 +86,9 @@ const STYLESHEET: any[] = (() => {
       selector: 'node',
       style: {
         label: 'data(label)',
-        width: 'mapData(weight, 40, 100, 32, 64)',
-        height: 'mapData(weight, 40, 100, 32, 64)',
-        'font-size': 'mapData(weight, 40, 100, 10, 13)',
+        width:  'mapData(weight, 1, 10, 36, 76)',
+        height: 'mapData(weight, 1, 10, 36, 76)',
+        'font-size': 'mapData(weight, 1, 10, 10, 15)',
         'font-weight': 600,
         color: '#e2e8f0',
         'text-valign': 'bottom',
@@ -102,7 +102,6 @@ const STYLESHEET: any[] = (() => {
         'text-events': 'yes',
       },
     },
-    ...nodeTypeRules,
     ...layerRules,
     ...categoryRules,
     {
@@ -131,6 +130,7 @@ const STYLESHEET: any[] = (() => {
       },
     },
     ...edgeTypeRules,
+    ...nodeTypeRules,
     {
       selector: '.selected-node',
       style: {
