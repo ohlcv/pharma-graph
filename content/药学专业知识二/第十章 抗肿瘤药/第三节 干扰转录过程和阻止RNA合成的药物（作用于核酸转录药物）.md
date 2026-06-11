@@ -5,18 +5,22 @@ data:
   type: concept
   category: pharmacology
   layer: system
-location:
-  book: 药学专业知识二
-  chapter: 第十章 抗肿瘤药
-  section: 第三节 干扰转录过程和阻止RNA合成的药物（作用于核酸转录药物）
-tags:
-  - 抗肿瘤药
-  - 转录抑制
-  - RNA合成
-  - 细胞毒治疗
-summary:
-  short: 本节介绍干扰转录过程和阻止RNA合成的药物及其在核酸信息流中的代表性意义。
-  full: 本节围绕干扰转录过程和阻止RNA合成的药物展开，帮助理解抗肿瘤药物如何在核酸信息流的下游层面进行干预，即从DNA转录为RNA的关键环节进行阻断，是核酸层面干预机制的进一步延伸。
+
+  location:
+    book: 药学专业知识二
+    chapter: 第十章 抗肿瘤药
+    section: 第三节 干扰转录过程和阻止RNA合成的药物（作用于核酸转录药物）
+
+  tags:
+    - 抗肿瘤药
+    - 转录抑制
+    - RNA合成
+    - 细胞毒治疗
+
+  summary:
+    short: 本节介绍干扰转录过程和阻止RNA合成的药物及其在核酸信息流中的代表性意义。
+    full: 本节围绕干扰转录过程和阻止RNA合成的药物展开，帮助理解抗肿瘤药物如何在核酸信息流的下游层面进行干预，即从DNA转录为RNA的关键环节进行阻断，是核酸层面干预机制的进一步延伸。
+
 edges_out:
   - target: chapter-antitumor-drugs
     type: part_of

@@ -135,6 +135,7 @@ export class DetailPanel {
   }
 
   onClose(): void {
+    document.querySelectorAll('.legend-row, .bs-chip').forEach((el) => el.classList.remove('active'));
     this.highlight.reset();
     this.callbacks?.onClose?.();
   }

@@ -5,18 +5,22 @@ data:
   type: concept
   category: pharmacology
   layer: system
-location:
-  book: 药学专业知识二
-  chapter: 第十章 抗肿瘤药
-  section: 第一节 直接影响DNA结构和功能的药物
-tags:
-  - 抗肿瘤药
-  - DNA损伤
-  - 烷化剂
-  - 铂类
-summary:
-  short: 本节介绍直接影响DNA结构和功能的抗肿瘤药物及其作为经典细胞毒治疗起点的意义。
-  full: 本节围绕直接影响DNA结构和功能的药物展开，帮助理解抗肿瘤药物最经典的一条机制主线，即通过直接破坏DNA稳定性和复制基础来抑制肿瘤细胞增殖，是全章最基础的细胞毒治疗入口之一。
+
+  location:
+    book: 药学专业知识二
+    chapter: 第十章 抗肿瘤药
+    section: 第一节 直接影响DNA结构和功能的药物
+
+  tags:
+    - 抗肿瘤药
+    - DNA损伤
+    - 烷化剂
+    - 铂类
+
+  summary:
+    short: 本节介绍直接影响DNA结构和功能的抗肿瘤药物及其作为经典细胞毒治疗起点的意义。
+    full: 本节围绕直接影响DNA结构和功能的药物展开，帮助理解抗肿瘤药物最经典的一条机制主线，即通过直接破坏DNA稳定性和复制基础来抑制肿瘤细胞增殖，是全章最基础的细胞毒治疗入口之一。
+
 edges_out:
   - target: chapter-antitumor-drugs
     type: part_of

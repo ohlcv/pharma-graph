@@ -1,71 +1,66 @@
 // src/scripts/migrate-frontmatter.ts
-// 一次性脚本：将所有 .md 文件的 frontmatter 统一为 docs/frontmatter.md 标准格式
-// 用法: npx tsx src/scripts/migrate-frontmatter.ts
+// 将所有 .md 文件的 frontmatter 统一为新格式：location/tags/summary 移入 data: 块内
+// 新顺序: id → label → type → category → layer → location → tags → summary
+// edges_out 保持在根级
+// 用法: npx tsx src/scripts/migrate-frontmatter.ts [--dry-run]
 
 import { readFileSync, writeFileSync, readdirSync } from 'fs';
-import { join, basename, extname } from 'path';
+import { join, basename } from 'path';
+import { parse as yamlParse, stringify as yamlStringify } from 'yaml';
 
 const CONTENT_DIR = join(process.cwd(), 'content');
 
-// 去掉 "第X节 " "第X章 " "第X篇 " 前缀
 function stripChapterPrefix(s: string): string {
-  // 支持中文数字和阿拉伯数字
   return s.replace(/^(?:第[一二三四五六七八九十零〇百千]+(?:节|章|篇)\s*)+/, '');
 }
 
-// 从文件名提取 label（去掉 .md 后缀）
 function labelFromFilename(filename: string): string {
   return filename.replace(/\.md$/i, '');
 }
 
-// 判断是否已有 data: 包裹层
-function hasDataBlock(fm: Record<string, unknown>): boolean {
-  return 'data' in fm && typeof fm['data'] === 'object' && fm['data'] !== null;
+function unquote(s: string): string {
+  return String(s).replace(/^["']|["']$/g, '');
 }
 
-// 解析 top-level fields from frontmatter (before conversion)
+// 提取 frontmatter YAML block
+function extractYamlBlock(text: string): { yamlBlock: string; body: string } {
+  const clean = text.replace(/^\uFEFF/, '');
+  const match = clean.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  if (!match) return { yamlBlock: '', body: clean };
+  return { yamlBlock: match[1], body: match[2] };
+}
+
 interface TopFields {
   id: string;
   label: string;
   type: string;
   category: string;
-  summary?: string;
+  layer?: string;
+  location?: Record<string, string>;
+  tags?: string[];
+  summary?: { short?: string; full?: string };
+  edges_out?: Array<{ target: string; type: string; reason?: string }>;
 }
 
-function parseTopFields(fm: Record<string, unknown>): TopFields | null {
-  if (!('id' in fm)) return null;
-  return {
-    id: String(fm['id'] ?? '').trim(),
-    label: String(fm['label'] ?? '').trim(),
-    type: String(fm['type'] ?? '').trim(),
-    category: String(fm['category'] ?? '').trim(),
-    summary: fm['summary'] !== undefined ? String(fm['summary']).trim() : undefined,
-  };
+// 从任意位置提取字段（data块内优先，否则根级）
+function getField(root: Record<string, unknown>, key: string): unknown {
+  const keys = key.split('.');
+  let val: unknown = root;
+  for (const k of keys) {
+    if (val && typeof val === 'object' && k in (val as Record<string, unknown>)) {
+      val = (val as Record<string, unknown>)[k];
+    } else {
+      return undefined;
+    }
+  }
+  return val;
 }
 
-// 解析 data block fields
-interface DataFields {
-  id: string;
-  label: string;
-  type: string;
-  category: string;
-}
-
-function parseDataFields(data: Record<string, unknown>): DataFields | null {
-  if (!('id' in data)) return null;
-  return {
-    id: String(data['id'] ?? '').trim(),
-    label: String(data['label'] ?? '').trim(),
-    type: String(data['type'] ?? '').trim(),
-    category: String(data['category'] ?? '').trim(),
-  };
-}
-
-// 清理 location：移除 undefined、part、point、item、subsection
+// 清理 location：只保留非空字段
 function cleanLocation(loc: Record<string, unknown> | undefined): Record<string, string> | undefined {
   if (!loc) return undefined;
   const cleaned: Record<string, string> = {};
-  for (const key of ['book', 'chapter', 'section']) {
+  for (const key of ['book', 'part', 'chapter', 'section', 'subsection', 'item']) {
     const v = loc[key];
     const s = String(v == null ? '' : v).trim();
     if (s !== '' && s !== 'undefined') {
@@ -75,281 +70,156 @@ function cleanLocation(loc: Record<string, unknown> | undefined): Record<string,
   return Object.keys(cleaned).length > 0 ? cleaned : undefined;
 }
 
-// 纯 YAML block → object（简化版，支持本次迁移所需）
-function parseYamlBlock(block: string): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  const lines = block.split('\n');
-  let i = 0;
-  while (i < lines.length && !lines[i].trim()) i++;
+// 收集 tags
+function collectTags(fm: Record<string, unknown>): string[] {
+  const raw = getField(fm, 'tags') as unknown[] | undefined;
+  if (!raw) return [];
+  return raw.filter((t): t is string => typeof t === 'string').map((t) => t.trim()).filter(Boolean);
+}
 
-  const getIndent = (l: string) => l.length - l.trimStart().length;
+// 收集 edges_out
+function collectEdges(fm: Record<string, unknown>): Array<{ target: string; type: string; reason?: string }> {
+  const raw = getField(fm, 'edges_out') as unknown[] | undefined;
+  if (!raw) return [];
+  return raw
+    .filter((e): e is Record<string, unknown> => typeof e === 'object' && e !== null && !Array.isArray(e))
+    .map((e) => ({
+      target: String(e['target'] ?? '').trim(),
+      type: String(e['type'] ?? 'relates').trim(),
+      reason: typeof e['reason'] === 'string' ? (e['reason'] as string).trim() : undefined,
+    }))
+    .filter((e): e is { target: string; type: string; reason?: string } => Boolean(e.target));
+}
 
-  while (i < lines.length) {
-    const raw = lines[i];
-    const trimmed = raw.trim();
-    if (!trimmed || trimmed.startsWith('#')) { i++; continue; }
-
-    const indent = getIndent(raw);
-
-    if (trimmed.startsWith('- ')) {
-      const content = trimmed.slice(2).trim();
-      const lastKey = Object.keys(result).at(-1);
-      if (!lastKey) { i++; continue; }
-      const last = result[lastKey];
-      if (Array.isArray(last)) last.push(content);
-      else result[lastKey] = [content];
-      i++;
-    } else if (trimmed.includes(':')) {
-      const colonIdx = trimmed.indexOf(':');
-      const key = trimmed.slice(0, colonIdx).trim();
-      const rest = trimmed.slice(colonIdx + 1).trim();
-
-      if (rest === '') {
-        // nested block follows
-        i++;
-        if (i < lines.length) {
-          const firstIndent = getIndent(lines[i]);
-          const sub: Record<string, string> = {};
-          while (i < lines.length) {
-            const subRaw = lines[i];
-            const subTrimmed = subRaw.trim();
-            if (!subTrimmed) { i++; continue; }
-            const subIndent = getIndent(subRaw);
-            if (subIndent <= indent) break;
-            if (subTrimmed.startsWith('- ')) { i++; continue; }
-            const subColon = subTrimmed.indexOf(':');
-            if (subColon > 0) {
-              sub[subTrimmed.slice(0, subColon).trim()] = subTrimmed.slice(subColon + 1).trim();
-            }
-            i++;
-          }
-          if (Object.keys(sub).length > 0) result[key] = sub;
-        }
-      } else {
-        result[key] = rest.replace(/^["']|["']$/g, '');
-        i++;
-      }
-    } else {
-      i++;
-    }
+// 收集 summary
+function collectSummary(fm: Record<string, unknown>): { short?: string; full?: string } {
+  const raw = getField(fm, 'summary');
+  if (!raw) return {};
+  if (typeof raw === 'string') return { short: raw.trim() };
+  if (typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>;
+    return {
+      short: typeof obj['short'] === 'string' ? (obj['short'] as string).trim() : undefined,
+      full: typeof obj['full'] === 'string' ? (obj['full'] as string).trim() : undefined,
+    };
   }
-  return result;
+  return {};
 }
 
-// 通用 frontmatter 反序列化（从文本中提取 data 块和 top-level 块）
-// 返回 { dataBlock, topBlock, rest } 其中 rest 是 data block 或 top-level 字段
-function parseFrontmatterRaw(text: string): {
-  dataBlock: Record<string, unknown>;
-  topBlock: Record<string, unknown>;
-  afterMarker: string;
-} {
-  // 去除 BOM
-  const clean = text.replace(/^\uFEFF/, '');
-  const match = clean.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
-  if (!match) return { dataBlock: {}, topBlock: {}, afterMarker: clean };
+// 构建标准 frontmatter（新格式）
+function buildFrontmatter(opts: {
+  id: string;
+  label: string;
+  type: string;
+  category: string;
+  layer?: string;
+  location?: Record<string, string>;
+  tags?: string[];
+  summaryShort?: string;
+  summaryFull?: string;
+  edgesOut?: Array<{ target: string; type: string; reason?: string }>;
+}): string {
+  const dataLines: string[] = [];
 
-  const yamlBlock = match[1];
-  const afterMarker = match[2];
+  dataLines.push(`  id: ${unquote(stripChapterPrefix(opts.id))}`);
+  dataLines.push(`  label: ${unquote(opts.label)}`);
+  dataLines.push(`  type: ${unquote(opts.type)}`);
+  dataLines.push(`  category: ${unquote(stripChapterPrefix(opts.category))}`);
 
-  // 简单分割 top-level keys（不支持跨行值，但足够处理本次迁移）
-  const fm = parseYamlBlock(yamlBlock);
-  const dataBlock = (fm['data'] as Record<string, unknown>) ?? {};
-  const topBlock = fm; // top-level fields (excluding data: key itself)
+  if (opts.layer) {
+    dataLines.push(`  layer: ${opts.layer}`);
+  }
 
-  return { dataBlock, topBlock, afterMarker };
-}
-
-// 构建标准格式的 frontmatter YAML
-function buildFrontmatter(
-  dataFields: DataFields,
-  location: Record<string, string> | undefined,
-  hasSummary: boolean,
-  hasEdges: boolean,
-  originalSummary?: string,
-): string {
-  const lines: string[] = [];
-
-  lines.push('---');
-  lines.push('data:');
-  // 去掉首尾引号，避免 YAML 值为 "xxx" 形式
-  const unquote = (s: string) => s.replace(/^["']|["']$/g, '');
-  lines.push(`  id: ${unquote(stripChapterPrefix(dataFields.id))}`);
-  lines.push(`  label: ${unquote(dataFields.label)}`);
-  lines.push(`  type: ${unquote(dataFields.type)}`);
-  lines.push(`  category: ${unquote(dataFields.category)}`);
-
-  if (location && Object.keys(location).length > 0) {
-    lines.push('');
-    lines.push('location:');
-    for (const [k, v] of Object.entries(location)) {
-      lines.push(`  ${k}: ${v}`);
+  if (opts.location && Object.keys(opts.location).length > 0) {
+    dataLines.push('');
+    dataLines.push('  location:');
+    for (const [k, v] of Object.entries(opts.location)) {
+      dataLines.push(`    ${k}: ${v}`);
     }
   }
 
-  lines.push('');
-  if (hasSummary) {
-    lines.push('summary:');
-    lines.push('  short: ');
-    lines.push('  full: ');
+  if (opts.tags && opts.tags.length > 0) {
+    dataLines.push('');
+    dataLines.push('  tags:');
+    for (const tag of opts.tags) {
+      dataLines.push(`    - ${tag}`);
+    }
+  }
+
+  if (opts.summaryShort || opts.summaryFull) {
+    dataLines.push('');
+    dataLines.push('  summary:');
+    if (opts.summaryShort) dataLines.push(`    short: ${opts.summaryShort}`);
+    if (opts.summaryFull) dataLines.push(`    full: ${opts.summaryFull}`);
   } else {
-    lines.push('summary: {}');
+    dataLines.push('  summary: {}');
   }
 
+  const lines: string[] = ['---', 'data:'];
+  lines.push(...dataLines);
   lines.push('');
-  if (hasEdges) {
+  if (opts.edgesOut && opts.edgesOut.length > 0) {
     lines.push('edges_out:');
-    lines.push('  - target: ');
-    lines.push('    type: related');
-    lines.push('    reason: ');
+    for (const edge of opts.edgesOut) {
+      lines.push(`  - target: ${edge.target}`);
+      lines.push(`    type: ${edge.type}`);
+      if (edge.reason) lines.push(`    reason: ${edge.reason}`);
+    }
   } else {
     lines.push('edges_out: []');
   }
-
   lines.push('---');
   return lines.join('\n');
 }
 
-// Dry-run single file
-function dryRunFile(filePath: string): string {
-  const text = readFileSync(filePath, 'utf-8');
-  const { dataBlock, topBlock } = parseFrontmatterRaw(text);
-  const fileName = basename(filePath);
-  const relPath = filePath.replace(CONTENT_DIR, '').replace(/^[/\\]/, '').replace(/\\/g, '/');
-  const pathParts = relPath.split('/').filter(Boolean);
-  const hasData = hasDataBlock(topBlock);
-
-  if (hasData) {
-    const data = dataBlock;
-    const loc = (data['location'] as Record<string, unknown> | undefined);
-    const cleanedLoc = cleanLocation(loc);
-    const hasSummary = 'summary' in data;
-    const hasEdges = 'edges_out' in data;
-    const df: DataFields = {
-      id: String(data['id'] ?? pathParts[pathParts.length - 1].replace(/\.md$/i, '')).trim(),
-      label: String(data['label'] ?? labelFromFilename(fileName)).trim(),
-      type: String(data['type'] ?? '').trim(),
-      category: String(data['category'] ?? '').trim(),
-    };
-    return buildFrontmatter(df, cleanedLoc, hasSummary, hasEdges);
-  } else {
-    const tf = parseTopFields(topBlock);
-    if (!tf) return '[NO ID - SKIP]';
-    const fileType = tf.type as string;
-    let bookName = '';
-    let chapterName = '';
-    let sectionName = '';
-
-    if (pathParts.length === 1) {
-      bookName = pathParts[0].replace(/\.md$/i, '');
-    } else {
-      bookName = pathParts[0] ?? '';
-      chapterName = pathParts[pathParts.length - 2] ?? '';
-      sectionName = pathParts.length >= 3 && pathParts[pathParts.length - 3] !== chapterName
-        ? pathParts[pathParts.length - 3] : '';
-    }
-    const location: Record<string, string> = {};
-    if (bookName) location['book'] = bookName;
-    if (chapterName) location['chapter'] = chapterName;
-    if (sectionName) location['section'] = sectionName;
-    let category = tf.category;
-    if (!category || category === tf.id) {
-      if (fileType === 'book') category = tf.id;
-      else if (fileType === 'chapter') category = bookName;
-      else if (fileType === 'section') category = chapterName || bookName;
-    }
-    return buildFrontmatter({ id: tf.id, label: stripChapterPrefix(tf.label || labelFromFilename(fileName)), type: fileType, category: stripChapterPrefix(category) }, location, false, false);
-  }
-}
-
-// 处理单个文件
+// 迁移单个文件
 function migrateFile(filePath: string): { changed: boolean; reason: string } {
   const text = readFileSync(filePath, 'utf-8');
-  const { dataBlock, topBlock } = parseFrontmatterRaw(text);
-    const fileName = basename(filePath);
-    const relPath = filePath.replace(CONTENT_DIR, '').replace(/^[/\\]/, '').replace(/\\/g, '/');
-    const pathParts = relPath.split('/').filter(Boolean);
+  const { yamlBlock, body } = extractYamlBlock(text);
+  if (!yamlBlock) return { changed: false, reason: 'No frontmatter found' };
 
-    const hasData = hasDataBlock(topBlock);
+  const fm = yamlParse(yamlBlock) as Record<string, unknown>;
 
-  if (hasData) {
-    // Pattern B or C: already has data block
-    const data = dataBlock;
-    const loc = (data['location'] as Record<string, unknown> | undefined);
-    const cleanedLoc = cleanLocation(loc);
-    const hasSummary = 'summary' in data;
-    const hasEdges = 'edges_out' in data;
+  // data块内优先
+  const dataBlock = (fm['data'] as Record<string, unknown> | undefined) ?? {};
+  const effective = Object.keys(dataBlock).length > 0 ? dataBlock : fm;
 
-    const df: DataFields = {
-      id: String(data['id'] ?? '').trim(),
-      label: stripChapterPrefix(String(data['label'] ?? '').trim()),
-      type: String(data['type'] ?? '').trim(),
-      category: stripChapterPrefix(String(data['category'] ?? '').trim()),
-    };
+  // 提取必需字段
+  const id = String(getField(effective, 'id') ?? getField(fm, 'id') ?? '').trim();
+  if (!id) return { changed: false, reason: 'No id field' };
 
-    if (!df.id) {
-      df.id = pathParts[pathParts.length - 1].replace(/\.md$/i, '');
-    }
-    if (!df.label) {
-      df.label = labelFromFilename(fileName);
-    }
+  const label = unquote(String(getField(effective, 'label') ?? getField(fm, 'label') ?? labelFromFilename(basename(filePath)))).trim();
+  const type = unquote(String(getField(effective, 'type') ?? getField(fm, 'type') ?? '')).trim();
+  const category = unquote(String(getField(effective, 'category') ?? getField(fm, 'category') ?? '')).trim();
+  const layer = typeof (getField(effective, 'layer') ?? getField(fm, 'layer')) === 'string'
+    ? String(getField(effective, 'layer') ?? getField(fm, 'layer')).trim()
+    : undefined;
 
-    const newFm = buildFrontmatter(df, cleanedLoc, hasSummary, hasEdges);
-    writeFileSync(filePath, newFm + '\n' + (text.split(/^---$/m)[2] ?? '').replace(/^\n/, ''), 'utf-8');
-    return { changed: true, reason: `Pattern B/C: id=${df.id}, type=${df.type}, location keys=${cleanedLoc ? Object.keys(cleanedLoc).join(',') : 'none'}` };
-  } else {
-    // Pattern A: top-level fields only
-    const tf = parseTopFields(topBlock);
-    if (!tf) {
-      // No id at all — skip
-      return { changed: false, reason: 'No id field, skipped' };
-    }
+  // location 和 tags 优先从 data 块取，没有再从根级取
+  const locData = (getField(effective, 'location') ?? getField(fm, 'location')) as Record<string, unknown> | undefined;
+  const location = cleanLocation(locData);
+  const tags = collectTags(Object.keys(dataBlock).length > 0 ? { ...fm, ...dataBlock } : fm);
+  const summary = collectSummary(Object.keys(dataBlock).length > 0 ? { ...fm, ...dataBlock } : fm);
+  const edgesOut = collectEdges(fm);
 
-    const fileType = tf.type as string;
-    // Derive location from parent directories (more reliable than filename comparison)
-    // book-level (content root): path like "药学专业知识二.md"                    → pathParts=["药学专业知识二.md"]
-    // book-level (book dir):     path like "药学专业知识一/药剂学.md"             → pathParts=["药学专业知识一","药剂学.md"]
-    // chapter-level:              path like "药学专业知识一/药理学/药理学.md"        → pathParts=["药学专业知识一","药理学","药理学.md"]
-    // section-level:              path like "药学专业知识一/药理学/第一章/第一章.md"  → pathParts=["药学专业知识一","药理学","第一章","第一章.md"]
-    let bookName = '';
-    let chapterName = '';
-    let sectionName = '';
+  const newFm = buildFrontmatter({
+    id,
+    label,
+    type,
+    category,
+    layer: layer || undefined,
+    location,
+    tags: tags.length > 0 ? tags : undefined,
+    summaryShort: summary.short,
+    summaryFull: summary.full,
+    edgesOut: edgesOut.length > 0 ? edgesOut : undefined,
+  });
 
-    if (pathParts.length === 1) {
-      // Root-level book file: content/药学专业知识二.md → book = filename without .md
-      bookName = pathParts[0].replace(/\.md$/i, '');
-    } else {
-      bookName = pathParts[0] ?? '';
-      chapterName = pathParts[pathParts.length - 2] ?? '';
-      sectionName = pathParts.length >= 3 && pathParts[pathParts.length - 3] !== chapterName
-        ? pathParts[pathParts.length - 3] : '';
-    }
-
-    const location: Record<string, string> = {};
-    if (bookName) location['book'] = bookName;
-    if (chapterName) location['chapter'] = chapterName;
-    if (sectionName) location['section'] = sectionName;
-
-    // Fix category for structural nodes
-    let category = tf.category;
-    if (!category || category === tf.id) {
-      if (fileType === 'book') category = tf.id;
-      else if (fileType === 'chapter') category = bookName;
-      else if (fileType === 'section') category = chapterName || bookName;
-    }
-
-    const df: DataFields = {
-      id: tf.id,
-      label: stripChapterPrefix(tf.label || labelFromFilename(fileName)),
-      type: fileType,
-      category: stripChapterPrefix(category),
-    };
-
-    const newFm = buildFrontmatter(df, location, false, false, tf.summary);
-    const bodyMatch = text.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?([\s\S]*)$/);
-    const body = bodyMatch ? bodyMatch[1] : '';
-    writeFileSync(filePath, newFm + '\n' + body, 'utf-8');
-    return { changed: true, reason: `Pattern A→std: type=${fileType}, location chapter=${chapterName}, section=${sectionName}` };
-  }
+  writeFileSync(filePath, newFm + '\n' + body, 'utf-8');
+  return {
+    changed: true,
+    reason: `id=${id}, type=${type || '?'}, location=${location ? Object.keys(location).join(',') : 'none'}, tags=${tags.length}, edges=${edgesOut.length}`,
+  };
 }
 
 // 递归收集所有 .md 文件
@@ -373,21 +243,11 @@ function collectMdFiles(dir: string): string[] {
 
 function main() {
   const dryRun = process.argv.includes('--dry-run');
-  const fileArg = process.argv.find((a) => a.startsWith('--file='));
-  console.log('Starting frontmatter migration...\n');
+  console.log('Starting frontmatter migration (new format: location/tags/summary inside data:)\n');
   if (dryRun) console.log('[DRY RUN] No files will be modified\n');
+
   const files = collectMdFiles(CONTENT_DIR);
   console.log(`Found ${files.length} .md files\n`);
-
-  if (fileArg) {
-    // Dry-run a specific file
-    const rel = fileArg.replace('--file=', '').replace(/\\/g, '/').replace(/^content\//, '');
-    const target = join(CONTENT_DIR, rel);
-    console.log(`[DRY RUN] ${rel}\n`);
-    const preview = dryRunFile(target);
-    console.log(preview);
-    return;
-  }
 
   let changed = 0;
   let skipped = 0;
@@ -396,14 +256,25 @@ function main() {
   for (const file of files) {
     try {
       const rel = file.replace(CONTENT_DIR, '').replace(/^[/\\]/, '');
-      const result = migrateFile(file);
-      if (result.changed) {
-        changed++;
-        console.log(`[MIGRATED] ${rel}`);
-        console.log(`           → ${result.reason}`);
+      if (dryRun) {
+        const text = readFileSync(file, 'utf-8');
+        const { yamlBlock } = extractYamlBlock(text);
+        if (!yamlBlock) { console.log(`[SKIP] ${rel} (no frontmatter)`); skipped++; continue; }
+        const fm = yamlParse(yamlBlock) as Record<string, unknown>;
+        const dataBlock = (fm['data'] as Record<string, unknown> | undefined) ?? {};
+        const effective = Object.keys(dataBlock).length > 0 ? dataBlock : fm;
+        const id = String(getField(effective, 'id') ?? '').trim();
+        console.log(`[OK] ${rel} → id=${id || '?'}`);
       } else {
-        skipped++;
-        console.log(`[SKIPPED] ${rel} (${result.reason})`);
+        const result = migrateFile(file);
+        if (result.changed) {
+          changed++;
+          console.log(`[MIGRATED] ${rel}`);
+          console.log(`           → ${result.reason}`);
+        } else {
+          skipped++;
+          console.log(`[SKIPPED] ${rel} (${result.reason})`);
+        }
       }
     } catch (e) {
       const err = e instanceof Error ? e.message : String(e);

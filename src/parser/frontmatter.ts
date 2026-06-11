@@ -103,9 +103,9 @@ export function parseFrontmatter(raw: string, filePath: string): ParsedFrontmatt
         : undefined;
 
   const edgesRaw = (rawData['edges_out'] as unknown[] | undefined) ??
-                   (data['edges_out'] as unknown[] | undefined);
-  const edges_out: EdgeDef[] = Array.isArray(edgesRaw)
-    ? edgesRaw
+                   (data['edges_out'] as unknown[] | undefined) ?? [];
+
+  const edges: EdgeDef[] = edgesRaw
         .filter(
           (e): e is Record<string, unknown> =>
             typeof e === 'object' && e !== null && !Array.isArray(e)
@@ -115,8 +115,7 @@ export function parseFrontmatter(raw: string, filePath: string): ParsedFrontmatt
           type: String(e['type'] ?? 'related'),
           reason: typeof e['reason'] === 'string' ? e['reason'] : undefined,
         }))
-        .filter((e): e is EdgeDef => Boolean(e.target))
-    : [];
+        .filter((e): e is EdgeDef => Boolean(e.target));
 
   const location = (rawData['location'] as Record<string, unknown> | undefined) ??
                    (data['location'] as Record<string, unknown> | undefined);
@@ -134,7 +133,7 @@ export function parseFrontmatter(raw: string, filePath: string): ParsedFrontmatt
     category: String(rawData['category']),
     layer: typeof rawData['layer'] === 'string' ? (rawData['layer'] as string).trim() : undefined,
     summary,
-    edges_out: edges_out.length > 0 ? edges_out : undefined,
+    edges_out: edges.length > 0 ? edges : undefined,
     tags: tags.length > 0 ? tags : undefined,
     location: location
       ? {

@@ -22,6 +22,7 @@ import {
   randomize,
   animatePulse,
   highlightShape,
+  clearShapeFilter,
   toggleBsParams,
   applyBsParams,
 } from './layout-manager.js';
@@ -512,6 +513,7 @@ function initGraphEvents(
 
   cy.on('tap', (evt) => {
     if (evt.target === cy) {
+      clearShapeFilter();
       highlight.reset();
       closeNodePanelAnimated();
       if (uiState.tour.engine?.isRunning() || uiState.tour.engine?.isPaused()) tourStop();
@@ -655,6 +657,7 @@ function exposeGlobals(renderer: Renderer, highlight: HighlightEngine, detailPan
     syncBottomSheetStats(renderer.getCy());
   };
   (window as any).resetAll = () => {
+    clearShapeFilter();
     highlight.reset();
     closeNodePanelAnimated();
     renderer.runLayout('cose');

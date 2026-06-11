@@ -182,25 +182,40 @@
           <div class="legend-block">
             <div class="legend-block__label">节点类型（填充色）</div>
             <div class="legend-grid legend-grid--2">
-              <div class="legend-row" onclick="highlightShape('ellipse')">
-                <span class="legend-node legend-node--shape" style="background:#818cf8;border-radius:50%"></span>
+              <div class="legend-row" data-shape="ellipse" onclick="highlightShape('ellipse')">
+                <span class="legend-node legend-node--shape">
+                  <svg viewBox="0 0 14 14"><ellipse cx="7" cy="7" rx="5.5" ry="5.5" fill="#818cf8"/></svg>
+                </span>
                 <span class="legend-row__label">概念</span>
                 <span class="legend-row__count" id="count-type-concept"></span>
               </div>
-              <div class="legend-row" onclick="highlightShape('round-rectangle')">
-                <span class="legend-node legend-node--shape" style="background:#67e8f9"></span>
+              <div class="legend-row" data-shape="round-rectangle" onclick="highlightShape('round-rectangle')">
+                <span class="legend-node legend-node--shape">
+                  <svg viewBox="0 0 14 14"><rect x="1.5" y="3.5" width="11" height="7" rx="2.5" fill="#67e8f9"/></svg>
+                </span>
                 <span class="legend-row__label">药物</span>
                 <span class="legend-row__count" id="count-type-drug"></span>
               </div>
-              <div class="legend-row" onclick="highlightShape('diamond')">
-                <span class="legend-node legend-node--shape" style="background:#fca5a5;border-radius:2px;transform:rotate(45deg);width:9px;height:9px"></span>
+              <div class="legend-row" data-shape="diamond" onclick="highlightShape('diamond')">
+                <span class="legend-node legend-node--shape">
+                  <svg viewBox="0 0 14 14"><polygon points="7,1 13,7 7,13 1,7" fill="#fca5a5"/></svg>
+                </span>
                 <span class="legend-row__label">疾病</span>
                 <span class="legend-row__count" id="count-type-disease"></span>
               </div>
-              <div class="legend-row" onclick="highlightShape('barrel')">
-                <span class="legend-node legend-node--shape" style="background:#c4b5fd"></span>
+              <div class="legend-row" data-shape="barrel" onclick="highlightShape('barrel')">
+                <span class="legend-node legend-node--shape">
+                  <svg viewBox="0 0 14 14"><polygon points="4,1 10,1 13,4 13,10 10,13 4,13 1,10 1,4" fill="#c4b5fd"/></svg>
+                </span>
                 <span class="legend-row__label">成分</span>
                 <span class="legend-row__count" id="count-type-ingredient"></span>
+              </div>
+              <div class="legend-row" data-shape="rectangle" onclick="highlightShape('rectangle')">
+                <span class="legend-node legend-node--shape">
+                  <svg viewBox="0 0 14 14"><rect x="1.5" y="3" width="11" height="8" rx="0.5" fill="#16a34a"/></svg>
+                </span>
+                <span class="legend-row__label">通路</span>
+                <span class="legend-row__count" id="count-type-pathway"></span>
               </div>
             </div>
           </div>
@@ -379,21 +394,25 @@
     <div class="bs-section">
       <div class="bs-section__label">节点类型</div>
       <div class="bs-chips" id="bs-type-chips">
-        <div class="bs-chip" onclick="highlightShape('ellipse')">
+        <div class="bs-chip" data-shape="ellipse" onclick="highlightShape('ellipse')">
           <div class="bs-chip__dot" style="background:#818cf8;border-radius:50%"></div>
           <span>概念</span>
         </div>
-        <div class="bs-chip" onclick="highlightShape('round-rectangle')">
+        <div class="bs-chip" data-shape="round-rectangle" onclick="highlightShape('round-rectangle')">
           <div class="bs-chip__dot" style="background:#67e8f9"></div>
           <span>药物</span>
         </div>
-        <div class="bs-chip" onclick="highlightShape('diamond')">
+        <div class="bs-chip" data-shape="diamond" onclick="highlightShape('diamond')">
           <div class="bs-chip__dot" style="background:#fca5a5;transform:rotate(45deg);border-radius:2px;width:9px;height:9px"></div>
           <span>疾病</span>
         </div>
-        <div class="bs-chip" onclick="highlightShape('barrel')">
+        <div class="bs-chip" data-shape="barrel" onclick="highlightShape('barrel')">
           <div class="bs-chip__dot" style="background:#c4b5fd"></div>
           <span>成分</span>
+        </div>
+        <div class="bs-chip" data-shape="rectangle" onclick="highlightShape('rectangle')">
+          <div class="bs-chip__dot" style="background:#16a34a;border-radius:1px"></div>
+          <span>通路</span>
         </div>
       </div>
     </div>

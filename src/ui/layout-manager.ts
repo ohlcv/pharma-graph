@@ -46,14 +46,97 @@ function doUpdateStats(cy: Core): void {
     set('stat-edges', String(cy.edges().length));
     set('stat-selected', String(cy.$(':selected').length));
     set('stat-layout', _currentLayout.toUpperCase());
-    const countShape = (shape: string, elId: string) => {
+
+    // Node type counts (按 type 字段计数，而非 shape)
+    const countType = (type: string, elId: string) => {
       const el = document.getElementById(elId);
-      if (el) { const count = nodes.filter(`[type = "${shape}"]`).length; el.textContent = count > 0 ? `${count}` : ''; }
+      if (el) { const count = nodes.filter(`[type = "${type}"]`).length; el.textContent = count > 0 ? `${count}` : ''; }
     };
-    countShape('concept', 'count-ellipse');
-    countShape('drug', 'count-round-rectangle');
-    countShape('disease', 'count-diamond');
-    countShape('ingredient', 'count-barrel');
+    countType('concept',    'count-type-concept');
+    countType('drug',      'count-type-drug');
+    countType('disease',   'count-type-disease');
+    countType('ingredient','count-type-ingredient');
+    countType('pathway',   'count-type-pathway');
+
+    // Category legend — populate from CATEGORY_COLOR config
+    populateCategoryLegend(cy);
+  });
+}
+
+/**
+ * Populate category legend (sidebar grid + mobile chips) from CATEGORY_COLOR.
+ * Call once after graph load; runs on every stats update to sync counts.
+ */
+function populateCategoryLegend(cy: Core): void {
+  // Import at runtime to avoid circular deps (config is plain, no side effects)
+  const CATEGORY_COLOR: Record<string, string> = {
+    cardiovascular:    '#ef4444', respiratory:       '#3b82f6',
+    digestive:         '#22c55e', endocrine:         '#f97316',
+    musculoskeletal:   '#06b6d4', anti_infective:    '#a855f7',
+    anti_tumor:       '#ec4899', blood:             '#f43f5e',
+    immunology:       '#eab308', dermatology:       '#a16207',
+    antipyretic:      '#7dd3fc', anti_rheumatic:    '#ea580c',
+    anti_gout:        '#9333ea', nutrition:          '#6b7280',
+    diagnostic:       '#9ca3af', pharmacy_practice: '#94a3b8',
+    pharmacy_service: '#94a3b8', pharmacology:      '#ec4899',
+  };
+  const CATEGORY_LABEL: Record<string, string> = {
+    cardiovascular:    '心血管', respiratory:       '呼吸',
+    digestive:         '消化',   endocrine:         '内分泌',
+    musculoskeletal:   '骨骼',   anti_infective:    '抗感染',
+    anti_tumor:       '抗肿瘤', blood:             '血液',
+    immunology:       '免疫',   dermatology:       '皮肤',
+    antipyretic:      '解热镇痛', anti_rheumatic:  '抗风湿',
+    anti_gout:        '抗痛风', nutrition:          '营养',
+    diagnostic:       '诊断',   pharmacy_practice: '药学知识一',
+    pharmacy_service: '药学服务', pharmacology:    '药学知识二',
+  };
+
+  const sidebarGrid = document.getElementById('legend-category-grid');
+  const mobileChips = document.getElementById('bs-category-chips');
+  if (!sidebarGrid || !mobileChips) return;
+
+  const usedCats = new Set<string>();
+  cy.nodes().not('.layer-parent').forEach((n: cytoscape.NodeSingular) => {
+    const cat = n.data('category') as string;
+    if (cat && cat in CATEGORY_COLOR) usedCats.add(cat);
+  });
+
+  // Sort by display label
+  const sorted = [...usedCats].sort((a, b) =>
+    (CATEGORY_LABEL[a] ?? a).localeCompare(CATEGORY_LABEL[b] ?? b)
+  );
+
+  // Build sidebar HTML
+  if (sidebarGrid.children.length === 0) {
+    sidebarGrid.innerHTML = sorted.map((cat) => {
+      const color = CATEGORY_COLOR[cat];
+      const label = CATEGORY_LABEL[cat] ?? cat;
+      return `<div class="legend-row">
+        <span class="legend-cat-dot" style="background:${color}"></span>
+        <span class="legend-row__label">${label}</span>
+        <span class="legend-row__count" id="legend-cat-count-${cat}"></span>
+      </div>`;
+    }).join('');
+  }
+
+  // Build mobile chips HTML (initial build only)
+  if (mobileChips.children.length === 0) {
+    mobileChips.innerHTML = sorted.map((cat) => {
+      const color = CATEGORY_COLOR[cat];
+      const label = CATEGORY_LABEL[cat] ?? cat;
+      return `<div class="bs-chip">
+        <div class="bs-chip__dot bs-chip__dot--cat" style="background:${color}"></div>
+        <span>${label}</span>
+      </div>`;
+    }).join('');
+  }
+
+  // Update counts on both
+  sorted.forEach((cat) => {
+    const count = cy.nodes().not('.layer-parent').filter(`[category = "${cat}"]`).length;
+    const sidebarCountEl = document.getElementById(`legend-cat-count-${cat}`);
+    if (sidebarCountEl) sidebarCountEl.textContent = count > 0 ? `${count}` : '';
   });
 }
 
@@ -214,6 +297,7 @@ export function fitGraph(renderer: Renderer): void {
 }
 
 export function randomize(renderer: Renderer, highlight: HighlightEngine): void {
+  clearShapeFilter();
   highlight.reset();
   const cy = renderer.getCy();
   cy.nodes().not('.layer-parent').forEach((node: cytoscape.NodeSingular) => { node.unlock(); });
@@ -260,40 +344,39 @@ export function animatePulse(renderer: Renderer): void {
 
 let activeShapeFilter: string | null = null;
 
+export function clearShapeFilter(): void {
+  if (activeShapeFilter !== null) {
+    activeShapeFilter = null;
+    document.querySelectorAll('.legend-row, .shape-filter-item, .bs-chip').forEach((el) => el.classList.remove('active'));
+  }
+}
+
 export function getActiveShapeFilter(): string | null {
   return activeShapeFilter;
 }
 
 export function highlightShape(shape: string, highlight: HighlightEngine): void {
   if (activeShapeFilter === shape) {
-    activeShapeFilter = null;
-    document.querySelectorAll('.node-type-item, .shape-filter-item, .bs-chip').forEach((el) => el.classList.remove('active'));
+    clearShapeFilter();
     highlight.reset();
     return;
   }
   activeShapeFilter = shape;
-  document.querySelectorAll('.node-type-item, .shape-filter-item, .bs-chip').forEach((el) => { el.classList.remove('active'); });
+  document.querySelectorAll('.legend-row, .shape-filter-item, .bs-chip').forEach((el) => { el.classList.remove('active'); });
   highlight.highlightShape(shape);
+
+  // Activate legend-row by data-shape
+  document.querySelectorAll('.legend-row[data-shape]').forEach((el) => {
+    if ((el as HTMLElement).dataset.shape === shape) el.classList.add('active');
+  });
+  // Activate mobile chips by data-shape
+  document.querySelectorAll('.bs-chip[data-shape]').forEach((el) => {
+    if ((el as HTMLElement).dataset.shape === shape) el.classList.add('active');
+  });
+  // Legacy shape-filter-item
   document.querySelectorAll('.shape-filter-item').forEach((el) => {
     const label = el.querySelector('.shape-filter-item__label')?.textContent ?? '';
     const shapeName = Object.entries(SHAPE_LABEL).find(([, v]) => v === label)?.[0] ?? label;
     if (shapeName === shape || label.toLowerCase().includes(shape)) el.classList.add('active');
-  });
-  document.querySelectorAll('.node-type-item').forEach((el) => {
-    const dot = el.querySelector('.node-type-item__dot') as HTMLElement;
-    if (!dot) return;
-    const bg = dot.style.background;
-    const matchesShape = (
-      (shape === 'ellipse' && dot.style.borderRadius === '50%') ||
-      (shape === 'round-rectangle' && bg.includes('67e8f9')) ||
-      (shape === 'diamond' && bg.includes('rotate(45deg)')) ||
-      (shape === 'barrel' && bg.includes('c4b5fd')) ||
-      (shape === 'rectangle' && bg.includes('f59e0b'))
-    );
-    if (matchesShape) el.classList.add('active');
-  });
-  document.querySelectorAll('.bs-chip').forEach((el) => {
-    const chipShape = (el as HTMLElement).dataset.shape ?? '';
-    if (chipShape === shape) el.classList.add('active');
   });
 }

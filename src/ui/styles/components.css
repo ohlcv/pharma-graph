@@ -200,6 +200,50 @@
 .node-type-item__label { font-size: 0.72rem; color: var(--text-2); font-weight: 500; position: relative; z-index: 1; line-height: 1; }
 .node-type-item__count { font-size: 0.62rem; color: var(--muted); font-weight: 400; margin-left: auto; flex-shrink: 0; }
 
+/* ── Legend blocks (图例说明) ───────────────────────────────────────────────── */
+.legend-block { display: flex; flex-direction: column; gap: 5px; }
+.legend-block__label {
+  font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--muted); padding: 4px 0 2px;
+}
+.legend-block + .legend-block { margin-top: 10px; }
+
+.legend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+.legend-grid--4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.legend-grid--2 { grid-template-columns: 1fr 1fr; }
+
+.legend-row {
+  display: flex; align-items: center; gap: 7px;
+  padding: 5px 8px; border-radius: 7px;
+  cursor: pointer; border: 1px solid transparent;
+  transition: background 0.12s, border-color 0.12s;
+  user-select: none;
+}
+.legend-row:hover { background: rgba(255,255,255,0.04); border-color: var(--border-hi); }
+
+.legend-node { flex-shrink: 0; }
+.legend-node--shape { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
+.legend-node--shape svg { width: 14px; height: 14px; }
+.legend-node--cat   { width: 8px; height: 8px; border-radius: 50%; display: inline-block; border: 1px solid rgba(255,255,255,0.15); }
+.legend-node--layer { width: 12px; height: 12px; display: inline-block; flex-shrink: 0; }
+
+.legend-row__label { font-size: 0.7rem; color: var(--text-2); font-weight: 500; flex: 1; }
+.legend-row__count { font-size: 0.6rem; color: var(--muted); font-weight: 400; margin-left: auto; }
+
+.legend-edge-list { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+.legend-edge-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 6px; border-radius: 6px;
+  font-size: 0.68rem; color: var(--text-2); font-weight: 500;
+}
+.legend-edge-row svg { flex-shrink: 0; }
+
+/* category dot in sidebar (dynamic) */
+.legend-cat-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
 .stat-list { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
 .stat-card  { background: rgba(255,255,255,0.025); border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; }
 .stat-card__label { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
@@ -432,6 +476,7 @@
 .bs-chip:active:not(.active) { background: rgba(99,102,241,0.15); border-color: var(--accent); color: var(--accent); }
 .bs-chip.active { background: rgba(99,102,241,0.22); border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 10px rgba(99,102,241,0.3); }
 .bs-chip__dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.bs-chip__dot--cat { border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); }
 
 .bs-layout-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .bs-layout-btn  { padding: 7px 4px; border-radius: 10px; border: 1px solid var(--border); background: rgba(255,255,255,0.03); color: var(--text-2); font-size: 0.68rem; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.14s, border-color 0.14s, color 0.14s; -webkit-tap-highlight-color: transparent; text-align: center; }

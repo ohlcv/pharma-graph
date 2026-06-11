@@ -5,18 +5,18 @@ data:
   type: concept
   category: anti_rheumatic
   layer: system
-location:
-  book: (根文件名)
-  part: (第一级子目录，有则写)
-  chapter: (第二级子目录或文件名，必须)
-  section: (第三级子目录，有子节文件才写)
-  subsection: (第四级子目录，有孙节文件才写)
-  item: (具体知识点名，有则写)
-tags:
-  - XXX
-summary:
-  short: (一句话定义，悬停时显示)
-  full: (详细解释，点击弹出)
+  location:
+    book: (根文件名)
+    part: (第一级子目录，有则写)
+    chapter: (第二级子目录或文件名，必须)
+    section: (第三级子目录，有子节文件才写)
+    subsection: (第四级子目录，有孙节文件才写)
+    item: (具体知识点名，有则写)
+  tags:
+    - XXX
+  summary:
+    short: (一句话定义，悬停时显示)
+    full: (详细解释，点击弹出)
 edges_out:
   - target: (对方节点 id)
     type: relates

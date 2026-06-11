@@ -20,6 +20,7 @@ export class HighlightEngine {
     this.cy.elements().removeClass(
       [CLASSES.DIMMED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED, CLASSES.HIGHLIGHTED_EDGE].join(' '),
     );
+    this.cy.elements().unselect();
 
     const node = this.cy.getElementById(nodeId);
     if (node.empty()) return prev;
@@ -33,6 +34,7 @@ export class HighlightEngine {
     }
 
     node.addClass(CLASSES.SELECTED_NODE);
+    node.select();
     node.neighborhood('node').not(`.${CLASSES.LAYER_PARENT}`).addClass(CLASSES.HIGHLIGHTED);
     node.connectedEdges().addClass(CLASSES.HIGHLIGHTED_EDGE);
 
@@ -55,6 +57,7 @@ export class HighlightEngine {
     this.cy.elements().removeClass(
       [CLASSES.DIMMED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED, CLASSES.HIGHLIGHTED_EDGE].join(' '),
     );
+    this.cy.elements().unselect();
 
     if (!query.trim()) return results;
 
@@ -63,9 +66,11 @@ export class HighlightEngine {
       const label = (n.data('label') ?? '').toLowerCase();
       if (label.includes(q)) {
         n.addClass(CLASSES.HIGHLIGHTED);
+        n.select();
         results.push(n.id());
       } else {
         n.addClass(CLASSES.DIMMED);
+        n.unselect();
       }
     });
 
@@ -94,15 +99,19 @@ export class HighlightEngine {
     const edge = this.cy.getElementById(edgeId);
     if (edge.empty()) return;
     this.cy.elements().addClass(CLASSES.DIMMED);
+    this.cy.elements().unselect();
     edge.removeClass(CLASSES.DIMMED).addClass(CLASSES.HIGHLIGHTED_EDGE);
     edge.source().removeClass(CLASSES.DIMMED).addClass(CLASSES.SELECTED_NODE);
     edge.target().removeClass(CLASSES.DIMMED).addClass(CLASSES.SELECTED_NODE);
+    edge.source().select();
+    edge.target().select();
   }
 
   reset(): void {
     this.cy.elements().removeClass(
       [CLASSES.DIMMED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED, CLASSES.HIGHLIGHTED_EDGE].join(' '),
     );
+    this.cy.elements().unselect();
   }
 
   clearAllNodeInlineStyles(): void {

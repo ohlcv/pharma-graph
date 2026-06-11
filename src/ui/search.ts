@@ -35,6 +35,7 @@ export class Search {
   clear(): void {
     this.results = [];
     this.index = -1;
+    document.querySelectorAll('.legend-row, .bs-chip').forEach((el) => el.classList.remove('active'));
     this.highlight.reset();
   }
 

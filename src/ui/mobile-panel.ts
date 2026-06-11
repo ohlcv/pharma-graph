@@ -18,12 +18,12 @@ const LAYER_LABELS: Record<string, string> = {
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
-  pharmacy_practice: '药学实践', cardiovascular: '心血管', respiratory: '呼吸系统',
-  digestive: '消化系统', endocrine: '内分泌', musculoskeletal: '肌肉骨骼',
-  anti_infective: '抗感染', anti_tumor: '抗肿瘤', blood: '血液系统',
-  immunology: '免疫系统', dermatology: '皮肤科', antipyretic: '解热镇痛',
-  anti_rheumatic: '抗风湿', anti_gout: '抗痛风', nutrition: '营养',
-  diagnostic: '诊断',
+  pharmacy_practice: '药学知识一', pharmacy_service: '药学服务', pharmacology: '药学知识二',
+  cardiovascular: '心血管', respiratory: '呼吸', digestive: '消化', endocrine: '内分泌',
+  musculoskeletal: '骨骼', anti_infective: '抗感染', anti_tumor: '抗肿瘤',
+  blood: '血液', immunology: '免疫', dermatology: '皮肤',
+  antipyretic: '解热镇痛', anti_rheumatic: '抗风湿', anti_gout: '抗痛风',
+  nutrition: '营养', diagnostic: '诊断',
 };
 
 let currentCy: cytoscape.Core | null = null;
