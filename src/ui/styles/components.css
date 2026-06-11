@@ -148,7 +148,7 @@
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.28s ease, width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   will-change: transform;
 }
-#sidebar.hidden { transform: translateX(100%); opacity: 0; pointer-events: none; display: none; }
+#sidebar.hidden { transform: translateX(100%); opacity: 0; pointer-events: none; }
 
 .sidebar-strip {
   position: absolute; right: 0; top: 50%; transform: translateY(-50%);
@@ -461,6 +461,7 @@
 
 /* ── Mobile responsive ──────────────────────────────────────────────────── */
 @media (max-width: 768px) {
+  #sidebar { display: none; }
   #main    { grid-template-columns: 1fr; }
   .topbar  { z-index: 60; }
   #app.sheet-open { z-index: 60; }
