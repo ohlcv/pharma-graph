@@ -4,7 +4,7 @@
 
 import cytoscape from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
-import { NODE_TYPE_COLOR, ESSENCE_LABEL, FIELD_LABEL, TIER_LABEL } from '../core/config.js';
+import { NODE_TYPE_COLOR, ESSENCE_LABEL, FIELD_COLOR, FIELD_LABEL, TIER_LABEL, NODE_TIER_STYLE } from '../core/config.js';
 import { uiState } from './state.js';
 
 const EDGE_TYPE_LABELS: Record<string, string> = {
@@ -161,6 +161,17 @@ export function initMobilePanelBackdrop(): void {
   backdrop.addEventListener('click', closeMobilePanel);
 }
 
+// ── Color utilities ──────────────────────────────────────────────────────────
+
+function rgba(hex: string, alpha: number): string {
+  const h = hex.replace('#', '');
+  if (h.length === 6) {
+    const [r, g, b] = h.match(/.{2}/g)!.map((v) => parseInt(v, 16));
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  return hex;
+}
+
 // ── Content builders ─────────────────────────────────────────────────────────
 
 function sectionToggleHtml(label: string): string {
@@ -182,8 +193,8 @@ function buildOverviewContent(
 
   const heroBadges = [
     badgeHtml(essenceVal ? (ESSENCE_LABEL[essenceVal] ?? essenceVal) : '—', 'np-badge--type', color),
-    d.field ? badgeHtml(FIELD_LABEL[d.field as string] ?? (d.field as string), 'np-badge--field', '#a78bfa') : '',
-    d.tier  ? badgeHtml(TIER_LABEL[d.tier  as string] ?? (d.tier  as string), 'np-badge--tier',  '#fbbf24') : '',
+    d.field ? badgeHtml(FIELD_LABEL[d.field as string] ?? (d.field as string), 'np-badge--field', FIELD_COLOR[d.field as string] ?? '#a78bfa') : '',
+    d.tier  ? badgeHtml(TIER_LABEL[d.tier  as string] ?? (d.tier  as string), 'np-badge--tier',  NODE_TIER_STYLE[d.tier as string]?.bgColor ?? '#fbbf24') : '',
   ].join('');
 
   const nodeName = (d.label as string) || (d.id as string);
@@ -273,7 +284,7 @@ function buildBodyContent(d: cytoscape.NodeDataDefinition): string {
 }
 
 function badgeHtml(text: string, cssClass: string, color: string): string {
-  return `<span class="np-badge ${cssClass}" style="color:${color};border-color:${color}66;background:${color}1a">${escHtml(text)}</span>`;
+  return `<span class="np-badge ${cssClass}" style="color:${color};border-color:${rgba(color,0.4)};background:${rgba(color,0.12)}">${escHtml(text)}</span>`;
 }
 
 function escHtml(s: string): string {

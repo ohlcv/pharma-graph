@@ -460,9 +460,9 @@
 .np-hero { display: flex; flex-direction: column; gap: 4px; }
 .np-hero__badges { display: flex; gap: 5px; flex-wrap: wrap; }
 .np-badge { font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; padding: 2px 8px; border-radius: 5px; border: 1px solid; flex-shrink: 0; }
-.np-badge--type    { color: var(--accent);  border-color: rgba(99,102,241,0.4);  background: rgba(99,102,241,0.12); }
-.np-badge--field   { color: var(--purple);  border-color: rgba(167,139,250,0.4);  background: rgba(167,139,250,0.1);  }
-.np-badge--tier    { color: var(--yellow);  border-color: rgba(251,191,36,0.4);   background: rgba(251,191,36,0.1);   }
+.np-badge--type    { border-color: rgba(99,102,241,0.4);  background: rgba(99,102,241,0.12); }
+.np-badge--field   { border-color: rgba(167,139,250,0.4);  background: rgba(167,139,250,0.1);  }
+.np-badge--tier    { border-color: rgba(251,191,36,0.4);   background: rgba(251,191,36,0.1);   }
 .np-hero__name     { font-size: 1rem; font-weight: 700; color: var(--text); letter-spacing: -0.01em; line-height: 1.35; word-break: break-word; }
 .np-hero__location { font-size: 0.66rem; color: var(--muted); line-height: 1.5; word-break: break-word; }
 

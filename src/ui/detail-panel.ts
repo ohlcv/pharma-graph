@@ -4,7 +4,7 @@
 
 import cytoscape from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
-import { NODE_TYPE_COLOR, ESSENCE_LABEL, FIELD_LABEL, TIER_LABEL } from '../core/config.js';
+import { NODE_TYPE_COLOR, ESSENCE_LABEL, FIELD_COLOR, FIELD_LABEL, TIER_LABEL, NODE_TIER_STYLE } from '../core/config.js';
 import { uiState } from './state.js';
 
 const EDGE_TYPE_LABELS: Record<string, string> = {
@@ -227,6 +227,17 @@ function switchDesktopTab(tab: 'overview' | 'body'): void {
   if (bodyPage) bodyPage.style.display = tab === 'body' ? '' : 'none';
 }
 
+// ── Color utilities ──────────────────────────────────────────────────────────
+
+function rgba(hex: string, alpha: number): string {
+  const h = hex.replace('#', '');
+  if (h.length === 6) {
+    const [r, g, b] = h.match(/.{2}/g)!.map((v) => parseInt(v, 16));
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  return hex;
+}
+
 // ── Build helpers ─────────────────────────────────────────────────────────────
 
 function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
@@ -234,8 +245,10 @@ function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
   const color = essenceVal ? (NODE_TYPE_COLOR[essenceVal] ?? NODE_TYPE_COLOR.default) : '#94a3b8';
   const nodeName = (d.label as string) || (d.id as string);
   const essenceText = essenceVal ? (ESSENCE_LABEL[essenceVal] ?? essenceVal) : '—';
+  const fieldColor = d.field ? (FIELD_COLOR[d.field as string] ?? '#a78bfa') : '';
   const fieldText = d.field ? (FIELD_LABEL[d.field as string] ?? (d.field as string)) : '';
   const tierText = d.tier ? (TIER_LABEL[d.tier as string] ?? (d.tier as string)) : '';
+  const tierColor = d.tier ? (NODE_TIER_STYLE[d.tier as string]?.bgColor ?? '#fbbf24') : '';
 
   let location = '';
   if (d.location) {
@@ -246,9 +259,9 @@ function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
 
   return `<div class="np-hero">
   <div class="np-hero__badges">
-    <span class="np-badge np-badge--type" style="color:${color};border-color:${color}66;background:${color}1a">${escHtml(essenceText)}</span>
-    ${fieldText ? `<span class="np-badge np-badge--field">${escHtml(fieldText)}</span>` : ''}
-    ${tierText ? `<span class="np-badge np-badge--tier">${escHtml(tierText)}</span>` : ''}
+    <span class="np-badge np-badge--type" style="color:${color};border-color:${rgba(color,0.4)};background:${rgba(color,0.12)}">${escHtml(essenceText)}</span>
+    ${fieldText ? `<span class="np-badge np-badge--field" style="color:${fieldColor};border-color:${rgba(fieldColor,0.4)};background:${rgba(fieldColor,0.1)}">${escHtml(fieldText)}</span>` : ''}
+    ${tierText && tierColor ? `<span class="np-badge np-badge--tier" style="color:${tierColor};border-color:${rgba(tierColor,0.4)};background:${rgba(tierColor,0.12)}">${escHtml(tierText)}</span>` : ''}
   </div>
   <div class="np-hero__name">${escHtml(nodeName)}</div>
   ${location}
