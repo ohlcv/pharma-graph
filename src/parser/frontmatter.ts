@@ -7,9 +7,15 @@ import { parse as yamlParse } from 'yaml';
 export interface NodeMeta {
   id: string;
   label: string;
-  type: string;
-  category: string;
-  layer?: string;  // knowledge layer: foundation / system / clinical / service
+  /** 节点本质（决定形状），新字段为 essence，旧字段为 type */
+  essence?: string;
+  /** 学科领域（决定填充色），新字段为 field，旧字段为 category */
+  field?: string;
+  /** 自然分层（决定边框色），新字段为 tier，旧字段为 layer */
+  tier?: string;
+  type?: string;     // 旧字段
+  category?: string; // 旧字段
+  layer?: string;    // 旧字段
   summary?: string;
   location?: {
     book?: string;
@@ -69,7 +75,8 @@ function basename(filepath: string): string {
   return last.replace(/\.md$/i, '');
 }
 
-const REQUIRED_FIELDS = ['id', 'type', 'category'];
+/** 必需的顶级字段（新 schema 使用 essence/field/tier，兼容旧 schema 的 type/category/layer） */
+const REQUIRED_FIELDS = ['id'];
 
 export function parseFrontmatter(raw: string, filePath: string): ParsedFrontmatter {
   const { data } = parseFrontmatterRaw(raw);
@@ -91,9 +98,34 @@ export function parseFrontmatter(raw: string, filePath: string): ParsedFrontmatt
     getField(data, 'label') ??
     basename(filePath);
 
+  // ── essence（新）/ type（旧）：取 essence，不存在则降级到 type ──
+  const essence =
+    getField(rawData, 'essence') ??
+    getField(data, 'essence') ??
+    getField(rawData, 'type') ??
+    getField(data, 'type') ??
+    '';
+
+  // ── field（新）/ category（旧）：取 field，不存在则降级到 category ──
+  const field =
+    getField(rawData, 'field') ??
+    getField(data, 'field') ??
+    getField(rawData, 'category') ??
+    getField(data, 'category') ??
+    '';
+
+  // ── tier（新）/ layer（旧）：取 tier，不存在则降级到 layer ──
+  const tier =
+    getField(rawData, 'tier') ??
+    getField(data, 'tier') ??
+    getField(rawData, 'layer') ??
+    getField(data, 'layer') ??
+    undefined;
+
   const rawSummary =
     (rawData['summary'] as Record<string, unknown> | string | undefined) ??
     (data['summary'] as Record<string, unknown> | string | undefined);
+  // 优先取 summary.short（简短定义），其次 full（完整解释），最后直接取字符串
   const summary =
     typeof rawSummary === 'object' && rawSummary !== null
       ? (getField(rawSummary as Record<string, unknown>, 'short') ??
@@ -129,9 +161,13 @@ export function parseFrontmatter(raw: string, filePath: string): ParsedFrontmatt
   return {
     id,
     label,
-    type: String(rawData['type']),
-    category: String(rawData['category']),
-    layer: typeof rawData['layer'] === 'string' ? (rawData['layer'] as string).trim() : undefined,
+    essence,
+    field,
+    tier: tier ?? undefined,
+    // 旧字段也保留，方便直接引用
+    type: essence,
+    category: field,
+    layer: tier,
     summary,
     edges_out: edges.length > 0 ? edges : undefined,
     tags: tags.length > 0 ? tags : undefined,

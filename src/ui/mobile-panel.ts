@@ -5,25 +5,12 @@
 import cytoscape from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
 import { nodeColor } from '../core/colors.js';
-import { NODE_TYPE_LABEL } from '../core/config.js';
+import { ESSENCE_LABEL, FIELD_LABEL, TIER_LABEL } from '../core/config.js';
 import { uiState } from './state.js';
 
 const EDGE_TYPE_LABELS: Record<string, string> = {
   part_of: '包含', mechanism: '机制', causes: '致因',
   treats: '治疗', has: '含', relates: '关联', isa: '是个',
-};
-
-const LAYER_LABELS: Record<string, string> = {
-  foundation: '基础层', system: '系统层', clinical: '临床层', service: '服务层',
-};
-
-const CATEGORY_LABELS: Record<string, string> = {
-  pharmacy_practice: '药学知识一', pharmacy_service: '药学服务', pharmacology: '药学知识二',
-  cardiovascular: '心血管', respiratory: '呼吸', digestive: '消化', endocrine: '内分泌',
-  musculoskeletal: '骨骼', anti_infective: '抗感染', anti_tumor: '抗肿瘤',
-  blood: '血液', immunology: '免疫', dermatology: '皮肤',
-  antipyretic: '解热镇痛', anti_rheumatic: '抗风湿', anti_gout: '抗痛风',
-  nutrition: '营养', diagnostic: '诊断',
 };
 
 let currentCy: cytoscape.Core | null = null;
@@ -191,12 +178,13 @@ function buildOverviewContent(
   cy: cytoscape.Core,
   collapsible = false,
 ): string {
-  const color = nodeColor(d.type);
+  const typeVal = (d.type as string) || '';
+  const color = typeVal ? nodeColor(typeVal) : '#94a3b8';
 
   const heroBadges = [
-    badgeHtml(NODE_TYPE_LABEL[d.type as string] ?? (d.type as string) ?? '—', 'np-badge--type', color),
-    d.layer ? badgeHtml(LAYER_LABELS[d.layer as string] ?? (d.layer as string), 'np-badge--layer', '#818cf8') : '',
-    d.category ? badgeHtml(CATEGORY_LABELS[d.category as string] ?? (d.category as string), 'np-badge--category', '#34d399') : '',
+    badgeHtml(typeVal ? (ESSENCE_LABEL[typeVal] ?? typeVal) : '—', 'np-badge--type', color),
+    d.field ? badgeHtml(FIELD_LABEL[d.field as string] ?? (d.field as string), 'np-badge--field', '#a78bfa') : '',
+    d.tier  ? badgeHtml(TIER_LABEL[d.tier  as string] ?? (d.tier  as string), 'np-badge--tier',  '#fbbf24') : '',
   ].join('');
 
   const nodeName = (d.label as string) || (d.id as string);

@@ -16,7 +16,10 @@ export interface NodeData {
   label: string;
   type: string;
   category: string;
-  layer?: string;     // knowledge layer: foundation / system / clinical / service
+  essence?: string;  // 节点本质：药/疾病/概念/机制...
+  field?: string;   // 学科归属：pharmaceutics/pharmacology/medicinal_chemistry
+  tier?: string;    // 知识层次：basic/drug/disease/management/service/legal
+  layer?: string;   // knowledge layer: foundation / system / clinical / service
   summary?: string;   // full summary text
   location?: NodeLocation;
   tags?: string[];

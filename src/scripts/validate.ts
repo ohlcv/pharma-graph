@@ -11,25 +11,30 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const ROOT = path.resolve(__dirname, "../..");
 
-const VALID_NODE_TYPES = [
-  "concept",
-  "drug",
-  "mechanism",
-  "disease",
-  "ingredient",
-  "book",
-  "chapter",
-  "section",
+// 新 schema 有效值
+const VALID_ESSENCE = [
+  'notion', 'medication', 'illness', 'route', 'substance', 'process', 'module', 'section',
+  'concept', 'drug', 'disease', 'ingredient', 'mechanism', 'bridge', 'service',
+  'pathogen', 'pathway', 'indicator', 'book', 'chapter', 'section',
+];
+const VALID_FIELD = [
+  'pharmaceutics', 'pharmacokinetics', 'medicinal_chemistry', 'pharmacology',
+  'toxicology', 'biopharmaceutics', 'clinical_pharmacy', 'pharmacy_service',
+  'cardiovascular', 'respiratory', 'digestive', 'endocrine', 'musculoskeletal',
+  'anti_infective', 'anti_tumor', 'blood', 'immunology', 'dermatology',
+  'antipyretic', 'anti_rheumatic', 'anti_gout', 'nutrition', 'diagnostic',
+  'pharmacy_practice',
+];
+const VALID_TIER = [
+  'basic', 'drug', 'disease', 'management', 'service', 'legal',
+  'foundation', 'system', 'clinical',
 ];
 
 const VALID_EDGE_TYPES = [
-  "isa",
-  "part_of",
-  "mechanism",
-  "causes",
-  "treats",
-  "has",
-  "relates",
+  'has', 'isa',
+  'activates', 'inhibits', 'mechanism', 'metabolizes',
+  'treats', 'causes', 'interacts', 'contraindicates',
+  'prerequisite',
 ];
 
 interface ValidationError {
@@ -71,23 +76,36 @@ export async function validate(): Promise<void> {
     // Collect node IDs for cross-reference validation
     allIds.add(fm.id);
 
-    // Validate type field
-    if (!VALID_NODE_TYPES.includes(fm.type)) {
+    // Validate essence field (新: essence / 旧: type)
+    const essenceVal = fm.essence ?? fm.type;
+    if (essenceVal && !VALID_ESSENCE.includes(essenceVal)) {
       errors.push({
         file: relPath,
-        field: "type",
-        message: `type 值 "${fm.type}" 不在已知类型列表中 (${VALID_NODE_TYPES.join(", ")})`,
-        severity: "warning",
+        field: 'essence',
+        message: `essence/type 值 "${essenceVal}" 不在已知类型列表中`,
+        severity: 'warning',
       });
     }
 
-    // Validate category field
-    if (!fm.category || String(fm.category).trim() === "") {
+    // Validate field field (新: field / 旧: category)
+    const fieldVal = fm.field ?? fm.category;
+    if (fieldVal && !VALID_FIELD.includes(fieldVal)) {
       errors.push({
         file: relPath,
-        field: "category",
-        message: "category 不能为空",
-        severity: "error",
+        field: 'field',
+        message: `field/category 值 "${fieldVal}" 不在已知类型列表中`,
+        severity: 'warning',
+      });
+    }
+
+    // Validate tier field (新: tier / 旧: layer)
+    const tierVal = fm.tier ?? fm.layer;
+    if (tierVal && !VALID_TIER.includes(tierVal)) {
+      errors.push({
+        file: relPath,
+        field: 'tier',
+        message: `tier/layer 值 "${tierVal}" 不在已知层级列表中`,
+        severity: 'warning',
       });
     }
 
@@ -109,7 +127,7 @@ export async function validate(): Promise<void> {
           errors.push({
             file: relPath,
             field: `edges_out[${i}].type`,
-            message: `edges_out[${i}].type 值 "${edge.type}" 不在已知类型列表中 (${VALID_EDGE_TYPES.join(", ")})`,
+            message: `edges_out[${i}].type 值 "${edge.type}" 不在已知类型列表中`,
             severity: "warning",
           });
         }
@@ -133,7 +151,7 @@ export async function validate(): Promise<void> {
           errors.push({
             file: relPath,
             field: `edges_out[${i}].target`,
-            message: `edges_out[${i}].target 指向的节点 id "${target}" 不存在（尚未在任何文件的 id 字段中定义）`,
+            message: `edges_out[${i}].target 指向的节点 id "${target}" 不存在`,
             severity: "error",
           });
         }

@@ -16,7 +16,7 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^22.19.21",
     "cytoscape-cose-bilkent": "^4.1.0",
     "cytoscape-dagre": "^4.0.0",
     "cytoscape-euler": "^1.2.4",

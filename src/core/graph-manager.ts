@@ -53,12 +53,18 @@ export class GraphManager {
     const nodes: NodeData[] = [];
     for (const [fp, raw] of Object.entries(this.mdFiles)) {
       const fm = parseFrontmatter(raw, fp);
+      const essence = fm.essence || fm.type || '';
+      const field   = fm.field   || fm.category || '';
+      const tier    = fm.tier    || fm.layer;
       nodes.push({
         id: fm.id,
         label: fm.label,
-        type: fm.type,
-        category: fm.category,
-        layer: fm.layer,
+        essence,
+        field,
+        tier,
+        type: essence,
+        category: field,
+        layer: tier,
         summary: fm.summary,
         location: fm.location,
         tags: fm.tags,

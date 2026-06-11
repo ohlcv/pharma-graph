@@ -9,11 +9,10 @@ import euler from 'cytoscape-euler';
 import { GraphData } from './graph.js';
 import {
   NODE_TYPE_SHAPE,
-  NODE_TYPE_COLOR,
   NODE_TYPE_COLOR_DARK,
-  CATEGORY_COLOR,
+  FIELD_COLOR,
   EDGE_TYPE_STYLE,
-  NODE_LAYER_STYLE,
+  NODE_TIER_STYLE,
   LAYOUTS,
   LayoutConfig,
 } from './config.js';
@@ -40,34 +39,33 @@ export const CLASSES = {
 
 // ── Stylesheet (computed once at module load) ───────────────────────────────────
 
+// 视觉层级（从上到下依次展开）：
+//   ① 节点基础样式（默认椭圆、权重决定大小、文字底对齐）
+//   ② field → 边框色（学科归属）
+//   ③ essence → 形状（节点本质决定形状）
+//   ④ tier → 纯色填充（层次感，均匀覆盖整节点）
+//   ⑤ 边、选中/悬停等交互状态
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const STYLESHEET: any[] = (() => {
-  const nodeTypeRules = Object.entries(NODE_TYPE_SHAPE).map(([type, shape]) => ({
-    selector: `node[type = "${type}"]`,
-    style: {
-      shape: shape as cytoscape.Css.NodeShape,
-      'background-color': nodeColor(type),
-    },
-  }));
+  // Tier 填充色
+  const TIER_DEFAULT_FILL = '#f8fafc';
 
-  const categoryRules = Object.entries(CATEGORY_COLOR).map(([cat, color]) => ({
-    selector: `node[category = "${cat}"]`,
-    style: {
-      'border-color': color,
-      'border-width': 2.5,
-    },
-  }));
-
-  const layerRules = Object.entries(NODE_LAYER_STYLE).map(([layer, style]) => {
-    const s: Record<string, unknown> = {
-      'border-width': style.borderWidth,
-      'border-color': style.borderColor,
+  // Essence 规则 — 仅形状（填充色由 tier 统一管理）
+  const nodeTypeRules = Object.entries(NODE_TYPE_SHAPE).map(([key, shape]) => {
+    return {
+      selector: `node[essence = "${key}"]`,
+      style: {
+        shape: shape as cytoscape.Css.NodeShape,
+      },
     };
-    if (style.bgColor !== 'transparent') {
-      s['background-color'] = style.bgColor;
-    }
-    return { selector: `node[layer = "${layer}"]`, style: s };
   });
+
+  // Field 规则 — 边框色（区分学科归属）
+  const fieldRules = Object.entries(FIELD_COLOR).map(([key, color]) => ({
+    selector: `node[field = "${key}"]`,
+    style: { 'border-color': color, 'border-width': 2 },
+  }));
 
   const edgeTypeRules = Object.entries(EDGE_TYPE_STYLE).map(([type, s]) => ({
     selector: `edge[edgeType = "${type}"]`,
@@ -80,6 +78,7 @@ const STYLESHEET: any[] = (() => {
   }));
 
   return [
+    // ① 节点基础样式
     {
       selector: 'node',
       style: {
@@ -97,12 +96,22 @@ const STYLESHEET: any[] = (() => {
         'text-background-padding': '3px',
         'border-width': 0,
         'border-color': '#475569',
+        'background-color': TIER_DEFAULT_FILL,
+        'background-blacken': 0,
         shape: 'ellipse',
         'text-events': 'yes',
       },
     },
-    ...layerRules,
-    ...categoryRules,
+    // ② field 边框色
+    ...fieldRules,
+    // ③ essence 形状（节点本质决定形状）
+    ...nodeTypeRules,
+    // ④ tier 填充色（层次色均匀覆盖整节点）
+    ...Object.entries(NODE_TIER_STYLE).map(([key, style]) => ({
+      selector: `node[tier = "${key}"]`,
+      style: { 'background-color': style.bgColor },
+    })),
+    // 虚拟层父节点
     {
       selector: '.layer-parent',
       style: {
@@ -113,6 +122,7 @@ const STYLESHEET: any[] = (() => {
         shape: 'rectangle' as cytoscape.Css.NodeShape,
       },
     },
+    // 边默认样式
     {
       selector: 'edge',
       style: {
@@ -128,14 +138,12 @@ const STYLESHEET: any[] = (() => {
         'transition-duration': '0.15s',
       },
     },
+    // 边类型样式
     ...edgeTypeRules,
-    ...nodeTypeRules,
+    // ── 交互状态 ──────────────────────────────────────────────────────────────
     {
       selector: '.selected-node',
-      style: {
-        opacity: 1,
-        'border-width': 4,
-      },
+      style: { opacity: 1, 'border-width': 4 },
     },
     { selector: '.dimmed', style: {
       opacity: 0.1,
@@ -355,16 +363,16 @@ export class Renderer {
         data: {
           id: n.id,
           label: n.label || n.id,
-          type: n.type,
-          category: n.category ?? 'default',
-          layer: n.layer,
+          essence: n.essence || n.type || 'default',
+          field: n.field || n.category || '',
+          tier: n.tier || n.layer,
           summary: n.summary,
           location: n.location,
           tags: n.tags ?? [],
           body: n.body,
           weight: n.weight ?? 60,
-          color: nodeColor(n.type),
-          colorDark: nodeColorDark(n.type),
+          color: nodeColor(n.essence || n.type || 'default'),
+          colorDark: nodeColorDark(n.essence || n.type || 'default'),
         },
       })),
       ...data.edges

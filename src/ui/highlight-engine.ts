@@ -79,7 +79,7 @@ export class HighlightEngine {
 
   highlightShape(shape: string): void {
     this.cy.elements().removeClass(
-      [CLASSES.DIMMED, CLASSES.HIGHLIGHTED, CLASSES.SELECTED_NODE].join(' '),
+      [CLASSES.DIMMED, CLASSES.HIGHLIGHTED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED_EDGE].join(' '),
     );
 
     this.cy.nodes().not(`.${CLASSES.LAYER_PARENT}`).forEach((n: cytoscape.NodeSingular) => {
@@ -89,6 +89,51 @@ export class HighlightEngine {
         n.addClass(CLASSES.DIMMED);
       }
     });
+  }
+
+  highlightField(field: string): void {
+    this.cy.elements().removeClass(
+      [CLASSES.DIMMED, CLASSES.HIGHLIGHTED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED_EDGE].join(' '),
+    );
+
+    this.cy.nodes().not(`.${CLASSES.LAYER_PARENT}`).forEach((n: cytoscape.NodeSingular) => {
+      if (n.data('field') === field) {
+        n.addClass(CLASSES.HIGHLIGHTED);
+      } else {
+        n.addClass(CLASSES.DIMMED);
+      }
+    });
+  }
+
+  highlightTier(tier: string): void {
+    this.cy.elements().removeClass(
+      [CLASSES.DIMMED, CLASSES.HIGHLIGHTED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED_EDGE].join(' '),
+    );
+
+    this.cy.nodes().not(`.${CLASSES.LAYER_PARENT}`).forEach((n: cytoscape.NodeSingular) => {
+      if (n.data('tier') === tier) {
+        n.addClass(CLASSES.HIGHLIGHTED);
+      } else {
+        n.addClass(CLASSES.DIMMED);
+      }
+    });
+  }
+
+  highlightEdgeType(edgeType: string): void {
+    this.cy.elements().removeClass(
+      [CLASSES.DIMMED, CLASSES.HIGHLIGHTED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED_EDGE].join(' '),
+    );
+
+    const matchingEdges = this.cy.edges(`[edgeType = "${edgeType}"]`);
+    if (matchingEdges.length === 0) {
+      this.cy.elements().addClass(CLASSES.DIMMED);
+      return;
+    }
+
+    matchingEdges.addClass(CLASSES.HIGHLIGHTED_EDGE);
+    matchingEdges.connectedNodes().not(`.${CLASSES.LAYER_PARENT}`).addClass(CLASSES.HIGHLIGHTED);
+    this.cy.nodes().not(`.${CLASSES.HIGHLIGHTED}`).not(`.${CLASSES.LAYER_PARENT}`).addClass(CLASSES.DIMMED);
+    this.cy.edges().not(`.${CLASSES.HIGHLIGHTED_EDGE}`).addClass(CLASSES.DIMMED);
   }
 
   dimAll(): void {

@@ -33,8 +33,11 @@ function extractYamlBlock(text: string): { yamlBlock: string; body: string } {
 interface TopFields {
   id: string;
   label: string;
-  type: string;
-  category: string;
+  essence?: string;
+  field?: string;
+  tier?: string;
+  type?: string;
+  category?: string;
   layer?: string;
   location?: Record<string, string>;
   tags?: string[];
@@ -81,14 +84,14 @@ function collectTags(fm: Record<string, unknown>): string[] {
 function collectEdges(fm: Record<string, unknown>): Array<{ target: string; type: string; reason?: string }> {
   const raw = getField(fm, 'edges_out') as unknown[] | undefined;
   if (!raw) return [];
-  return raw
+  const result = raw
     .filter((e): e is Record<string, unknown> => typeof e === 'object' && e !== null && !Array.isArray(e))
     .map((e) => ({
       target: String(e['target'] ?? '').trim(),
-      type: String(e['type'] ?? 'relates').trim(),
+      type: String(e['type'] ?? 'mechanism').trim(),
       reason: typeof e['reason'] === 'string' ? (e['reason'] as string).trim() : undefined,
-    }))
-    .filter((e): e is { target: string; type: string; reason?: string } => Boolean(e.target));
+    }));
+  return result.filter((e) => Boolean(e.target));
 }
 
 // 收集 summary
@@ -110,9 +113,12 @@ function collectSummary(fm: Record<string, unknown>): { short?: string; full?: s
 function buildFrontmatter(opts: {
   id: string;
   label: string;
-  type: string;
-  category: string;
-  layer?: string;
+  essence: string;
+  field: string;
+  tier?: string;
+  type?: string;       // 旧字段，保留
+  category?: string;   // 旧字段，保留
+  layer?: string;      // 旧字段，保留
   location?: Record<string, string>;
   tags?: string[];
   summaryShort?: string;
@@ -123,12 +129,14 @@ function buildFrontmatter(opts: {
 
   dataLines.push(`  id: ${unquote(stripChapterPrefix(opts.id))}`);
   dataLines.push(`  label: ${unquote(opts.label)}`);
-  dataLines.push(`  type: ${unquote(opts.type)}`);
-  dataLines.push(`  category: ${unquote(stripChapterPrefix(opts.category))}`);
-
-  if (opts.layer) {
-    dataLines.push(`  layer: ${opts.layer}`);
-  }
+  // 新字段（essence/field/tier）
+  dataLines.push(`  essence: ${unquote(opts.essence)}`);
+  dataLines.push(`  field: ${unquote(stripChapterPrefix(opts.field))}`);
+  if (opts.tier) dataLines.push(`  tier: ${opts.tier}`);
+  // 旧字段（向后兼容）
+  if (opts.type)     dataLines.push(`  type: ${unquote(opts.type)}`);
+  if (opts.category) dataLines.push(`  category: ${unquote(stripChapterPrefix(opts.category))}`);
+  if (opts.layer)    dataLines.push(`  layer: ${opts.layer}`);
 
   if (opts.location && Object.keys(opts.location).length > 0) {
     dataLines.push('');
@@ -184,15 +192,15 @@ function migrateFile(filePath: string): { changed: boolean; reason: string } {
   const dataBlock = (fm['data'] as Record<string, unknown> | undefined) ?? {};
   const effective = Object.keys(dataBlock).length > 0 ? dataBlock : fm;
 
-  // 提取必需字段
+  // 提取必需字段（新字段 essence/field/tier，兼容旧 type/category/layer）
   const id = String(getField(effective, 'id') ?? getField(fm, 'id') ?? '').trim();
   if (!id) return { changed: false, reason: 'No id field' };
 
   const label = unquote(String(getField(effective, 'label') ?? getField(fm, 'label') ?? labelFromFilename(basename(filePath)))).trim();
-  const type = unquote(String(getField(effective, 'type') ?? getField(fm, 'type') ?? '')).trim();
-  const category = unquote(String(getField(effective, 'category') ?? getField(fm, 'category') ?? '')).trim();
-  const layer = typeof (getField(effective, 'layer') ?? getField(fm, 'layer')) === 'string'
-    ? String(getField(effective, 'layer') ?? getField(fm, 'layer')).trim()
+  const essence   = unquote(String(getField(effective, 'essence') ?? getField(fm, 'essence') ?? getField(effective, 'type') ?? getField(fm, 'type') ?? '')).trim();
+  const field    = unquote(String(getField(effective, 'field')  ?? getField(fm, 'field')  ?? getField(effective, 'category') ?? getField(fm, 'category') ?? '')).trim();
+  const tier     = typeof (getField(effective, 'tier') ?? getField(fm, 'tier') ?? getField(effective, 'layer') ?? getField(fm, 'layer')) === 'string'
+    ? String(getField(effective, 'tier') ?? getField(fm, 'tier') ?? getField(effective, 'layer') ?? getField(fm, 'layer')).trim()
     : undefined;
 
   // location 和 tags 优先从 data 块取，没有再从根级取
@@ -205,9 +213,9 @@ function migrateFile(filePath: string): { changed: boolean; reason: string } {
   const newFm = buildFrontmatter({
     id,
     label,
-    type,
-    category,
-    layer: layer || undefined,
+    essence,
+    field,
+    tier: tier || undefined,
     location,
     tags: tags.length > 0 ? tags : undefined,
     summaryShort: summary.short,
@@ -218,7 +226,7 @@ function migrateFile(filePath: string): { changed: boolean; reason: string } {
   writeFileSync(filePath, newFm + '\n' + body, 'utf-8');
   return {
     changed: true,
-    reason: `id=${id}, type=${type || '?'}, location=${location ? Object.keys(location).join(',') : 'none'}, tags=${tags.length}, edges=${edgesOut.length}`,
+    reason: `id=${id}, essence=${essence || '?'}, field=${field || '?'}, location=${location ? Object.keys(location).join(',') : 'none'}, tags=${tags.length}, edges=${edgesOut.length}`,
   };
 }
 

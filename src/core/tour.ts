@@ -278,7 +278,7 @@ export class TourEngine {
       zoom: depth === 0 ? 1.5 : 1.3,
       duration: 600,
       easing: 'ease-out-cubic',
-    }, {
+    } as cytoscape.AnimationOptions, {
       done: () => {
         if (this.onAfterCenter) {
           const currentPan = this.cy.pan();
@@ -286,7 +286,7 @@ export class TourEngine {
           this.cy.pan(adjusted);
         }
       },
-    });
+    } as unknown as cytoscape.AnimationOptions);
 
     if (!silent) {
       this.onStep?.({

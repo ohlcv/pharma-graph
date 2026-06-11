@@ -111,16 +111,23 @@
     .tour-dt__ctrl { display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: auto; }
     .tour-dt__btn {
       display: flex; align-items: center; justify-content: center;
-      width: 28px; height: 28px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
-      background: rgba(255,255,255,0.05); color: var(--text-2); cursor: pointer;
-      transition: background 0.12s, transform 0.1s, box-shadow 0.12s;
+      padding: 5px 10px; border-radius: 8px; border: 1px solid transparent;
+      background: transparent; color: var(--text-2); cursor: pointer;
+      font-size: 0.7rem; font-weight: 500; font-family: inherit;
+      transition: background 0.14s, border-color 0.14s, color 0.14s, box-shadow 0.14s, transform 0.1s;
+      position: relative; overflow: hidden; white-space: nowrap; flex-shrink: 0;
     }
-    .tour-dt__btn:hover  { background: rgba(255,255,255,0.12); transform: scale(1.05); }
-    .tour-dt__btn:active { transform: scale(0.95); }
-    .tour-dt__btn--play  { background: rgba(99,102,241,0.2); color: var(--tour-accent); box-shadow: 0 0 8px rgba(99,102,241,0.2); }
-    .tour-dt__btn--play:hover  { background: rgba(99,102,241,0.35); box-shadow: 0 0 12px rgba(99,102,241,0.35); }
-    .tour-dt__btn--close:hover { background: rgba(239,68,68,0.2); color: #f87171; }
-    .tour-dt__btn svg { width: 12px; height: 12px; }
+    .tour-dt__btn::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, var(--accent), var(--accent2)); opacity: 0; transition: opacity 0.14s; }
+    .tour-dt__btn:hover::after  { opacity: 0.12; }
+    .tour-dt__btn:active::after { opacity: 0.2; transform: scale(0.97); }
+    .tour-dt__btn > * { position: relative; z-index: 1; }
+    .tour-dt__btn:hover  { background: rgba(255,255,255,0.07); border-color: var(--border-hi); color: var(--text); }
+    .tour-dt__btn:active { transform: scale(0.96); box-shadow: 0 0 0 2px rgba(99,102,241,0.3); }
+    .tour-dt__btn--play  { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.4); color: var(--accent); }
+    .tour-dt__btn--play:hover  { background: rgba(99,102,241,0.2); border-color: var(--accent); box-shadow: 0 0 12px rgba(99,102,241,0.25); }
+    .tour-dt__btn--play.active { background: rgba(99,102,241,0.25); border-color: var(--accent); box-shadow: 0 0 12px rgba(99,102,241,0.4), 0 0 0 2px rgba(99,102,241,0.2); }
+    .tour-dt__btn--close:hover { background: rgba(239,68,68,0.1); border-color: rgba(239,68,113,0.3); color: #f87171; }
+    .tour-dt__btn svg { width: 14px; height: 14px; flex-shrink: 0; }
     
     /* ─────────────────────────────────────────────────────────────────────────
        手机版 .tour-mob
@@ -178,27 +185,39 @@
       /* 控制按钮 */
       .tour-mob__ctrl {
         display: flex; flex-direction: column; align-items: center; justify-content: center;
-        gap: 8px; padding: 2px 0 4px;
+        gap: 6px; padding: 2px 0 4px;
       }
       .tour-mob__close {
         display: flex; align-items: center; justify-content: center;
-        width: 32px; height: 32px; padding: 0;
-        background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3);
+        padding: 5px 10px;
+        background: rgba(239,68,113,0.1); border: 1px solid rgba(239,68,113,0.3);
         border-radius: 8px; color: #f87171; cursor: pointer; flex-shrink: 0;
-        transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+        font-size: 0.68rem; font-weight: 500; font-family: inherit;
+        transition: background 0.14s, border-color 0.14s, color 0.14s, box-shadow 0.14s;
+        position: relative; overflow: hidden;
       }
-      .tour-mob__close:hover { background: rgba(239,68,68,0.25); border-color: rgba(239,68,68,0.5); box-shadow: 0 0 10px rgba(239,68,68,0.3); }
+      .tour-mob__close::after { content: ''; position: absolute; inset: 0; background: rgba(239,68,113,0.2); opacity: 0; transition: opacity 0.14s; }
+      .tour-mob__close:hover::after { opacity: 1; }
+      .tour-mob__close:active { transform: scale(0.96); box-shadow: 0 0 0 2px rgba(239,68,113,0.3); }
+      .tour-mob__close > * { position: relative; z-index: 1; }
+      .tour-mob__close:hover { border-color: rgba(239,68,113,0.5); box-shadow: 0 0 10px rgba(239,68,113,0.2); }
       .tour-mob__close svg { width: 13px; height: 13px; stroke: currentColor; }
-    
+
       .tour-mob__badge {
         display: flex; align-items: center; justify-content: center;
-        width: 32px; height: 32px; padding: 0;
+        padding: 5px 10px;
         background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.3);
         border-radius: 8px; color: #a78bfa; cursor: pointer; flex-shrink: 0;
-        transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+        font-size: 0.68rem; font-weight: 500; font-family: inherit;
+        transition: background 0.14s, border-color 0.14s, color 0.14s, box-shadow 0.14s;
+        position: relative; overflow: hidden;
       }
-      .tour-mob__badge:hover { background: rgba(99,102,241,0.22); border-color: rgba(99,102,241,0.5); box-shadow: 0 0 10px rgba(99,102,241,0.25); }
-      .tour-mob__badge.tour-active { background: rgba(99,102,241,0.25) !important; border-color: rgba(99,102,241,0.6) !important; box-shadow: 0 0 12px rgba(99,102,241,0.4); }
+      .tour-mob__badge::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, var(--accent), var(--accent2)); opacity: 0; transition: opacity 0.14s; }
+      .tour-mob__badge:hover::after { opacity: 0.12; }
+      .tour-mob__badge:active { transform: scale(0.96); box-shadow: 0 0 0 2px rgba(99,102,241,0.3); }
+      .tour-mob__badge > * { position: relative; z-index: 1; }
+      .tour-mob__badge:hover { background: rgba(99,102,241,0.2); border-color: rgba(99,102,241,0.5); box-shadow: 0 0 10px rgba(99,102,241,0.2); color: var(--accent); }
+      .tour-mob__badge.tour-active { background: rgba(99,102,241,0.25) !important; border-color: var(--accent) !important; box-shadow: 0 0 12px rgba(99,102,241,0.4); color: var(--accent); }
       .tour-mob__badge svg { width: 14px; height: 14px; stroke: currentColor; }
     
       /* 统计数字 */

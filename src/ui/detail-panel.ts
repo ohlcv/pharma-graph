@@ -5,7 +5,7 @@
 import cytoscape from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
 import { nodeColor } from '../core/colors.js';
-import { NODE_TYPE_LABEL } from '../core/config.js';
+import { ESSENCE_LABEL, FIELD_LABEL, TIER_LABEL } from '../core/config.js';
 import { uiState } from './state.js';
 
 const EDGE_TYPE_LABELS: Record<string, string> = {
@@ -16,32 +16,6 @@ const EDGE_TYPE_LABELS: Record<string, string> = {
   has: '含',
   relates: '关联',
   isa: '是个',
-};
-
-const LAYER_LABELS: Record<string, string> = {
-  foundation: '基础层',
-  system: '系统层',
-  clinical: '临床层',
-  service: '服务层',
-};
-
-const CATEGORY_LABELS: Record<string, string> = {
-  pharmacy_practice: '药学实践',
-  cardiovascular: '心血管',
-  respiratory: '呼吸系统',
-  digestive: '消化系统',
-  endocrine: '内分泌',
-  musculoskeletal: '肌肉骨骼',
-  anti_infective: '抗感染',
-  anti_tumor: '抗肿瘤',
-  blood: '血液系统',
-  immunology: '免疫系统',
-  dermatology: '皮肤科',
-  antipyretic: '解热镇痛',
-  anti_rheumatic: '抗风湿',
-  anti_gout: '抗痛风',
-  nutrition: '营养',
-  diagnostic: '诊断',
 };
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -257,11 +231,12 @@ function switchDesktopTab(tab: 'overview' | 'body'): void {
 // ── Build helpers ─────────────────────────────────────────────────────────────
 
 function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
-  const color = nodeColor(d.type);
+  const typeVal = (d.type as string) || '';
+  const color = typeVal ? nodeColor(typeVal) : '#94a3b8';
   const nodeName = (d.label as string) || (d.id as string);
-  const typeText = NODE_TYPE_LABEL[d.type as string] ?? (d.type as string) ?? '—';
-  const layerText = d.layer ? (LAYER_LABELS[d.layer as string] ?? (d.layer as string)) : '';
-  const categoryText = d.category ? (CATEGORY_LABELS[d.category as string] ?? (d.category as string)) : '';
+  const essenceText = typeVal ? (ESSENCE_LABEL[typeVal] ?? typeVal) : '—';
+  const fieldText = d.field ? (FIELD_LABEL[d.field as string] ?? (d.field as string)) : '';
+  const tierText = d.tier ? (TIER_LABEL[d.tier as string] ?? (d.tier as string)) : '';
 
   let location = '';
   if (d.location) {
@@ -272,9 +247,9 @@ function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
 
   return `<div class="np-hero">
   <div class="np-hero__badges">
-    <span class="np-badge np-badge--type" style="color:${color};border-color:${color}66;background:${color}1a">${escHtml(typeText)}</span>
-    ${layerText ? `<span class="np-badge np-badge--layer">${escHtml(layerText)}</span>` : ''}
-    ${categoryText ? `<span class="np-badge np-badge--category">${escHtml(categoryText)}</span>` : ''}
+    <span class="np-badge np-badge--type" style="color:${color};border-color:${color}66;background:${color}1a">${escHtml(essenceText)}</span>
+    ${fieldText ? `<span class="np-badge np-badge--field">${escHtml(fieldText)}</span>` : ''}
+    ${tierText ? `<span class="np-badge np-badge--tier">${escHtml(tierText)}</span>` : ''}
   </div>
   <div class="np-hero__name">${escHtml(nodeName)}</div>
   ${location}

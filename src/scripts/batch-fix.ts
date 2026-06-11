@@ -2,7 +2,6 @@
  * 批量修正全库 frontmatter 和正文格式问题：
  * 1. 正文标题：所有非标准五问格式 → 标准五问格式
  * 2. layer 值：section/chapter → system/clinical
- * 3. edges_out has → relates (仅章入口层级)
  *
  * 用法：npx tsx src/scripts/batch-fix.ts
  */
@@ -13,7 +12,7 @@ import { join, extname } from "path";
 const contentRoot = join(process.cwd(), "content");
 
 // ============ 正文标题替换规则 ============
-const allBodyRules = [
+const allBodyRules: Array<[RegExp, string]> = [
   // Q1 各种变体 → 它是什么？
   [/^## 这一节主要在讲什么[？?]$/gm, "## 它是什么？"],
   [/^## 这一章主要在讲什么[？?]$/gm, "## 它是什么？"],
@@ -42,16 +41,12 @@ const allBodyRules = [
 ];
 
 // layer section → system
-const layerSectionRules = [
+const layerSectionRules: Array<[RegExp, string]> = [
   [/^  layer: section$/gm, "  layer: system"],
 ];
 // layer chapter → clinical
-const layerChapterRules = [
+const layerChapterRules: Array<[RegExp, string]> = [
   [/^  layer: chapter$/gm, "  layer: clinical"],
-];
-// edges type: has → relates (仅章入口)
-const edgesHasRules = [
-  [/^    type: has$/gm, "    type: relates"],
 ];
 
 function walkDir(dir: string): string[] {
@@ -77,22 +72,18 @@ for (const file of files) {
 
   // 1. 正文标题替换
   for (const [pattern, replacement] of allBodyRules) {
-    content = content.replace(pattern, replacement);
+    content = content.replace(pattern as RegExp, replacement);
   }
 
   // 2. layer 替换
   const isChapterEntry = /type: chapter/.test(content);
   if (isChapterEntry) {
     for (const [pattern, replacement] of layerChapterRules) {
-      content = content.replace(pattern, replacement);
-    }
-    // 章入口的 edges has → relates
-    for (const [pattern, replacement] of edgesHasRules) {
-      content = content.replace(pattern, replacement);
+      content = content.replace(pattern as RegExp, replacement);
     }
   } else {
     for (const [pattern, replacement] of layerSectionRules) {
-      content = content.replace(pattern, replacement);
+      content = content.replace(pattern as RegExp, replacement);
     }
   }
 

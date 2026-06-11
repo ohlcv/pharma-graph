@@ -2,7 +2,17 @@ import cytoscape from 'cytoscape';
 import type { Core } from 'cytoscape';
 import { Renderer } from '../core/renderer.js';
 import { HighlightEngine } from './highlight-engine.js';
-import { LAYOUTS, SHAPE_LABEL } from '../core/config.js';
+import { uiState } from './state.js';
+import {
+  LAYOUTS,
+  SHAPE_LABEL,
+  ESSENCE_LABEL,
+  FIELD_COLOR,
+  FIELD_LABEL,
+  NODE_TIER_STYLE,
+  TIER_LABEL,
+  EDGE_TYPE_STYLE,
+} from '../core/config.js';
 
 // ── Debounce utility ────────────────────────────────────────────────────────────
 
@@ -60,6 +70,12 @@ function doUpdateStats(cy: Core): void {
 
     // Category legend — populate from CATEGORY_COLOR config
     populateCategoryLegend(cy);
+
+    // Three orthogonal visual legends (Essence→shape, Field→border, Tier→fill)
+    populateEssenceLegend(cy);
+    populateFieldLegend(cy);
+    populateTierLegend(cy);
+    populateEdgeLegend(cy);
   });
 }
 
@@ -140,10 +156,333 @@ function populateCategoryLegend(cy: Core): void {
   });
 }
 
+// ── Essence legend (shape) ───────────────────────────────────────────────────────
+// Fills: #legend-essence-grid (desktop sidebar) + #bs-essence-chips (mobile)
+
+export function populateEssenceLegend(cy: Core): void {
+  const desktopGrid = document.getElementById('legend-essence-grid');
+  const mobileChips = document.getElementById('bs-essence-chips');
+  if (!desktopGrid || !mobileChips) return;
+
+  // Build once
+  if (desktopGrid.children.length === 0) {
+    const rows = Object.entries(ESSENCE_LABEL).map(([key, label]) => {
+      const shape = NODE_TYPE_SHAPE_MAP[key] ?? 'rectangle';
+      return `<div class="legend-row" data-type="${key}">
+        <span class="legend-node--shape shape-${shape}" style="background:#94a3b8"></span>
+        <span class="legend-row__label">${label}</span>
+        <span class="legend-row__count" id="legend-essence-count-${key}"></span>
+      </div>`;
+    });
+    desktopGrid.innerHTML = rows.join('');
+
+    // Attach click → highlightShape (uses uiState.highlight internally)
+    desktopGrid.querySelectorAll<HTMLElement>('.legend-row[data-type]').forEach((row) => {
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', () => {
+        const type = row.dataset.type ?? '';
+        document.querySelectorAll('.legend-row[data-type]').forEach((r) => r.classList.remove('active'));
+        row.classList.add('active');
+        highlightShape(type, uiState.highlight!);
+      });
+    });
+  }
+
+  if (mobileChips.children.length === 0) {
+    mobileChips.innerHTML = Object.entries(ESSENCE_LABEL).map(([key, label]) => {
+      const shape = NODE_TYPE_SHAPE_MAP[key] ?? 'rectangle';
+      return `<div class="bs-chip" data-type="${key}">
+        <span class="bs-chip__shape shape-${shape}" style="background:#94a3b8"></span>
+        <span>${label}</span>
+        <span class="bs-chip__count" id="bs-essence-count-${key}"></span>
+      </div>`;
+    }).join('');
+
+    mobileChips.querySelectorAll<HTMLElement>('.bs-chip[data-type]').forEach((chip) => {
+      chip.style.cursor = 'pointer';
+      chip.addEventListener('click', () => {
+        const type = chip.dataset.type ?? '';
+        document.querySelectorAll('.bs-chip[data-type]').forEach((c) => c.classList.remove('active'));
+        chip.classList.add('active');
+        highlightShape(type, uiState.highlight!);
+      });
+    });
+  }
+
+  // Update counts
+  Object.keys(ESSENCE_LABEL).forEach((key) => {
+    const count = cy.nodes().not('.layer-parent').filter(`[type = "${key}"]`).length;
+    const dEl = document.getElementById(`legend-essence-count-${key}`);
+    const mEl = document.getElementById(`bs-essence-count-${key}`);
+    if (dEl) dEl.textContent = count > 0 ? `${count}` : '';
+    if (mEl) mEl.textContent = count > 0 ? `${count}` : '';
+  });
+}
+
+// ── Field legend (border color) ─────────────────────────────────────────────────
+
+export function populateFieldLegend(cy: Core): void {
+  const desktopGrid = document.getElementById('legend-field-grid');
+  const mobileChips = document.getElementById('bs-field-chips');
+  if (!desktopGrid || !mobileChips) return;
+
+  if (desktopGrid.children.length === 0) {
+    desktopGrid.innerHTML = Object.entries(FIELD_LABEL).map(([key, label]) => {
+      const color = FIELD_COLOR[key] ?? '#94a3b8';
+      return `<div class="legend-field-row" data-field="${key}">
+        <span class="legend-swatch" style="background:#ffffff;border:2px solid ${color}"></span>
+        <span class="legend-row__label">${label}</span>
+        <span class="legend-row__count" id="legend-field-count-${key}"></span>
+      </div>`;
+    }).join('');
+
+    desktopGrid.querySelectorAll<HTMLElement>('.legend-field-row[data-field]').forEach((row) => {
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', () => {
+        const field = row.dataset.field ?? '';
+        if (activeFieldFilter === field) {
+          activeFieldFilter = null;
+          row.classList.remove('active');
+          uiState.highlight!.reset();
+        } else {
+          activeFieldFilter = field;
+          document.querySelectorAll('.legend-field-row[data-field]').forEach((r) => r.classList.remove('active'));
+          row.classList.add('active');
+          uiState.highlight!.highlightField(field);
+        }
+      });
+    });
+  }
+
+  if (mobileChips.children.length === 0) {
+    mobileChips.innerHTML = Object.entries(FIELD_LABEL).map(([key, label]) => {
+      const color = FIELD_COLOR[key] ?? '#94a3b8';
+      return `<div class="bs-chip bs-chip--field" data-field="${key}">
+        <span class="bs-chip__swatch" style="background:#ffffff;border:2px solid ${color}"></span>
+        <span>${label}</span>
+        <span class="bs-chip__count" id="bs-field-count-${key}"></span>
+      </div>`;
+    }).join('');
+
+    mobileChips.querySelectorAll<HTMLElement>('.bs-chip[data-field]').forEach((chip) => {
+      chip.style.cursor = 'pointer';
+      chip.addEventListener('click', () => {
+        const field = chip.dataset.field ?? '';
+        if (activeFieldFilter === field) {
+          activeFieldFilter = null;
+          chip.classList.remove('active');
+          uiState.highlight!.reset();
+        } else {
+          activeFieldFilter = field;
+          document.querySelectorAll('.bs-chip[data-field]').forEach((c) => c.classList.remove('active'));
+          chip.classList.add('active');
+          uiState.highlight!.highlightField(field);
+        }
+      });
+    });
+  }
+
+  Object.keys(FIELD_LABEL).forEach((key) => {
+    const count = cy.nodes().not('.layer-parent').filter(`[field = "${key}"]`).length;
+    const dEl = document.getElementById(`legend-field-count-${key}`);
+    const mEl = document.getElementById(`bs-field-count-${key}`);
+    if (dEl) dEl.textContent = count > 0 ? `${count}` : '';
+    if (mEl) mEl.textContent = count > 0 ? `${count}` : '';
+  });
+}
+
+// ── Tier legend (fill color) ───────────────────────────────────────────────────
+
+export function populateTierLegend(cy: Core): void {
+  const desktopGrid = document.getElementById('legend-tier-grid');
+  const mobileChips = document.getElementById('bs-tier-chips');
+  if (!desktopGrid || !mobileChips) return;
+
+  if (desktopGrid.children.length === 0) {
+    desktopGrid.innerHTML = Object.entries(TIER_LABEL).map(([key, label]) => {
+      const bgColor = NODE_TIER_STYLE[key]?.bgColor ?? '#f1f5f9';
+      return `<div class="legend-tier-row" data-tier="${key}">
+        <span class="legend-swatch" style="background:${bgColor};border:2px solid #ffffff"></span>
+        <span class="legend-row__label">${label}</span>
+        <span class="legend-row__count" id="legend-tier-count-${key}"></span>
+      </div>`;
+    }).join('');
+
+    desktopGrid.querySelectorAll<HTMLElement>('.legend-tier-row[data-tier]').forEach((row) => {
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', () => {
+        const tier = row.dataset.tier ?? '';
+        if (activeTierFilter === tier) {
+          activeTierFilter = null;
+          row.classList.remove('active');
+          uiState.highlight!.reset();
+        } else {
+          activeTierFilter = tier;
+          document.querySelectorAll('.legend-tier-row[data-tier]').forEach((r) => r.classList.remove('active'));
+          row.classList.add('active');
+          uiState.highlight!.highlightTier(tier);
+        }
+      });
+    });
+  }
+
+  if (mobileChips.children.length === 0) {
+    mobileChips.innerHTML = Object.entries(TIER_LABEL).map(([key, label]) => {
+      const bgColor = NODE_TIER_STYLE[key]?.bgColor ?? '#f1f5f9';
+      return `<div class="bs-chip bs-chip--tier" data-tier="${key}">
+        <span class="bs-chip__swatch" style="background:${bgColor};border:2px solid #ffffff"></span>
+        <span>${label}</span>
+        <span class="bs-chip__count" id="bs-tier-count-${key}"></span>
+      </div>`;
+    }).join('');
+
+    mobileChips.querySelectorAll<HTMLElement>('.bs-chip[data-tier]').forEach((chip) => {
+      chip.style.cursor = 'pointer';
+      chip.addEventListener('click', () => {
+        const tier = chip.dataset.tier ?? '';
+        if (activeTierFilter === tier) {
+          activeTierFilter = null;
+          chip.classList.remove('active');
+          uiState.highlight!.reset();
+        } else {
+          activeTierFilter = tier;
+          document.querySelectorAll('.bs-chip[data-tier]').forEach((c) => c.classList.remove('active'));
+          chip.classList.add('active');
+          uiState.highlight!.highlightTier(tier);
+        }
+      });
+    });
+  }
+
+  Object.keys(TIER_LABEL).forEach((key) => {
+    const count = cy.nodes().not('.layer-parent').filter(`[tier = "${key}"]`).length;
+    const dEl = document.getElementById(`legend-tier-count-${key}`);
+    const mEl = document.getElementById(`bs-tier-count-${key}`);
+    if (dEl) dEl.textContent = count > 0 ? `${count}` : '';
+    if (mEl) mEl.textContent = count > 0 ? `${count}` : '';
+  });
+}
+
+// ── Edge legend (边类型) ────────────────────────────────────────────────────────
+export function populateEdgeLegend(cy: Core): void {
+  const desktopGrid = document.getElementById('legend-edge-grid');
+  const mobileChips = document.getElementById('bs-edge-chips');
+  if (!desktopGrid && !mobileChips) return;
+
+  if (desktopGrid && desktopGrid.children.length === 0) {
+    desktopGrid.innerHTML = Object.entries(EDGE_LABEL).map(([key, label]) => {
+      const style = EDGE_TYPE_STYLE[key] ?? { color: '#95a5a6', lineStyle: 'solid', arrow: 'none' };
+      const dash = style.lineStyle === 'dashed' ? 'stroke-dasharray="5 3"'
+        : style.lineStyle === 'dotted' ? 'stroke-dasharray="1 3"'
+        : '';
+      const arrowDef = style.arrow === 'triangle'
+        ? `<polygon points="26,5 21,2 21,8" fill="${style.color}"/>`
+        : style.arrow === 'tee'
+        ? `<line x1="24" y1="2" x2="26" y2="5" stroke="${style.color}" stroke-width="2"/><line x1="24" y1="8" x2="26" y2="5" stroke="${style.color}" stroke-width="2"/>`
+        : '';
+      return `<div class="legend-edge-row" data-edge="${key}">
+        <svg width="28" height="10" viewBox="0 0 28 10">
+          <line x1="2" y1="5" x2="26" y2="5" stroke="${style.color}" stroke-width="2" ${dash}/>
+          ${arrowDef}
+        </svg>
+        <span class="legend-edge-row__label">${label}</span>
+        <span class="legend-edge-row__count" id="legend-edge-count-${key}"></span>
+      </div>`;
+    }).join('');
+  }
+
+  // Attach click handlers via event delegation (handles static + dynamic rows in one place)
+  const attachEdgeHandlers = (container: HTMLElement, selector: string) => {
+    if ((container as HTMLElement & { _edgeDelegated?: boolean })._edgeDelegated) return;
+    (container as HTMLElement & { _edgeDelegated?: boolean })._edgeDelegated = true;
+    container.addEventListener('click', (e) => {
+      const row = (e.target as HTMLElement).closest<HTMLElement>(selector);
+      if (!row) return;
+      const edge = row.dataset.edge ?? '';
+      highlightEdgeTypeFilter(edge, uiState.highlight!);
+    });
+  };
+
+  if (desktopGrid) attachEdgeHandlers(desktopGrid, '.legend-edge-row[data-edge]');
+  if (mobileChips) attachEdgeHandlers(mobileChips, '.bs-chip[data-edge]');
+
+  Object.keys(EDGE_LABEL).forEach((key) => {
+    const count = cy.edges(`[edgeType = "${key}"]`).length;
+    // Dynamic IDs (populated from dynamic HTML generation)
+    const dEl = document.getElementById(`legend-edge-count-${key}`);
+    const mEl = document.getElementById(`bs-edge-count-${key}`);
+    // Static HTML IDs (desktop sidebar static rows)
+    const staticEl = document.getElementById(`count-edge-${key}`);
+    const text = count > 0 ? `${count}` : '';
+    if (dEl) dEl.textContent = text;
+    if (mEl) mEl.textContent = text;
+    if (staticEl) staticEl.textContent = text;
+  });
+}
+
+// ── Edge type filter ───────────────────────────────────────────────────────────
+
+export function highlightEdgeTypeFilter(edge: string, highlight: HighlightEngine): void {
+  if (activeEdgeFilter === edge) {
+    clearAllFilters();
+    highlight.reset();
+    return;
+  }
+  clearAllFilters();
+  activeEdgeFilter = edge;
+  highlight.highlightEdgeType(edge);
+
+  // Activate desktop legend rows
+  document.querySelectorAll('.legend-edge-row[data-edge]').forEach((el) => {
+    if ((el as HTMLElement).dataset.edge === edge) el.classList.add('active');
+  });
+  // Activate mobile chips
+  document.querySelectorAll('.bs-chip[data-edge]').forEach((el) => {
+    if ((el as HTMLElement).dataset.edge === edge) el.classList.add('active');
+  });
+}
+
+// ── Edge label ─────────────────────────────────────────────────────────────────
+const EDGE_LABEL: Record<string, string> = {
+  has:             '包含',
+  isa:             '属于',
+  activates:       '激动',
+  inhibits:       '抑制',
+  mechanism:       '机制',
+  metabolizes:     '代谢',
+  treats:          '治疗',
+  causes:          '致因',
+  interacts:       '相互作用',
+  contraindicates: '禁忌',
+  prerequisite:    '前置',
+};
+
+// ── Active filter state ────────────────────────────────────────────────────────
+let activeFieldFilter: string | null = null;
+let activeTierFilter: string | null = null;
+let activeEdgeFilter: string | null = null;
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+const NODE_TYPE_SHAPE_MAP: Record<string, string> = {
+  notion: 'octagon',
+  medication: 'ellipse',
+  illness: 'diamond',
+  route: 'triangle',
+  substance: 'pentagon',
+  process: 'star',
+  module: 'round-rectangle',
+  section: 'tag',
+};
+
 export function updateStats(cy: Core): void {
   if (_statsDebounce !== null) clearTimeout(_statsDebounce);
-  _statsDebounce = setTimeout(() => { doUpdateStats(cy); _statsDebounce = null; }, 100);
+  _statsDebounce = setTimeout(() => {
+    doUpdateStats(cy);
+    _statsDebounce = null;
+  }, 100);
 }
+
 
 let _sheetStatsDebounce: ReturnType<typeof setTimeout> | null = null;
 
@@ -340,15 +679,24 @@ export function animatePulse(renderer: Renderer): void {
   raf = requestAnimationFrame(step);
 }
 
+// ── Shared filter clear ───────────────────────────────────────────────────────
+
+function clearAllFilters(): void {
+  activeShapeFilter = null;
+  activeFieldFilter = null;
+  activeTierFilter = null;
+  activeEdgeFilter = null;
+  document.querySelectorAll(
+    '.legend-row,.legend-field-row,.legend-tier-row,.legend-edge-row,.shape-filter-item,.bs-chip'
+  ).forEach((el) => el.classList.remove('active'));
+}
+
 // ── Shape filter ───────────────────────────────────────────────────────────────
 
 let activeShapeFilter: string | null = null;
 
 export function clearShapeFilter(): void {
-  if (activeShapeFilter !== null) {
-    activeShapeFilter = null;
-    document.querySelectorAll('.legend-row, .shape-filter-item, .bs-chip').forEach((el) => el.classList.remove('active'));
-  }
+  clearAllFilters();
 }
 
 export function getActiveShapeFilter(): string | null {
@@ -361,17 +709,17 @@ export function highlightShape(shape: string, highlight: HighlightEngine): void 
     highlight.reset();
     return;
   }
+  clearAllFilters();
   activeShapeFilter = shape;
-  document.querySelectorAll('.legend-row, .shape-filter-item, .bs-chip').forEach((el) => { el.classList.remove('active'); });
   highlight.highlightShape(shape);
 
-  // Activate legend-row by data-shape
-  document.querySelectorAll('.legend-row[data-shape]').forEach((el) => {
-    if ((el as HTMLElement).dataset.shape === shape) el.classList.add('active');
+  // Activate legend-row by data-type
+  document.querySelectorAll('.legend-row[data-type]').forEach((el) => {
+    if ((el as HTMLElement).dataset.type === shape) el.classList.add('active');
   });
-  // Activate mobile chips by data-shape
-  document.querySelectorAll('.bs-chip[data-shape]').forEach((el) => {
-    if ((el as HTMLElement).dataset.shape === shape) el.classList.add('active');
+  // Activate mobile chips by data-type
+  document.querySelectorAll('.bs-chip[data-type]').forEach((el) => {
+    if ((el as HTMLElement).dataset.type === shape) el.classList.add('active');
   });
   // Legacy shape-filter-item
   document.querySelectorAll('.shape-filter-item').forEach((el) => {

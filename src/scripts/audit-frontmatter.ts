@@ -9,14 +9,23 @@ const CONTENT_DIR = path.resolve('content');
 const OUTPUT_FILE = path.resolve('docs/frontmatter-audit.md');
 
 // Schema values
-const VALID_TYPES = ['drug', 'disease', 'pathogen', 'mechanism', 'ingredient', 'concept', 'service', 'pathway', 'indicator'];
-const VALID_CATEGORIES = [
-  'cardiovascular', 'respiratory', 'digestive', 'endocrine',
+// 新命名（essence / field / tier）与旧命名（type / category / layer）共存
+const VALID_ESSENCE = [
+  'notion', 'medication', 'illness', 'route', 'substance', 'process', 'module', 'section', // 新
+  'drug', 'disease', 'pathogen', 'mechanism', 'ingredient', 'concept', 'service', 'pathway', 'indicator', // 旧
+];
+const VALID_FIELD = [
+  'pharmaceutics', 'pharmacokinetics', 'medicinal_chemistry', 'pharmacology', // 新
+  'toxicology', 'biopharmaceutics', 'clinical_pharmacy', 'pharmacy_service', // 新
+  'cardiovascular', 'respiratory', 'digestive', 'endocrine', // 旧 category
   'musculoskeletal', 'anti_infective', 'anti_tumor', 'blood',
   'immunology', 'dermatology', 'antipyretic', 'anti_rheumatic',
   'anti_gout', 'nutrition', 'diagnostic', 'pharmacy_practice',
 ];
-const VALID_LAYERS = ['foundation', 'system', 'clinical', 'service'];
+const VALID_TIER = [
+  'basic', 'drug', 'disease', 'management', 'service', 'legal', // 新
+  'foundation', 'system', 'clinical', // 旧 layer
+];
 
 function isKebabCase(s: string): boolean {
   return /^[a-z0-9]+(-[a-z0-9]+)*$/.test(s);
@@ -87,6 +96,10 @@ function extractFrontmatter(content: string): Record<string, unknown> {
 interface Score {
   id: number;      // 1=严重错误, 2=缺失/不完整, 3=正确
   label: number;
+  essence: number; // 新字段
+  field: number;   // 新字段
+  tier: number;    // 新字段
+  // 以下旧字段保留，向后兼容
   type: number;
   category: number;
   layer: number;
@@ -109,27 +122,53 @@ function scoreField(fm: Record<string, unknown>, field: string): number {
     if (!v) return 1;
     return 3;
   }
+  // essence（新字段，兼容旧 type）
+  if (field === 'essence') {
+    const v = fm['essence'] ?? fm['type'];
+    if (!v) return 2;
+    const str = String(v).toLowerCase();
+    if (['book', 'chapter', 'section', 'part'].includes(str)) return 1;
+    if (VALID_ESSENCE.includes(str)) return 3;
+    return 1;
+  }
+  // field（新字段，兼容旧 category）
+  if (field === 'field') {
+    const v = fm['field'] ?? fm['category'];
+    if (!v) return 2;
+    const str = String(v).toLowerCase();
+    if (VALID_FIELD.includes(str)) return 3;
+    return 2;
+  }
+  // tier（新字段，兼容旧 layer）
+  if (field === 'tier') {
+    const v = fm['tier'] ?? fm['layer'];
+    if (!v) return 2;
+    const str = String(v).toLowerCase();
+    if (VALID_TIER.includes(str)) return 3;
+    return 1;
+  }
+  // 以下为旧字段评分，保留兼容逻辑
   if (field === 'type') {
     const v = fm['type'];
-    if (!v) return 1;
+    if (!v) return 2; // 有 essence 替代则非必须
     const str = String(v).toLowerCase();
-    if (['book', 'chapter', 'section', 'part'].includes(str)) return 1; // structural, not entity type
-    if (VALID_TYPES.includes(str)) return 3;
+    if (['book', 'chapter', 'section', 'part'].includes(str)) return 1;
+    if (VALID_ESSENCE.includes(str)) return 3;
     return 1;
   }
   if (field === 'category') {
     const v = fm['category'];
-    if (!v) return 1;
+    if (!v) return 2; // 有 field 替代则非必须
     const str = String(v).toLowerCase();
-    if (VALID_CATEGORIES.includes(str)) return 3;
-    return 2; // free-text Chinese category
+    if (VALID_FIELD.includes(str)) return 3;
+    return 2;
   }
   if (field === 'layer') {
     const v = fm['layer'];
-    if (!v) return 2; // missing — allowed but scored 2
+    if (!v) return 2; // 有 tier 替代则非必须
     const str = String(v).toLowerCase();
-    if (VALID_LAYERS.includes(str)) return 3;
-    return 1; // invalid value
+    if (VALID_TIER.includes(str)) return 3;
+    return 1;
   }
   if (field === 'summary') {
     const v = fm['summary'];
@@ -151,7 +190,7 @@ function scoreField(fm: Record<string, unknown>, field: string): number {
     return 3;
   }
   if (field === 'tags') {
-    return 3; // optional, just score 3 if absent
+    return 3; // optional
   }
   return 2;
 }
@@ -160,6 +199,9 @@ function scoreAll(fm: Record<string, unknown>): Score {
   return {
     id: scoreField(fm, 'id'),
     label: scoreField(fm, 'label'),
+    essence: scoreField(fm, 'essence'),
+    field: scoreField(fm, 'field'),
+    tier: scoreField(fm, 'tier'),
     type: scoreField(fm, 'type'),
     category: scoreField(fm, 'category'),
     layer: scoreField(fm, 'layer'),
@@ -183,7 +225,7 @@ function scoreToLabel(s: number): string {
 }
 
 function scoreTotal(scores: Score[]): number {
-  const keys = ['id', 'label', 'type', 'category', 'layer', 'summary', 'edges_out', 'location', 'tags'] as const;
+  const keys = ['id', 'label', 'essence', 'field', 'tier', 'summary', 'edges_out', 'location', 'tags'] as const;
   let correct = 0;
   let total = 0;
   for (const key of keys) {
@@ -221,7 +263,7 @@ async function main() {
     const dataBlock = fm;
 
     if (Object.keys(fm).length === 0) {
-      results.push({ relPath: rel, fm: {}, score: { id: 1, label: 1, type: 1, category: 1, layer: 2, summary: 2, edges_out: 2, location: 2, tags: 3 }, issues: ['❌ 无 frontmatter'] });
+      results.push({ relPath: rel, fm: {}, score: { id: 1, label: 1, essence: 2, field: 2, tier: 2, type: 2, category: 2, layer: 2, summary: 2, edges_out: 2, location: 2, tags: 3 }, issues: ['❌ 无 frontmatter'] });
       continue;
     }
 
@@ -232,16 +274,18 @@ async function main() {
     if (score.id === 1) issues.push(`❌ id 错误：\`${fm['id'] ?? 'N/A'}\`（应为 kebab-case 英文）`);
     // label
     if (score.label === 1) issues.push(`❌ label 缺失`);
-    // type
-    const typeVal = String(dataBlock['type'] ?? '');
-    if (score.type === 1) issues.push(`❌ type 错误：\`${typeVal}\`（应为 drug/disease/mechanism/ingredient/concept/service/pathway/indicator）`);
-    // category
-    const catVal = String(dataBlock['category'] ?? '');
-    if (score.category === 2) issues.push(`⚠️ category 为自由文本：\`${catVal}\`（建议改为标准化英文值）`);
-    if (score.category === 1) issues.push(`❌ category 缺失`);
-    // layer
-    if (score.layer === 1) issues.push(`❌ layer 值非法：\`${dataBlock['layer']}\``);
-    if (score.layer === 2) issues.push(`⚠️ layer 缺失（建议添加 foundation/system/clinical/service）`);
+    // essence（新）/ type（旧）
+    const essenceVal = String(fm['essence'] ?? fm['type'] ?? '');
+    if (score.essence === 1) issues.push(`❌ essence/type 错误：\`${essenceVal}\`（应为 notion/medication/illness/route/substance/process/module/section 或 drug/disease/mechanism/concept 等）`);
+    if (score.essence === 2) issues.push(`⚠️ essence/type 缺失`);
+    // field（新）/ category（旧）
+    const fieldVal = String(fm['field'] ?? fm['category'] ?? '');
+    if (score.field === 1) issues.push(`❌ field/category 值非法：\`${fieldVal}\``);
+    if (score.field === 2) issues.push(`⚠️ field/category 缺失`);
+    // tier（新）/ layer（旧）
+    const tierVal = String(fm['tier'] ?? fm['layer'] ?? '');
+    if (score.tier === 1) issues.push(`❌ tier/layer 值非法：\`${tierVal}\``);
+    if (score.tier === 2) issues.push(`⚠️ tier/layer 缺失（建议添加 basic/drug/disease/management/service/legal）`);
     // summary
     if (score.summary === 2) issues.push(`⚠️ summary 为空`);
     // edges_out
@@ -283,21 +327,24 @@ async function main() {
 
   for (const [group, files] of groups) {
     md += `### ${group}\n\n`;
-    md += `| # | 文件 | id | type | category | layer | summary | edges | 完成度 |\n`;
+    md += `| # | 文件 | id | essence | field | tier | summary | edges | 完成度 |\n`;
     md += `|---|---|---|---|---|---|---|---|---|\n`;
     for (const [idx, r] of files.entries()) {
-      const keys = ['id', 'label', 'type', 'category', 'layer', 'summary', 'edges_out'] as const;
+      const keys = ['id', 'label', 'essence', 'field', 'tier', 'summary', 'edges_out'] as const;
       const correct = keys.filter(k => r.score[k] === 3).length;
       const pct = Math.round((correct / keys.length) * 100);
       const idDisplay = r.score.id === 1 ? `❌ \`${r.fm['id'] ?? '—'}\`` :
                         r.score.id === 2 ? `⚠️ \`${r.fm['id'] ?? '—'}\`` :
                         `✅ \`${r.fm['id'] ?? '—'}\``;
-      const typeDisplay = r.score.type === 1 ? `❌ ${r.fm['type']}` : r.score.type === 2 ? `⚠️ ${r.fm['type']}` : `✅ ${r.fm['type']}`;
-      const catDisplay = r.score.category === 1 ? `❌ ${r.fm['category']}` : r.score.category === 2 ? `⚠️ ${r.fm['category']}` : `✅ ${r.fm['category']}`;
-      const layerDisplay = r.score.layer === 1 ? `❌ ${r.fm['layer'] ?? '—'}` : r.score.layer === 2 ? `⚠️ —` : `✅ ${r.fm['layer']}`;
+      const essenceVal = String(r.fm['essence'] ?? r.fm['type'] ?? '—');
+      const essenceDisplay = r.score.essence === 1 ? `❌ ${essenceVal}` : r.score.essence === 2 ? `⚠️ —` : `✅ ${essenceVal}`;
+      const fieldVal = String(r.fm['field'] ?? r.fm['category'] ?? '—');
+      const fieldDisplay = r.score.field === 1 ? `❌ ${fieldVal}` : r.score.field === 2 ? `⚠️ —` : `✅ ${fieldVal}`;
+      const tierVal = String(r.fm['tier'] ?? r.fm['layer'] ?? '—');
+      const tierDisplay = r.score.tier === 1 ? `❌ ${tierVal}` : r.score.tier === 2 ? `⚠️ —` : `✅ ${tierVal}`;
       const sumDisplay = r.score.summary === 3 ? `✅` : `⚠️`;
       const edgeDisplay = r.score.edges_out === 3 ? `✅` : `⚠️`;
-      md += `| ${idx + 1} | \`${r.relPath}\` | ${idDisplay} | ${typeDisplay} | ${catDisplay} | ${layerDisplay} | ${sumDisplay} | ${edgeDisplay} | ${pct}% |\n`;
+      md += `| ${idx + 1} | \`${r.relPath}\` | ${idDisplay} | ${essenceDisplay} | ${fieldDisplay} | ${tierDisplay} | ${sumDisplay} | ${edgeDisplay} | ${pct}% |\n`;
     }
     md += `\n`;
   }

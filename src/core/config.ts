@@ -1,134 +1,163 @@
 // src/core/config.ts
-// 全局配置：节点类型→形状/颜色映射、关系类型→颜色/线型映射、布局配置
-// 这是视觉配置的单一来源（Single Source of Truth）
+// 全局配置：节点 essence → 形状映射、field → 边框色、tier → 填充色、关系类型 → 颜色/线型、布局配置
+// 视觉配置的单一来源（Single Source of Truth）
+//
+// 视觉维度与知识语义一一对应：
+//
+//   Essence（本质）  → 形状            → 回答"这是什么"（药/病/概念/机制...）
+//   Field（学科）   → 边框色           → 回答"属于哪门学科"（药剂/药理/药化...）
+//   Tier（层次）    → 填充色           → 回答"在哪一层"（底层→高层，从大众到稀有）
+//
+// 颜色选取原则：
+//   - Field 边框色：学科气质（药剂=工程橙、药理=权威紫、药化=理性绿）
+//   - Tier 填充色：从大众到稀有（基础=灰蓝、药物=浅蓝、疾病=浅红、管理=浅黄、服务=浅青、法规=浅紫）
 
 import cytoscape from 'cytoscape';
 
-// ── Node type → visual style ────────────────────────────────────────────────
+// ── Essence → visual style（节点本质决定形状）──────────────────────────────────
+// 8 种本质，与 frontmatter.md 的 essence 枚举一一对应
 
 export const NODE_TYPE_SHAPE: Record<string, string> = {
-  concept:    'ellipse',
-  drug:       'round-rectangle',
-  disease:    'diamond',
-  ingredient: 'barrel',
-  bridge:     'round-rectangle',
-  service:    'barrel',
-  mechanism:  'diamond',
-  pathogen:   'diamond',
-  pathway:    'rectangle',
-  indicator:  'ellipse',
-  default:    'ellipse',
+  notion:     'octagon',          // 概念 — 八边形，分类聚集
+  medication: 'ellipse',          // 具体药物或制剂 — 圆形，规整具体
+  illness:    'diamond',          // 疾病或病理状态 — 菱形，警示感强
+  route:      'triangle',        // 信号通路、受体家族 — 三角形，方向汇聚
+  substance:  'pentagon',         // 成分、辅料、指标 — 五边形，化学基础感
+  process:    'star',             // 过程、机制、体内行为 — 星形
+  module:     'round-rectangle',  // 模块、入口、章节 — 圆角矩形，结构感
+  section:    'tag',              // 标签型知识点 — 标签形，入口标识
 };
 
 export const NODE_TYPE_COLOR: Record<string, string> = {
-  concept:    '#818cf8',
-  drug:       '#67e8f9',
-  disease:    '#fca5a5',
-  ingredient: '#c4b5fd',
-  bridge:     '#9c27b0',
-  service:    '#c4b5fd',
-  mechanism:  '#f87171',
-  pathogen:   '#dc2626',
-  pathway:    '#16a34a',
-  indicator:  '#475569',
-  default:    '#94a3b8',
+  notion:     '#818cf8',  // 靛蓝 — 概念
+  medication: '#67e8f9',  // 青色 — 具体药物或制剂
+  illness:    '#fca5a5',  // 浅红 — 疾病或病理状态
+  route:      '#22d3ee',  // 青色 — 信号通路、受体家族
+  substance:  '#c4b5fd',  // 紫色 — 成分、辅料、指标
+  process:    '#f87171',  // 红色 — 过程、机制、体内行为
+  module:     '#67e8f9',  // 青色 — 模块、入口、章节
+  section:    '#d1d5db',  // 淡灰 — 标签型知识点
+  default:    '#94a3b8',  // 未知类型的兜底色
 };
 
-// Category → border color (used as overlay on top of type fill)
-// 17 种系统归属，用于边框着色 — 同一颜色 = 同一系统领域
-export const CATEGORY_COLOR: Record<string, string> = {
-  // 系统归属（药学专业知识对应）
-  cardiovascular:      '#ef4444',  // 红 — 心血管系统
-  respiratory:         '#3b82f6',  // 蓝 — 呼吸系统
-  digestive:           '#22c55e',  // 绿 — 消化系统
-  endocrine:          '#f97316',  // 橙 — 内分泌系统
-  musculoskeletal:     '#06b6d4',  // 青 — 肌肉骨骼系统
-  anti_infective:      '#a855f7',  // 紫 — 抗感染（抗菌/抗病毒/抗真菌）
-  anti_tumor:          '#ec4899',  // 粉 — 抗肿瘤
-  blood:               '#f43f5e',  // 玫瑰红 — 血液系统
-  immunology:          '#eab308',  // 金 — 免疫与抗过敏
-  dermatology:         '#a16207',  // 棕 — 皮肤疾病
-  antipyretic:         '#7dd3fc',  // 浅蓝 — 解热镇痛抗炎
-  anti_rheumatic:      '#ea580c',  // 深橙 — 抗风湿
-  anti_gout:           '#9333ea',  // 紫红 — 抗痛风
-  nutrition:           '#6b7280',  // 灰绿 — 营养与维生素
-  diagnostic:          '#9ca3af',  // 灰 — 诊断与检验
-  pharmacy_practice:   '#94a3b8',  // 灰蓝 — 药学综合知识与技能
-  pharmacy_service:   '#94a3b8',  // 灰蓝 — 药学服务（与 pharmacy_practice 同色）
-  pharmacology:       '#ec4899',  // 粉 — 药学专业知识二（药理学/药物治疗）
-  // 向后兼容旧值
-  '第一篇 药剂学':    '#fb923c',
-  '第二篇 药理与毒理学': '#a78bfa',
-  '第三篇 药物化学':    '#34d399',
-  '第四篇 药动学':      '#fbbf24',
-  '第五篇 生命药学':    '#60a5fa',
-  '药剂学':            '#fb923c',
-  '药理学':            '#a78bfa',
-  '心血管药物':        '#f87171',
-};
-
-// 深色变体 — 用于节点径向渐变的内层，模拟立体感
 export const NODE_TYPE_COLOR_DARK: Record<string, string> = {
-  concept:    '#4f46e5',
-  drug:       '#0891b2',
-  disease:    '#dc2626',
-  ingredient: '#7c3aed',
-  bridge:     '#6a1080',
-  service:    '#7c3aed',
-  mechanism:  '#dc2626',
-  pathogen:   '#7f1d1d',
-  pathway:    '#14532d',
-  indicator:  '#1e293b',
-  default:    '#475569',
+  notion:     '#4f46e5',
+  medication: '#0891b2',
+  illness:    '#dc2626',
+  route:      '#0891b2',
+  substance:  '#7c3aed',
+  process:    '#dc2626',
+  module:     '#0891b2',
+  section:    '#94a3b8',
+  default:    '#64748b',
 };
 
-export const NODE_TYPE_LABEL: Record<string, string> = {
-  concept:    '概念',
-  drug:       '药物',
-  disease:    '疾病',
-  ingredient: '成分',
-  bridge:     '靶点',
-  service:    '服务',
-  mechanism:  '机制',
-  pathogen:   '病原体',
-  pathway:    '通路',
-  indicator:  '指标',
-  default:    '默认',
+// ── Essence → 中文标签 ───────────────────────────────────────────────────────
+
+export const ESSENCE_LABEL: Record<string, string> = {
+  notion:     '概念',
+  medication: '药物',
+  illness:    '疾病',
+  route:      '通路',
+  substance:  '成分',
+  process:    '过程',
+  module:     '入口',
+  section:    '标签',
 };
 
-export const SHAPE_LABEL: Record<string, string> = {
-  ellipse:         '椭圆',
-  'round-rectangle': '圆角矩形',
-  rectangle:       '矩形',
-  diamond:         '菱形',
-  barrel:          '六边形',
+// ── Field → 学科领域边框色 ───────────────────────────────────────────────────
+// 8 门学科，每门一色，色相间隔清晰
+// field 回答"属于哪门学科"——边框色区分学科归属
+
+export const FIELD_COLOR: Record<string, string> = {
+  pharmaceutics:      '#fb923c',  // 橙 — 药剂学
+  pharmacokinetics:   '#fbbf24',  // 黄 — 药代动力学
+  medicinal_chemistry:'#34d399',  // 绿 — 药物化学
+  pharmacology:       '#a78bfa',  // 紫 — 药理学
+  toxicology:         '#7c3aed',  // 深紫 — 毒理学
+  biopharmaceutics:   '#fbbf24',  // 黄 — 生物药剂学（与药代同族）
+  clinical_pharmacy:  '#94a3b8',  // 灰蓝 — 临床药学
+  pharmacy_service:   '#818cf8',  // 靛蓝 — 药学服务
 };
 
-// ── Knowledge layer → border style (thickness + background tint) ─────────────
+export const FIELD_LABEL: Record<string, string> = {
+  pharmaceutics:      '药剂学',
+  pharmacokinetics:   '药代动力学',
+  medicinal_chemistry:'药物化学',
+  pharmacology:       '药理学',
+  toxicology:         '毒理学',
+  biopharmaceutics:   '生物药剂学',
+  clinical_pharmacy:  '临床药学',
+  pharmacy_service:   '药学服务',
+};
 
-// layer 决定节点视觉层次（边框粗细 + 背景色）
-// foundation（基础层：生理/病理/药理基础）→ 细边框 + 浅灰底
-// system  （药物系统层：具体药物/制剂/成分）→ 中边框 + 无底色
-// clinical（临床层：疾病/治疗方案）      → 粗边框 + 无底色
-// service（服务层：用药管理/合理用药）  → 细边框 + 浅青底
-export const NODE_LAYER_STYLE: Record<string, { borderWidth: number; bgColor: string; borderColor: string }> = {
-  foundation: { borderWidth: 1,   bgColor: '#f8fafc', borderColor: '#94a3b8' },
-  system:     { borderWidth: 2,   bgColor: 'transparent', borderColor: '#475569' },
-  clinical:   { borderWidth: 3,   bgColor: 'transparent', borderColor: '#1e293b' },
-  service:    { borderWidth: 1,   bgColor: '#f0fdfa', borderColor: '#14b8a6' },
+// ── Tier → 填充色（从大众到稀有）─────────────────────────────────────────────
+// tier 回答"在哪一层"——基础层最大众、法规层最稀有
+// 填充色辅助识别层次
+
+export const NODE_TIER_STYLE: Record<string, { bgColor: string }> = {
+  basic:      { bgColor: '#cbd5e1' },  // 灰蓝 — 基础层
+  drug:       { bgColor: '#93c5fd' },  // 浅蓝 — 药物层
+  disease:    { bgColor: '#fca5a5' },  // 浅红 — 疾病层
+  management: { bgColor: '#fde68a' },  // 浅黄 — 管理层
+  service:    { bgColor: '#6ee7b7' },  // 浅青 — 服务层
+  legal:      { bgColor: '#d8b4fe' },  // 浅紫 — 法规层
+};
+
+export const TIER_LABEL: Record<string, string> = {
+  basic: '基础层', drug: '药物层', disease: '疾病层',
+  management: '管理层', service: '服务层', legal: '法规层',
 };
 
 // ── Edge type → visual style ────────────────────────────────────────────────
 
 export const EDGE_TYPE_STYLE: Record<string, { color: string; lineStyle: string; arrow: string }> = {
-  isa:       { color: '#4a90e2', lineStyle: 'solid',  arrow: 'triangle' },
-  part_of:   { color: '#50c878', lineStyle: 'solid',  arrow: 'triangle' },
-  mechanism: { color: '#e27c3e', lineStyle: 'solid',  arrow: 'triangle' },
-  causes:    { color: '#c0392b', lineStyle: 'solid',  arrow: 'triangle' },
-  treats:    { color: '#27ae60', lineStyle: 'solid',  arrow: 'triangle' },
-  has:       { color: '#95a5a6', lineStyle: 'solid',  arrow: 'none' },
-  relates:   { color: '#95a5a6', lineStyle: 'dashed', arrow: 'none' },
-  default:   { color: '#bdc3c7', lineStyle: 'solid',  arrow: 'none' },
+  // 结构与组成
+  has:       { color: '#95a5a6', lineStyle: 'solid',   arrow: 'none'     },
+  isa:       { color: '#4a90e2', lineStyle: 'solid',   arrow: 'triangle' },
+  // 药理机制
+  activates: { color: '#27ae60', lineStyle: 'solid',   arrow: 'triangle' },
+  inhibits:  { color: '#c0392b', lineStyle: 'solid',   arrow: 'tee'      },
+  mechanism: { color: '#e27c3e', lineStyle: 'solid',   arrow: 'triangle' },
+  metabolizes:{ color: '#8e44ad', lineStyle: 'solid',   arrow: 'triangle' },
+  // 临床关联
+  treats:     { color: '#2ecc71', lineStyle: 'solid',   arrow: 'triangle' },
+  causes:     { color: '#e74c3c', lineStyle: 'solid',   arrow: 'triangle' },
+  interacts:  { color: '#f39c12', lineStyle: 'dashed',  arrow: 'none'     },
+  contraindicates: { color: '#c0392b', lineStyle: 'dashed', arrow: 'none' },
+  // 学习路径
+  prerequisite:{ color: '#9b59b6', lineStyle: 'dotted', arrow: 'triangle' },
+  default:    { color: '#bdc3c7', lineStyle: 'solid',   arrow: 'none'     },
+};
+
+// ── Shape → 中文标签 ─────────────────────────────────────────────────────────
+
+export const SHAPE_LABEL: Record<string, string> = {
+  ellipse:          '椭圆',
+  'round-rectangle': '圆角矩形',
+  rectangle:        '矩形',
+  diamond:          '菱形',
+  triangle:         '三角形',
+  pentagon:         '五边形',
+  octagon:          '八边形',
+  star:             '星形',
+  tag:              '标签形',
+  'round-tag':      '圆角标签形',
+  'round-triangle': '圆角三角形',
+  'bottom-round-rectangle': '底圆矩形',
+  'cut-rectangle':  '切角矩形',
+  barrel:           '桶形',
+  rhomboid:         '菱形（横向）',
+  'right-rhomboid': '右斜菱形',
+  'round-diamond':  '圆角菱形',
+  'round-pentagon': '圆角五边形',
+  hexagon:          '六边形',
+  'round-hexagon':  '圆角六边形',
+  'concave-hexagon':'凹六边形',
+  heptagon:         '七边形',
+  'round-heptagon': '圆角七边形',
+  'round-octagon':  '圆角八边形',
+  vee:              'V形',
 };
 
 // ── Layout configs ───────────────────────────────────────────────────────────
