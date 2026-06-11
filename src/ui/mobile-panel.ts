@@ -4,8 +4,7 @@
 
 import cytoscape from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
-import { nodeColor } from '../core/colors.js';
-import { ESSENCE_LABEL, FIELD_LABEL, TIER_LABEL } from '../core/config.js';
+import { NODE_TYPE_COLOR, ESSENCE_LABEL, FIELD_LABEL, TIER_LABEL } from '../core/config.js';
 import { uiState } from './state.js';
 
 const EDGE_TYPE_LABELS: Record<string, string> = {
@@ -178,11 +177,11 @@ function buildOverviewContent(
   cy: cytoscape.Core,
   collapsible = false,
 ): string {
-  const typeVal = (d.type as string) || '';
-  const color = typeVal ? nodeColor(typeVal) : '#94a3b8';
+  const essenceVal = (d.essence as string) || '';
+  const color = essenceVal ? (NODE_TYPE_COLOR[essenceVal] ?? NODE_TYPE_COLOR.default) : '#94a3b8';
 
   const heroBadges = [
-    badgeHtml(typeVal ? (ESSENCE_LABEL[typeVal] ?? typeVal) : '—', 'np-badge--type', color),
+    badgeHtml(essenceVal ? (ESSENCE_LABEL[essenceVal] ?? essenceVal) : '—', 'np-badge--type', color),
     d.field ? badgeHtml(FIELD_LABEL[d.field as string] ?? (d.field as string), 'np-badge--field', '#a78bfa') : '',
     d.tier  ? badgeHtml(TIER_LABEL[d.tier  as string] ?? (d.tier  as string), 'np-badge--tier',  '#fbbf24') : '',
   ].join('');

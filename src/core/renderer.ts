@@ -9,6 +9,7 @@ import euler from 'cytoscape-euler';
 import { GraphData } from './graph.js';
 import {
   NODE_TYPE_SHAPE,
+  NODE_TYPE_COLOR,
   NODE_TYPE_COLOR_DARK,
   FIELD_COLOR,
   EDGE_TYPE_STYLE,
@@ -16,7 +17,6 @@ import {
   LAYOUTS,
   LayoutConfig,
 } from './config.js';
-import { nodeColor, nodeColorDark } from './colors.js';
 
 cytoscape.use(coseBilkent);
 cytoscape.use(dagre);
@@ -371,8 +371,8 @@ export class Renderer {
           tags: n.tags ?? [],
           body: n.body,
           weight: n.weight ?? 60,
-          color: nodeColor(n.essence || n.type || 'default'),
-          colorDark: nodeColorDark(n.essence || n.type || 'default'),
+          color: NODE_TYPE_COLOR[n.essence || n.type] ?? NODE_TYPE_COLOR.default,
+          colorDark: NODE_TYPE_COLOR_DARK[n.essence || n.type] ?? NODE_TYPE_COLOR_DARK.default,
         },
       })),
       ...data.edges

@@ -4,8 +4,7 @@
 
 import cytoscape from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
-import { nodeColor } from '../core/colors.js';
-import { ESSENCE_LABEL, FIELD_LABEL, TIER_LABEL } from '../core/config.js';
+import { NODE_TYPE_COLOR, ESSENCE_LABEL, FIELD_LABEL, TIER_LABEL } from '../core/config.js';
 import { uiState } from './state.js';
 
 const EDGE_TYPE_LABELS: Record<string, string> = {
@@ -231,10 +230,10 @@ function switchDesktopTab(tab: 'overview' | 'body'): void {
 // ── Build helpers ─────────────────────────────────────────────────────────────
 
 function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
-  const typeVal = (d.type as string) || '';
-  const color = typeVal ? nodeColor(typeVal) : '#94a3b8';
+  const essenceVal = (d.essence as string) || '';
+  const color = essenceVal ? (NODE_TYPE_COLOR[essenceVal] ?? NODE_TYPE_COLOR.default) : '#94a3b8';
   const nodeName = (d.label as string) || (d.id as string);
-  const essenceText = typeVal ? (ESSENCE_LABEL[typeVal] ?? typeVal) : '—';
+  const essenceText = essenceVal ? (ESSENCE_LABEL[essenceVal] ?? essenceVal) : '—';
   const fieldText = d.field ? (FIELD_LABEL[d.field as string] ?? (d.field as string)) : '';
   const tierText = d.tier ? (TIER_LABEL[d.tier as string] ?? (d.tier as string)) : '';
 
