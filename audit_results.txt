@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "C:\Users\GALAX\Desktop\pharma-graph\full_audit.py", line 155, in <module>
+    with open('audit_results.txt', 'w', encoding='utf-8') as out:
+         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: 'audit_results.txt'

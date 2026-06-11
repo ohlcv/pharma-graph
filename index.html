@@ -95,7 +95,7 @@
 
     <div class="toolbar__sep"></div>
 
-    <button id="btn-tour" class="btn" title="漫游探索">
+    <button id="btn-tour" class="btn" title="漫游探索" onclick="toggleTour()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="10"/>
         <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/>
@@ -171,33 +171,96 @@
     <!-- ── Desktop sidebar ───────────────────────────────────────────── -->
     <aside id="sidebar">
 
-      <!-- Node types -->
+      <!-- 图例说明 -->
       <div class="sidebar-section" data-section="types" data-section-state="open">
         <div class="sidebar-section__head" onclick="toggleSection('types')" aria-expanded="true" aria-controls="body-types">
-          <span class="sidebar-section__title">节点类型</span>
+          <span class="sidebar-section__title">图例说明</span>
           <svg class="sidebar-section__chevron open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
         <div class="sidebar-section__body" id="body-types">
-          <div class="node-type-grid">
-            <div class="node-type-item" onclick="highlightShape('ellipse')">
-              <div class="node-type-item__dot" style="background:#818cf8"></div>
-              <span class="node-type-item__label">概念</span>
-              <span class="node-type-item__count" id="count-ellipse"></span>
+          <!-- 节点类型 -->
+          <div class="legend-block">
+            <div class="legend-block__label">节点类型（填充色）</div>
+            <div class="legend-grid legend-grid--2">
+              <div class="legend-row" onclick="highlightShape('ellipse')">
+                <span class="legend-node legend-node--shape" style="background:#818cf8;border-radius:50%"></span>
+                <span class="legend-row__label">概念</span>
+                <span class="legend-row__count" id="count-type-concept"></span>
+              </div>
+              <div class="legend-row" onclick="highlightShape('round-rectangle')">
+                <span class="legend-node legend-node--shape" style="background:#67e8f9"></span>
+                <span class="legend-row__label">药物</span>
+                <span class="legend-row__count" id="count-type-drug"></span>
+              </div>
+              <div class="legend-row" onclick="highlightShape('diamond')">
+                <span class="legend-node legend-node--shape" style="background:#fca5a5;border-radius:2px;transform:rotate(45deg);width:9px;height:9px"></span>
+                <span class="legend-row__label">疾病</span>
+                <span class="legend-row__count" id="count-type-disease"></span>
+              </div>
+              <div class="legend-row" onclick="highlightShape('barrel')">
+                <span class="legend-node legend-node--shape" style="background:#c4b5fd"></span>
+                <span class="legend-row__label">成分</span>
+                <span class="legend-row__count" id="count-type-ingredient"></span>
+              </div>
             </div>
-            <div class="node-type-item" onclick="highlightShape('round-rectangle')">
-              <div class="node-type-item__dot" style="background:#67e8f9"></div>
-              <span class="node-type-item__label">药物</span>
-              <span class="node-type-item__count" id="count-round-rectangle"></span>
+          </div>
+          <!-- 系统归属（边框色） -->
+          <div class="legend-block">
+            <div class="legend-block__label">系统归属（边框色）</div>
+            <div class="legend-grid" id="legend-category-grid">
+              <!-- 由 populateLegendCounts() 动态填充 -->
             </div>
-            <div class="node-type-item" onclick="highlightShape('diamond')">
-              <div class="node-type-item__dot" style="background:#fca5a5;transform:rotate(45deg);border-radius:2px;width:9px;height:9px"></div>
-              <span class="node-type-item__label">疾病</span>
-              <span class="node-type-item__count" id="count-diamond"></span>
+          </div>
+          <!-- 知识层级 -->
+          <div class="legend-block">
+            <div class="legend-block__label">知识层级</div>
+            <div class="legend-grid legend-grid--4">
+              <div class="legend-row">
+                <span class="legend-node legend-node--layer" style="background:#f8fafc;border:2px solid #94a3b8;border-radius:50%"></span>
+                <span class="legend-row__label">基础层</span>
+              </div>
+              <div class="legend-row">
+                <span class="legend-node legend-node--layer" style="background:rgba(30,41,59,0.0);border:2px solid #475569;border-radius:50%"></span>
+                <span class="legend-row__label">系统层</span>
+              </div>
+              <div class="legend-row">
+                <span class="legend-node legend-node--layer" style="background:rgba(30,41,59,0.0);border:3px solid #1e293b;border-radius:50%"></span>
+                <span class="legend-row__label">临床层</span>
+              </div>
+              <div class="legend-row">
+                <span class="legend-node legend-node--layer" style="background:#f0fdfa;border:1px solid #14b8a6;border-radius:50%"></span>
+                <span class="legend-row__label">服务层</span>
+              </div>
             </div>
-            <div class="node-type-item" onclick="highlightShape('barrel')">
-              <div class="node-type-item__dot" style="background:#c4b5fd"></div>
-              <span class="node-type-item__label">成分</span>
-              <span class="node-type-item__count" id="count-barrel"></span>
+          </div>
+          <!-- 关系类型 -->
+          <div class="legend-block">
+            <div class="legend-block__label">关系类型</div>
+            <div class="legend-edge-list" id="legend-edge-list">
+              <div class="legend-edge-row">
+                <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#4a90e2" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#4a90e2"/></svg>
+                <span>是个</span>
+              </div>
+              <div class="legend-edge-row">
+                <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#50c878" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#50c878"/></svg>
+                <span>包含</span>
+              </div>
+              <div class="legend-edge-row">
+                <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#e27c3e" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#e27c3e"/></svg>
+                <span>机制</span>
+              </div>
+              <div class="legend-edge-row">
+                <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#c0392b" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#c0392b"/></svg>
+                <span>致因</span>
+              </div>
+              <div class="legend-edge-row">
+                <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#27ae60" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#27ae60"/></svg>
+                <span>治疗</span>
+              </div>
+              <div class="legend-edge-row">
+                <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#95a5a6" stroke-width="2" stroke-dasharray="4 3"/><polygon points="26,5 21,2 21,8" fill="#95a5a6"/></svg>
+                <span>关联</span>
+              </div>
             </div>
           </div>
         </div>
@@ -315,7 +378,7 @@
     <!-- ── Node type chips ───────────────────────────────── -->
     <div class="bs-section">
       <div class="bs-section__label">节点类型</div>
-      <div class="bs-chips">
+      <div class="bs-chips" id="bs-type-chips">
         <div class="bs-chip" onclick="highlightShape('ellipse')">
           <div class="bs-chip__dot" style="background:#818cf8;border-radius:50%"></div>
           <span>概念</span>
@@ -332,6 +395,14 @@
           <div class="bs-chip__dot" style="background:#c4b5fd"></div>
           <span>成分</span>
         </div>
+      </div>
+    </div>
+
+    <!-- ── Category chips ───────────────────────────────── -->
+    <div class="bs-section">
+      <div class="bs-section__label">系统归属（边框色）</div>
+      <div class="bs-chips" id="bs-category-chips">
+        <!-- 由 populateLegendCounts() 动态填充 -->
       </div>
     </div>
 
@@ -376,7 +447,7 @@
           </svg>
           <span>音乐</span>
         </button>
-        <button class="bs-quick-btn" id="bs-btn-tour" title="漫游探索">
+        <button class="bs-quick-btn" id="bs-btn-tour" title="漫游探索" onclick="toggleTour()">
           <svg id="bs-tour-icon-stop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
             <rect x="6" y="6" width="12" height="12" rx="1" fill="currentColor" stroke="none"/>
           </svg>

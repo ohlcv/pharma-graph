@@ -47,7 +47,6 @@ const STYLESHEET: any[] = (() => {
     style: {
       shape: shape as cytoscape.Css.NodeShape,
       'background-color': nodeColor(type),
-      'border-width': 1.5,
     },
   }));
 
@@ -97,6 +96,7 @@ const STYLESHEET: any[] = (() => {
         'text-background-shape': 'roundrectangle',
         'text-background-padding': '3px',
         'border-width': 0,
+        'border-color': '#475569',
         shape: 'ellipse',
         'text-events': 'yes',
       },

@@ -465,15 +465,6 @@ function initMusicPlayer(): void {
   if (bsBtn) bsBtn.addEventListener('click', toggleMusic);
 }
 
-// ── Tour button binding ────────────────────────────────────────────────────────
-
-function initTourButtonBinding(): void {
-  const tourBtn = document.getElementById('btn-tour');
-  const bsTourBtn = document.getElementById('bs-btn-tour');
-  if (tourBtn) tourBtn.addEventListener('click', toggleTour);
-  if (bsTourBtn) bsTourBtn.addEventListener('click', toggleTour);
-}
-
 // ── Graph events ──────────────────────────────────────────────────────────────
 
 function initGraphEvents(
@@ -785,7 +776,6 @@ if (uiState.renderer) {
   initKeyboardShortcuts(uiState.renderer);
   initSearchUI(cy, uiState.highlight!, uiState.search!, uiState.detailPanel!);
   initResizeHandler(uiState.renderer);
-  initTourButtonBinding();
   initMusicPlayer();
   exposeGlobals(uiState.renderer, uiState.highlight!, uiState.detailPanel!);
 }
