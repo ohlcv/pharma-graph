@@ -40,6 +40,7 @@ export async function buildNodes(filePaths: string[]): Promise<NodeData[]> {
       category: field,
       layer: tier,
       summary: fm.summary,
+      body: fm.body,
       location: toLocation(fp),
       weight: 1,
     };
