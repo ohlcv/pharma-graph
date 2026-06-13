@@ -110,29 +110,47 @@ function getLocationItem(node: cytoscape.NodeSingular): string {
 // 汉字数字转阿拉伯数字
 const CN_DIGIT_MAP: Record<string, number> = {
   '零': 0, '一': 1, '二': 2, '三': 3, '四': 4,
-  '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
+  '五': 5, '六': 6, '七': 7, '八': 8, '九': 9,
 };
 
-// 从"第X节"或"第X章"格式中提取数字
+// 从"第X节"/"第X章"/"第X篇"格式中提取数字，支持阿拉伯数字和汉字（含十、百）
 function extractSectionNumber(section: string): number {
   if (!section) return 0;
   const match = section.match(/第(.+?)[篇章节]/);
   if (!match) return 999;
   const numStr = match[1];
+
+  // 纯阿拉伯数字
   if (/^\d+$/.test(numStr)) return parseInt(numStr, 10);
+
+  // 汉字数字解析：支持 一~九、十、十一~十九、二十~九十九、一百…
+  // 算法：从高位到低位累加
   let result = 0;
-  if (numStr.includes('十')) {
-    const parts = numStr.split('十');
-    if (parts[0] === '') result = 10;
-    else if (parts[1] === '') result = CN_DIGIT_MAP[parts[0]] * 10;
-    else result = (CN_DIGIT_MAP[parts[0]] || 1) * 10 + (CN_DIGIT_MAP[parts[1]] || 0);
-  } else {
-    result = CN_DIGIT_MAP[numStr] ?? 999;
+  let tmp = 0; // 当前位的系数
+
+  for (let i = 0; i < numStr.length; i++) {
+    const ch = numStr[i];
+    if (ch in CN_DIGIT_MAP) {
+      tmp = CN_DIGIT_MAP[ch];
+    } else if (ch === '十') {
+      // "十" 单独出现（即字符串以"十"开头）时系数为 1
+      result += (tmp === 0 ? 1 : tmp) * 10;
+      tmp = 0;
+    } else if (ch === '百') {
+      result += tmp * 100;
+      tmp = 0;
+    } else {
+      // 未知字符，兜底
+      return 999;
+    }
   }
-  return result;
+  result += tmp; // 加上个位
+
+  return result > 0 ? result : 999;
 }
 
-// Full location sort key: book > chapter/part > section > subsection > item (纯数字段)
+// Full location sort key: book > part/chapter > section > subsection > item
+// book级总入口（无chapter也无part）用 chapterNum='000'，排在该 book 的最前面。
 function getLocationKey(node: cytoscape.NodeSingular): string {
   const book       = getLocationBook(node);
   const chapter    = getLocationChapter(node);
@@ -141,7 +159,8 @@ function getLocationKey(node: cytoscape.NodeSingular): string {
   const subsection = getLocationSubsection(node);
   const item       = getLocationItem(node);
   const label      = node.data('label') ?? node.id();
-  // book级总入口（无chapter也无part）用'000'排最前
+
+  // chapter 优先，无 chapter 则用 part，两者都无则为书级入口排最前
   let chapterNum: string;
   if (chapter) {
     chapterNum = extractSectionNumber(chapter).toString().padStart(3, '0');
@@ -150,10 +169,12 @@ function getLocationKey(node: cytoscape.NodeSingular): string {
   } else {
     chapterNum = '000';
   }
-  // 各层级缺失时用'000'，保证入口节点排在子节点前面
+
+  // 层级缺失时用 '000'，保证入口节点（section/subsection 均空）排在子节点前面
   const sectionNum    = section    ? extractSectionNumber(section).toString().padStart(3, '0')    : '000';
   const subsectionNum = subsection ? extractSectionNumber(subsection).toString().padStart(3, '0') : '000';
-  // item 不含"第X节"格式，直接用原文做 tiebreaker；label 兜底
+
+  // item 不含序号格式，直接用原文做 tiebreaker；label 兜底
   return book + '\x00' + chapterNum + '\x00' + sectionNum + '\x00' + subsectionNum + '\x00' + item + '\x00' + label;
 }
 
@@ -166,12 +187,19 @@ class HasDfsStrategy implements TourStrategyImpl {
   buildSequence(cy: cytoscape.Core): string[] {
     // 直接按 location 字段全局排序：book > part > chapter > section > subsection > item
     // 这比 has 边 DFS 更可靠——location 已完整编码教材层级，DFS 反而因边覆盖不均引入乱序。
+    const seen = new Set<string>();
     return cy.nodes().not('.layer-parent')
       .toArray()
       .sort((a, b) => {
         const la = getLocationKey(a as cytoscape.NodeSingular);
         const lb = getLocationKey(b as cytoscape.NodeSingular);
         return la < lb ? -1 : la > lb ? 1 : 0;
+      })
+      .filter((n) => {
+        const id = n.id();
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
       })
       .map((n) => n.id());
   }
@@ -249,18 +277,86 @@ class TopoPrereqStrategy implements TourStrategyImpl {
       }
     }
 
-    // 兜底：游离于先修链之外的节点（无 prerequisite 边或成环）按 location 顺序补在末尾
-    // 用 Set 做 O(1) 查询，避免 seq.includes 的 O(n²)
+    // ── 兜底：把先修链未覆盖的节点插入 seq ────────────────────────────────────
+    //
+    // 策略：
+    //   1. 对每个未访问节点，找它在 seq 中"最早出现的后代节点"的位置。
+    //      后代定义：seq 中某节点的 location key 以该节点的 location prefix 为前缀。
+    //   2. 若找到，就把它插到那个后代之前（入口节点紧贴第一个子节点）。
+    //   3. 若找不到，按 location 排序追加到末尾。
+    //
+    // 这样章级/篇级入口不再被甩到最后，而是紧贴着它的第一个子节点出现。
+
     const seqSet = new Set(seq);
+
+    // 未访问节点，按 location key 升序（保证同级入口先于子节点处理）
     const unvisited = nodes.toArray()
       .filter((n) => !seqSet.has(n.id()))
-      .map((n) => n.id())
       .sort((a, b) => {
-        const la = getLocationKey(cy.getElementById(a));
-        const lb = getLocationKey(cy.getElementById(b));
+        const la = getLocationKey(a as cytoscape.NodeSingular);
+        const lb = getLocationKey(b as cytoscape.NodeSingular);
         return la < lb ? -1 : la > lb ? 1 : 0;
-      });
-    seq.push(...unvisited);
+      })
+      .map((n) => n.id());
+
+    // getLocationPrefix：取 location key 中的层级段（不含 item+label 后缀），
+    // 用来做"祖先前缀匹配"
+    const getLocationPrefix = (node: cytoscape.NodeSingular): string => {
+      const book       = getLocationBook(node);
+      const chapter    = getLocationChapter(node);
+      const part       = getLocationPart(node);
+      const section    = getLocationSection(node);
+      const subsection = getLocationSubsection(node);
+
+      let chapterNum: string;
+      if (chapter) {
+        chapterNum = extractSectionNumber(chapter).toString().padStart(3, '0');
+      } else if (part) {
+        chapterNum = extractSectionNumber(part).toString().padStart(3, '0');
+      } else {
+        chapterNum = '000';
+      }
+      const sectionNum    = section    ? extractSectionNumber(section).toString().padStart(3, '0')    : '';
+      const subsectionNum = subsection ? extractSectionNumber(subsection).toString().padStart(3, '0') : '';
+
+      let key = book + '\x00' + chapterNum;
+      if (sectionNum)    key += '\x00' + sectionNum;
+      if (subsectionNum) key += '\x00' + subsectionNum;
+      return key;
+    };
+
+    const toAppend: string[] = [];
+    const insertions: Array<{ pos: number; id: string }> = [];
+
+    for (const uid of unvisited) {
+      const uNode = cy.getElementById(uid);
+      const uPrefix = getLocationPrefix(uNode);
+
+      // 在 seq 中找第一个 location key 以 uPrefix 为前缀的节点（即最早的后代）
+      let bestPos = -1;
+      for (let i = 0; i < seq.length; i++) {
+        const seqNode = cy.getElementById(seq[i]);
+        const seqKey  = getLocationKey(seqNode);
+        if (seqKey.startsWith(uPrefix + '\x00') || seqKey === uPrefix) {
+          bestPos = i;
+          break;
+        }
+      }
+
+      if (bestPos >= 0) {
+        insertions.push({ pos: bestPos, id: uid });
+      } else {
+        toAppend.push(uid);
+      }
+    }
+
+    // 按插入位置倒序处理，避免插入后后续 pos 偏移
+    insertions.sort((a, b) => b.pos - a.pos);
+    for (const { pos, id } of insertions) {
+      seq.splice(pos, 0, id);
+    }
+
+    seq.push(...toAppend);
 
     return seq;
   }
