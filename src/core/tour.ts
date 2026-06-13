@@ -36,7 +36,7 @@ export type TourStrategy =
 
 export const TOUR_STRATEGY_LABELS: Record<TourStrategy, string> = {
   'has-dfs':    'E1 教材顺序DFS',
-  'topo-prereq':'E2 先修链',
+  'topo-prereq':'E2 依赖链',
 };
 
 export interface TourStrategyImpl {
@@ -205,7 +205,7 @@ class HasDfsStrategy implements TourStrategyImpl {
   }
 }
 
-// ── E2: 先修链拓扑排序 ───────────────────────────────────────────────────────
+// ── E2: 依赖链拓扑排序 ───────────────────────────────────────────────────────
 
 class TopoPrereqStrategy implements TourStrategyImpl {
   id = 'topo-prereq' as TourStrategy;
@@ -277,7 +277,7 @@ class TopoPrereqStrategy implements TourStrategyImpl {
       }
     }
 
-    // ── 兜底：把先修链未覆盖的节点插入 seq ────────────────────────────────────
+    // ── 兜底：把依赖链未覆盖的节点插入 seq ────────────────────────────────────
     //
     // 策略：
     //   1. 对每个未访问节点，找它在 seq 中"最早出现的后代节点"的位置。

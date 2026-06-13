@@ -569,11 +569,8 @@
       <div class="tour-mob__strategy">
         <span class="tour-mob__strategy-label">策略</span>
         <select id="tour-strategy-select-mob" class="tour-mob__strategy-select" onchange="onTourStrategyChange(this.value)">
-          <option value="has-bfs">E1 has边</option>
-          <option value="full-bfs">E2 全边BFS</option>
-          <option value="field-layer">E3 学科分块</option>
-          <option value="tier-layer">E4 层次分层</option>
-          <option value="topo-prereq">E5 先修链</option>
+          <option value="has-dfs">E1 教材顺序DFS</option>
+          <option value="topo-prereq">E2 依赖链</option>
         </select>
       </div>
       <!-- 竖向滑动条列 -->
@@ -648,11 +645,8 @@
           策略
         </span>
         <select id="tour-strategy-select-dt" class="tour-dt__select" onchange="onTourStrategyChange(this.value)">
-          <option value="has-bfs">E1 has边</option>
-          <option value="full-bfs">E2 全边BFS</option>
-          <option value="field-layer">E3 学科分块</option>
-          <option value="tier-layer">E4 层次分层</option>
-          <option value="topo-prereq">E5 先修链</option>
+          <option value="has-dfs">E1 教材顺序DFS</option>
+          <option value="topo-prereq">E2 依赖链</option>
         </select>
       </div>
       <!-- 分隔线 -->
