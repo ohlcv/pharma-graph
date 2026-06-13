@@ -233,12 +233,11 @@ export function populateFieldLegend(cy: Core): void {
       row.addEventListener('click', () => {
         const field = row.dataset.field ?? '';
         if (activeFieldFilter === field) {
-          activeFieldFilter = null;
-          row.classList.remove('active');
+          clearAllFilters();
           uiState.highlight!.reset();
         } else {
+          clearAllFilters();
           activeFieldFilter = field;
-          document.querySelectorAll('.legend-field-row[data-field]').forEach((r) => r.classList.remove('active'));
           row.classList.add('active');
           uiState.highlight!.highlightField(field);
         }
@@ -261,12 +260,11 @@ export function populateFieldLegend(cy: Core): void {
       chip.addEventListener('click', () => {
         const field = chip.dataset.field ?? '';
         if (activeFieldFilter === field) {
-          activeFieldFilter = null;
-          chip.classList.remove('active');
+          clearAllFilters();
           uiState.highlight!.reset();
         } else {
+          clearAllFilters();
           activeFieldFilter = field;
-          document.querySelectorAll('.bs-chip[data-field]').forEach((c) => c.classList.remove('active'));
           chip.classList.add('active');
           uiState.highlight!.highlightField(field);
         }
@@ -305,12 +303,11 @@ export function populateTierLegend(cy: Core): void {
       row.addEventListener('click', () => {
         const tier = row.dataset.tier ?? '';
         if (activeTierFilter === tier) {
-          activeTierFilter = null;
-          row.classList.remove('active');
+          clearAllFilters();
           uiState.highlight!.reset();
         } else {
+          clearAllFilters();
           activeTierFilter = tier;
-          document.querySelectorAll('.legend-tier-row[data-tier]').forEach((r) => r.classList.remove('active'));
           row.classList.add('active');
           uiState.highlight!.highlightTier(tier);
         }
@@ -333,12 +330,11 @@ export function populateTierLegend(cy: Core): void {
       chip.addEventListener('click', () => {
         const tier = chip.dataset.tier ?? '';
         if (activeTierFilter === tier) {
-          activeTierFilter = null;
-          chip.classList.remove('active');
+          clearAllFilters();
           uiState.highlight!.reset();
         } else {
+          clearAllFilters();
           activeTierFilter = tier;
-          document.querySelectorAll('.bs-chip[data-tier]').forEach((c) => c.classList.remove('active'));
           chip.classList.add('active');
           uiState.highlight!.highlightTier(tier);
         }

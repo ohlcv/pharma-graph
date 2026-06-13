@@ -74,6 +74,15 @@ export class HighlightEngine {
       }
     });
 
+    this.cy.edges().not(`.${CLASSES.HIGHLIGHTED_EDGE}`).addClass(CLASSES.DIMMED);
+    this.cy.edges(`[source][target]`).forEach((e: cytoscape.EdgeSingular) => {
+      const src = e.source();
+      const tgt = e.target();
+      if (src.hasClass(CLASSES.HIGHLIGHTED) && tgt.hasClass(CLASSES.HIGHLIGHTED)) {
+        e.removeClass(CLASSES.DIMMED).addClass(CLASSES.HIGHLIGHTED_EDGE);
+      }
+    });
+
     return results;
   }
 
@@ -87,6 +96,15 @@ export class HighlightEngine {
         n.addClass(CLASSES.HIGHLIGHTED);
       } else {
         n.addClass(CLASSES.DIMMED);
+      }
+    });
+
+    this.cy.edges().not(`.${CLASSES.HIGHLIGHTED_EDGE}`).addClass(CLASSES.DIMMED);
+    this.cy.edges(`[source][target]`).forEach((e: cytoscape.EdgeSingular) => {
+      const src = e.source();
+      const tgt = e.target();
+      if (src.hasClass(CLASSES.HIGHLIGHTED) && tgt.hasClass(CLASSES.HIGHLIGHTED)) {
+        e.removeClass(CLASSES.DIMMED).addClass(CLASSES.HIGHLIGHTED_EDGE);
       }
     });
   }
@@ -103,6 +121,15 @@ export class HighlightEngine {
         n.addClass(CLASSES.DIMMED);
       }
     });
+
+    this.cy.edges().not(`.${CLASSES.HIGHLIGHTED_EDGE}`).addClass(CLASSES.DIMMED);
+    this.cy.edges(`[source][target]`).forEach((e: cytoscape.EdgeSingular) => {
+      const src = e.source();
+      const tgt = e.target();
+      if (src.hasClass(CLASSES.HIGHLIGHTED) && tgt.hasClass(CLASSES.HIGHLIGHTED)) {
+        e.removeClass(CLASSES.DIMMED).addClass(CLASSES.HIGHLIGHTED_EDGE);
+      }
+    });
   }
 
   highlightTier(tier: string): void {
@@ -115,6 +142,15 @@ export class HighlightEngine {
         n.addClass(CLASSES.HIGHLIGHTED);
       } else {
         n.addClass(CLASSES.DIMMED);
+      }
+    });
+
+    this.cy.edges().not(`.${CLASSES.HIGHLIGHTED_EDGE}`).addClass(CLASSES.DIMMED);
+    this.cy.edges(`[source][target]`).forEach((e: cytoscape.EdgeSingular) => {
+      const src = e.source();
+      const tgt = e.target();
+      if (src.hasClass(CLASSES.HIGHLIGHTED) && tgt.hasClass(CLASSES.HIGHLIGHTED)) {
+        e.removeClass(CLASSES.DIMMED).addClass(CLASSES.HIGHLIGHTED_EDGE);
       }
     });
   }
