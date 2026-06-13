@@ -33,6 +33,9 @@ edges_out:
   - target: hematologic-drugs-y2
     type: prerequisite
     reason: 骨髓抑制是这类药的主要毒性
+  - target: tumor-chemotherapy-management
+    type: treats
+    reason: DNA损伤药用于肿瘤化疗
 ---
 
 # 直接影响DNA结构和功能的药物
