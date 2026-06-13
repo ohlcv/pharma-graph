@@ -1,0 +1,167 @@
+{
+  "dangling": [],
+  "orphans": [
+    {
+      "id": "bioavailability-y1",
+      "label": "生物利用度",
+      "location": "药学专业知识一 > 第七章 口服制剂与临床应用 > 第一节 口服固体制剂",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学专业知识一\\第一篇 药剂学\\第七章 口服制剂与临床应用\\第一节 口服固体制剂\\生物利用度.md"
+    },
+    {
+      "id": "sustained-release-dosage-forms-y1",
+      "label": "缓释剂型",
+      "location": "药学专业知识一 > 第七章 口服制剂与临床应用 > 第一节 口服固体制剂",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学专业知识一\\第一篇 药剂学\\第七章 口服制剂与临床应用\\第一节 口服固体制剂\\缓释剂型.md"
+    },
+    {
+      "id": "metoprolol",
+      "label": "美托洛尔",
+      "location": "药学专业知识一 > 第七章 口服制剂与临床应用 > 第一节 口服固体制剂 > 美托洛尔",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学专业知识一\\第一篇 药剂学\\第七章 口服制剂与临床应用\\第一节 口服固体制剂\\美托洛尔.md"
+    },
+    {
+      "id": "drug-absorption-y1",
+      "label": "药物的吸收",
+      "location": "药学专业知识一 > 第三章 药物的体内过程 > 第二节 药物的吸收",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学专业知识一\\第四篇 药动学\\第三章 药物的体内过程\\第二节 药物的吸收.md"
+    },
+    {
+      "id": "first-pass-effect",
+      "label": "首过效应",
+      "location": "药学专业知识一 > 第七章 口服制剂与临床应用 > 第一节 口服固体制剂 > 首过效应",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学专业知识一\\第一篇 药剂学\\第七章 口服制剂与临床应用\\第一节 口服固体制剂\\首过效应.md"
+    },
+    {
+      "id": "pharmaceutics-y1",
+      "label": "药剂学",
+      "location": "药学专业知识一",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学专业知识一\\第一篇 药剂学.md"
+    },
+    {
+      "id": "structure-activity-drugs-1-y1",
+      "label": "药物结构与药物活性",
+      "location": "药学专业知识一 > 第六章 药物的结构与作用 > 第一节 药物结构与药物活性",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学专业知识一\\第三篇 药物化学\\第六章 药物的结构与作用\\第一节 药物结构与药物活性.md"
+    },
+    {
+      "id": "drug-metabolism-y1",
+      "label": "药物代谢",
+      "location": "药学专业知识一 > 第六章 药物的结构与作用 > 第二节 药物代谢",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学专业知识一\\第三篇 药物化学\\第六章 药物的结构与作用\\第二节 药物代谢.md"
+    },
+    {
+      "id": "pharmacogenetics-y1",
+      "label": "遗传药理学与临床合理用药",
+      "location": "药学专业知识一 > 第四章 药物对机体的作用 > 第五节 遗传药理学与临床合理用药",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学专业知识一\\第二篇 药理与毒理学\\第四章 药物对机体的作用\\第五节 遗传药理学与临床合理用药.md"
+    },
+    {
+      "id": "chronopharmacology-y1",
+      "label": "时辰药理学与临床合理用药",
+      "location": "药学专业知识一 > 第四章 药物对机体的作用 > 第六节 时辰药理学与临床合理用药",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学专业知识一\\第二篇 药理与毒理学\\第四章 药物对机体的作用\\第六节 时辰药理学与临床合理用药.md"
+    },
+    {
+      "id": "pharmacology-and-toxicology",
+      "label": "药理与毒理学",
+      "location": "药学专业知识一",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学专业知识一\\第二篇 药理与毒理学.md"
+    },
+    {
+      "id": "biopharmaceutics-chapter-y1",
+      "label": "生命药学",
+      "location": "药学专业知识一 > 第二章 生命药学",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学专业知识一\\第五篇 生命药学\\第二章 生命药学.md"
+    },
+    {
+      "id": "drug-disposition-processes",
+      "label": "药物的体内过程",
+      "location": "药学专业知识一 > 第三章 药物的体内过程",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学专业知识一\\第四篇 药动学\\第三章 药物的体内过程.md"
+    },
+    {
+      "id": "pharm-knowledge-1",
+      "label": "药学专业知识一",
+      "location": "药学专业知识一",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学专业知识一.md"
+    },
+    {
+      "id": "section-antihypertensive-heart-failure",
+      "label": "抗心力衰竭药",
+      "location": "药学专业知识二 > 第五章 心血管系统用药 > 第五节 抗心力衰竭药",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学专业知识二\\第五章 心血管系统用药\\第五节 抗心力衰竭药.md"
+    },
+    {
+      "id": "section-hypothalamic-pituitary-drugs",
+      "label": "下丘脑 - 垂体激素及相关药物",
+      "location": "药学专业知识二 > 第八章 内分泌系统用药 > 第一节 下丘脑 - 垂体激素及相关药物",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学专业知识二\\第八章 内分泌系统用药\\第一节 下丘脑 - 垂体激素及相关药物.md"
+    },
+    {
+      "id": "other-antitumor",
+      "label": "其他抗肿瘤药物",
+      "location": "药学专业知识二 > 第十章 抗肿瘤药 > 第七节 其他抗肿瘤药物",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学专业知识二\\第十章 抗肿瘤药\\第七节 其他抗肿瘤药物.md"
+    },
+    {
+      "id": "pharm-knowledge-2",
+      "label": "药学专业知识二",
+      "location": "药学专业知识二",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学专业知识二.md"
+    },
+    {
+      "id": "chronic-disease-management",
+      "label": "慢性病管理",
+      "location": "药学综合知识与技能 > 第七章 慢性病管理",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学综合知识与技能\\第七章 慢性病管理.md"
+    },
+    {
+      "id": "concept-ch5-s1",
+      "label": "急救的意义与原则",
+      "location": "药学综合知识与技能 > 第五章 急救、中毒解救及职业防护 > 第一节 急救的意义与原则",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学综合知识与技能\\第五章 急救、中毒解救及职业防护\\第一节 急救的意义与原则.md"
+    },
+    {
+      "id": "concept-ch5-s3",
+      "label": "中毒解救",
+      "location": "药学综合知识与技能 > 第五章 急救、中毒解救及职业防护 > 第三节 中毒解救",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学综合知识与技能\\第五章 急救、中毒解救及职业防护\\第三节 中毒解救.md"
+    },
+    {
+      "id": "concept-ch5-s2",
+      "label": "常见急症及处置",
+      "location": "药学综合知识与技能 > 第五章 急救、中毒解救及职业防护 > 第二节 常见急症及处置",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学综合知识与技能\\第五章 急救、中毒解救及职业防护\\第二节 常见急症及处置.md"
+    },
+    {
+      "id": "tumor-clinical-basis",
+      "label": "肿瘤的临床基础",
+      "location": "药学综合知识与技能 > 第十五章 肿瘤 > 第一节 肿瘤的临床基础",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学综合知识与技能\\第十五章 肿瘤\\第一节 肿瘤的临床基础.md"
+    },
+    {
+      "id": "tumor-treatment-prevention",
+      "label": "肿瘤的治疗与预防",
+      "location": "药学综合知识与技能 > 第十五章 肿瘤 > 第二节 肿瘤的治疗与预防",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学综合知识与技能\\第十五章 肿瘤\\第二节 肿瘤的治疗与预防.md"
+    },
+    {
+      "id": "dementia-management",
+      "label": "痴呆",
+      "location": "药学综合知识与技能 > 第十章 神经精神系统常见疾病 > 第六节 痴呆",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学综合知识与技能\\第十章 神经精神系统常见疾病\\第六节 痴呆.md"
+    },
+    {
+      "id": "immunosuppressive-patients",
+      "label": "免疫抑制患者用药",
+      "location": "药学综合知识与技能 > 用药安全 > 免疫抑制患者",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学综合知识与技能\\第四章 用药安全\\第六节 免疫抑制患者用药.md"
+    },
+    {
+      "id": "pharm-knowledge-3",
+      "label": "药学综合知识与技能",
+      "location": "药学综合知识与技能",
+      "file": "C:\\Users\\GALAX\\Desktop\\pharma-graph\\content\\药学综合知识与技能.md"
+    }
+  ]
+}

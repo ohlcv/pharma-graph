@@ -30,7 +30,7 @@ export interface EdgeData {
   id: string;
   source: string; // 源节点 id
   target: string; // 目标节点 id
-  type: string;   // 关系类型：isa / part_of / mechanism / causes / treats / has / relates
+  type: string;   // 关系类型：isa / has / mechanism / causes / treats / has / relates
   reason?: string; // 建边原因说明
 }
 

@@ -1,6 +1,8 @@
 // src/ui/state.ts
 // Centralized UI state — single source of truth for all ephemeral UI state.
 
+import type { TourStrategy } from '../core/tour.js';
+
 export const uiState = {
   /** Graph rendering engine */
   renderer: null as import('../core/renderer.js').Renderer | null,
@@ -20,6 +22,8 @@ export const uiState = {
     pathHistory: [] as string[],
     running: false,
     paused: false,
+    /** Currently selected tour strategy */
+    strategy: 'has-bfs' as TourStrategy,
   },
 
   /** Window resize debounce handle */

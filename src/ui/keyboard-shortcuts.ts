@@ -9,11 +9,14 @@ export interface ShortcutCallbacks {
   tourPause: () => void;
   closeNodePanel: () => void;
   tourStop: () => void;
+  tourPrev?: () => void;
+  tourNext?: () => void;
 }
 
 export function initShortcuts(cy: Core, callbacks: ShortcutCallbacks): void {
   document.addEventListener('keydown', (e) => {
     if ((e.target as HTMLElement).tagName === 'INPUT') return;
+    if ((e.target as HTMLElement).tagName === 'SELECT') return;
     switch (e.key) {
       case 'Delete':
       case 'Backspace':
@@ -43,6 +46,12 @@ export function initShortcuts(cy: Core, callbacks: ShortcutCallbacks): void {
       case 'p':
       case 'P':
         callbacks.tourPause();
+        break;
+      case '[':
+        if (callbacks.tourPrev) callbacks.tourPrev();
+        break;
+      case ']':
+        if (callbacks.tourNext) callbacks.tourNext();
         break;
     }
   });

@@ -13,6 +13,7 @@ const OUTPUT_FILE = path.resolve('docs/frontmatter-audit.md');
 const VALID_ESSENCE = [
   'notion', 'medication', 'illness', 'route', 'substance', 'process', 'module', 'section', // 新
   'drug', 'disease', 'pathogen', 'mechanism', 'ingredient', 'concept', 'service', 'pathway', 'indicator', // 旧
+  'book', 'chapter', 'part', // 结构性层级节点
 ];
 const VALID_FIELD = [
   'pharmaceutics', 'pharmacokinetics', 'medicinal_chemistry', 'pharmacology', // 新
@@ -129,7 +130,6 @@ function scoreField(fm: Record<string, unknown>, field: string): number {
     const v = fm['essence'] ?? fm['type'];
     if (!v) return 2;
     const str = String(v).toLowerCase();
-    if (['book', 'chapter', 'section', 'part'].includes(str)) return 1;
     if (VALID_ESSENCE.includes(str)) return 3;
     return 1;
   }
@@ -154,7 +154,6 @@ function scoreField(fm: Record<string, unknown>, field: string): number {
     const v = fm['type'];
     if (!v) return 2; // 有 essence 替代则非必须
     const str = String(v).toLowerCase();
-    if (['book', 'chapter', 'section', 'part'].includes(str)) return 1;
     if (VALID_ESSENCE.includes(str)) return 3;
     return 1;
   }

@@ -42,7 +42,8 @@ export interface ParsedFrontmatter extends NodeMeta {
 
 function parseFrontmatterRaw(raw: string): { data: Record<string, unknown>; content: string } {
   const trimmed = raw.replace(/^\uFEFF/, ''); // Remove BOM
-  const match = trimmed.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  // 修复：去掉末尾的 $，让正则能匹配不以换行结尾的文件
+  const match = trimmed.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)/);
   if (!match) return { data: {}, content: trimmed };
   const yamlBlock = match[1];
   const content = match[2];

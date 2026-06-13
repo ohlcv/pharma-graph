@@ -8,7 +8,7 @@ import { NODE_TYPE_COLOR, ESSENCE_LABEL, FIELD_COLOR, FIELD_LABEL, TIER_LABEL, N
 import { uiState } from './state.js';
 
 const EDGE_TYPE_LABELS: Record<string, string> = {
-  part_of: '包含', mechanism: '机制', causes: '致因',
+  has: '包含', mechanism: '机制', causes: '致因',
   treats: '治疗', has: '包含', relates: '关联', isa: '属于',
 };
 

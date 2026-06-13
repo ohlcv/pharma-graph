@@ -16,8 +16,8 @@ export class GraphManager {
     const nodeIds = new Set<string>();
 
     // First pass: collect edges and node IDs
-    for (const [, raw] of Object.entries(this.mdFiles)) {
-      const fm = parseFrontmatter(raw, '');
+    for (const [fp, raw] of Object.entries(this.mdFiles)) {
+      const fm = parseFrontmatter(raw, fp);
       if (fm.id) nodeIds.add(fm.id);
       if (fm.edges_out) {
         for (const edge of fm.edges_out) {

@@ -695,28 +695,32 @@ export function getActiveShapeFilter(): string | null {
   return activeShapeFilter;
 }
 
-export function highlightShape(shape: string, highlight: HighlightEngine): void {
-  if (activeShapeFilter === shape) {
+export function highlightShape(essence: string, highlight: HighlightEngine): void {
+  if (activeShapeFilter === essence) {
     clearShapeFilter();
     highlight.reset();
     return;
   }
   clearAllFilters();
-  activeShapeFilter = shape;
+  activeShapeFilter = essence;
+  // Convert essence key to Cytoscape shape value before passing to the engine.
+  // highlightEngine.highlightShape() compares n.style('shape'), which holds the
+  // Cytoscape shape name (octagon, ellipse, diamond …), not the essence key.
+  const shape = NODE_TYPE_SHAPE_MAP[essence] ?? essence;
   highlight.highlightShape(shape);
 
   // Activate legend-row by data-type
   document.querySelectorAll('.legend-row[data-type]').forEach((el) => {
-    if ((el as HTMLElement).dataset.type === shape) el.classList.add('active');
+    if ((el as HTMLElement).dataset.type === essence) el.classList.add('active');
   });
   // Activate mobile chips by data-type
   document.querySelectorAll('.bs-chip[data-type]').forEach((el) => {
-    if ((el as HTMLElement).dataset.type === shape) el.classList.add('active');
+    if ((el as HTMLElement).dataset.type === essence) el.classList.add('active');
   });
   // Legacy shape-filter-item
   document.querySelectorAll('.shape-filter-item').forEach((el) => {
     const label = el.querySelector('.shape-filter-item__label')?.textContent ?? '';
     const shapeName = Object.entries(SHAPE_LABEL).find(([, v]) => v === label)?.[0] ?? label;
-    if (shapeName === shape || label.toLowerCase().includes(shape)) el.classList.add('active');
+    if (shapeName === essence || label.toLowerCase().includes(essence)) el.classList.add('active');
   });
 }

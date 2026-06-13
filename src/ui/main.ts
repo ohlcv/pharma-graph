@@ -5,7 +5,7 @@ import './styles/index.css';
 import cytoscape from 'cytoscape';
 import { Renderer } from '../core/renderer.js';
 import { GraphManager } from '../core/graph-manager.js';
-import { TourEngine } from '../core/tour.js';
+import { TourEngine, type TourStrategy } from '../core/tour.js';
 import { HighlightEngine } from './highlight-engine.js';
 import { DetailPanel } from './detail-panel.js';
 import { Search } from './search.js';
@@ -236,11 +236,13 @@ function startTour(): void {
   const depthSlider    = (document.getElementById('tour-maxdepth') ?? document.getElementById('tour-maxdepth-dt')) as HTMLInputElement;
   const interval = parseInt(intervalSlider?.value ?? '3000');
   const maxDepth = parseInt(depthSlider?.value ?? '10');
+  const strategy = uiState.tour.strategy;
 
   uiState.tour.engine = new TourEngine(cy);
   uiState.tour.engine.start(rootId, {
     interval,
     maxDepth: maxDepth >= 10 ? -1 : maxDepth,
+    strategy,
     onStep: (info) => {
       const prevNodes = info.path.slice(0, -1);
       const currNode = info.path[info.path.length - 1];
@@ -259,11 +261,11 @@ function startTour(): void {
       // ── Mobile badges ─────────────────────────────────────────────────────
       const depthBadge = document.getElementById('tour-depth-badge');
       const countBadge = document.getElementById('tour-count-badge');
-      if (depthBadge) depthBadge.textContent = String(info.depth + 1);
-      if (countBadge) countBadge.textContent = String(info.totalExplored);
+      if (depthBadge) depthBadge.textContent = String(info.layerIndex);
+      if (countBadge) countBadge.textContent = String(info.layerIndex);
       const progressBar = document.getElementById('tour-progress-bar');
       if (progressBar && info.totalToExplore > 0) {
-        progressBar.style.width = Math.round((info.totalExplored / info.totalToExplore) * 100) + '%';
+        progressBar.style.width = Math.round((info.layerIndex / info.totalToExplore) * 100) + '%';
       }
       // Desktop: update cycle count on mobile bar (tour-cycle-num exists in HTML)
       const cycleNum = document.getElementById('tour-cycle-num');
@@ -274,8 +276,8 @@ function startTour(): void {
       const countBadgeDt = document.getElementById('tour-count-badge-dt');
       const cycleNumDt   = document.getElementById('tour-cycle-num-dt');
       const nodeNameDt   = document.getElementById('tour-dt-node-name');
-      if (depthBadgeDt) depthBadgeDt.textContent = String(info.depth + 1);
-      if (countBadgeDt) countBadgeDt.textContent = String(info.totalExplored);
+      if (depthBadgeDt) depthBadgeDt.textContent = String(info.layerIndex);
+      if (countBadgeDt) countBadgeDt.textContent = String(info.layerIndex);
       if (cycleNumDt) cycleNumDt.textContent = String(info.cycleCount + 1);
       if (nodeNameDt) {
         const node = cy.getElementById(info.nodeId);
@@ -284,10 +286,10 @@ function startTour(): void {
       const progressFillDt = document.getElementById('tour-progress-fill-dt');
       const progressLabelDt = document.getElementById('tour-progress-label-dt');
       if (progressFillDt && info.totalToExplore > 0) {
-        progressFillDt.style.width = Math.round((info.totalExplored / info.totalToExplore) * 100) + '%';
+        progressFillDt.style.width = Math.round((info.layerIndex / info.totalToExplore) * 100) + '%';
       }
       if (progressLabelDt) {
-        progressLabelDt.textContent = `${info.totalExplored} / ${info.totalToExplore}`;
+        progressLabelDt.textContent = `${info.layerIndex} / ${info.totalToExplore}`;
       }
     },
     onAfterCenter: (pan: { x: number; y: number }) => {
@@ -387,6 +389,42 @@ function tourStop(): void {
 function toggleTour(): void {
   if (uiState.tour.engine?.isRunning() || uiState.tour.engine?.isPaused()) tourStop();
   else startTour();
+}
+
+function tourPrev(): void {
+  if (!uiState.tour.engine) return;
+  uiState.tour.engine.prev();
+  uiState.detailPanel?.close();
+}
+
+function tourNext(): void {
+  if (!uiState.tour.engine) return;
+  uiState.tour.engine.next();
+  uiState.detailPanel?.close();
+}
+
+function onTourStrategyChange(value: string): void {
+  uiState.tour.strategy = value as TourStrategy;
+  // Sync both selectors
+  const mobSel = document.getElementById('tour-strategy-select-mob') as HTMLSelectElement;
+  const dtSel = document.getElementById('tour-strategy-select-dt') as HTMLSelectElement;
+  if (mobSel) mobSel.value = value;
+  if (dtSel) dtSel.value = value;
+  // If tour is already running, restart with new strategy
+  if (uiState.tour.engine?.isRunning() || uiState.tour.engine?.isPaused()) {
+    startTour();
+  }
+  // Flash the selector green to confirm the switch
+  const flashEl = (el: HTMLElement | null) => {
+    if (!el) return;
+    el.classList.remove('strategy-switched');
+    // Force reflow so removing+re-adding the class restarts the animation
+    void (el as HTMLElement).offsetWidth;
+    el.classList.add('strategy-switched');
+    el.addEventListener('animationend', () => el.classList.remove('strategy-switched'), { once: true });
+  };
+  flashEl(dtSel);
+  flashEl(mobSel);
 }
 
 // ── Node panel (desktop only) ─────────────────────────────────────────────────
@@ -627,6 +665,8 @@ function initKeyboardShortcuts(renderer: Renderer): void {
       closeNodePanelAnimated();
     },
     tourStop,
+    tourPrev,
+    tourNext,
   });
 }
 
@@ -645,9 +685,12 @@ function initResizeHandler(renderer: Renderer): void {
 // ── Global exposure ────────────────────────────────────────────────────────────
 
 function exposeGlobals(renderer: Renderer, highlight: HighlightEngine, detailPanel: DetailPanel): void {
-(window as any).toggleTour = toggleTour;
-(window as any).tourPause = tourPause;
-(window as any).tourStop = tourStop;
+  (window as any).toggleTour = toggleTour;
+  (window as any).tourPause = tourPause;
+  (window as any).tourStop = tourStop;
+  (window as any).tourPrev = tourPrev;
+  (window as any).tourNext = tourNext;
+  (window as any).onTourStrategyChange = onTourStrategyChange;
   (window as any).startPanelDrag = initPanelDrag;
   (window as any).closeNodePanel = closeNodePanelAnimated;
   (window as any).fitGraph = () => fitGraph(renderer);
@@ -781,4 +824,6 @@ if (uiState.renderer) {
   initResizeHandler(uiState.renderer);
   initMusicPlayer();
   exposeGlobals(uiState.renderer, uiState.highlight!, uiState.detailPanel!);
+  // Debug: expose uiState for console diagnostics
+  (window as any).uiState = uiState;
 }
