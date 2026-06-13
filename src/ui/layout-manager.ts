@@ -57,12 +57,6 @@ function doUpdateStats(cy: Core): void {
     set('stat-selected', String(cy.$(':selected').length));
     set('stat-layout', _currentLayout.toUpperCase());
 
-    // Essence counts (按 essence 字段计数)
-    Object.entries(ESSENCE_LABEL).forEach(([essence, _label]) => {
-      const el = document.getElementById(`count-type-${essence}`);
-      if (el) { const count = nodes.filter(`[essence = "${essence}"]`).length; el.textContent = count > 0 ? `${count}` : ''; }
-    });
-
     // Three orthogonal visual legends (Essence→shape, Field→border, Tier→fill)
     populateEssenceLegend(cy);
     populateFieldLegend(cy);
@@ -172,10 +166,7 @@ export function populateEssenceLegend(cy: Core): void {
     desktopGrid.querySelectorAll<HTMLElement>('.legend-row[data-type]').forEach((row) => {
       row.style.cursor = 'pointer';
       row.addEventListener('click', () => {
-        const type = row.dataset.type ?? '';
-        document.querySelectorAll('.legend-row[data-type]').forEach((r) => r.classList.remove('active'));
-        row.classList.add('active');
-        highlightShape(type, uiState.highlight!);
+        highlightShape(row.dataset.type ?? '', uiState.highlight!);
       });
     });
   }
@@ -193,10 +184,7 @@ export function populateEssenceLegend(cy: Core): void {
     mobileChips.querySelectorAll<HTMLElement>('.bs-chip[data-type]').forEach((chip) => {
       chip.style.cursor = 'pointer';
       chip.addEventListener('click', () => {
-        const type = chip.dataset.type ?? '';
-        document.querySelectorAll('.bs-chip[data-type]').forEach((c) => c.classList.remove('active'));
-        chip.classList.add('active');
-        highlightShape(type, uiState.highlight!);
+        highlightShape(chip.dataset.type ?? '', uiState.highlight!);
       });
     });
   }
@@ -231,16 +219,7 @@ export function populateFieldLegend(cy: Core): void {
     desktopGrid.querySelectorAll<HTMLElement>('.legend-field-row[data-field]').forEach((row) => {
       row.style.cursor = 'pointer';
       row.addEventListener('click', () => {
-        const field = row.dataset.field ?? '';
-        if (activeFieldFilter === field) {
-          clearAllFilters();
-          uiState.highlight!.reset();
-        } else {
-          clearAllFilters();
-          activeFieldFilter = field;
-          row.classList.add('active');
-          uiState.highlight!.highlightField(field);
-        }
+        highlightField(row.dataset.field ?? '', uiState.highlight!);
       });
     });
   }
@@ -258,16 +237,7 @@ export function populateFieldLegend(cy: Core): void {
     mobileChips.querySelectorAll<HTMLElement>('.bs-chip[data-field]').forEach((chip) => {
       chip.style.cursor = 'pointer';
       chip.addEventListener('click', () => {
-        const field = chip.dataset.field ?? '';
-        if (activeFieldFilter === field) {
-          clearAllFilters();
-          uiState.highlight!.reset();
-        } else {
-          clearAllFilters();
-          activeFieldFilter = field;
-          chip.classList.add('active');
-          uiState.highlight!.highlightField(field);
-        }
+        highlightField(chip.dataset.field ?? '', uiState.highlight!);
       });
     });
   }
@@ -301,16 +271,7 @@ export function populateTierLegend(cy: Core): void {
     desktopGrid.querySelectorAll<HTMLElement>('.legend-tier-row[data-tier]').forEach((row) => {
       row.style.cursor = 'pointer';
       row.addEventListener('click', () => {
-        const tier = row.dataset.tier ?? '';
-        if (activeTierFilter === tier) {
-          clearAllFilters();
-          uiState.highlight!.reset();
-        } else {
-          clearAllFilters();
-          activeTierFilter = tier;
-          row.classList.add('active');
-          uiState.highlight!.highlightTier(tier);
-        }
+        highlightTier(row.dataset.tier ?? '', uiState.highlight!);
       });
     });
   }
@@ -328,16 +289,7 @@ export function populateTierLegend(cy: Core): void {
     mobileChips.querySelectorAll<HTMLElement>('.bs-chip[data-tier]').forEach((chip) => {
       chip.style.cursor = 'pointer';
       chip.addEventListener('click', () => {
-        const tier = chip.dataset.tier ?? '';
-        if (activeTierFilter === tier) {
-          clearAllFilters();
-          uiState.highlight!.reset();
-        } else {
-          clearAllFilters();
-          activeTierFilter = tier;
-          chip.classList.add('active');
-          uiState.highlight!.highlightTier(tier);
-        }
+        highlightTier(chip.dataset.tier ?? '', uiState.highlight!);
       });
     });
   }
@@ -405,6 +357,50 @@ export function populateEdgeLegend(cy: Core): void {
     if (dEl) dEl.textContent = text;
     if (mEl) mEl.textContent = text;
     if (staticEl) staticEl.textContent = text;
+  });
+}
+
+// ── Field filter ───────────────────────────────────────────────────────────────
+
+export function highlightField(field: string, highlight: HighlightEngine): void {
+  if (activeFieldFilter === field) {
+    clearAllFilters();
+    highlight.reset();
+    return;
+  }
+  clearAllFilters();
+  activeFieldFilter = field;
+  highlight.highlightField(field);
+
+  // Activate desktop legend rows
+  document.querySelectorAll('.legend-field-row[data-field]').forEach((el) => {
+    if ((el as HTMLElement).dataset.field === field) el.classList.add('active');
+  });
+  // Activate mobile chips
+  document.querySelectorAll('.bs-chip[data-field]').forEach((el) => {
+    if ((el as HTMLElement).dataset.field === field) el.classList.add('active');
+  });
+}
+
+// ── Tier filter ───────────────────────────────────────────────────────────────
+
+export function highlightTier(tier: string, highlight: HighlightEngine): void {
+  if (activeTierFilter === tier) {
+    clearAllFilters();
+    highlight.reset();
+    return;
+  }
+  clearAllFilters();
+  activeTierFilter = tier;
+  highlight.highlightTier(tier);
+
+  // Activate desktop legend rows
+  document.querySelectorAll('.legend-tier-row[data-tier]').forEach((el) => {
+    if ((el as HTMLElement).dataset.tier === tier) el.classList.add('active');
+  });
+  // Activate mobile chips
+  document.querySelectorAll('.bs-chip[data-tier]').forEach((el) => {
+    if ((el as HTMLElement).dataset.tier === tier) el.classList.add('active');
   });
 }
 

@@ -91,8 +91,25 @@ export class HighlightEngine {
       [CLASSES.DIMMED, CLASSES.HIGHLIGHTED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED_EDGE].join(' '),
     );
 
+    // shape here is the Cytoscape shape name (ellipse, octagon …) that maps to
+    // an essence key via NODE_TYPE_SHAPE_MAP.  We match against n.data('essence')
+    // rather than n.style('shape') so that nodes with no explicit shape style
+    // (and therefore inheriting the default 'ellipse') are still correctly
+    // filtered by their essence attribute — which is what the legend counts use.
+    const essenceMap: Record<string, string> = {
+      ellipse:           'medication',
+      octagon:          'notion',
+      diamond:          'illness',
+      triangle:         'route',
+      pentagon:         'substance',
+      star:             'process',
+      'round-rectangle':'module',
+      tag:              'section',
+    };
+    const essence = essenceMap[shape] ?? null;
+
     this.cy.nodes().not(`.${CLASSES.LAYER_PARENT}`).forEach((n: cytoscape.NodeSingular) => {
-      if (n.style('shape') === shape) {
+      if (essence !== null && n.data('essence') === essence) {
         n.addClass(CLASSES.HIGHLIGHTED);
       } else {
         n.addClass(CLASSES.DIMMED);
