@@ -174,7 +174,7 @@ function buildFrontmatter(opts: {
       if (edge.reason) lines.push(`    reason: ${edge.reason}`);
     }
   } else {
-    lines.push('edges_out: []');
+    lines.push('');
   }
   lines.push('---');
   return lines.join('\n');
