@@ -31,14 +31,14 @@ export interface TourStepInfo {
 // ── Strategy Interface ─────────────────────────────────────────────────────────
 
 export type TourStrategy =
-  | 'has-bfs'
+  | 'has-dfs'
   | 'full-bfs'
   | 'field-layer'
   | 'tier-layer'
   | 'topo-prereq';
 
 export const TOUR_STRATEGY_LABELS: Record<TourStrategy, string> = {
-  'has-bfs':    'E1 has边优先',
+  'has-dfs':    'E1 has边优先（深度优先）',
   'full-bfs':   'E2 全边BFS',
   'field-layer': 'E3 学科分块',
   'tier-layer':  'E4 层次分层',
@@ -141,17 +141,20 @@ function getLocationKey(node: cytoscape.NodeSingular): string {
   const book = getLocationBook(node);
   const chapter = getLocationChapter(node);
   const section = getLocationSection(node);
-  // 用零填充章节号，保证字典序正确
+  // Extract chapter number for proper ordering
   const chapterNum = extractSectionNumber(chapter).toString().padStart(3, '0');
-  const sectionNum = extractSectionNumber(section).toString().padStart(3, '0');
-  return book + '\x00' + chapterNum + chapter + '\x00' + sectionNum + section;
+  // Extract section number; use 999 for empty sections (chapter entries come before sections)
+  const sectionNum = section ? extractSectionNumber(section).toString().padStart(3, '0') : '000';
+  // When chapter is empty (book-level entry), use label as tiebreaker
+  // When section is empty (chapter entry), it naturally sorts before sections with the same chapter
+  return book + '\x00' + chapterNum + chapter + '\x00' + sectionNum + section + '\x00' + (node.data('label') ?? node.id());
 }
 
 
 
-class HasBfsStrategy implements TourStrategyImpl {
-  id = 'has-bfs' as TourStrategy;
-  label = TOUR_STRATEGY_LABELS['has-bfs'];
+class HasDfsStrategy implements TourStrategyImpl {
+  id = 'has-dfs' as TourStrategy;
+  label = TOUR_STRATEGY_LABELS['has-dfs'];
 
   buildSequence(cy: cytoscape.Core): string[] {
     const nodes = cy.nodes().not('.layer-parent');
@@ -174,26 +177,30 @@ class HasBfsStrategy implements TourStrategyImpl {
       }
     });
 
-    // ── 2. BFS from a root along has-edges, emitting each node once ─────────
-    const bfsFromRoot = (rootId: string): void => {
+    // ── 2. DFS from a root along has-edges, emitting each node once ─────────
+    const dfsFromRoot = (rootId: string): void => {
       if (visited.has(rootId)) return;
-      const q: string[] = [rootId];
-      const seen = new Set<string>([rootId]);
+      const stack: string[] = [rootId];
       visited.add(rootId);
       seq.push(rootId);
-      while (q.length > 0) {
-        const curr = q.shift()!;
-        // Sort children by full location key so sibling order is deterministic
+      while (stack.length > 0) {
+        const curr = stack.pop()!;
+        // Sort children by full location key (ascending = smallest first)
+        // Stack is LIFO: last pushed is first popped
+        // To visit in ascending order, push in reverse order
         const children = (hasAdj.get(curr) ?? []).slice().sort((a, b) => {
           const la = getLocationKey(cy.getElementById(a));
           const lb = getLocationKey(cy.getElementById(b));
-          return la < lb ? -1 : la > lb ? 1 : 0;
+          console.log(`[SORT] ${a}: "${la}" vs ${b}: "${lb}" = ${la.localeCompare(lb)}`);
+          return la.localeCompare(lb);
         });
-        for (const nb of children) {
-          if (!seen.has(nb)) {
-            seen.add(nb);
-            q.push(nb);
-            if (!visited.has(nb)) { visited.add(nb); seq.push(nb); }
+        console.log(`[CHILDREN] ${curr} sorted: [${children.join(', ')}]`);
+        for (let i = children.length - 1; i >= 0; i--) {
+          const nb = children[i];
+          if (!visited.has(nb)) {
+            visited.add(nb);
+            seq.push(nb);
+            stack.push(nb);
           }
         }
       }
@@ -211,9 +218,9 @@ class HasBfsStrategy implements TourStrategyImpl {
         return la < lb ? -1 : la > lb ? 1 : 0;
       });
 
-    // ── 4. BFS from each entry in location order ────────────────────────────
+    // ── 4. DFS from each entry in location order ────────────────────────────
     for (const n of entryNodes) {
-      bfsFromRoot(n.id());
+      dfsFromRoot(n.id());
     }
 
     // ── 5. Remaining nodes (not reachable via has-edges from any entry) ──────
@@ -701,7 +708,7 @@ class TopoPrereqStrategy implements TourStrategyImpl {
 // ── TourEngine ────────────────────────────────────────────────────────────────
 
 export const ALL_STRATEGIES: TourStrategyImpl[] = [
-  new HasBfsStrategy(),
+  new HasDfsStrategy(),
   new FullBfsStrategy(),
   new FieldLayerStrategy(),
   new TierLayerStrategy(),
@@ -855,7 +862,7 @@ export class TourEngine {
    * 调试用：列出指定策略（或全部策略）的遍历序列。
    * 控制台调用示例：
    *   uiState.tour.engine.previewSequence()           // 全部五种
-   *   uiState.tour.engine.previewSequence('has-bfs')  // 单种
+   *   uiState.tour.engine.previewSequence('has-dfs')  // 单种
    */
   previewSequence(strategyId?: TourStrategy): void {
     const targets = strategyId
@@ -958,7 +965,7 @@ export class TourEngine {
     for (const s of ALL_STRATEGIES) {
       if (s.label === this.strategyName) return s.id;
     }
-    return 'has-bfs';
+    return 'has-dfs';
   }
 
   private highlightAndFocus(

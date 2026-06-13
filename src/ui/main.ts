@@ -756,6 +756,22 @@ function exposeGlobals(renderer: Renderer, highlight: HighlightEngine, detailPan
       }));
     },
     carousel: brandCarousel,
+    edges: () => {
+      const cy = renderer?.getCy();
+      if (!cy) return 'no cy';
+      const total = cy.edges().length;
+      const out = cy.edges('[source="urinary-diseases-y3"]').length;
+      return `total edges: ${total}, urinary-diseases-y3 outgoing: ${out}`;
+    },
+    findEdge: (src: string, tgt: string) => {
+      const cy = renderer?.getCy();
+      if (!cy) return 'no cy';
+      const sel = `[source="${src}"][target="${tgt}"]`;
+      const found = cy.edges(sel);
+      return found.length > 0
+        ? `✅ 边存在: ${src} → ${tgt}, type=${found[0].data('edgeType')}, reason=${found[0].data('reason')}`
+        : `❌ 边不存在: ${src} → ${tgt}`;
+    },
   };
 }
 

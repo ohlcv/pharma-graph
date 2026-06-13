@@ -23,7 +23,7 @@ export const uiState = {
     running: false,
     paused: false,
     /** Currently selected tour strategy */
-    strategy: 'has-bfs' as TourStrategy,
+    strategy: 'has-dfs' as TourStrategy,
   },
 
   /** Window resize debounce handle */
