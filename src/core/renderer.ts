@@ -324,6 +324,33 @@ export class Renderer {
 
     this.currentLayoutInstance?.stop();
     const layoutInstance = this.cy.layout(base as unknown as cytoscape.LayoutOptions);
+
+    // Resolve overlapping nodes before animation starts — prevents "invalid endpoints" warnings
+    // from COSE placing two nodes at identical coordinates (e.g. randomize → COSE chain)
+    const resolveOverlaps = () => {
+      const seen = new Map<string, cytoscape.NodeSingular[]>();
+      const nodes = this.cy.nodes().not(`.${CLASSES.LAYER_PARENT}`);
+      nodes.forEach((n: cytoscape.NodeSingular) => {
+        const p = n.position();
+        const key = `${Math.round(p.x)},${Math.round(p.y)}`;
+        const arr = seen.get(key) ?? [];
+        arr.push(n);
+        seen.set(key, arr);
+      });
+      seen.forEach((group) => {
+        if (group.length < 2) return;
+        group.forEach((n: cytoscape.NodeSingular, i: number) => {
+          const angle = (2 * Math.PI * i) / group.length;
+          const r = 80;
+          n.position({
+            x: n.position().x + Math.cos(angle) * r,
+            y: n.position().y + Math.sin(angle) * r,
+          });
+        });
+      });
+    };
+
+    resolveOverlaps();
     this.currentLayoutInstance = layoutInstance;
     layoutInstance.run();
   }

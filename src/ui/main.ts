@@ -728,8 +728,6 @@ function exposeGlobals(renderer: Renderer, highlight: HighlightEngine, detailPan
         updateForensicPanel(renderer);
       }
     },
-    _active: false,
-    _raf: null,
     node: (id: string) => {
       const n = renderer?.getCy().getElementById(id);
       if (n.empty()) return `节点 "${id}" 不存在`;
@@ -738,39 +736,19 @@ function exposeGlobals(renderer: Renderer, highlight: HighlightEngine, detailPan
         type: n.data('type'), category: n.data('category'),
         layer: n.data('layer'),
         weight: n.data('weight'),
-        // 实际渲染样式（供调试 shape/border/size 是否生效）
         shape: n.style('shape'),
         borderColor: n.style('border-color'),
         borderWidth: n.style('border-width'),
         backgroundColor: n.style('background-color'),
-        bgGradientStops: n.style('background-gradient-stop-colors'),
         width: n.renderedWidth(), height: n.renderedHeight(),
       };
     },
-    filter: () => renderer?.getCy().container()?.style.filter || '(无)',
     selected: () => {
       const cy = renderer?.getCy();
       if (!cy) return [];
       return cy.$(':selected').nodes().map((n: cytoscape.NodeSingular) => ({
         id: n.id(), label: n.data('label'), dimmed: n.hasClass('dimmed'),
       }));
-    },
-    carousel: brandCarousel,
-    edges: () => {
-      const cy = renderer?.getCy();
-      if (!cy) return 'no cy';
-      const total = cy.edges().length;
-      const out = cy.edges('[source="urinary-diseases-y3"]').length;
-      return `total edges: ${total}, urinary-diseases-y3 outgoing: ${out}`;
-    },
-    findEdge: (src: string, tgt: string) => {
-      const cy = renderer?.getCy();
-      if (!cy) return 'no cy';
-      const sel = `[source="${src}"][target="${tgt}"]`;
-      const found = cy.edges(sel);
-      return found.length > 0
-        ? `✅ 边存在: ${src} → ${tgt}, type=${found[0].data('edgeType')}, reason=${found[0].data('reason')}`
-        : `❌ 边不存在: ${src} → ${tgt}`;
     },
   };
 }

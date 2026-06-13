@@ -102,6 +102,14 @@ function getLocationChapter(node: cytoscape.NodeSingular): string {
   return '';
 }
 
+function getLocationPart(node: cytoscape.NodeSingular): string {
+  const loc = node.data('location');
+  if (typeof loc === 'object' && loc !== null) {
+    return (loc as Record<string, unknown>)['part'] as string ?? '';
+  }
+  return '';
+}
+
 function getLocationSection(node: cytoscape.NodeSingular): string {
   const loc = node.data('location');
   if (typeof loc === 'object' && loc !== null) {
@@ -118,12 +126,11 @@ const CN_DIGIT_MAP: Record<string, number> = {
 
 // 从"第X节"或"第X章"格式中提取数字
 function extractSectionNumber(section: string): number {
-  if (!section) return 0; // 没有 section 的节点（如章入口）排在前面
-  const match = section.match(/第(.+?)[章节]/);
-  if (!match) return 999; // 没有章节号的排后面
+  if (!section) return 0;
+  const match = section.match(/第(.+?)[篇章节]/);
+  if (!match) return 999;
   const numStr = match[1];
   if (/^\d+$/.test(numStr)) return parseInt(numStr, 10);
-  // 处理"十一"、"二十三"等汉字数字
   let result = 0;
   if (numStr.includes('十')) {
     const parts = numStr.split('十');
@@ -136,18 +143,28 @@ function extractSectionNumber(section: string): number {
   return result;
 }
 
-// Full location sort key: book > chapter > section (章节按数字排序)
+// Full location sort key: book > part/chapter > section (章节按数字排序)
 function getLocationKey(node: cytoscape.NodeSingular): string {
   const book = getLocationBook(node);
   const chapter = getLocationChapter(node);
+  const part = getLocationPart(node);
   const section = getLocationSection(node);
+  const label = node.data('label') ?? node.id();
   // Extract chapter number for proper ordering
-  const chapterNum = extractSectionNumber(chapter).toString().padStart(3, '0');
-  // Extract section number; use 999 for empty sections (chapter entries come before sections)
+  // For book-level entries (chapter empty), try to use part or extract "第X篇" from label
+  let chapterNum: string;
+  if (chapter) {
+    chapterNum = extractSectionNumber(chapter).toString().padStart(3, '0');
+  } else if (part) {
+    chapterNum = extractSectionNumber(part).toString().padStart(3, '0');
+  } else {
+    chapterNum = extractSectionNumber(label).toString().padStart(3, '0');
+  }
+  // Extract section number; use 000 for empty sections (chapter entries come before sections)
   const sectionNum = section ? extractSectionNumber(section).toString().padStart(3, '0') : '000';
   // When chapter is empty (book-level entry), use label as tiebreaker
   // When section is empty (chapter entry), it naturally sorts before sections with the same chapter
-  return book + '\x00' + chapterNum + chapter + '\x00' + sectionNum + section + '\x00' + (node.data('label') ?? node.id());
+  return book + '\x00' + chapterNum + (chapter || part) + '\x00' + sectionNum + section + '\x00' + label;
 }
 
 
@@ -187,14 +204,12 @@ class HasDfsStrategy implements TourStrategyImpl {
         const curr = stack.pop()!;
         // Sort children by full location key (ascending = smallest first)
         // Stack is LIFO: last pushed is first popped
-        // To visit in ascending order, push in reverse order
+        // Iterate backwards so smallest key is popped first (ascending order)
         const children = (hasAdj.get(curr) ?? []).slice().sort((a, b) => {
           const la = getLocationKey(cy.getElementById(a));
           const lb = getLocationKey(cy.getElementById(b));
-          console.log(`[SORT] ${a}: "${la}" vs ${b}: "${lb}" = ${la.localeCompare(lb)}`);
           return la.localeCompare(lb);
         });
-        console.log(`[CHILDREN] ${curr} sorted: [${children.join(', ')}]`);
         for (let i = children.length - 1; i >= 0; i--) {
           const nb = children[i];
           if (!visited.has(nb)) {
@@ -213,11 +228,11 @@ class HasDfsStrategy implements TourStrategyImpl {
       .toArray()
       .filter((n) => !hasTargets.has(n.id()))
       .sort((a, b) => {
-        const la = getLocationKey(a as cytoscape.NodeSingular);
-        const lb = getLocationKey(b as cytoscape.NodeSingular);
+        const na = a as cytoscape.NodeSingular, nb = b as cytoscape.NodeSingular;
+        const la = getLocationKey(na), lb = getLocationKey(nb);
         return la < lb ? -1 : la > lb ? 1 : 0;
       });
-
+    
     // ── 4. DFS from each entry in location order ────────────────────────────
     for (const n of entryNodes) {
       dfsFromRoot(n.id());
@@ -239,7 +254,7 @@ class HasDfsStrategy implements TourStrategyImpl {
     if (unvisited.length > 0) {
       const groupKey = (id: string): string => {
         const n = cy.getElementById(id);
-        return getLocationBook(n) + '\x00' + getLocationChapter(n) + '\x00' + getLocationSection(n);
+        return getLocationKey(n);
       };
       let groupStart = 0;
       for (let i = 1; i <= unvisited.length; i++) {
@@ -448,8 +463,7 @@ class FieldLayerStrategy implements TourStrategyImpl {
       roots.sort((a, b) => {
         const na = cy.getElementById(a);
         const nb = cy.getElementById(b);
-        const la = getLocationBook(na) + getLocationChapter(na);
-        const lb = getLocationBook(nb) + getLocationChapter(nb);
+        const la = getLocationKey(na), lb = getLocationKey(nb);
         return la < lb ? -1 : la > lb ? 1 : 0;
       });
 
@@ -462,8 +476,7 @@ class FieldLayerStrategy implements TourStrategyImpl {
       remaining.sort((a, b) => {
         const na = cy.getElementById(a);
         const nb = cy.getElementById(b);
-        const la = getLocationBook(na) + getLocationChapter(na);
-        const lb = getLocationBook(nb) + getLocationChapter(nb);
+        const la = getLocationKey(na), lb = getLocationKey(nb);
         if (la < lb) return -1;
         if (la > lb) return 1;
         return 0;
@@ -564,8 +577,7 @@ class TierLayerStrategy implements TourStrategyImpl {
       // ── Step 1: entry nodes first, sorted by location ───────────────────────
       const entryIds = comp.filter(isEntryNode).sort((a, b) => {
         const na = cy.getElementById(a), nb = cy.getElementById(b);
-        const la = getLocationBook(na) + getLocationChapter(na);
-        const lb = getLocationBook(nb) + getLocationChapter(nb);
+        const la = getLocationKey(na), lb = getLocationKey(nb);
         return la < lb ? -1 : la > lb ? 1 : 0;
       });
 
@@ -574,8 +586,7 @@ class TierLayerStrategy implements TourStrategyImpl {
         const ta = nodeTierScore(a), tb = nodeTierScore(b);
         if (ta !== tb) return ta - tb;
         const na = cy.getElementById(a), nb = cy.getElementById(b);
-        const la = getLocationBook(na) + getLocationChapter(na);
-        const lb = getLocationBook(nb) + getLocationChapter(nb);
+        const la = getLocationKey(na), lb = getLocationKey(nb);
         return la < lb ? -1 : la > lb ? 1 : 0;
       });
 
@@ -584,10 +595,10 @@ class TierLayerStrategy implements TourStrategyImpl {
         let groupStart = 0;
         for (let i = 1; i <= bucket.length; i++) {
           const currKey = i > 0
-            ? `${nodeTierScore(bucket[i - 1])}|${getLocationBook(cy.getElementById(bucket[i - 1]))}${getLocationChapter(cy.getElementById(bucket[i - 1]))}`
+            ? `${nodeTierScore(bucket[i - 1])}|${getLocationKey(cy.getElementById(bucket[i - 1]))}`
             : '__end__';
           const nextKey = i < bucket.length
-            ? `${nodeTierScore(bucket[i])}|${getLocationBook(cy.getElementById(bucket[i]))}${getLocationChapter(cy.getElementById(bucket[i]))}`
+            ? `${nodeTierScore(bucket[i])}|${getLocationKey(cy.getElementById(bucket[i]))}`
             : '__end__';
           if (currKey !== nextKey) {
             const group = bucket.slice(groupStart, i);
@@ -646,8 +657,7 @@ class TopoPrereqStrategy implements TourStrategyImpl {
     noPrereq.sort((a, b) => {
       const na = cy.getElementById(a);
       const nb = cy.getElementById(b);
-      const la = getLocationBook(na) + getLocationChapter(na);
-      const lb = getLocationBook(nb) + getLocationChapter(nb);
+      const la = getLocationKey(na), lb = getLocationKey(nb);
       return la < lb ? -1 : la > lb ? 1 : 0;
     });
     shuffleInPlace(noPrereq);
@@ -661,11 +671,11 @@ class TopoPrereqStrategy implements TourStrategyImpl {
         if (newDeg === 0) {
           // Insert in location order
           const nb = cy.getElementById(dep);
-          const loc = getLocationBook(nb) + getLocationChapter(nb);
+          const loc = getLocationKey(nb);
           let inserted = false;
           for (let i = 0; i < noPrereq.length; i++) {
             const na = cy.getElementById(noPrereq[i]);
-            const la = getLocationBook(na) + getLocationChapter(na);
+            const la = getLocationKey(na);
             if (loc < la) { noPrereq.splice(i, 0, dep); inserted = true; break; }
           }
           if (!inserted) noPrereq.push(dep);
@@ -678,8 +688,7 @@ class TopoPrereqStrategy implements TourStrategyImpl {
     unvisited.sort((a, b) => {
       const na = cy.getElementById(a);
       const nb = cy.getElementById(b);
-      const la = getLocationBook(na) + getLocationChapter(na);
-      const lb = getLocationBook(nb) + getLocationChapter(nb);
+      const la = getLocationKey(na), lb = getLocationKey(nb);
       if (la < lb) return -1;
       if (la > lb) return 1;
       return 0;
@@ -688,10 +697,10 @@ class TopoPrereqStrategy implements TourStrategyImpl {
     let groupStart = 0;
     for (let i = 1; i <= unvisited.length; i++) {
       const currLoc = i < unvisited.length
-        ? (() => { const n = cy.getElementById(unvisited[i - 1]); return getLocationBook(n) + getLocationChapter(n); })()
+        ? (() => { const n = cy.getElementById(unvisited[i - 1]); return getLocationKey(n); })()
         : '__end__';
       const nextLoc = i < unvisited.length
-        ? (() => { const n = cy.getElementById(unvisited[i]); return getLocationBook(n) + getLocationChapter(n); })()
+        ? (() => { const n = cy.getElementById(unvisited[i]); return getLocationKey(n); })()
         : '__end__';
       if (currLoc !== nextLoc) {
         const group = unvisited.slice(groupStart, i);
