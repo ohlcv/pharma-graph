@@ -565,13 +565,12 @@
           <span class="tour-mob__stat-lbl">节点</span>
         </div>
       </div>
-      <!-- 策略选择（移动端横向紧凑） -->
+      <!-- 策略切换（移动端紧凑：按钮+下方标签） -->
       <div class="tour-mob__strategy">
+        <button id="tour-strategy-toggle-mob" class="tour-mob__strategy-toggle" onclick="onTourStrategyToggle()" aria-label="切换漫游策略">
+          <span class="tour-mob__strategy-value" id="tour-strategy-value-mob">教材</span>
+        </button>
         <span class="tour-mob__strategy-label">策略</span>
-        <select id="tour-strategy-select-mob" class="tour-mob__strategy-select" onchange="onTourStrategyChange(this.value)">
-          <option value="has-dfs">E1 教材顺序DFS</option>
-          <option value="topo-prereq">E2 层级依赖BFS</option>
-        </select>
       </div>
       <!-- 竖向滑动条列 -->
       <div class="tour-mob__sliders">

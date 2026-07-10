@@ -405,26 +405,35 @@ function tourNext(): void {
 
 function onTourStrategyChange(value: string): void {
   uiState.tour.strategy = value as TourStrategy;
-  // Sync both selectors
-  const mobSel = document.getElementById('tour-strategy-select-mob') as HTMLSelectElement;
   const dtSel = document.getElementById('tour-strategy-select-dt') as HTMLSelectElement;
-  if (mobSel) mobSel.value = value;
   if (dtSel) dtSel.value = value;
-  // If tour is already running, restart with new strategy
+  syncMobStrategyUI(value);
   if (uiState.tour.engine?.isRunning() || uiState.tour.engine?.isPaused()) {
     startTour();
   }
-  // Flash the selector green to confirm the switch
   const flashEl = (el: HTMLElement | null) => {
     if (!el) return;
     el.classList.remove('strategy-switched');
-    // Force reflow so removing+re-adding the class restarts the animation
     void (el as HTMLElement).offsetWidth;
     el.classList.add('strategy-switched');
     el.addEventListener('animationend', () => el.classList.remove('strategy-switched'), { once: true });
   };
   flashEl(dtSel);
-  flashEl(mobSel);
+  const mobBtn = document.getElementById('tour-strategy-toggle-mob');
+  flashEl(mobBtn);
+}
+
+function onTourStrategyToggle(): void {
+  const current = uiState.tour.strategy;
+  const next: TourStrategy = current === 'has-dfs' ? 'topo-prereq' : 'has-dfs';
+  onTourStrategyChange(next);
+}
+
+function syncMobStrategyUI(strategy: TourStrategy): void {
+  const valueEl = document.getElementById('tour-strategy-value-mob');
+  if (valueEl) {
+    valueEl.textContent = strategy === 'has-dfs' ? '教材' : '层级';
+  }
 }
 
 // ── Node panel (desktop only) ─────────────────────────────────────────────────
@@ -691,6 +700,7 @@ function exposeGlobals(renderer: Renderer, highlight: HighlightEngine, detailPan
   (window as any).tourPrev = tourPrev;
   (window as any).tourNext = tourNext;
   (window as any).onTourStrategyChange = onTourStrategyChange;
+  (window as any).onTourStrategyToggle = onTourStrategyToggle;
   (window as any).startPanelDrag = initPanelDrag;
   (window as any).closeNodePanel = closeNodePanelAnimated;
   (window as any).fitGraph = () => fitGraph(renderer);
@@ -786,6 +796,7 @@ try {
   initEdgeTooltip();
   initDebugOverlay(uiState.renderer);
   initTourSlider();
+  syncMobStrategyUI(uiState.tour.strategy);
   updateStats(cy);
   syncBottomSheetStats(cy);
 
