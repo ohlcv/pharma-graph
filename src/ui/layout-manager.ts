@@ -331,6 +331,28 @@ export function populateEdgeLegend(cy: Core): void {
     }).join('');
   }
 
+  if (mobileChips && mobileChips.children.length === 0) {
+    mobileChips.innerHTML = Object.entries(EDGE_LABEL).map(([key, label]) => {
+      const style = EDGE_TYPE_STYLE[key] ?? { color: '#95a5a6', lineStyle: 'solid', arrow: 'none' };
+      const dash = style.lineStyle === 'dashed' ? 'stroke-dasharray="5 3"'
+        : style.lineStyle === 'dotted' ? 'stroke-dasharray="1 3"'
+        : '';
+      const arrowDef = style.arrow === 'triangle'
+        ? `<polygon points="22,5 18,2 18,8" fill="${style.color}"/>`
+        : style.arrow === 'tee'
+        ? `<line x1="20" y1="2" x2="22" y2="5" stroke="${style.color}" stroke-width="2"/><line x1="20" y1="8" x2="22" y2="5" stroke="${style.color}" stroke-width="2"/>`
+        : '';
+      return `<div class="bs-chip" data-edge="${key}">
+        <svg width="24" height="10" viewBox="0 0 24 10" style="flex-shrink:0">
+          <line x1="2" y1="5" x2="22" y2="5" stroke="${style.color}" stroke-width="2" ${dash}/>
+          ${arrowDef}
+        </svg>
+        <span>${label}</span>
+        <span class="bs-chip__count" id="bs-edge-count-${key}"></span>
+      </div>`;
+    }).join('');
+  }
+
   // Attach click handlers via event delegation (handles static + dynamic rows in one place)
   const attachEdgeHandlers = (container: HTMLElement, selector: string) => {
     if ((container as HTMLElement & { _edgeDelegated?: boolean })._edgeDelegated) return;
