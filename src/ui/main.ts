@@ -291,16 +291,6 @@ function startTour(): void {
       // reads the node's final (centered) renderedPosition, not its pre-animation position.
       uiState.detailPanel?.show(info.nodeId);
     },
-    onAfterCenter: (pan: { x: number; y: number }) => {
-      if (window.innerWidth <= 640) {
-        // Panel takes 85dvh — shift focus to upper 1/3 of remaining space
-        const vh = window.innerHeight;
-        const panelH = vh * 0.85;
-        const offsetY = panelH * 0.4;
-        return { x: pan.x, y: pan.y + offsetY };
-      }
-      return pan;
-    },
     onComplete: () => {
       uiState.tour.pathHistory = [];
       // Close detail panel

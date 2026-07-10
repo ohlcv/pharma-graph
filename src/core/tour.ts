@@ -6,12 +6,11 @@ export interface TourOptions {
   maxDepth: number;
   strategy: TourStrategy;
   onStep?: (info: TourStepInfo) => void;
-  /** Called after the pan animation completes and onAfterCenter has been applied */
+  /** Called after the pan animation completes */
   onStepAfterCenter?: (info: TourStepInfo) => void;
   onComplete?: () => void;
   onPause?: () => void;
   onResume?: () => void;
-  onAfterCenter?: (pan: { x: number; y: number }) => { x: number; y: number };
 }
 
 export interface TourStepInfo {
@@ -387,7 +386,6 @@ export class TourEngine {
   private onComplete?: TourOptions['onComplete'];
   private onPause?: TourOptions['onPause'];
   private onResume?: TourOptions['onResume'];
-  private onAfterCenter?: TourOptions['onAfterCenter'];
 
   // Pre-computed sequence
   private seq: string[] = [];
@@ -421,7 +419,7 @@ export class TourEngine {
     this.onComplete = options.onComplete;
     this.onPause = options.onPause;
     this.onResume = options.onResume;
-    this.onAfterCenter = options.onAfterCenter;
+    // panOffset is NOT reset here — it persists across tour restarts
     this.totalExplored = 0;
     this.currentStep = 0;
     this.cycleCount = 0;
@@ -669,11 +667,6 @@ export class TourEngine {
       duration: 600,
       easing: 'ease-out-cubic',
       complete: () => {
-        if (this.onAfterCenter) {
-          const currentPan = this.cy.pan();
-          const adjusted = this.onAfterCenter(currentPan);
-          this.cy.pan(adjusted);
-        }
         this.onStepAfterCenter?.(stepInfo);
         if (!this.stopped && !this.paused) this.scheduleNext();
       },

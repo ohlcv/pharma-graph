@@ -1,6 +1,5 @@
 // src/ui/detail-panel.ts
 // Node detail panel rendering and positioning.
-// Pure build-function approach for consistency with mobile-panel.ts.
 
 import cytoscape from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
@@ -19,7 +18,6 @@ const EDGE_TYPE_LABELS: Record<string, string> = {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export class DetailPanel {
-  private sheetOpen = false;
   private _currentNodeId: string | null = null;
 
   private panel!: HTMLElement;
@@ -115,75 +113,16 @@ export class DetailPanel {
   reposition(nodeId: string, W?: number, H?: number): void {
     if (!this.panel.classList.contains('visible') || uiState.isPanelPinned) return;
 
-    const node = this.cy.getElementById(nodeId);
-    if (node.empty()) return;
-
     const pW = W ?? this.panel.offsetWidth;
     const pH = H ?? this.panel.offsetHeight;
     const vpW = window.innerWidth;
     const vpH = window.innerHeight;
     const TOPBAR_H = 56;
     const PAD = 12;
-    const SHEET_H = this.sheetOpen ? 56 : 0;
-    const bottomReserve = SHEET_H;
-    const nodePos = node.renderedPosition();
-    const nodeHalfW = node.renderedWidth() / 2;
-    const nodeHalfH = node.renderedHeight() / 2;
-    const GAP = 12;
 
-    const spaceRight = vpW - (nodePos.x + nodeHalfW);
-    const spaceLeft = nodePos.x - nodeHalfW;
-    const spaceAbove = nodePos.y - TOPBAR_H - nodeHalfH;
-    const spaceBelow = vpH - nodePos.y - nodeHalfH - bottomReserve;
-
-    const canRight = spaceRight - GAP >= pW;
-    const canLeft = spaceLeft - GAP >= pW;
-    const canAbove = spaceAbove - GAP >= pH;
-    const canBelow = spaceBelow - GAP >= pH;
-
-    let left: number;
-    let top: number;
-
-    if (canRight && spaceRight >= spaceLeft) {
-      left = nodePos.x + nodeHalfW + GAP;
-      top = Math.max(TOPBAR_H + PAD, Math.min(nodePos.y - pH / 2, vpH - bottomReserve - pH - PAD));
-    } else if (canLeft) {
-      left = nodePos.x - nodeHalfW - GAP - pW;
-      top = Math.max(TOPBAR_H + PAD, Math.min(nodePos.y - pH / 2, vpH - bottomReserve - pH - PAD));
-    } else if (canAbove && spaceAbove >= spaceBelow) {
-      left = Math.max(PAD, Math.min(nodePos.x - pW / 2, vpW - pW - PAD));
-      top = nodePos.y - nodeHalfH - GAP - pH;
-    } else if (canBelow) {
-      left = Math.max(PAD, Math.min(nodePos.x - pW / 2, vpW - pW - PAD));
-      top = nodePos.y + nodeHalfH + GAP;
-    } else {
-      const scores = [
-        { side: 'right', score: canRight ? spaceRight : -1 },
-        { side: 'left', score: canLeft ? spaceLeft : -1 },
-        { side: 'above', score: canAbove ? spaceAbove : -1 },
-        { side: 'below', score: canBelow ? spaceBelow : -1 },
-      ];
-      scores.sort((a, b) => b.score - a.score);
-      const best = scores[0].side;
-
-      if (best === 'right') {
-        left = nodePos.x + nodeHalfW + GAP;
-      } else if (best === 'left') {
-        left = nodePos.x - nodeHalfW - GAP - pW;
-      } else {
-        left = Math.max(PAD, Math.min(nodePos.x - pW / 2, vpW - pW - PAD));
-      }
-      top = best === 'above'
-        ? nodePos.y - nodeHalfH - GAP - pH
-        : best === 'below'
-          ? nodePos.y + nodeHalfH + GAP
-          : Math.max(TOPBAR_H + PAD, Math.min(nodePos.y - pH / 2, vpH - bottomReserve - pH - PAD));
-    }
-
-    if (left < PAD) left = PAD;
-    if (left + pW + PAD > vpW) left = vpW - pW - PAD;
-    if (top < TOPBAR_H + PAD) top = TOPBAR_H + PAD;
-    if (top + pH + PAD > vpH - bottomReserve) top = vpH - pH - PAD - bottomReserve;
+    // Simple centered position
+    let left = (vpW - pW) / 2;
+    let top = TOPBAR_H + PAD;
 
     this.panel.style.left = left + 'px';
     this.panel.style.top = top + 'px';
@@ -191,10 +130,6 @@ export class DetailPanel {
 
   repositionCurrent(): void {
     if (this._currentNodeId) this.reposition(this._currentNodeId);
-  }
-
-  setSheetOpen(open: boolean): void {
-    this.sheetOpen = open;
   }
 
   private applySectionState(): void {
