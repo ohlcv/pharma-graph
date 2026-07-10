@@ -35,12 +35,24 @@ export class DetailPanel {
       onClose?: () => void;
     }
   ) {
-    this.panel = document.getElementById('node-panel') as HTMLElement;
-    this.overviewPage = document.getElementById('lp-overview-page') as HTMLElement;
-    this.bodyPage = document.getElementById('lp-body-page') as HTMLElement;
-    this.overviewTab = document.getElementById('lp-tab-overview') as HTMLElement;
-    this.bodyTab = document.getElementById('lp-tab-body') as HTMLElement;
-    this.pinBtn = document.getElementById('lp-btn-pin') as HTMLElement;
+    const panel = document.getElementById('node-panel');
+    const overviewPage = document.getElementById('lp-overview-page');
+    const bodyPage = document.getElementById('lp-body-page');
+    const overviewTab = document.getElementById('lp-tab-overview');
+    const bodyTab = document.getElementById('lp-tab-body');
+    const pinBtn = document.getElementById('lp-btn-pin');
+
+    if (!panel || !overviewPage || !bodyPage || !overviewTab || !bodyTab || !pinBtn) {
+      console.warn('DetailPanel: required DOM elements not found');
+      return;
+    }
+
+    this.panel = panel;
+    this.overviewPage = overviewPage;
+    this.bodyPage = bodyPage;
+    this.overviewTab = overviewTab;
+    this.bodyTab = bodyTab;
+    this.pinBtn = pinBtn;
 
     this.overviewTab.addEventListener('click', () => switchDesktopTab('overview'));
     this.bodyTab.addEventListener('click', () => switchDesktopTab('body'));
@@ -116,13 +128,12 @@ export class DetailPanel {
     const pW = W ?? this.panel.offsetWidth;
     const pH = H ?? this.panel.offsetHeight;
     const vpW = window.innerWidth;
-    const vpH = window.innerHeight;
     const TOPBAR_H = 56;
     const PAD = 12;
 
-    // Simple centered position
-    let left = (vpW - pW) / 2;
-    let top = TOPBAR_H + PAD;
+    // Position in top-right corner
+    const left = vpW - pW - PAD;
+    const top = TOPBAR_H + PAD;
 
     this.panel.style.left = left + 'px';
     this.panel.style.top = top + 'px';

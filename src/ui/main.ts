@@ -32,7 +32,7 @@ import {
   closeBottomSheet,
   syncTourBarPosition,
   initSheetDrag,
-  initTourBarDrag,
+  initTourBarCollapse,
   initPanelDrag,
   toggleSidebar,
   toggleSection,
@@ -294,7 +294,7 @@ function startTour(): void {
     onComplete: () => {
       uiState.tour.pathHistory = [];
       // Close detail panel
-      closeNodePanelAnimated();
+      closeNodePanel();
       // Mobile: show check mark
       const depthBadge = document.getElementById('tour-depth-badge');
       const countBadge = document.getElementById('tour-count-badge');
@@ -425,12 +425,6 @@ function syncMobStrategyUI(strategy: TourStrategy): void {
   }
 }
 
-// ── Node panel (desktop only) ─────────────────────────────────────────────────
-
-function closeNodePanelAnimated(): void {
-  uiState.detailPanel?.close();
-}
-
 // ── Music player ───────────────────────────────────────────────────────────────
 
 function initMusicPlayer(): void {
@@ -551,7 +545,7 @@ function initGraphEvents(
     if (evt.target === cy) {
       clearShapeFilter();
       highlight.reset();
-      closeNodePanelAnimated();
+      closeNodePanel();
       if (uiState.tour.engine?.isRunning() || uiState.tour.engine?.isPaused()) tourStop();
     }
   });
@@ -660,7 +654,7 @@ function initKeyboardShortcuts(renderer: Renderer): void {
     toggleTour,
     tourPause,
     closeNodePanel: () => {
-      closeNodePanelAnimated();
+      closeNodePanel();
     },
     tourStop,
     tourPrev,
@@ -691,7 +685,7 @@ function exposeGlobals(renderer: Renderer, highlight: HighlightEngine, detailPan
   (window as any).onTourStrategyChange = onTourStrategyChange;
   (window as any).onTourStrategyToggle = onTourStrategyToggle;
   (window as any).startPanelDrag = initPanelDrag;
-  (window as any).closeNodePanel = closeNodePanelAnimated;
+  (window as any).closeNodePanel = () => detailPanel.close();
   (window as any).fitGraph = () => fitGraph(renderer);
   (window as any).randomize = () => {
     randomize(renderer, highlight);
@@ -701,7 +695,7 @@ function exposeGlobals(renderer: Renderer, highlight: HighlightEngine, detailPan
   (window as any).resetAll = () => {
     clearShapeFilter();
     highlight.reset();
-    closeNodePanelAnimated();
+    closeNodePanel();
     renderer.runLayout('cose');
     updateStats(renderer.getCy());
     syncBottomSheetStats(renderer.getCy());
@@ -799,7 +793,7 @@ try {
   if (sidebar && sidebarBtn) sidebarBtn.classList.toggle('active', !sidebar.classList.contains('hidden'));
 
   initSheetDrag();
-  initTourBarDrag();
+  initTourBarCollapse();
   initPanelDrag();
 
 } catch (err) {

@@ -32,7 +32,7 @@ export const uiState = {
   /** Drag mode (graph is being dragged by user) */
   isDragging: false,
 
-  /** Section collapse state for node detail panels (both desktop & mobile) */
+  /** Section collapse state for node detail panel */
   sectionState: {
     summary: true,
     tags: true,
@@ -44,4 +44,7 @@ export const uiState = {
 
   /** Whether the desktop node panel is pinned to its current position */
   isPanelPinned: false,
+
+  /** Mobile tour bar collapsed state */
+  tourBarCollapsed: false,
 };

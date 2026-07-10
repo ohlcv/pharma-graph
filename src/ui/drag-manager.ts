@@ -28,10 +28,13 @@ function applySheetState(open: boolean): void {
   if (backdrop) backdrop.classList.toggle('visible', open);
   if (peekTab) peekTab.classList.toggle('visible', !open);
   if (app) app.classList.toggle('sheet-open', open);
-  uiState.detailPanel?.setSheetOpen(open);
 
   if (open) {
-    sheet.addEventListener('transitionend', () => uiState.detailPanel?.repositionCurrent(), { once: true });
+    sheet.addEventListener('transitionend', () => {
+      if (typeof uiState.detailPanel?.repositionCurrent === 'function') {
+        uiState.detailPanel!.repositionCurrent();
+      }
+    }, { once: true });
   }
   syncTourBarPosition();
 }
@@ -180,55 +183,20 @@ export function initSheetDrag(): void {
   applySheetState(false);
 }
 
-// ── Tour bar drag ─────────────────────────────────────────────────────────────
+// ── Tour bar collapse / expand ─────────────────────────────────────────────────
 
-const TOPBAR_H = 72;
-let tourDragState: { startX: number; startY: number; startLeft: number; startTop: number; el: HTMLElement } | null = null;
-
-export function initTourBarDrag(): void {
-  const bar = document.getElementById('tour-status');
+export function   initTourBarCollapse(): void {
   const handle = document.getElementById('tour-status-handle');
-  if (!bar) return;
-
-  // Dragging is always bound to the handle (mobile mop / desktop fixed at bottom-center)
-  (handle ?? bar).addEventListener('pointerdown', (e: PointerEvent) => {
-    // Desktop: bar is fixed at bottom-center, not draggable
-    if (window.innerWidth > 640) return;
-    // Only the grip area triggers drag
-    const handleEl = document.getElementById('tour-status-handle');
-    if (!handleEl?.contains(e.target as Node)) return;
-    e.preventDefault();
-    const rect = bar.getBoundingClientRect();
-    tourDragState = { startX: e.clientX, startY: e.clientY, startLeft: rect.left, startTop: rect.top, el: bar };
-    bar.style.cursor = 'grabbing';
-    bar.style.transition = 'none';
-    document.addEventListener('pointermove', onTourDrag, { passive: false });
-    document.addEventListener('pointerup', stopTourDrag);
+  if (!handle) return;
+  handle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    uiState.tourBarCollapsed = !uiState.tourBarCollapsed;
+    const bar = document.getElementById('tour-status');
+    const chevron = handle.querySelector<SVGElement>('.tour-mob__chev');
+    if (!bar) return;
+    bar.classList.toggle('collapsed', uiState.tourBarCollapsed);
+    if (chevron) chevron.classList.toggle('collapsed', uiState.tourBarCollapsed);
   });
-}
-
-function onTourDrag(e: PointerEvent): void {
-  if (!tourDragState) return;
-  e.preventDefault();
-  const { el, startX, startY, startLeft, startTop } = tourDragState;
-  const deltaX = e.clientX - startX;
-  const deltaY = e.clientY - startY;
-  const PAD = 8;
-  const newLeft = Math.max(PAD, Math.min(startLeft + deltaX, window.innerWidth - el.offsetWidth - PAD));
-  const newTop = Math.max(TOPBAR_H, Math.min(startTop + deltaY, window.innerHeight - el.offsetHeight - PAD));
-  el.style.left = newLeft + 'px'; el.style.top = newTop + 'px'; el.style.bottom = 'auto'; el.style.transform = 'none';
-}
-
-function stopTourDrag(): void {
-  if (!tourDragState) return;
-  const { el } = tourDragState;
-  tourDragState = null;
-  el.style.cursor = '';
-  el.style.transition = 'top 0.3s cubic-bezier(0.34,1.4,0.64,1),left 0.3s cubic-bezier(0.34,1.4,0.64,1),transform 0.3s cubic-bezier(0.34,1.4,0.64,1)';
-  document.removeEventListener('pointermove', onTourDrag);
-  document.removeEventListener('pointerup', stopTourDrag);
-  const elRef = el;
-  setTimeout(() => { elRef.style.transition = ''; }, 350);
 }
 
 // ── Desktop panel drag ─────────────────────────────────────────────────────────

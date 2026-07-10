@@ -218,22 +218,28 @@
         overflow: visible;
       }
     
-      /* 拖拽把手 */
+      /* 折叠把手 */
       .tour-mob__handle {
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
-        padding: 10px 0 8px; cursor: grab; min-height: 36px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        padding: 10px 16px; cursor: pointer; min-height: 44px; flex-shrink: 0;
+        color: rgba(148,163,184,0.5); transition: color 0.15s, background 0.15s;
+        touch-action: manipulation;
       }
-      .tour-mob__handle:active { cursor: grabbing; }
-      .tour-mob__grip { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-      .tour-mob__grip span { display: block; width: 32px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.3); transition: background 0.12s; }
-      .tour-mob__handle:hover .tour-mob__grip span,
-      .tour-mob__handle:active .tour-mob__grip span { background: rgba(255,255,255,0.6); }
-    
+      .tour-mob__handle:hover { color: rgba(226,232,240,0.8); background: rgba(255,255,255,0.04); }
+      .tour-mob__chev { pointer-events: none; transition: transform 0.28s cubic-bezier(0.34,1.4,0.64,1), color 0.15s; flex-shrink: 0; }
+      .tour-mob__chev.collapsed { transform: rotate(180deg); }
+      .tour-mob__handle:hover .tour-mob__chev { color: rgba(226,232,240,0.8); }
+
+      /* 收起状态：只留把手 */
+      .tour-mob.collapsed .tour-mob__inner { display: none; }
+      .tour-mob.collapsed { min-height: unset; padding: 0; border-radius: 24px; }
+
       /* 内容区 */
       .tour-mob__inner {
         display: flex; flex-direction: column; align-items: stretch;
         padding: 4px 12px 12px; gap: 8px;
         max-height: calc(100vh - 180px); overflow-y: auto; height: auto;
+        transition: opacity 0.2s;
       }
       .tour-mob__inner::-webkit-scrollbar { width: 3px; }
       .tour-mob__inner::-webkit-scrollbar-track { background: transparent; }
