@@ -251,12 +251,6 @@ function startTour(): void {
       } else {
         uiState.tour.pathHistory.push(currNode);
       }
-      uiState.detailPanel?.show(info.nodeId);
-
-      // Mobile: auto-open detail panel
-      if (window.innerWidth <= 640) {
-        uiState.detailPanel?.show(info.nodeId);
-      }
 
       // ── Mobile badges ─────────────────────────────────────────────────────
       const depthBadge = document.getElementById('tour-depth-badge');
@@ -291,6 +285,11 @@ function startTour(): void {
       if (progressLabelDt) {
         progressLabelDt.textContent = `${info.layerIndex} / ${info.totalToExplore}`;
       }
+    },
+    onStepAfterCenter: (info) => {
+      // Show detail panel AFTER pan animation completes — ensures reposition
+      // reads the node's final (centered) renderedPosition, not its pre-animation position.
+      uiState.detailPanel?.show(info.nodeId);
     },
     onAfterCenter: (pan: { x: number; y: number }) => {
       if (window.innerWidth <= 640) {

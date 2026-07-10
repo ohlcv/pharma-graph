@@ -91,7 +91,8 @@ export function showMobilePanel(
 
   panel.classList.add('open');
   document.body.style.overflow = 'hidden';
-  panGraphToUpperThird(cy, node);
+  // panGraphToUpperThird removed: tour engine's onAfterCenter already handles
+  // the mobile offset (pan.y + panelH * 0.4) in the 600ms animation complete callback.
 }
 
 function switchTab(tab: 'overview' | 'body'): void {

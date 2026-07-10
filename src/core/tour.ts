@@ -6,6 +6,8 @@ export interface TourOptions {
   maxDepth: number;
   strategy: TourStrategy;
   onStep?: (info: TourStepInfo) => void;
+  /** Called after the pan animation completes and onAfterCenter has been applied */
+  onStepAfterCenter?: (info: TourStepInfo) => void;
   onComplete?: () => void;
   onPause?: () => void;
   onResume?: () => void;
@@ -381,6 +383,7 @@ export class TourEngine {
   private paused = false;
   private stopped = false;
   private onStep?: TourOptions['onStep'];
+  private onStepAfterCenter?: TourOptions['onStepAfterCenter'];
   private onComplete?: TourOptions['onComplete'];
   private onPause?: TourOptions['onPause'];
   private onResume?: TourOptions['onResume'];
@@ -414,6 +417,7 @@ export class TourEngine {
     this.interval = options.interval ?? 3000;
     this.maxDepth = options.maxDepth ?? -1;
     this.onStep = options.onStep;
+    this.onStepAfterCenter = options.onStepAfterCenter;
     this.onComplete = options.onComplete;
     this.onPause = options.onPause;
     this.onResume = options.onResume;
@@ -642,6 +646,22 @@ export class TourEngine {
 
     this.startTourPulse(node);
 
+    const stepInfo: TourStepInfo = {
+      nodeId,
+      label: node.data('label') || nodeId,
+      depth,
+      path,
+      pathLabels,
+      layerSize: total,
+      layerIndex: layerIdx,
+      totalExplored: this.totalExplored,
+      totalToExplore: total,
+      currentStep: this.currentStep,
+      maxDepthReached: depth,
+      cycleCount: this.cycleCount,
+      strategyName: this.strategyName,
+    };
+
     this.cy.stop();
     this.cy.animate({
       center: { eles: node },
@@ -654,26 +674,13 @@ export class TourEngine {
           const adjusted = this.onAfterCenter(currentPan);
           this.cy.pan(adjusted);
         }
+        this.onStepAfterCenter?.(stepInfo);
         if (!this.stopped && !this.paused) this.scheduleNext();
       },
     } as cytoscape.AnimationOptions);
 
     if (!silent) {
-      this.onStep?.({
-        nodeId,
-        label: node.data('label') || nodeId,
-        depth,
-        path,
-        pathLabels,
-        layerSize: total,
-        layerIndex: layerIdx,
-        totalExplored: this.totalExplored,
-        totalToExplore: total,
-        currentStep: this.currentStep,
-        maxDepthReached: depth,
-        cycleCount: this.cycleCount,
-        strategyName: this.strategyName,
-      });
+      this.onStep?.(stepInfo);
     }
   }
 
