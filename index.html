@@ -115,7 +115,7 @@
       <svg id="music-icon-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polygon points="5 3 19 12 5 21 5 3" fill="currentColor" stroke="none"/>
       </svg>
-      <span id="music-label">播放</span>
+      <span id="music-label">音乐</span>
     </button>
 
     <div class="toolbar__sep"></div>
@@ -466,11 +466,12 @@
           <span>音乐</span>
         </button>
         <button class="bs-quick-btn" id="bs-btn-tour" title="漫游探索" onclick="toggleTour()">
-          <svg id="bs-tour-icon-stop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
+          <svg id="bs-tour-icon-stop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="6" y="6" width="12" height="12" rx="1" fill="currentColor" stroke="none"/>
           </svg>
           <svg id="bs-tour-icon-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="5 3 19 12 5 21 5 3" fill="currentColor" stroke="none"/>
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+            <circle cx="12" cy="9" r="2.5" fill="currentColor" stroke="none"/>
           </svg>
           <span>漫游</span>
         </button>
@@ -559,7 +560,7 @@
         </button>
         <button class="tour-mob__badge" id="tour-badge-btn" onclick="tourPause()">
           <svg id="tour-badge-play" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><polygon points="9,7 17,12 9,17" fill="currentColor"/></svg>
-          <svg id="tour-badge-pause" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><rect x="7" y="6" width="3.5" height="12" fill="currentColor"/><rect x="13.5" y="6" width="3.5" height="12" fill="currentColor"/></svg>
+          <svg id="tour-badge-pause" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><rect x="7" y="6" width="3.5" height="12" fill="currentColor"/><rect x="13.5" y="6" width="3.5" height="12" fill="currentColor"/></svg>
         </button>
         <button class="tour-mob__badge tour-mob__badge--next" onclick="tourNext()" title="下一个">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -708,7 +709,7 @@
         </button>
         <button class="tour-dt__btn tour-dt__btn--play" id="tour-badge-btn-dt" onclick="tourPause()" title="暂停">
           <svg id="tour-badge-play-dt" viewBox="0 0 24 24"><polygon points="6,4 20,12 6,20" fill="currentColor"/></svg>
-          <svg id="tour-badge-pause-dt" viewBox="0 0 24 24" style="display:none"><rect x="5" y="4" width="4" height="16" fill="currentColor"/><rect x="15" y="4" width="4" height="16" fill="currentColor"/></svg>
+          <svg id="tour-badge-pause-dt" viewBox="0 0 24 24"><rect x="5" y="4" width="4" height="16" fill="currentColor"/><rect x="15" y="4" width="4" height="16" fill="currentColor"/></svg>
         </button>
         <button class="tour-dt__btn tour-dt__btn--next" onclick="tourNext()" title="下一个">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">

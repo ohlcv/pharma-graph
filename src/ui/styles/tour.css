@@ -50,12 +50,24 @@
 /* ── Play / pause icon swap ──────────────────────────────────────────────────
    Toolbar buttons carry both icons; CSS hides one or the other based on the
    global state class so the JS layer doesn't have to touch style.display. */
-.tour-state--idle    [data-tour-icon="play"]  { display: inline-flex; }
-.tour-state--idle    [data-tour-icon="pause"] { display: none; }
-.tour-state--running [data-tour-icon="play"]  { display: none; }
-.tour-state--running [data-tour-icon="pause"] { display: inline-flex; }
-.tour-state--paused  [data-tour-icon="play"]  { display: inline-flex; }
-.tour-state--paused  [data-tour-icon="pause"] { display: none; }
+.tour-state--idle    #tour-badge-play,
+.tour-state--idle    #tour-badge-play-dt,
+.tour-state--idle    #bs-tour-icon-play  { display: inline-flex; }
+.tour-state--idle    #tour-badge-pause,
+.tour-state--idle    #tour-badge-pause-dt,
+.tour-state--idle    #bs-tour-icon-stop  { display: none; }
+.tour-state--running #tour-badge-play,
+.tour-state--running #tour-badge-play-dt,
+.tour-state--running #bs-tour-icon-play { display: none; }
+.tour-state--running #tour-badge-pause,
+.tour-state--running #tour-badge-pause-dt,
+.tour-state--running #bs-tour-icon-stop { display: inline-flex; }
+.tour-state--paused  #tour-badge-play,
+.tour-state--paused  #tour-badge-play-dt,
+.tour-state--paused  #bs-tour-icon-play  { display: inline-flex; }
+.tour-state--paused  #tour-badge-pause,
+.tour-state--paused  #tour-badge-pause-dt,
+.tour-state--paused  #bs-tour-icon-stop  { display: none; }
 
 /* The compact mobile-bar play/pause button mirrors the same logic. */
 .tour-state--idle    .tour-mob__badge { background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.4); }
