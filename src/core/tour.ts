@@ -396,7 +396,12 @@ export class TourEngine {
   private pulseRafId: number | null = null;
   private pulsingNode: cytoscape.NodeSingular | null = null;
   private strategyName = '';
-  private _recursionCount = 0;
+  // Tracks how many times we've rebuilt the visit sequence in the *current*
+  // tour invocation, when infinite mode (maxDepth < 0) loops back. Caps at 3
+  // to prevent pathological re-runs from locking the UI. Resets in start() and
+  // when the tour ends naturally. Previously misnamed `_recursionCount` —
+  // it is not a recursion counter in the call-stack sense.
+  private _restartAttempts = 0;
 
   constructor(cy: cytoscape.Core) {
     this.cy = cy;
@@ -423,7 +428,7 @@ export class TourEngine {
     this.totalExplored = 0;
     this.currentStep = 0;
     this.cycleCount = 0;
-    this._recursionCount = 0;
+    this._restartAttempts = 0;
 
     const strategy = getStrategy(options.strategy);
     this.strategyName = strategy.label;
@@ -593,8 +598,8 @@ export class TourEngine {
       if (this.maxDepth < 0 && !restarted) {
         restarted = true;
         this.cycleCount++;
-        this._recursionCount++;
-        if (this._recursionCount < 3) {
+        this._restartAttempts++;
+        if (this._restartAttempts < 3) {
           const strategy = getStrategy(this.getStrategyId());
           this.seq = strategy.buildSequence(this.cy);
           if (this.seq.length === 0) {
@@ -609,7 +614,7 @@ export class TourEngine {
         }
       }
 
-      this._recursionCount = 0;
+      this._restartAttempts = 0;
       this.stopped = true;
       this.onComplete?.();
       return;

@@ -16,16 +16,24 @@ import { uiState } from './state.js';
 import {
   updateStats,
   syncBottomSheetStats,
+} from './graph-stats.js';
+
+import {
   runLayout,
   applyLayoutParams,
   fitGraph,
   randomize,
   animatePulse,
-  highlightShape,
-  clearShapeFilter,
   toggleBsParams,
   applyBsParams,
 } from './layout-manager.js';
+
+import {
+  highlightShape,
+  clearShapeFilter,
+} from './legend-manager.js';
+
+import { initGraphEvents } from './graph-events.js';
 
 import {
   toggleBottomSheet,
@@ -496,97 +504,6 @@ function initMusicPlayer(): void {
   if (bsBtn) bsBtn.addEventListener('click', toggleMusic);
 }
 
-// ── Graph events ──────────────────────────────────────────────────────────────
-
-function initGraphEvents(
-  cy: cytoscape.Core,
-  renderer: Renderer,
-  highlight: HighlightEngine,
-  detailPanel: DetailPanel,
-): void {
-  cy.on('tap', 'node', (evt) => {
-    const node = evt.target;
-    const dbgBtn = document.getElementById('debug-toggle');
-    if (dbgBtn) {
-      dbgBtn.style.transition = 'none';
-      dbgBtn.style.background = '#4338ca';
-      dbgBtn.style.color = '#fff';
-      requestAnimationFrame(() => {
-        dbgBtn.style.transition = 'background 0.5s, color 0.5s';
-        dbgBtn.style.background = '';
-        dbgBtn.style.color = '';
-      });
-    }
-    const cont = node.cy().container();
-    if (cont) {
-      const pos = node.renderedPosition();
-      const rect = cont.getBoundingClientRect();
-      spawnNodeRipple(rect.left + pos.x, rect.top + pos.y, node.data('color') || '#818cf8');
-    }
-    const prev = highlight.highlightNode(node.id());
-    setPrevSelectedNode(prev.prevNodeId, prev.prevNodeName);
-    detailPanel.show(node.id());
-    updateStats(cy);
-    syncBottomSheetStats(cy);
-
-    // Update forensic panel if debug mode is active
-    if (debugOverlayActive) {
-      updateForensicPanel(renderer);
-    }
-  });
-
-  cy.on('tap', 'edge', (evt) => {
-    highlight.highlightEdgeOnly(evt.target.id());
-    updateStats(cy);
-    syncBottomSheetStats(cy);
-  });
-
-  cy.on('tap', (evt) => {
-    if (evt.target === cy) {
-      clearShapeFilter();
-      highlight.reset();
-      detailPanel.close();
-      if (uiState.tour.engine?.isRunning() || uiState.tour.engine?.isPaused()) tourStop();
-    }
-  });
-
-  cy.on('mouseover', 'node', (evt) => {
-    const node = evt.target;
-    if (node.hasClass('dimmed')) return;
-    node.addClass('hovered');
-  });
-
-  cy.on('mouseout', 'node', (evt) => {
-    const node = evt.target;
-    if (node.hasClass('dimmed') || node.hasClass('highlighted')) return;
-    node.removeClass('hovered');
-    cy.edges().removeClass('tour-path-preview');
-  });
-
-  cy.on('mouseover', 'edge', (evt) => {
-    const reason = renderer.getEdgeReason(evt.target);
-    if (!reason) return;
-    const mid = renderer.getEdgeMidpoint(evt.target);
-    showEdgeTooltip(reason, mid.x, mid.y);
-  });
-
-  cy.on('mouseout', 'edge', () => { hideEdgeTooltip(); });
-
-  cy.on('grab', 'node', () => { uiState.isDragging = true; renderer.setDragMode(true); });
-  cy.on('free', 'node', () => { uiState.isDragging = false; renderer.setDragMode(false); });
-  cy.on('dragfree', () => { uiState.isDragging = false; renderer.setDragMode(false); updateStats(cy); syncBottomSheetStats(cy); });
-  cy.on('layoutstop', () => { updateStats(cy); syncBottomSheetStats(cy); });
-  cy.on('select', () => { updateStats(cy); syncBottomSheetStats(cy); });
-  cy.on('unselect', () => { updateStats(cy); syncBottomSheetStats(cy); });
-
-  cy.on('zoom', () => {
-    const zoom = cy.zoom();
-    if (zoom < 0.05) cy.zoom(0.05);
-    if (zoom > 5.0) cy.zoom(5.0);
-    showZoomIndicator(cy);
-  });
-}
-
 // ── Search ─────────────────────────────────────────────────────────────────────
 
 function initSearchUI(
@@ -774,7 +691,23 @@ try {
   uiState.search = new Search(uiState.renderer.getCy(), uiState.highlight);
   const cy = uiState.renderer.getCy();
 
-  initGraphEvents(cy, uiState.renderer, uiState.highlight, uiState.detailPanel);
+  initGraphEvents({
+    cy,
+    renderer: uiState.renderer,
+    highlight: uiState.highlight!,
+    detailPanel: uiState.detailPanel!,
+    spawnNodeRipple,
+    setPrevSelectedNode,
+    showEdgeTooltip,
+    hideEdgeTooltip,
+    showZoomIndicator,
+    isDebugOverlayActive: () => debugOverlayActive,
+    updateForensicPanel,
+    onCanvasTapWhileTour: () => Boolean(uiState.tour.engine?.isRunning()) || Boolean(uiState.tour.engine?.isPaused()),
+    onCanvasTapWhileTourClear: () => tourStop(),
+    setDragging: (d) => { uiState.isDragging = d; },
+    setDragMode: (d) => { uiState.renderer!.setDragMode(d); },
+  });
 
   initEdgeTooltip();
   initDebugOverlay(uiState.renderer);
