@@ -28,9 +28,50 @@
       to   { opacity: 1; transform: translateY(0)    scale(1);    }
     }
     
-    /* JS 通过添加 .tour-visible class 来显示，配合 CSS 媒体查询的默认隐藏 */
-    .tour-dt.tour-visible { display: flex; }
-    .tour-mob.tour-visible { display: flex; }
+    /* ── State-driven visibility (TourController broadcasts via document class) ──
+   We rely entirely on the html.tour-state--* class plus media queries. The
+   .tour-state-target opt-in is used by #tour-dt / #tour-status so other
+   hidden elements don't suddenly become visible by accident.
+
+   When the engine is idle the rules below emit no `display` → the bars keep
+   their default display:none. When running/paused the bars get display:flex,
+   then the @media queries pick the physical bar for the current breakpoint. */
+.tour-state--running .tour-state-target,
+.tour-state--paused  .tour-state-target { display: flex; }
+@media (max-width: 640px) {
+  .tour-state--running .tour-dt,
+  .tour-state--paused  .tour-dt { display: none; }
+}
+@media (min-width: 641px) {
+  .tour-state--running .tour-mob,
+  .tour-state--paused  .tour-mob { display: none; }
+}
+
+/* ── Play / pause icon swap ──────────────────────────────────────────────────
+   Toolbar buttons carry both icons; CSS hides one or the other based on the
+   global state class so the JS layer doesn't have to touch style.display. */
+.tour-state--idle    [data-tour-icon="play"]  { display: inline-flex; }
+.tour-state--idle    [data-tour-icon="pause"] { display: none; }
+.tour-state--running [data-tour-icon="play"]  { display: none; }
+.tour-state--running [data-tour-icon="pause"] { display: inline-flex; }
+.tour-state--paused  [data-tour-icon="play"]  { display: inline-flex; }
+.tour-state--paused  [data-tour-icon="pause"] { display: none; }
+
+/* The compact mobile-bar play/pause button mirrors the same logic. */
+.tour-state--idle    .tour-mob__badge { background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.4); }
+.tour-state--running .tour-mob__badge,
+.tour-state--paused  .tour-mob__badge { background: rgba(168,85,247,0.18); border-color: rgba(168,85,247,0.4); }
+
+/* Dot color reflects state */
+.tour-state--idle    .tour-dt__dot { background: rgba(148,163,184,0.5); box-shadow: none; animation: none; }
+.tour-state--running .tour-dt__dot { background: var(--tour-accent);    box-shadow: 0 0 6px var(--tour-accent); animation: dot-pulse 2s ease-in-out infinite; }
+.tour-state--paused  .tour-dt__dot { background: #fbbf24;               box-shadow: 0 0 6px #fbbf24; animation: none; }
+
+/* Toolbar "active" state for the tour button — derive from global state. */
+.tour-state--running #btn-tour,
+.tour-state--paused  #btn-tour,
+.tour-state--running #bs-btn-tour,
+.tour-state--paused  #bs-btn-tour { background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.45); color: var(--accent); }
 
     /* ─────────────────────────────────────────────────────────────────────────
        桌面版 .tour-dt
@@ -84,16 +125,28 @@
     .tour-dt__stats     { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
     .tour-dt__stat      { display: flex; align-items: center; gap: 4px; font-size: 0.68rem; }
     .tour-dt__stat svg  { width: 14px; height: 14px; stroke: currentColor; flex-shrink: 0; }
-    .tour-dt__stat-label { color: rgba(226,232,240,0.4); }
+    .tour-dt__stat-label { color: rgba(226,232,240,0.55); }
     .tour-dt__stat-val   { font-weight: 700; color: rgba(226,232,240,0.9); font-variant-numeric: tabular-nums; }
     
-    .tour-dt__progress       { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 80px; max-width: 200px; }
-    .tour-dt__progress-track { flex: 1; height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
-    .tour-dt__progress-fill  { height: 100%; background: linear-gradient(90deg, var(--tour-accent), var(--tour-accent-2)); border-radius: 2px; transition: width 0.3s ease; width: 0%; }
-    .tour-dt__progress-label { font-size: 0.6rem; color: rgba(226,232,240,0.4); font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
+.tour-dt__progress       { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 80px; max-width: 200px; }
+.tour-dt__progress-track { flex: 1; height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: visible; position: relative; }
+.tour-dt__progress-fill  { height: 100%; background: linear-gradient(90deg, var(--tour-accent), var(--tour-accent-2)); border-radius: 2px; transition: width 0.3s ease; width: 0%; }
+/* Timeline marker — a small dot riding the leading edge of the fill so users
+   can pinpoint where they are in the sequence. The JS sets `left:%` to match
+   the fill width, keeping both visually in sync. */
+.tour-dt__progress-marker {
+  position: absolute; top: 50%; left: 0;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #fff; box-shadow: 0 0 0 2px var(--tour-accent), 0 0 6px rgba(99,102,241,0.6);
+  transform: translate(-50%, -50%);
+  transition: left 0.3s ease;
+  pointer-events: none;
+}
+.tour-state--idle    .tour-dt__progress-marker { display: none; }
+.tour-dt__progress-label { font-size: 0.6rem; color: rgba(226,232,240,0.55); font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
     
     .tour-dt__params      { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
-    .tour-dt__param-label { display: flex; align-items: center; gap: 3px; font-size: 0.6rem; color: rgba(226,232,240,0.4); white-space: nowrap; }
+    .tour-dt__param-label { display: flex; align-items: center; gap: 3px; font-size: 0.6rem; color: rgba(226,232,240,0.55); white-space: nowrap; }
     .tour-dt__param-label svg { width: 12px; height: 12px; stroke: currentColor; flex-shrink: 0; }
     .tour-dt__range {
       width: 60px; height: 3px; -webkit-appearance: none; appearance: none;
@@ -326,14 +379,14 @@
         background: rgba(99,102,241,0.18);
       }
       .tour-mob__strategy-label {
-        font-size: 0.48rem; color: rgba(226,232,240,0.35); white-space: nowrap;
+        font-size: 0.48rem; color: rgba(226,232,240,0.55); white-space: nowrap;
       }
 
       /* 统计数字 */
       .tour-mob__stats { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 0; }
       .tour-mob__stat-item { display: flex; flex-direction: column; align-items: center; gap: 1px; }
       .tour-mob__stat-num  { font-size: 0.82rem; font-weight: 600; color: rgba(226,232,240,0.9); font-variant-numeric: tabular-nums; line-height: 1; }
-      .tour-mob__stat-item svg { width: 11px; height: 11px; stroke: currentColor; color: rgba(226,232,240,0.35); flex-shrink: 0; }
+      .tour-mob__stat-item svg { width: 11px; height: 11px; stroke: currentColor; color: rgba(226,232,240,0.55); flex-shrink: 0; }
       .tour-mob__stat-lbl  { font-size: 0.48rem; color: rgba(226,232,240,0.28); user-select: none; letter-spacing: 0.02em; }
     
       /* 滑块区 */

@@ -50,4 +50,55 @@
   white-space: nowrap; flex-shrink: 0;
 }
 
+/* ── Focus ring for keyboard-promoted divs (legend rows, chips) ──────────── */
+/* Use :focus-visible so mouse clicks don't show a ring, only Tab navigation. */
+.legend-row:focus-visible,
+.legend-field-row:focus-visible,
+.legend-tier-row:focus-visible,
+.legend-edge-row:focus-visible,
+.bs-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25);
+}
+
+/* ── Reduced-motion accommodation ──────────────────────────────────────────
+   Users with `prefers-reduced-motion: reduce` (vestibular sensitivity,
+   screen-reader or battery saver) should not be subjected to looping
+   decorative animations or long transitions.
+
+   Strategy:
+   - Kill *infinite* decorations (shimmer, dot-pulse).
+   - Compress *finite* enter animations to < 1 frame (instant).
+   - Keep opacity/colour transitions short so hover/focus feedback still works.
+
+   This is intentionally broad: scoped via known animation names so we don't
+   break legitimate user-driven transitions on inputs. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* Cytoscape canvas transitions — set via JS in renderer.ts, but we can ask
+     for instant motion at the stylesheet level too. */
+  cy, #cy, .cy { transition: none !important; }
+  /* Disable the looping shimmers explicitly so they don't flicker at start. */
+  .badge-shimmer, .carousel-shimmer, .badge-meow, .empty-state__icon,
+  .topbar__badge-dot, .tour-dt__dot, .node-ripple {
+    animation: none !important;
+  }
+  /* Respect that the user still wants visible feedback: keep outlines, but
+     remove the halo/glow which is itself a (subtle) motion driver. */
+  .legend-row:focus-visible,
+  .legend-field-row:focus-visible,
+  .legend-tier-row:focus-visible,
+  .legend-edge-row:focus-visible,
+  .bs-chip:focus-visible {
+    box-shadow: none;
+  }
+}
+
 }

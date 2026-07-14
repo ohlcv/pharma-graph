@@ -177,8 +177,8 @@ summary:
 
 ```
 A. 结构与组成
-   ├── has          组成（has）：整体 - 部分构成关系（整体→部分）
-   └── isa          归类（isa）：实例 - 概念从属关系（具体→抽象）
+   ├── has          组成（has）：整体 - 部分构成关系（整体→部分），仅用于物理组成
+   └── isa          归类（isa）：层级归属/概念从属关系（子→父、具体→抽象）
 
 B. 药理机制
    ├── activates    激动受体/通路
@@ -200,8 +200,15 @@ D. 学习路径
 
 | 值 | 含义 | 方向 | 示例 |
 |---|---|---|---|
-| `has` | 物理组成（整体含部分） | 制剂 → 辅料 | 布洛芬缓释胶囊 → 羟丙甲纤维素 |
-| `isa` | 是个体/实例（具体归抽象） | 具体药 → 药理分类 | 美托洛尔 → β受体阻滞剂 |
+| `has` | 物理/组合组成（整体含部分） | 整体 → 部分 | 布洛芬缓释胶囊 → 羟丙甲纤维素 |
+| `isa` | 层级归属或概念归类（具体归抽象） | 子 → 父 | 节 → 章、美托洛尔 → β受体阻滞剂 |
+
+> **重要：`has` 与 `isa` 的判定规则**
+>
+> - **结构层级归属**（节属于章、章属于篇、篇属于 book）→ 用 `isa`，方向子→父。
+> - **物理/组合组成**（制剂含辅料、人体含器官）→ 用 `has`，方向整体→部分。
+> - 不要混用：避免"章→节"用 `has` 而"节→章"用 `isa` 这种写法。
+> - 详见 [ADR-0001](./ADR-0001-层级关系统一使用isa方向.md)。
 
 **B. 药理机制**
 
@@ -229,20 +236,24 @@ D. 学习路径
 
 **填写规则：**
 
-1. 先确认节点本质：结构/组成类用 `has`；药理类用 `activates`/`inhibits`/`mechanism`/`metabolizes`；临床类用 `treats`/`causes`/`interacts`/`contraindicates`；学习类用 `prerequisite`
+1. 先确认节点本质：结构/组成类用 `has`（仅物理组成）或 `isa`（层级归属）；药理类用 `activates`/`inhibits`/`mechanism`/`metabolizes`；临床类用 `treats`/`causes`/`interacts`/`contraindicates`；学习类用 `prerequisite`
 2. 尽量选最具体的边类型，不用泛化的万能边
 3. `metabolizes`、`interacts`、`contraindicates` 可以是双向边
 4. 不要为"有边而有边"；`target` 必须指向仓库里真实存在的节点 id
+5. **层级关系一律用 `isa`（子→父方向），不使用 `has` 表达"属于"。** 父节点不需要枚举自己的子节点。
+6. **禁止双向书写同一对层级关系**（如同时写 `A isa B` 和 `B isa A`）—— 这会让图谱去重失效并产生歧义。
 
 **各类节点最低要求：**
 
 | 节点类型 | 最低边数 | 重点边类型 |
 |---|---|---|
-| 篇/章/节入口 | 1 条 `has` + 1–2 条下游关联 | `has`、`prerequisite` |
-| 概念类 | 1 条归属边 + 关键上下游 | `isa`、`prerequisite` |
-| 具体药物类 | 1 条归属边 + 机制/适应证/禁忌 | `activates`、`inhibits`、`mechanism`、`treats`、`causes`、`contraindicates` |
-| 制剂/工艺类 | 1 条结构归属边 + 组成/实例关联 | `has`、`isa` |
-| 疾病类 | 1 条归属边 + 治疗药/病因 | `treats`、`causes` |
+| 篇/章/节入口（非 book 根） | 1 条 `isa`（指向父）+ 1–2 条下游关联 | `isa`、`prerequisite`、`treats` |
+| 概念类 | 1 条 `isa` + 关键上下游 | `isa`、`prerequisite` |
+| 具体药物类 | 1 条 `isa` + 机制/适应证/禁忌 | `isa`、`activates`、`inhibits`、`mechanism`、`treats`、`causes`、`contraindicates` |
+| 制剂/工艺类 | 1 条 `isa` + 组成/实例关联 | `isa`、`has`（仅当拆解为组分时） |
+| 疾病类 | 1 条 `isa` + 治疗药/病因 | `isa`、`treats`、`causes` |
+
+> **建议规则**：除 `book` 根节点外，所有节点都建议至少有 1 条 `isa` 边。这一条由校验脚本以 warning 形式提示，不阻断构建，但长期未补充的节点会被标记为"薄弱节点"（参见 `src/scripts/validate.ts`）。等你确认数据规模后再考虑是否升级为 error 级强制。
 
 **完成标准：** frontmatter 符合当前 schema + 正文五问成立 + `edges_out` 不为空且反映正文关键关系 + 所有 `target` 能在现有节点 id 中找到 + 边类型从当前 11 种中选取，不出现其他值。
 
@@ -307,7 +318,7 @@ D. 学习路径
 |---|---|---|
 | `activates`/`inhibits` | "它主要影响哪些通路或受体？" | 边 → "它通过激动/抑制……起作用" |
 | `treats`/`causes` | "它和哪些疾病或症状直接相关？" | 边 → "它治疗/会引起……" |
-| `has`/`isa` | "它属于哪个更大的体系？" | 边 → "它属于……系统/分类" |
+| `has`/`isa` | "它属于哪个更大的体系？" | 边 → "它属于……系统/分类"（层级归属用 isa，物理组成用 has） |
 | `prerequisite` | "搞懂它之后能接着学什么？" | 边 → "它之后会用到……" |
 | 混合型（多种边都有） | "它和哪几条线上的内容关系最密切？" | 把不同类型的边分别翻译成关系 |
 
@@ -421,6 +432,100 @@ edges_out:
 ```
 
 **字数：** 五答合计约 300 字。
+
+---
+
+### 层级关系方向专题（ADR-0001 配套规则）
+
+> 这一节专门讲 `edges_out` 中层级关系的方向选择，避免常见的"双向 has / 父→子 has"反模式。详细决策见 [ADR-0001](./ADR-0001-层级关系统一使用isa方向.md)。
+
+**一句话规则：层级归属一律用 `isa`，方向永远是子→父。**
+
+#### 1. 用 `isa` 表示层级归属
+
+| 关系 | 用什么 | 写在谁那里 | 方向 |
+|---|---|---|---|
+| 节属于章 | `isa` | 节节点的 frontmatter | `section-id → chapter-id` |
+| 章属于篇 | `isa` | 章节点的 frontmatter | `chapter-id → part-id` |
+| 篇属于 book | `isa` | 篇节点的 frontmatter | `part-id → book-id` |
+| 概念属于分类 | `isa` | 概念节点的 frontmatter | `concept-id → category-id` |
+
+**禁止**用 `has` 表达"属于"。例如 "第一节 镇静催眠药" 写 `has → 第一章 精神与中枢神经系统用药` 是错的，应写 `isa → cns-drugs-y2`。
+
+#### 2. `has` 只用于物理/组合组成
+
+| 用法 | 示例 | 方向 |
+|---|---|---|
+| ✓ 物理组成 | 制剂 → 辅料 | 整体 → 部分 |
+| ✓ 形态分解 | 人体 → 器官、化合物 → 元素 | 整体 → 部分 |
+| ✗ 结构层级（章→节） | 章 → 节 | 改用 `isa` |
+| ✗ 分类归属（节→章） | 节 → 章 | 改用 `isa` |
+| ✗ 双向都写 | `A has B` + `B has A` | 删掉一边，或改成一对 `isa` |
+
+#### 3. 父节点不枚举自己的子节点
+
+**错误**：
+
+```yaml
+# 在 chapter 节点的 frontmatter 里：
+edges_out:
+  - target: section-a-id
+    type: has       # ✗ 不要从父节点写"我含哪些子节点"
+  - target: section-b-id
+    type: has
+```
+
+**正确**：
+
+```yaml
+# 在 chapter 节点的 frontmatter 里：
+edges_out:
+  - target: parent-book-id
+    type: isa        # ✓ 章属于 book
+  - target: downstream-node-id
+    type: treats     # ✓ 下游学科关联
+# 注意：chapter 不写它包含哪些 section；section 自己来声明归属。
+```
+
+```yaml
+# 在 section 节点的 frontmatter 里：
+edges_out:
+  - target: cns-drugs-y2     # 父章 id
+    type: isa                # ✓ section 属于 chapter
+  - target: relevant-topic-id
+    type: treats             # ✓ 与其他节点的关联
+```
+
+#### 4. 禁止双向书写同一对层级关系
+
+```yaml
+# 错误：写了 A→B 又写 B→A 配对
+# A 节点：
+edges_out:
+  - target: B
+    type: isa
+# B 节点：
+edges_out:
+  - target: A
+    type: isa
+```
+
+去重 key 是 `source||target||type`，反向的两条会绕过去重进入 Cytoscape。加上 `has` 边没有方向箭头样式，肉眼看到的就是"两条重合的灰线"。修复：删一边或换成正确的 `isa`。
+
+#### 5. book 根节点是唯一例外
+
+`药学专业知识一.md`、`药学综合知识与技能.md` 这类 book 级节点没有 `isa` 边（它们是根），但它们可以是被 `isa` 指向的目标。
+
+#### 6. 实战自检清单
+
+写完一个节点的 frontmatter，跑过下面的检查：
+
+- [ ] 我是否用了 `isa` 表示"属于"（而不是 `has`）？
+- [ ] 我写的 `isa` 方向是否子→父（我指向我的归属父节点）？
+- [ ] 父节点有没有反过来写一条 `has` 或 `isa` 指向我？（如果有，提醒父节点作者删除）
+- [ ] 我有没有写一条又一条 `has` 反向指向我的 location 上级？（如果有，删掉或改成 `isa`）
+- [ ] 我是非 book 节点吗？如果是，我有没有 1 条 `isa` 边（建议至少 1 条，作为 warning 级别提示）？
+- [ ] 我的 `isa` 目标在仓库里有真实节点吗？（`target` 必须存在）
 
 ---
 

@@ -75,19 +75,19 @@
     <div class="toolbar__sep"></div>
 
     <div class="toolbar__group">
-      <button id="btn-fit"    class="btn" onclick="fitGraph()">
+      <button id="btn-fit"    class="btn" onclick="fitGraph()" title="适应视图（F）— 自动缩放图谱到最佳视图">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
         <span>适应</span>
       </button>
-      <button id="btn-random" class="btn" onclick="randomize()">
+      <button id="btn-random" class="btn" onclick="randomize()" title="随机布局（R）— 用 cose 算法重新打散所有节点位置">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
         <span>随机</span>
       </button>
-      <button id="btn-reset" class="btn" onclick="resetAll()">
+      <button id="btn-reset" class="btn" onclick="resetAll()" title="重置一切 — 布局回到 cose、清除形状筛选、取消高亮">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
         <span>重置</span>
       </button>
-      <button id="btn-pulse"  class="btn" onclick="animatePulse()">
+      <button id="btn-pulse"  class="btn" onclick="animatePulse()" title="节点脉冲 — 所有节点闪一下，提示数据已加载">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
         <span>脉冲</span>
       </button>
@@ -95,7 +95,7 @@
 
     <div class="toolbar__sep"></div>
 
-    <button id="btn-tour" class="btn" title="漫游探索" onclick="toggleTour()">
+    <button id="btn-tour" class="btn" title="漫游（T）— 按所选策略依次访问节点；再次点击停止" onclick="toggleTour()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="10"/>
         <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/>
@@ -515,7 +515,7 @@
   </div>
 
   <!-- 漫游状态条：桌面端浮动底部，移动端独立卡片 -->
-  <div id="tour-status" class="tour-status tour-mob">
+  <div id="tour-status" class="tour-status tour-mob tour-state-target" aria-live="polite">
     <!-- 折叠把手（移动端专属） -->
     <div class="tour-mob__handle" id="tour-status-handle">
       <svg class="tour-mob__chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -559,6 +559,11 @@
           <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><line x1="2" y1="8" x2="22" y2="8" stroke="currentColor" stroke-width="1.8"/><line x1="2" y1="14" x2="22" y2="14" stroke="currentColor" stroke-width="1.8"/></svg>
           <span class="tour-mob__stat-lbl">层</span>
         </div>
+        <div class="tour-mob__stat-item" title="当前步 / 总步">
+          <span class="tour-mob__stat-num" id="tour-step-badge">1/<span id="tour-step-total">0</span></span>
+          <svg viewBox="0 0 24 24"><path d="M4 17l6-6 4 4 8-9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><polyline points="17 6 22 6 22 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="tour-mob__stat-lbl">步</span>
+        </div>
         <div class="tour-mob__stat-item" title="已探索节点">
           <span class="tour-mob__stat-num" id="tour-count-badge">0</span>
           <svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="16" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><line x1="8" y1="11" x2="12" y2="13" stroke="currentColor" stroke-width="1.5"/><line x1="16" y1="11" x2="12" y2="13" stroke="currentColor" stroke-width="1.5"/></svg>
@@ -567,7 +572,10 @@
       </div>
       <!-- 策略切换（移动端紧凑：按钮+下方标签） -->
       <div class="tour-mob__strategy">
-        <button id="tour-strategy-toggle-mob" class="tour-mob__strategy-toggle" onclick="onTourStrategyToggle()" aria-label="切换漫游策略">
+        <button id="tour-strategy-toggle-mob" class="tour-mob__strategy-toggle"
+                onclick="onTourStrategyToggle()"
+                title="教材顺序 = 按章节遍历；层级依赖 = 按前置知识遍历"
+                aria-label="切换漫游策略">
           <span class="tour-mob__strategy-value" id="tour-strategy-value-mob">教材</span>
         </button>
         <span class="tour-mob__strategy-label">策略</span>
@@ -597,7 +605,7 @@
   </div>
 
   <!-- 桌面版漫游条（和移动版平级，独立控制显示） -->
-  <div class="tour-dt" id="tour-dt">
+  <div id="tour-dt" class="tour-dt tour-state-target">
       <!-- 左侧：状态指示 -->
       <div class="tour-dt__status">
         <span class="tour-dt__dot" id="tour-dt-dot"></span>
@@ -629,9 +637,10 @@
         </span>
       </div>
       <!-- 进度条 -->
-      <div class="tour-dt__progress">
+      <div class="tour-dt__progress" title="当前步 / 总步">
         <div class="tour-dt__progress-track">
           <div class="tour-dt__progress-fill" id="tour-progress-fill-dt"></div>
+          <div class="tour-dt__progress-marker" id="tour-progress-marker-dt" aria-hidden="true"></div>
         </div>
         <span class="tour-dt__progress-label" id="tour-progress-label-dt">0 / 0</span>
       </div>
@@ -643,9 +652,9 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
           策略
         </span>
-        <select id="tour-strategy-select-dt" class="tour-dt__select" onchange="window.onTourStrategyChange(this.value)">
-          <option value="has-dfs">E1 教材顺序DFS</option>
-          <option value="topo-prereq">E2 层级依赖BFS</option>
+        <select id="tour-strategy-select-dt" class="tour-dt__select" title="选择遍历策略：决定漫游访问节点的顺序">
+          <option value="has-dfs" title="按教材章节顺序遍历，深度优先（一种图遍历算法）">教材顺序（深度优先）</option>
+          <option value="topo-prereq" title="按前置知识依赖遍历，先基础后进阶（一种图遍历算法）">层级依赖（广度优先）</option>
         </select>
       </div>
       <!-- 分隔线 -->

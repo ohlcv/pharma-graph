@@ -472,6 +472,22 @@
 .np-edges { display: flex; flex-direction: column; gap: 4px; }
 .np-edge-item { display: flex; align-items: flex-start; gap: 8px; padding: 6px 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; cursor: pointer; transition: background 0.12s, border-color 0.12s; }
 .np-edge-item:hover { background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.3); }
+/* Incoming edge-item: distinguished by an amber stripe on the left — same shape
+   as outgoing items so the two groups read at a glance. */
+.np-edge-item--incoming {
+  background: rgba(251,191,36,0.04);
+  border-left: 2px solid rgba(251,191,36,0.55);
+  border-color: rgba(251,191,36,0.18);
+}
+.np-edge-item--incoming:hover {
+  background: rgba(251,191,36,0.08);
+  border-color: rgba(251,191,36,0.4);
+}
+.np-edge-item--incoming .np-edge-item__type {
+  color: #f59e0b;
+  border-color: rgba(251,191,36,0.35);
+  background: rgba(251,191,36,0.1);
+}
 .np-edge-item__type   { font-size: 0.56rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); border: 1px solid rgba(99,102,241,0.3); background: rgba(99,102,241,0.1); border-radius: 4px; padding: 1px 5px; flex-shrink: 0; margin-top: 1px; }
 .np-edge-item__body   { flex: 1; min-width: 0; }
 .np-edge-item__target { font-size: 0.72rem; font-weight: 600; color: var(--text); line-height: 1.4; }
@@ -484,6 +500,9 @@
 
 .np-edges-group + .np-edges-group { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.06); }
 .np-edges-group__label { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-2); margin-bottom: 4px; }
+/* Visual cue for incoming group — label picks up the amber accent shared by
+   the .np-edge-item--incoming cards, so the two sub-groups read as a unit. */
+.np-edges-group--incoming .np-edges-group__label { color: #fbbf24; }
 .np-count { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; font-size: 0.6rem; font-weight: 700; color: var(--accent); background: rgba(99,102,241,0.15); border-radius: 8px; padding: 0 4px; margin-left: 4px; vertical-align: middle; }
 
 .np-body-content { display: flex; flex-direction: column; gap: 12px; }

@@ -16,12 +16,13 @@ export const uiState = {
   /** Search engine */
   search: null as import('./search.js').Search | null,
 
-  /** Tour engine instance (null when not running) */
+  /**
+   * Cross-module tour state. TourController owns the engine lifecycle and
+   * running/paused flags — but `strategy` and `pathHistory` are read here by
+   * other modules (drag-manager uses them; TourController writes back).
+   */
   tour: {
-    engine: null as import('../core/tour.js').TourEngine | null,
     pathHistory: [] as string[],
-    running: false,
-    paused: false,
     /** Currently selected tour strategy */
     strategy: 'has-dfs' as TourStrategy,
   },

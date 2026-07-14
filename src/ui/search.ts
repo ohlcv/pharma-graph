@@ -4,6 +4,7 @@
 
 import cytoscape from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
+import { forEachStatic } from './dom-cache.js';
 
 export class Search {
   private results: string[] = [];
@@ -35,7 +36,7 @@ export class Search {
   clear(): void {
     this.results = [];
     this.index = -1;
-    document.querySelectorAll('.legend-row, .bs-chip').forEach((el) => el.classList.remove('active'));
+    forEachStatic((el) => el.classList.remove('active'), '.legend-row', '.bs-chip');
     this.highlight.reset();
   }
 
@@ -55,6 +56,9 @@ export class Search {
 
     this.cy.elements().removeClass('selected-node');
     node.addClass('selected-node');
+    // Cancel any in-flight centering animation so rapid ArrowDown presses
+    // don't queue overlapping camera moves that produce a "jitter" effect.
+    this.cy.stop();
     this.cy.animate({
       center: { eles: node },
       zoom: 1.5,

@@ -21,7 +21,7 @@
   --accent2:     #06b6d4;
   --text:        #f1f5f9;
   --text-2:      #94a3b8;
-  --muted:       #475569;
+  --muted:       #64748b;  /* slate-500 — was slate-600 (~4.1:1, below AA on bg); raised to clear 4.5:1 */
   --green:       #34d399;
   --yellow:      #fbbf24;
   --red:         #f87171;

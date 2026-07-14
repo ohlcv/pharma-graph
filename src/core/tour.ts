@@ -36,8 +36,8 @@ export type TourStrategy =
   | 'topo-prereq';
 
 export const TOUR_STRATEGY_LABELS: Record<TourStrategy, string> = {
-  'has-dfs':    'E1 教材顺序DFS',
-  'topo-prereq':'E2 层级依赖BFS',
+  'has-dfs':    '教材顺序（深度优先）',
+  'topo-prereq':'层级依赖（广度优先）',
 };
 
 export interface TourStrategyImpl {
@@ -517,6 +517,16 @@ export class TourEngine {
 
   isPaused(): boolean {
     return this.paused && !this.stopped;
+  }
+
+  /** Total steps in this tour's sequence (built once at start()). */
+  totalSteps(): number {
+    return this.seq.length;
+  }
+
+  /** Current step in the sequence (1-indexed; matches TourStepInfo.currentStep). */
+  currentStepIndex(): number {
+    return this.currentStep;
   }
 
   /**

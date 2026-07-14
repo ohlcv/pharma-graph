@@ -91,6 +91,8 @@ const STYLESHEET: any[] = (() => {
         'text-valign': 'bottom',
         'text-halign': 'center',
         'text-margin-y': 6,
+        'text-wrap': 'wrap',
+        'text-max-width': '120px',
         'text-background-color': 'rgba(15,17,23,0.82)',
         'text-background-shape': 'roundrectangle',
         'text-background-padding': '3px',
@@ -181,10 +183,11 @@ const STYLESHEET: any[] = (() => {
     {
       selector: '.pulse',
       style: {
+        // width/height intentionally omitted — anim-pulse.ts animates them via
+        // inline styles using the base formula, then clears them at end.
+        // border is what makes the pulse visually obvious.
         'border-width': 2.5,
         'border-color': '#fbbf24',
-        width: 'mapData(weight, 40, 100, 38, 72)',
-        height: 'mapData(weight, 40, 100, 38, 72)',
       },
     },
     {

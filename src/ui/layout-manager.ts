@@ -9,6 +9,7 @@ import { Renderer } from '../core/renderer.js';
 import { HighlightEngine } from './highlight-engine.js';
 import { LAYOUTS } from '../core/config.js';
 import { pulseSelection } from './anim-pulse.js';
+import { forEachStatic } from './dom-cache.js';
 
 // ── Current layout state ────────────────────────────────────────────────────────
 
@@ -26,7 +27,7 @@ export function setCurrentLayout(name: string): void {
 
 export function runLayout(name: string, renderer: Renderer): void {
   _currentLayout = name;
-  document.querySelectorAll('.layout-btn').forEach((b) => b.classList.remove('active'));
+  forEachStatic((b) => b.classList.remove('active'), '.layout-btn');
   const btn = document.getElementById('btn-' + name);
   if (btn) btn.classList.add('active');
   const bsBtn = document.getElementById('bs-btn-' + name);
@@ -78,7 +79,7 @@ export function applyLayoutParams(renderer: Renderer): void {
   if (!container) return;
   const overrides = collectParamOverrides(container, '.param-slider');
   // Keep toolbar active state in sync (same as runLayout)
-  document.querySelectorAll('.layout-btn').forEach((b) => b.classList.remove('active'));
+  forEachStatic((b) => b.classList.remove('active'), '.layout-btn');
   const btn = document.getElementById('btn-' + _currentLayout);
   if (btn) btn.classList.add('active');
   const bsBtn = document.getElementById('bs-btn-' + _currentLayout);

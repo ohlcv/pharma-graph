@@ -5,6 +5,8 @@ import cytoscape from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
 import { NODE_TYPE_COLOR, ESSENCE_LABEL, FIELD_COLOR, FIELD_LABEL, TIER_LABEL, NODE_TIER_STYLE, EDGE_TYPE_LABEL } from '../core/config.js';
 import { uiState } from './state.js';
+import { forEachStatic } from './dom-cache.js';
+import { UiToggle } from './ui-toggle.js';
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -17,6 +19,7 @@ export class DetailPanel {
   private overviewTab!: HTMLElement;
   private bodyTab!: HTMLElement;
   private pinBtn!: HTMLElement;
+  private pinToggle!: UiToggle;
 
   constructor(
     private cy: cytoscape.Core,
@@ -45,12 +48,23 @@ export class DetailPanel {
     this.bodyTab = bodyTab;
     this.pinBtn = pinBtn;
 
+    // Centralised boolean toggle — syncs the pin button's `active` class and
+    // mirrors its state into uiState.isPanelPinned (kept for legacy readers
+    // such as drag-manager that read it directly).
+    this.pinToggle = new UiToggle({
+      initial: uiState.isPanelPinned,
+      persist: 'detailPanel.pinned',
+      cssClass: 'active',
+      applyTo: this.pinBtn,
+      onChange: (on) => { uiState.isPanelPinned = on; },
+    });
+
     this.overviewTab.addEventListener('click', () => switchDesktopTab('overview'));
     this.bodyTab.addEventListener('click', () => switchDesktopTab('body'));
 
     this.pinBtn.addEventListener('click', () => {
-      uiState.isPanelPinned = !uiState.isPanelPinned;
-      this.pinBtn.classList.toggle('active', uiState.isPanelPinned);
+      this.pinToggle.toggle();
+      uiState.isPanelPinned = this.pinToggle.value;
     });
 
     this.panel.addEventListener('click', (e) => {
@@ -67,9 +81,11 @@ export class DetailPanel {
       if (!toggle) return;
       const section = toggle.closest('.np-section');
       if (!section) return;
-      const label = toggle.querySelector('.np-section__label')?.textContent;
-      if (!label) return;
-      const key = label === '摘要' ? 'summary' : label === '标签' ? 'tags' : label === '关联' ? 'edges' : null;
+      // Read the section key from a data-attribute rather than the visible
+      // label text — keeps the toggle in sync with i18n and prevents a label
+      // rename from silently breaking the collapse/expand state.
+      const key = (toggle.dataset['sectionKey']
+        ?? toggle.closest<HTMLElement>('.np-section')?.dataset['sectionKey']) as 'summary' | 'tags' | 'edges' | null;
       if (!key) return;
       uiState.sectionState[key] = !uiState.sectionState[key];
       const arrow = toggle.querySelector<HTMLElement>('.np-section__toggle-arrow');
@@ -108,7 +124,7 @@ export class DetailPanel {
   }
 
   onClose(): void {
-    document.querySelectorAll('.legend-row, .bs-chip').forEach((el) => el.classList.remove('active'));
+    forEachStatic((el) => el.classList.remove('active'), '.legend-row', '.bs-chip');
     this.highlight.reset();
     this.callbacks?.onClose?.();
   }
@@ -136,9 +152,8 @@ export class DetailPanel {
 
   private applySectionState(): void {
     this.overviewPage.querySelectorAll<HTMLElement>('.np-section__toggle').forEach((toggle) => {
-      const label = toggle.querySelector('.np-section__label')?.textContent;
-      if (!label) return;
-      const key = label === '摘要' ? 'summary' : label === '标签' ? 'tags' : label === '关联' ? 'edges' : null;
+      const key = (toggle.dataset['sectionKey']
+        ?? toggle.closest<HTMLElement>('.np-section')?.dataset['sectionKey']) as 'summary' | 'tags' | 'edges' | null;
       if (!key) return;
       const arrow = toggle.closest('.np-section')?.querySelector<HTMLElement>('.np-section__toggle-arrow');
       const content = toggle.closest('.np-section')?.querySelector<HTMLElement>('.np-section__content');
@@ -206,8 +221,8 @@ function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
 
 function buildSummaryHtml(d: cytoscape.NodeDataDefinition): string {
   if (!d.summary) return '';
-  return `<div class="np-section">
-  <div class="np-section__toggle">
+  return `<div class="np-section" data-section-key="summary">
+  <div class="np-section__toggle" data-section-key="summary">
     <svg class="np-section__toggle-arrow rotated" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
     <span class="np-section__label">摘要</span>
   </div>
@@ -219,8 +234,8 @@ function buildSummaryHtml(d: cytoscape.NodeDataDefinition): string {
 
 function buildTagsHtml(d: cytoscape.NodeDataDefinition): string {
   if (!d.tags || (d.tags as string[]).length === 0) return '';
-  return `<div class="np-section">
-  <div class="np-section__toggle">
+  return `<div class="np-section" data-section-key="tags">
+  <div class="np-section__toggle" data-section-key="tags">
     <svg class="np-section__toggle-arrow rotated" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
     <span class="np-section__label">标签</span>
   </div>
@@ -254,20 +269,28 @@ function buildEdgesHtml(node: cytoscape.NodeSingular, cy: cytoscape.Core): strin
     const srcId = edge.data('source') as string;
     const srcNode = cy.getElementById(srcId);
     const srcLabel = srcNode.empty() ? srcId : (srcNode.data('label') || srcId);
-    return `<span class="np-neighbor np-neighbor--incoming" data-id="${escAttr(srcId)}">${escHtml(srcLabel)}</span>`;
+    const edgeType = (edge.data('edgeType') as string) ?? 'relates';
+    const reason = edge.data('reason') as string | undefined;
+    return `<div class="np-edge-item np-edge-item--incoming" data-target="${escAttr(srcId)}">
+  <span class="np-edge-item__type">${EDGE_TYPE_LABEL[edgeType] ?? edgeType}</span>
+  <div class="np-edge-item__body">
+    <div class="np-edge-item__target">${escHtml(srcLabel)}</div>
+    ${reason ? `<div class="np-edge-item__reason">${escHtml(reason)}</div>` : ''}
+  </div>
+</div>`;
   }).join('');
 
   const outLabel = outEdges.length > 0 ? `关联 <span class="np-count">${outEdges.length}</span>` : '';
   const inLabel = inEdges.length > 0 ? `被关联 <span class="np-count">${inEdges.length}</span>` : '';
 
-  return `<div class="np-section">
-  <div class="np-section__toggle">
+  return `<div class="np-section" data-section-key="edges">
+  <div class="np-section__toggle" data-section-key="edges">
     <svg class="np-section__toggle-arrow rotated" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
     <span class="np-section__label">关联</span>
   </div>
   <div class="np-section__content">
     ${outHtml ? `<div class="np-edges-group"><div class="np-edges-group__label">${outLabel}</div>${outHtml}</div>` : ''}
-    ${inHtml ? `<div class="np-edges-group"><div class="np-edges-group__label">${inLabel}</div>${inHtml}</div>` : ''}
+    ${inHtml ? `<div class="np-edges-group np-edges-group--incoming"><div class="np-edges-group__label">${inLabel}</div>${inHtml}</div>` : ''}
   </div>
 </div>`;
 }

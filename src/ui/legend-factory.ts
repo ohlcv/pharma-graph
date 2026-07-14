@@ -12,6 +12,7 @@
 import type { Core } from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
 import { uiState } from './state.js';
+import { staticEls } from './dom-cache.js';
 
 export type ClickHandler = (key: string, highlight: HighlightEngine) => void;
 
@@ -49,6 +50,32 @@ export interface LegendAxisDescriptor {
 /** Tracks whether a container has had its click handler attached. */
 type Delegated = HTMLElement & { __legendDelegated?: boolean };
 
+/**
+ * Promote a legend row to be keyboard-activatable: adds role="button",
+ * tabindex="0", and an aria-pressed attribute that mirrors the "active" class.
+ * Idempotent — safe to call on rebuilt rows.
+ */
+function decorateRowA11y(row: HTMLElement): void {
+  if (row.getAttribute('role') === 'button') return;
+  row.setAttribute('role', 'button');
+  row.tabIndex = 0;
+  const syncAria = () => row.setAttribute('aria-pressed', row.classList.contains('active') ? 'true' : 'false');
+  syncAria();
+  // Stay in sync with subsequent toggleFilter() calls. Cheap: a single classList
+  // read per mutation on a container that holds at most a few dozen rows.
+  const observer = new MutationObserver(syncAria);
+  observer.observe(row, { attributes: true, attributeFilter: ['class'] });
+}
+
+/** Static-row variant: edges don't go through MutationObserver (they only
+ * toggle once or twice). Inline aria-pressed sync is enough. */
+function decorateStaticRowA11y(row: HTMLElement): void {
+  if (row.getAttribute('role') === 'button') return;
+  row.setAttribute('role', 'button');
+  row.tabIndex = 0;
+  row.setAttribute('aria-pressed', row.classList.contains('active') ? 'true' : 'false');
+}
+
 function attachDelegated(
   container: HTMLElement,
   selector: string,
@@ -63,6 +90,18 @@ function attachDelegated(
     if (!row) return;
     const key = row.dataset[dataKey] ?? '';
     if (!key) return;
+    onClick(key, uiState.highlight!);
+  });
+  // Keyboard parity: Enter/Space on a focused row activates the same handler.
+  // Skip if the user is typing in an inner editable element (none today, but
+  // future-proof — legend rows don't host inputs).
+  container.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const row = (e.target as HTMLElement).closest<HTMLElement>(selector);
+    if (!row) return;
+    const key = row.dataset[dataKey] ?? '';
+    if (!key) return;
+    e.preventDefault();
     onClick(key, uiState.highlight!);
   });
 }
@@ -90,11 +129,21 @@ export function buildLegend(cy: Core, descriptor: LegendAxisDescriptor): void {
     desktop.innerHTML = Object.entries(descriptor.labels)
       .map(([k, v]) => descriptor.desktopRow(k, v))
       .join('');
+    Array.from(desktop.children).forEach((c) => decorateRowA11y(c as HTMLElement));
   }
   if (mobile && mobile.children.length === 0) {
     mobile.innerHTML = Object.entries(descriptor.labels)
       .map(([k, v]) => descriptor.mobileChip(k, v))
       .join('');
+    Array.from(mobile.children).forEach((c) => decorateRowA11y(c as HTMLElement));
+  }
+
+  // Static edge-legend rows are hard-coded in index.html (rather than generated
+  // via desktopRow()) so they bypass the innerHTML branch above. Decorate them
+  // once on first build so they pick up keyboard support too.
+  if (descriptor.dataKey === 'data-edge') {
+    staticEls('.legend-edge-row[data-edge]').forEach(decorateStaticRowA11y);
+    staticEls('.bs-chip[data-edge]').forEach(decorateStaticRowA11y);
   }
 
   if (desktop) {

@@ -5,6 +5,7 @@
 import type { Core } from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
 import { uiState } from './state.js';
+import { staticEls } from './dom-cache.js';
 import {
   SHAPE_LABEL,
   ESSENCE_LABEL,
@@ -41,8 +42,9 @@ function clearAllFilters(): void {
   activeFieldFilter = null;
   activeTierFilter = null;
   activeEdgeFilter = null;
-  document.querySelectorAll(
-    '.legend-row,.legend-field-row,.legend-tier-row,.legend-edge-row,.shape-filter-item,.bs-chip'
+  staticEls(
+    '.legend-row', '.legend-field-row', '.legend-tier-row', '.legend-edge-row',
+    '.shape-filter-item', '.bs-chip',
   ).forEach((el) => el.classList.remove('active'));
 }
 
@@ -186,15 +188,15 @@ export function highlightShape(essence: string, highlight: HighlightEngine): voi
   highlight.highlightShape(shape);
 
   // Activate legend-row by data-type
-  document.querySelectorAll('.legend-row[data-type]').forEach((el) => {
-    if ((el as HTMLElement).dataset.type === essence) el.classList.add('active');
+  staticEls('.legend-row[data-type]').forEach((el) => {
+    if (el.dataset.type === essence) el.classList.add('active');
   });
   // Activate mobile chips by data-type
-  document.querySelectorAll('.bs-chip[data-type]').forEach((el) => {
-    if ((el as HTMLElement).dataset.type === essence) el.classList.add('active');
+  staticEls('.bs-chip[data-type]').forEach((el) => {
+    if (el.dataset.type === essence) el.classList.add('active');
   });
   // Legacy shape-filter-item (older side panel that hasn't been removed yet)
-  document.querySelectorAll('.shape-filter-item').forEach((el) => {
+  staticEls('.shape-filter-item').forEach((el) => {
     const label = el.querySelector('.shape-filter-item__label')?.textContent ?? '';
     const shapeName = Object.entries(SHAPE_LABEL).find(([, v]) => v === label)?.[0] ?? label;
     if (shapeName === essence || label.toLowerCase().includes(essence)) el.classList.add('active');
@@ -241,7 +243,7 @@ export function highlightEdgeTypeFilter(edge: string, highlight: HighlightEngine
 }
 
 function activateAxis(selector: string, attr: string, key: string): void {
-  document.querySelectorAll<HTMLElement>(selector).forEach((el) => {
+  staticEls(selector).forEach((el) => {
     if (el.dataset[attr] === key) el.classList.add('active');
   });
 }

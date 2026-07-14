@@ -1,5 +1,6 @@
 import { Renderer } from '../core/renderer.js';
 import { uiState } from './state.js';
+import { UiToggle } from './ui-toggle.js';
 
 // ── Bottom sheet ───────────────────────────────────────────────────────────────
 
@@ -183,21 +184,8 @@ export function initSheetDrag(): void {
   applySheetState(false);
 }
 
-// ── Tour bar collapse / expand ─────────────────────────────────────────────────
-
-export function   initTourBarCollapse(): void {
-  const handle = document.getElementById('tour-status-handle');
-  if (!handle) return;
-  handle.addEventListener('click', (e) => {
-    e.stopPropagation();
-    uiState.tourBarCollapsed = !uiState.tourBarCollapsed;
-    const bar = document.getElementById('tour-status');
-    const chevron = handle.querySelector<SVGElement>('.tour-mob__chev');
-    if (!bar) return;
-    bar.classList.toggle('collapsed', uiState.tourBarCollapsed);
-    if (chevron) chevron.classList.toggle('collapsed', uiState.tourBarCollapsed);
-  });
-}
+// Tour bar collapse/expand was moved to TourController.bindMobileCollapse();
+// this module now only owns the bottom-sheet drag and the desktop panel drag.
 
 // ── Desktop panel drag ─────────────────────────────────────────────────────────
 
@@ -237,15 +225,33 @@ function stopPanelDrag(): void {
 
 // ── Sidebar toggle ────────────────────────────────────────────────────────────
 
+// Sidebar toggle — UiToggle owns the on/off state, persistence, and class
+// application across sidebar / button / strip. Renderer is mutated via the
+// `onChange` hook so the cytoscape instance resizes on every toggle.
+let sidebarToggle: UiToggle | null = null;
+
 export function toggleSidebar(renderer: Renderer): void {
   const sidebar = document.getElementById('sidebar');
   const btn = document.getElementById('btn-sidebar-toggle');
   const strip = document.getElementById('sidebar-strip');
   if (!sidebar) return;
-  const hidden = sidebar.classList.toggle('hidden');
-  if (btn) btn.classList.toggle('active', !hidden);
-  if (strip) { strip.classList.toggle('visible', hidden); strip.style.right = hidden ? '0' : ''; }
-  renderer.getCy().resize();
+  if (!sidebarToggle) {
+    sidebarToggle = new UiToggle({
+      initial: sidebar.classList.contains('hidden'),
+      persist: 'sidebar.hidden',
+      cssClass: 'hidden',
+      applyTo: sidebar,
+      onChange: (hidden) => {
+        if (btn) btn.classList.toggle('active', !hidden);
+        if (strip) {
+          strip.classList.toggle('visible', hidden);
+          strip.style.right = hidden ? '0' : '';
+        }
+        renderer.getCy().resize();
+      },
+    });
+  }
+  sidebarToggle.toggle();
 }
 
 // ── Section collapse ───────────────────────────────────────────────────────────
