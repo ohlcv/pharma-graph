@@ -13,7 +13,7 @@
  * shape) so callers that already used `import.meta.glob` paths still work.
  */
 
-const MANIFEST_URL = 'public/content-manifest.json';
+const MANIFEST_URL = '/content-manifest.json';
 // Keys used to match import.meta.glob('../content/**/*.md') shape:
 const CONTENT_ROOT = '../../content';
 
@@ -36,7 +36,7 @@ export async function loadContent(): Promise<LoadedContent> {
 
   const responses = await Promise.all(
     manifest.files.map((rel) =>
-      fetch('public/content/' + rel).then((r) => {
+      fetch('/content/' + rel).then((r) => {
         if (!r.ok) throw new Error(`[content-loader] ${rel}: ${r.status}`);
         return r.text().then((text) => [rel, text] as const);
       }),
