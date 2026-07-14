@@ -171,13 +171,20 @@ function classBadge(cls: string, active: boolean): string {
 
 function buildRulesTable(cy: cytoscape.Core): string {
   const rows: string[] = [];
-  cy.nodes().not('.layer-parent').forEach((n: NodeSingular) => {
+  // Only show non-dimmed nodes — dimmed ones have their styles overridden
+  // by the .dimmed rule (border → rgba(255,255,255,0.06), opacity → 0.1),
+  // so reading their effective styles gives misleading "everything is white"
+  // results that don't reflect the field/tier mapping.
+  const visible = cy.nodes().not('.layer-parent').filter((n: NodeSingular) => !n.hasClass('dimmed'));
+  visible.forEach((n: NodeSingular) => {
     const t = n.data('type') ?? '?';
     const shape = n.style('shape') as string;
     const bc = n.style('border-color') as string;
     const bw = n.style('border-width') as string;
     const w = n.data('weight') ?? '?';
     const rw = n.renderedWidth().toFixed(1);
+    const field = n.data('field') ?? '?';
+    const tier = n.data('tier') ?? '?';
     const label = (n.data('label') || n.id()).slice(0, 12);
     const isSelected = n.hasClass('selected-node');
     rows.push(`<tr class="${isSelected ? 'dbg-rules-table__tr--active' : ''}">
@@ -185,14 +192,17 @@ function buildRulesTable(cy: cytoscape.Core): string {
       <td class="dbg-rules-table__td dbg-rules-table__td--type">${t}</td>
       <td class="dbg-rules-table__td dbg-rules-table__td--shape">${shape}</td>
       <td class="dbg-rules-table__td dbg-rules-table__td--w">wt=${w} rw=${rw}</td>
-      <td class="dbg-rules-table__td">${bc}</td>
+      <td class="dbg-rules-table__td" style="font-size:9px">
+        <span title="field: ${field}">${bc}</span>
+        <div style="color:#64748b">f=${field} t=${tier} bw=${bw}</div>
+      </td>
     </tr>`);
   });
   return `<table class="dbg-rules-table__table">
     <thead><tr><th>节点</th><th>type</th><th>shape</th><th>weight</th><th>border-color</th></tr></thead>
     <tbody>${rows.join('')}</tbody>
   </table>
-  <div class="dbg-rules-table__count">共 ${rows.length} 个节点</div>`;
+  <div class="dbg-rules-table__count">显示 ${rows.length} 个非 dimmed 节点（dimmed 节点的样式被 .dimmed 规则覆盖，读出来的值不真实）</div>`;
 }
 
 function nodeProps(node: NodeSingular): string {
