@@ -100,6 +100,33 @@ export function initDebugOverlay(renderer: Renderer): void {
       </div>
     </div>
 
+    <!-- Pipeline integrity — confirms parser→cy.add didn't drop anything -->
+    <div class="dbg-section">
+      <div class="dbg-section__label">数据流对照（buildGraph → cy）</div>
+      <div class="dbg-stats-grid" id="dbg-pipeline-grid">
+        <div class="dbg-stat">
+          <div class="dbg-stat__val" id="dbg-cy-nodes">0</div>
+          <div class="dbg-stat__key">cy 节点</div>
+        </div>
+        <div class="dbg-stat">
+          <div class="dbg-stat__val" id="dbg-cy-edges">0</div>
+          <div class="dbg-stat__key">cy 边</div>
+        </div>
+        <div class="dbg-stat">
+          <div class="dbg-stat__val" id="dbg-orphan-nodes">0</div>
+          <div class="dbg-stat__key">孤立节点<br>(degree=0)</div>
+        </div>
+        <div class="dbg-stat">
+          <div class="dbg-stat__val" id="dbg-visible-edges">0</div>
+          <div class="dbg-stat__key">可见边<br>(非 .dimmed)</div>
+        </div>
+        <div class="dbg-stat">
+          <div class="dbg-stat__val" id="dbg-bad-edges">0</div>
+          <div class="dbg-stat__key">orphan 边<br>(src/tgt missing)</div>
+        </div>
+      </div>
+    </div>
+
     <!-- 样式规则对照表 -->
     <div class="dbg-section">
       <div class="dbg-section__label">type → shape 对照</div>
@@ -217,6 +244,40 @@ export function updateForensicPanel(renderer: Renderer): void {
   setEl('dbg-dim-count', String(cy.nodes('.dimmed').not('.layer-parent').length));
   setEl('dbg-snode-count', String(cy.nodes('.selected-node').length));
   setEl('dbg-hl-count', String(cy.nodes('.highlighted').length));
+
+  // ── Pipeline integrity ──────────────────────────────────────────
+  // Surface what cytoscape actually has vs what the user would expect.
+  // This is the fastest way to tell whether "no edges on screen" is a
+  // rendering issue (edges exist, are dimmed) or a data issue (edges
+  // never made it past cy.add).
+  const allNodes = cy.nodes().not('.layer-parent');
+  const allEdges = cy.edges();
+  const orphanNodes = allNodes.filter((n: NodeSingular) => n.degree(false) === 0);
+  const visibleEdges = allEdges.not('.dimmed');
+  // Orphan edge: edge whose source or target is a layer-parent or missing —
+  // would render as a line floating in space, usually a parser bug.
+  const badEdges = allEdges.filter((e: cytoscape.EdgeSingular) => {
+    const s = e.source();
+    const t = e.target();
+    return s.empty() || t.empty() || s.hasClass('layer-parent') || t.hasClass('layer-parent');
+  });
+  setEl('dbg-cy-nodes', String(allNodes.length));
+  setEl('dbg-cy-edges', String(allEdges.length));
+  setEl('dbg-orphan-nodes', String(orphanNodes.length));
+  setEl('dbg-visible-edges', String(visibleEdges.length));
+  setEl('dbg-bad-edges', String(badEdges.length));
+  // Recolor edge counters — red if 0 (data loss), green otherwise.
+  const cyEdgesEl = el('dbg-cy-edges');
+  if (cyEdgesEl) {
+    cyEdgesEl.classList.toggle('dbg-stat__val--red', allEdges.length === 0);
+    cyEdgesEl.classList.toggle('dbg-stat__val--green', allEdges.length > 0);
+  }
+  const visibleEdgesEl = el('dbg-visible-edges');
+  if (visibleEdgesEl) {
+    const expected = allEdges.length - badEdges.length;
+    visibleEdgesEl.classList.toggle('dbg-stat__val--red', visibleEdges.length === 0 && expected > 0);
+    visibleEdgesEl.classList.toggle('dbg-stat__val--green', visibleEdges.length > 0);
+  }
 
   // ── Filter ────────────────────────────────────────────────────────
   const filterEl = el('dbg-filter');
