@@ -127,6 +127,8 @@ export const EDGE_TYPE_STYLE: Record<string, { color: string; lineStyle: string;
   contraindicates: { color: '#c0392b', lineStyle: 'dashed', arrow: 'none' },
   // 学习路径
   prerequisite:{ color: '#9b59b6', lineStyle: 'dotted', arrow: 'triangle' },
+  relates:    { color: '#7f8c8d', lineStyle: 'dashed',  arrow: 'none'     },
+  sibling:    { color: '#16a085', lineStyle: 'dotted',  arrow: 'none'     },
   default:    { color: '#bdc3c7', lineStyle: 'solid',   arrow: 'none'     },
 };
 
@@ -145,6 +147,8 @@ export const EDGE_TYPE_LABEL: Record<string, string> = {
   interacts:        '相互作用',
   contraindicates:  '禁忌',
   prerequisite:     '前置',
+  relates:         '相关',
+  sibling:         '兄弟',
 };
 
 // ── Shape → 中文标签 ─────────────────────────────────────────────────────────

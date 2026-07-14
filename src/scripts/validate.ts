@@ -35,7 +35,7 @@ const VALID_EDGE_TYPES = [
   'has', 'isa',
   'activates', 'inhibits', 'mechanism', 'metabolizes',
   'treats', 'causes', 'interacts', 'contraindicates',
-  'prerequisite',
+  'prerequisite', 'relates', 'sibling',
 ];
 
 interface ValidationError {

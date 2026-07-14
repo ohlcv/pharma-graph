@@ -125,7 +125,13 @@ export function parseFrontmatter(raw: string, filePath: string): ParsedFrontmatt
         ? rawSummary.trim()
         : undefined;
 
-  const edgesRaw = (fm['edges_out'] as unknown[] | undefined) ?? [];
+  // edges_out typically lives at the YAML root — the migration script puts
+  // most fields under `data:` but leaves `edges_out` at the top level. Fall
+  // back to the nested map only if the root didn't have it.
+  const edgesRaw =
+    (data['edges_out'] as unknown[] | undefined) ??
+    (fm['edges_out'] as unknown[] | undefined) ??
+    [];
   const edges: EdgeDef[] = edgesRaw
     .filter(
       (e): e is Record<string, unknown> =>
