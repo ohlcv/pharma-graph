@@ -130,6 +130,23 @@ export const EDGE_TYPE_STYLE: Record<string, { color: string; lineStyle: string;
   default:    { color: '#bdc3c7', lineStyle: 'solid',   arrow: 'none'     },
 };
 
+// ── Edge type → 中文标签 ─────────────────────────────────────────────────────
+// Single source of truth: 详情面板、图例、节点关联都查这里。
+
+export const EDGE_TYPE_LABEL: Record<string, string> = {
+  has:              '包含',
+  isa:              '属于',
+  activates:        '激动',
+  inhibits:         '抑制',
+  mechanism:        '机制',
+  metabolizes:      '代谢',
+  treats:           '治疗',
+  causes:           '致因',
+  interacts:        '相互作用',
+  contraindicates:  '禁忌',
+  prerequisite:     '前置',
+};
+
 // ── Shape → 中文标签 ─────────────────────────────────────────────────────────
 
 export const SHAPE_LABEL: Record<string, string> = {

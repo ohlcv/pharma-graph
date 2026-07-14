@@ -294,7 +294,7 @@ function startTour(): void {
     onComplete: () => {
       uiState.tour.pathHistory = [];
       // Close detail panel
-      closeNodePanel();
+      uiState.detailPanel?.close();
       // Mobile: show check mark
       const depthBadge = document.getElementById('tour-depth-badge');
       const countBadge = document.getElementById('tour-count-badge');
@@ -392,8 +392,8 @@ function tourNext(): void {
   uiState.detailPanel?.close();
 }
 
-function onTourStrategyChange(value: string): void {
-  uiState.tour.strategy = value as TourStrategy;
+function onTourStrategyChange(value: TourStrategy): void {
+  uiState.tour.strategy = value;
   const dtSel = document.getElementById('tour-strategy-select-dt') as HTMLSelectElement;
   if (dtSel) dtSel.value = value;
   syncMobStrategyUI(value);
@@ -545,7 +545,7 @@ function initGraphEvents(
     if (evt.target === cy) {
       clearShapeFilter();
       highlight.reset();
-      closeNodePanel();
+      detailPanel.close();
       if (uiState.tour.engine?.isRunning() || uiState.tour.engine?.isPaused()) tourStop();
     }
   });
@@ -654,7 +654,7 @@ function initKeyboardShortcuts(renderer: Renderer): void {
     toggleTour,
     tourPause,
     closeNodePanel: () => {
-      closeNodePanel();
+      uiState.detailPanel?.close();
     },
     tourStop,
     tourPrev,
@@ -682,7 +682,7 @@ function exposeGlobals(renderer: Renderer, highlight: HighlightEngine, detailPan
   (window as any).tourStop = tourStop;
   (window as any).tourPrev = tourPrev;
   (window as any).tourNext = tourNext;
-  (window as any).onTourStrategyChange = onTourStrategyChange;
+  (window as any).onTourStrategyChange = (v: string) => onTourStrategyChange(v as TourStrategy);
   (window as any).onTourStrategyToggle = onTourStrategyToggle;
   (window as any).startPanelDrag = initPanelDrag;
   (window as any).closeNodePanel = () => detailPanel.close();
@@ -695,7 +695,7 @@ function exposeGlobals(renderer: Renderer, highlight: HighlightEngine, detailPan
   (window as any).resetAll = () => {
     clearShapeFilter();
     highlight.reset();
-    closeNodePanel();
+    detailPanel.close();
     renderer.runLayout('cose');
     updateStats(renderer.getCy());
     syncBottomSheetStats(renderer.getCy());

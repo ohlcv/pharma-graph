@@ -12,6 +12,7 @@ import {
   NODE_TIER_STYLE,
   TIER_LABEL,
   EDGE_TYPE_STYLE,
+  EDGE_TYPE_LABEL,
 } from '../core/config.js';
 
 // ── Debounce utility ────────────────────────────────────────────────────────────
@@ -62,83 +63,6 @@ function doUpdateStats(cy: Core): void {
     populateFieldLegend(cy);
     populateTierLegend(cy);
     populateEdgeLegend(cy);
-  });
-}
-
-/**
- * Populate category legend (sidebar grid + mobile chips) from CATEGORY_COLOR.
- * Call once after graph load; runs on every stats update to sync counts.
- */
-function populateCategoryLegend(cy: Core): void {
-  // Import at runtime to avoid circular deps (config is plain, no side effects)
-  const CATEGORY_COLOR: Record<string, string> = {
-    cardiovascular:    '#ef4444', respiratory:       '#3b82f6',
-    digestive:         '#22c55e', endocrine:         '#f97316',
-    musculoskeletal:   '#06b6d4', anti_infective:    '#a855f7',
-    anti_tumor:       '#ec4899', blood:             '#f43f5e',
-    immunology:       '#eab308', dermatology:       '#a16207',
-    antipyretic:      '#7dd3fc', anti_rheumatic:    '#ea580c',
-    anti_gout:        '#9333ea', nutrition:          '#6b7280',
-    diagnostic:       '#9ca3af', pharmacy_practice: '#94a3b8',
-    pharmacy_service: '#94a3b8', pharmacology:      '#ec4899',
-  };
-  const CATEGORY_LABEL: Record<string, string> = {
-    cardiovascular:    '心血管', respiratory:       '呼吸',
-    digestive:         '消化',   endocrine:         '内分泌',
-    musculoskeletal:   '骨骼',   anti_infective:    '抗感染',
-    anti_tumor:       '抗肿瘤', blood:             '血液',
-    immunology:       '免疫',   dermatology:       '皮肤',
-    antipyretic:      '解热镇痛', anti_rheumatic:  '抗风湿',
-    anti_gout:        '抗痛风', nutrition:          '营养',
-    diagnostic:       '诊断',   pharmacy_practice: '药学知识一',
-    pharmacy_service: '药学服务', pharmacology:    '药学知识二',
-  };
-
-  const sidebarGrid = document.getElementById('legend-category-grid');
-  const mobileChips = document.getElementById('bs-category-chips');
-  if (!sidebarGrid || !mobileChips) return;
-
-  const usedCats = new Set<string>();
-  cy.nodes().not('.layer-parent').forEach((n: cytoscape.NodeSingular) => {
-    const cat = n.data('category') as string;
-    if (cat && cat in CATEGORY_COLOR) usedCats.add(cat);
-  });
-
-  // Sort by display label
-  const sorted = [...usedCats].sort((a, b) =>
-    (CATEGORY_LABEL[a] ?? a).localeCompare(CATEGORY_LABEL[b] ?? b)
-  );
-
-  // Build sidebar HTML
-  if (sidebarGrid.children.length === 0) {
-    sidebarGrid.innerHTML = sorted.map((cat) => {
-      const color = CATEGORY_COLOR[cat];
-      const label = CATEGORY_LABEL[cat] ?? cat;
-      return `<div class="legend-row">
-        <span class="legend-cat-dot" style="background:${color}"></span>
-        <span class="legend-row__label">${label}</span>
-        <span class="legend-row__count" id="legend-cat-count-${cat}"></span>
-      </div>`;
-    }).join('');
-  }
-
-  // Build mobile chips HTML (initial build only)
-  if (mobileChips.children.length === 0) {
-    mobileChips.innerHTML = sorted.map((cat) => {
-      const color = CATEGORY_COLOR[cat];
-      const label = CATEGORY_LABEL[cat] ?? cat;
-      return `<div class="bs-chip">
-        <div class="bs-chip__dot bs-chip__dot--cat" style="background:${color}"></div>
-        <span>${label}</span>
-      </div>`;
-    }).join('');
-  }
-
-  // Update counts on both
-  sorted.forEach((cat) => {
-    const count = cy.nodes().not('.layer-parent').filter(`[category = "${cat}"]`).length;
-    const sidebarCountEl = document.getElementById(`legend-cat-count-${cat}`);
-    if (sidebarCountEl) sidebarCountEl.textContent = count > 0 ? `${count}` : '';
   });
 }
 
@@ -310,7 +234,7 @@ export function populateEdgeLegend(cy: Core): void {
   if (!desktopGrid && !mobileChips) return;
 
   if (desktopGrid && desktopGrid.children.length === 0) {
-    desktopGrid.innerHTML = Object.entries(EDGE_LABEL).map(([key, label]) => {
+    desktopGrid.innerHTML = Object.entries(EDGE_TYPE_LABEL).map(([key, label]) => {
       const style = EDGE_TYPE_STYLE[key] ?? { color: '#95a5a6', lineStyle: 'solid', arrow: 'none' };
       const dash = style.lineStyle === 'dashed' ? 'stroke-dasharray="5 3"'
         : style.lineStyle === 'dotted' ? 'stroke-dasharray="1 3"'
@@ -332,7 +256,7 @@ export function populateEdgeLegend(cy: Core): void {
   }
 
   if (mobileChips && mobileChips.children.length === 0) {
-    mobileChips.innerHTML = Object.entries(EDGE_LABEL).map(([key, label]) => {
+    mobileChips.innerHTML = Object.entries(EDGE_TYPE_LABEL).map(([key, label]) => {
       const style = EDGE_TYPE_STYLE[key] ?? { color: '#95a5a6', lineStyle: 'solid', arrow: 'none' };
       const dash = style.lineStyle === 'dashed' ? 'stroke-dasharray="5 3"'
         : style.lineStyle === 'dotted' ? 'stroke-dasharray="1 3"'
@@ -368,7 +292,7 @@ export function populateEdgeLegend(cy: Core): void {
   if (desktopGrid) attachEdgeHandlers(desktopGrid, '.legend-edge-row[data-edge]');
   if (mobileChips) attachEdgeHandlers(mobileChips, '.bs-chip[data-edge]');
 
-  Object.keys(EDGE_LABEL).forEach((key) => {
+  Object.keys(EDGE_TYPE_LABEL).forEach((key) => {
     const count = cy.edges(`[edgeType = "${key}"]`).length;
     // Dynamic IDs (populated from dynamic HTML generation)
     const dEl = document.getElementById(`legend-edge-count-${key}`);
@@ -447,21 +371,6 @@ export function highlightEdgeTypeFilter(edge: string, highlight: HighlightEngine
     if ((el as HTMLElement).dataset.edge === edge) el.classList.add('active');
   });
 }
-
-// ── Edge label ─────────────────────────────────────────────────────────────────
-const EDGE_LABEL: Record<string, string> = {
-  has:             '包含',
-  isa:             '属于',
-  activates:       '激动',
-  inhibits:       '抑制',
-  mechanism:       '机制',
-  metabolizes:     '代谢',
-  treats:          '治疗',
-  causes:          '致因',
-  interacts:       '相互作用',
-  contraindicates: '禁忌',
-  prerequisite:    '前置',
-};
 
 // ── Active filter state ────────────────────────────────────────────────────────
 let activeFieldFilter: string | null = null;
@@ -566,19 +475,14 @@ export function renderLayoutParams(name: string): void {
 export function applyLayoutParams(renderer: Renderer): void {
   const container = document.getElementById('layout-params-rows');
   if (!container) return;
-  const overrides: Record<string, unknown> = {};
-  container.querySelectorAll<HTMLInputElement>('.param-slider').forEach((s) => { overrides[s.dataset.key ?? ''] = parseFloat(s.value); });
-  container.querySelectorAll<HTMLSelectElement>('.param-select').forEach((s) => { overrides[s.dataset.key ?? ''] = s.value; });
-  container.querySelectorAll<HTMLInputElement>('.param-row input[type="checkbox"]').forEach((cb) => { overrides[cb.dataset.key ?? ''] = cb.checked; });
-  const base = { ...(LAYOUTS[_currentLayout]?.cytoscape ?? {}) };
-  Object.assign(base, overrides);
+  const overrides = collectParamOverrides(container, '.param-slider');
+  // Keep toolbar active state in sync (same as runLayout)
   document.querySelectorAll('.layout-btn').forEach((b) => b.classList.remove('active'));
   const btn = document.getElementById('btn-' + _currentLayout);
   if (btn) btn.classList.add('active');
   const bsBtn = document.getElementById('bs-btn-' + _currentLayout);
   if (bsBtn) bsBtn.classList.add('active');
-  const l = renderer.getCy().layout(base as unknown as cytoscape.LayoutOptions);
-  l.run();
+  renderer.runLayout(_currentLayout, overrides);
 }
 
 export function renderBsLayoutParams(name: string): void {
@@ -627,14 +531,31 @@ export function toggleBsParams(): void {
 export function applyBsParams(renderer: Renderer): void {
   const container = document.getElementById('bs-layout-params');
   if (!container) return;
+  const overrides = collectParamOverrides(container, '.bs-param-slider:not(.param-select)');
+  renderer.runLayout(_currentLayout, overrides);
+}
+
+// Collect slider/select/checkbox values into an overrides map.
+// Desktop uses `.param-slider`, mobile uses `.bs-param-slider:not(.param-select)` — both branches
+// share the same param-row markup, so we resolve by passing the slider selector.
+function collectParamOverrides(
+  container: HTMLElement,
+  sliderSelector: string,
+): Record<string, unknown> {
   const overrides: Record<string, unknown> = {};
-  container.querySelectorAll<HTMLInputElement>('.bs-param-slider:not(.param-select)').forEach((s) => { overrides[s.dataset.key ?? ''] = parseFloat(s.value); });
-  container.querySelectorAll<HTMLSelectElement>('.param-select').forEach((s) => { overrides[s.dataset.key ?? ''] = s.value; });
-  container.querySelectorAll<HTMLInputElement>('.bs-param-row input[type="checkbox"]').forEach((cb) => { overrides[cb.dataset.key ?? ''] = cb.checked; });
-  const base = { ...(LAYOUTS[_currentLayout]?.cytoscape ?? {}) };
-  Object.assign(base, overrides);
-  const l = renderer.getCy().layout(base as unknown as cytoscape.LayoutOptions);
-  l.run();
+  container.querySelectorAll<HTMLInputElement>(sliderSelector).forEach((s) => {
+    overrides[s.dataset.key ?? ''] = parseFloat(s.value);
+  });
+  container.querySelectorAll<HTMLSelectElement>('.param-select').forEach((s) => {
+    overrides[s.dataset.key ?? ''] = s.value;
+  });
+  container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach((cb) => {
+    if (!cb.dataset.key) return;
+    // Only count checkboxes that live inside a param-row (skip any other checkboxes)
+    if (!cb.closest('.param-row, .bs-param-row')) return;
+    overrides[cb.dataset.key] = cb.checked;
+  });
+  return overrides;
 }
 
 export function fitGraph(renderer: Renderer): void {

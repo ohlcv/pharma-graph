@@ -643,7 +643,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
           策略
         </span>
-        <select id="tour-strategy-select-dt" class="tour-dt__select" onchange="onTourStrategyChange(this.value)">
+        <select id="tour-strategy-select-dt" class="tour-dt__select" onchange="window.onTourStrategyChange(this.value)">
           <option value="has-dfs">E1 教材顺序DFS</option>
           <option value="topo-prereq">E2 层级依赖BFS</option>
         </select>

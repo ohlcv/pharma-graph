@@ -3,17 +3,8 @@
 
 import cytoscape from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
-import { NODE_TYPE_COLOR, ESSENCE_LABEL, FIELD_COLOR, FIELD_LABEL, TIER_LABEL, NODE_TIER_STYLE } from '../core/config.js';
+import { NODE_TYPE_COLOR, ESSENCE_LABEL, FIELD_COLOR, FIELD_LABEL, TIER_LABEL, NODE_TIER_STYLE, EDGE_TYPE_LABEL } from '../core/config.js';
 import { uiState } from './state.js';
-
-const EDGE_TYPE_LABELS: Record<string, string> = {
-  has: '包含',
-  mechanism: '机制',
-  causes: '致因',
-  treats: '治疗',
-  relates: '关联',
-  isa: '属于',
-};
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -251,7 +242,7 @@ function buildEdgesHtml(node: cytoscape.NodeSingular, cy: cytoscape.Core): strin
     const edgeType = (edge.data('edgeType') as string) ?? 'relates';
     const reason = edge.data('reason') as string | undefined;
     return `<div class="np-edge-item" data-target="${escAttr(targetId)}">
-  <span class="np-edge-item__type">${EDGE_TYPE_LABELS[edgeType] ?? edgeType}</span>
+  <span class="np-edge-item__type">${EDGE_TYPE_LABEL[edgeType] ?? edgeType}</span>
   <div class="np-edge-item__body">
     <div class="np-edge-item__target">${escHtml(targetLabel)}</div>
     ${reason ? `<div class="np-edge-item__reason">${escHtml(reason)}</div>` : ''}
