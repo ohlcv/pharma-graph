@@ -27,6 +27,13 @@ export function pulseSelection(cy: cytoscape.Core, options: PulseOptions = {}): 
   const startAt = performance.now();
   let raf = 0;
   sel.addClass('pulse');
+  // Mirrors the stylesheet base formula `mapData(weight, 1, 10, 36, 76)` so
+  // pulse breathes from each node's resting size. Earlier the raf wrote
+  // `weight * scale` directly, turning a weight-4 node into a 4×4 px dot.
+  const baseWidthFor = (weight: number): number => {
+    const w = Math.min(Math.max(weight, 1), 10);
+    return 36 + (w - 1) * (76 - 36) / 9;
+  };
   const step = () => {
     const t = (performance.now() - startAt) / duration;
     if (t >= 1) {
@@ -39,8 +46,8 @@ export function pulseSelection(cy: cytoscape.Core, options: PulseOptions = {}): 
     const phase = Math.sin(t * Math.PI);
     const scale = 1 + (peak - 1) * phase;
     // 1.0 → peak → 1.0
-    sel.style('width',  (n: cytoscape.NodeSingular) => String((n.data('weight') || 70) * scale));
-    sel.style('height', (n: cytoscape.NodeSingular) => String((n.data('weight') || 70) * scale));
+    sel.style('width',  (n: cytoscape.NodeSingular) => String(baseWidthFor(Number(n.data('weight') ?? 1)) * scale));
+    sel.style('height', (n: cytoscape.NodeSingular) => String(baseWidthFor(Number(n.data('weight') ?? 1)) * scale));
     raf = requestAnimationFrame(step);
   };
   raf = requestAnimationFrame(step);
