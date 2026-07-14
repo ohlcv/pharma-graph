@@ -1,7 +1,12 @@
 // src/core/node-builder.ts
+// Node CLI entry — loads frontmatter from disk, derives NodeLocation from
+// the file path, and produces NodeData via the shared buildGraph helper.
+
 import fs from 'fs/promises';
-import { parseFrontmatter, ParsedFrontmatter } from "../parser/frontmatter.js";
-import { NodeData, NodeLocation } from "./graph.js";
+import { parseFrontmatter } from '../parser/frontmatter.js';
+import { NodeData, NodeLocation } from './graph.js';
+import { buildGraph } from './build-graph.js';
+import type { ParsedFrontmatter } from '../parser/frontmatter.js';
 
 /**
  * Load and parse all frontmatter in parallel, returning a reusable map.
@@ -17,48 +22,15 @@ export async function loadAllFrontmatter(filePaths: string[]): Promise<Map<strin
 }
 
 /**
- * 将 content/ 下所有 .md 文件映射为 Cytoscape 节点数据
- */
-export async function buildNodes(filePaths: string[]): Promise<NodeData[]> {
-  const all = await loadAllFrontmatter(filePaths);
-  const nodes: NodeData[] = [];
-
-  for (const fp of filePaths) {
-    const fm = all.get(fp)!;
-    // 新 schema: essence/field/tier；旧 schema 降级到 type/category/layer
-    const essence = fm.essence || fm.type || '';
-    const field   = fm.field   || fm.category || '';
-    const tier    = fm.tier    || fm.layer;
-    const node: NodeData = {
-      id: fm.id,
-      label: fm.label,
-      essence,
-      field,
-      tier,
-      // 向后兼容：保留旧字段
-      type: essence,
-      category: field,
-      layer: tier,
-      summary: fm.summary,
-      body: fm.body,
-      location: toLocation(fp),
-      weight: 1,
-    };
-    nodes.push(node);
-  }
-
-  return nodes;
-}
-
-/**
- * 将绝对路径转换为 NodeLocation 对象
- * content/药学综合知识与技能/第三章/第一节 → { book, part, chapter, section }
+ * Convert an absolute path to a NodeLocation object based on the content/
+ * subdirectory layout:
+ *   content/<book>/<part?>/<chapter?>/<section?>/<subsection?>/<item?>
  */
 function toLocation(filePath: string): NodeLocation {
   const parts = filePath.split(/[/\\]/);
   const idx = parts.findIndex((p) => p === 'content');
   if (idx === -1) return {};
-  const slice = parts.slice(idx + 1); // drop 'content'
+  const slice = parts.slice(idx + 1);
   return {
     book:      slice[0] ?? undefined,
     part:      slice[1] ?? undefined,
@@ -68,3 +40,24 @@ function toLocation(filePath: string): NodeLocation {
     item:      slice[5] ?? undefined,
   };
 }
+
+/**
+ * Inject the file-derived location into every node, then delegate to buildGraph.
+ * location lives outside frontmatter, so it has to be threaded in here rather
+ * than inside the shared builder.
+ */
+export async function buildNodes(filePaths: string[]): Promise<NodeData[]> {
+  const frontmatters = await loadAllFrontmatter(filePaths);
+  const { nodes } = buildGraph(frontmatters);
+  const pathById = new Map<string, string>();
+  for (const fp of filePaths) {
+    const fm = frontmatters.get(fp);
+    if (fm?.id) pathById.set(fm.id, fp);
+  }
+  return nodes.map((n) => ({ ...n, location: toLocation(pathById.get(n.id) ?? '') }));
+}
+
+/**
+ * Re-export so existing CLI scripts keep their `buildEdges` import.
+ */
+export { buildEdges } from './edge-builder.js';

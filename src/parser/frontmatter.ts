@@ -1,5 +1,14 @@
 // src/parser/frontmatter.ts
-// 纯 JS frontmatter 解析器，浏览器兼容
+// Pure JS frontmatter parser, browser-compatible.
+//
+// Schema (new, post-migration):
+//   id, label, essence, field, tier, summary, location, tags, edges_out
+//
+// Frontmatter may be either top-level keys or nested under a `data:` block
+// (the latter is what the migration script emits). Both shapes are accepted,
+// but `data.data.id` would mean a nested-block user error — we resolve it
+// safely by treating the nested map as the source of truth when present.
+
 import { parse as yamlParse } from 'yaml';
 
 // --- frontmatter 字段类型 ---
@@ -7,15 +16,12 @@ import { parse as yamlParse } from 'yaml';
 export interface NodeMeta {
   id: string;
   label: string;
-  /** 节点本质（决定形状），新字段为 essence，旧字段为 type */
+  /** 节点本质（决定形状） */
   essence?: string;
-  /** 学科领域（决定填充色），新字段为 field，旧字段为 category */
+  /** 学科领域（决定边框色） */
   field?: string;
-  /** 自然分层（决定边框色），新字段为 tier，旧字段为 layer */
+  /** 自然分层（决定填充色） */
   tier?: string;
-  type?: string;     // 旧字段
-  category?: string; // 旧字段
-  layer?: string;    // 旧字段
   summary?: string;
   location?: {
     book?: string;
@@ -42,7 +48,6 @@ export interface ParsedFrontmatter extends NodeMeta {
 
 function parseFrontmatterRaw(raw: string): { data: Record<string, unknown>; content: string } {
   const trimmed = raw.replace(/^\uFEFF/, ''); // Remove BOM
-  // 修复：去掉末尾的 $，让正则能匹配不以换行结尾的文件
   const match = trimmed.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)/);
   if (!match) return { data: {}, content: trimmed };
   const yamlBlock = match[1];
@@ -76,57 +81,42 @@ function basename(filepath: string): string {
   return last.replace(/\.md$/i, '');
 }
 
-/** 必需的顶级字段（新 schema 使用 essence/field/tier，兼容旧 schema 的 type/category/layer） */
+/** 必需的顶级字段 */
 const REQUIRED_FIELDS = ['id'];
 
+/**
+ * Resolve the source-of-truth object. Migration puts everything under
+ * `data:`, so when that block exists we use it; otherwise we read from
+ * the root map. Only the new schema (essence/field/tier) is accepted;
+ * legacy type/category/layer is not supported here.
+ */
+function pickSource(yamlRoot: Record<string, unknown>): Record<string, unknown> {
+  const nested = yamlRoot['data'];
+  return nested && typeof nested === 'object' && !Array.isArray(nested)
+    ? (nested as Record<string, unknown>)
+    : yamlRoot;
+}
+
 export function parseFrontmatter(raw: string, filePath: string): ParsedFrontmatter {
-  const { data } = parseFrontmatterRaw(raw);
+  const { data, content } = parseFrontmatterRaw(raw);
+  const fm = pickSource(data);
 
-  const rawData = (data['data'] as Record<string, unknown> | undefined) ?? data;
-
-  const missing = REQUIRED_FIELDS.filter((f) => !(f in rawData));
+  const missing = REQUIRED_FIELDS.filter((f) => !(f in fm));
   if (missing.length > 0) {
     throw new Error(`frontmatter 缺少必需字段 [${missing.join(', ')}]，文件: ${filePath}`);
   }
 
-  const id = String(rawData['id'] ?? '').trim();
+  const id = String(fm['id'] ?? '').trim();
   if (!id) {
     throw new Error(`frontmatter id 不能为空，文件: ${filePath}`);
   }
 
-  const label =
-    getField(rawData, 'label') ??
-    getField(data, 'label') ??
-    basename(filePath);
+  const label = getField(fm, 'label') ?? basename(filePath);
+  const essence = getField(fm, 'essence') ?? '';
+  const field   = getField(fm, 'field')   ?? '';
+  const tier    = getField(fm, 'tier');
 
-  // ── essence（新）/ type（旧）：取 essence，不存在则降级到 type ──
-  const essence =
-    getField(rawData, 'essence') ??
-    getField(data, 'essence') ??
-    getField(rawData, 'type') ??
-    getField(data, 'type') ??
-    '';
-
-  // ── field（新）/ category（旧）：取 field，不存在则降级到 category ──
-  const field =
-    getField(rawData, 'field') ??
-    getField(data, 'field') ??
-    getField(rawData, 'category') ??
-    getField(data, 'category') ??
-    '';
-
-  // ── tier（新）/ layer（旧）：取 tier，不存在则降级到 layer ──
-  const tier =
-    getField(rawData, 'tier') ??
-    getField(data, 'tier') ??
-    getField(rawData, 'layer') ??
-    getField(data, 'layer') ??
-    undefined;
-
-  const rawSummary =
-    (rawData['summary'] as Record<string, unknown> | string | undefined) ??
-    (data['summary'] as Record<string, unknown> | string | undefined);
-  // 优先取 summary.short（简短定义），其次 full（完整解释），最后直接取字符串
+  const rawSummary = fm['summary'] as Record<string, unknown> | string | undefined;
   const summary =
     typeof rawSummary === 'object' && rawSummary !== null
       ? (getField(rawSummary as Record<string, unknown>, 'short') ??
@@ -135,26 +125,21 @@ export function parseFrontmatter(raw: string, filePath: string): ParsedFrontmatt
         ? rawSummary.trim()
         : undefined;
 
-  const edgesRaw = (rawData['edges_out'] as unknown[] | undefined) ??
-                   (data['edges_out'] as unknown[] | undefined) ?? [];
-
+  const edgesRaw = (fm['edges_out'] as unknown[] | undefined) ?? [];
   const edges: EdgeDef[] = edgesRaw
-        .filter(
-          (e): e is Record<string, unknown> =>
-            typeof e === 'object' && e !== null && !Array.isArray(e)
-        )
-        .map((e): EdgeDef => ({
-          target: String(e['target'] ?? ''),
-          type: String(e['type'] ?? 'related'),
-          reason: typeof e['reason'] === 'string' ? e['reason'] : undefined,
-        }))
-        .filter((e): e is EdgeDef => Boolean(e.target));
+    .filter(
+      (e): e is Record<string, unknown> =>
+        typeof e === 'object' && e !== null && !Array.isArray(e)
+    )
+    .map((e): EdgeDef => ({
+      target: String(e['target'] ?? ''),
+      type: String(e['type'] ?? 'related'),
+      reason: typeof e['reason'] === 'string' ? e['reason'] : undefined,
+    }))
+    .filter((e): e is EdgeDef => Boolean(e.target));
 
-  const location = (rawData['location'] as Record<string, unknown> | undefined) ??
-                   (data['location'] as Record<string, unknown> | undefined);
-
-  const tagsRaw = (rawData['tags'] as unknown[] | undefined) ??
-                  (data['tags'] as unknown[] | undefined);
+  const location = fm['location'] as Record<string, unknown> | undefined;
+  const tagsRaw = fm['tags'] as unknown[] | undefined;
   const tags: string[] = Array.isArray(tagsRaw)
     ? tagsRaw.filter((t): t is string => typeof t === 'string')
     : [];
@@ -164,11 +149,7 @@ export function parseFrontmatter(raw: string, filePath: string): ParsedFrontmatt
     label,
     essence,
     field,
-    tier: tier ?? undefined,
-    // 旧字段也保留，方便直接引用
-    type: essence,
-    category: field,
-    layer: tier,
+    tier,
     summary,
     edges_out: edges.length > 0 ? edges : undefined,
     tags: tags.length > 0 ? tags : undefined,
@@ -183,6 +164,6 @@ export function parseFrontmatter(raw: string, filePath: string): ParsedFrontmatt
           subsection: getField(location, 'subsection'),
         }
       : undefined,
-    body: parseFrontmatterRaw(raw).content.trim(),
+    body: content.trim(),
   };
 }

@@ -15,7 +15,7 @@ const ROOT = path.resolve(__dirname, "../..");
 const VALID_ESSENCE = [
   'notion', 'medication', 'illness', 'route', 'substance', 'process', 'module', 'section',
   'concept', 'drug', 'disease', 'ingredient', 'mechanism', 'bridge', 'service',
-  'pathogen', 'pathway', 'indicator', 'book', 'chapter', 'section',
+  'pathogen', 'pathway', 'indicator', 'book', 'chapter',
 ];
 const VALID_FIELD = [
   'pharmaceutics', 'pharmacokinetics', 'medicinal_chemistry', 'pharmacology',
@@ -23,6 +23,7 @@ const VALID_FIELD = [
   'cardiovascular', 'respiratory', 'digestive', 'endocrine', 'musculoskeletal',
   'anti_infective', 'anti_tumor', 'blood', 'immunology', 'dermatology',
   'antipyretic', 'anti_rheumatic', 'anti_gout', 'nutrition', 'diagnostic',
+  'life_sciences', 'biopharmaceutical', '药学专业知识二',
   'pharmacy_practice',
 ];
 const VALID_TIER = [
@@ -76,35 +77,32 @@ export async function validate(): Promise<void> {
     // Collect node IDs for cross-reference validation
     allIds.add(fm.id);
 
-    // Validate essence field (新: essence / 旧: type)
-    const essenceVal = fm.essence ?? fm.type;
-    if (essenceVal && !VALID_ESSENCE.includes(essenceVal)) {
+    // Validate essence field
+    if (fm.essence && !VALID_ESSENCE.includes(fm.essence)) {
       errors.push({
         file: relPath,
         field: 'essence',
-        message: `essence/type 值 "${essenceVal}" 不在已知类型列表中`,
+        message: `essence 值 "${fm.essence}" 不在已知类型列表中`,
         severity: 'warning',
       });
     }
 
-    // Validate field field (新: field / 旧: category)
-    const fieldVal = fm.field ?? fm.category;
-    if (fieldVal && !VALID_FIELD.includes(fieldVal)) {
+    // Validate field field
+    if (fm.field && !VALID_FIELD.includes(fm.field)) {
       errors.push({
         file: relPath,
         field: 'field',
-        message: `field/category 值 "${fieldVal}" 不在已知类型列表中`,
+        message: `field 值 "${fm.field}" 不在已知类型列表中`,
         severity: 'warning',
       });
     }
 
-    // Validate tier field (新: tier / 旧: layer)
-    const tierVal = fm.tier ?? fm.layer;
-    if (tierVal && !VALID_TIER.includes(tierVal)) {
+    // Validate tier field
+    if (fm.tier && !VALID_TIER.includes(fm.tier)) {
       errors.push({
         file: relPath,
         field: 'tier',
-        message: `tier/layer 值 "${tierVal}" 不在已知层级列表中`,
+        message: `tier 值 "${fm.tier}" 不在已知层级列表中`,
         severity: 'warning',
       });
     }

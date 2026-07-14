@@ -390,16 +390,21 @@ export class Renderer {
         data: {
           id: n.id,
           label: n.label || n.id,
-          essence: n.essence || n.type || 'default',
-          field: n.field || n.category || '',
-          tier: n.tier || n.layer,
+          essence: n.essence || 'default',
+          field: n.field || '',
+          tier: n.tier,
+          // Display aliases — debug panel + older code paths read these directly.
+          // Kept in sync with the new-schema values via build-graph.ts.
+          type: n.essence || 'default',
+          category: n.field || '',
+          layer: n.tier,
           summary: n.summary,
           location: n.location,
           tags: n.tags ?? [],
           body: n.body,
           weight: n.weight ?? 60,
-          color: NODE_TYPE_COLOR[n.essence || n.type] ?? NODE_TYPE_COLOR.default,
-          colorDark: NODE_TYPE_COLOR_DARK[n.essence || n.type] ?? NODE_TYPE_COLOR_DARK.default,
+          color: n.essence ? (NODE_TYPE_COLOR[n.essence] ?? NODE_TYPE_COLOR.default) : NODE_TYPE_COLOR.default,
+          colorDark: n.essence ? (NODE_TYPE_COLOR_DARK[n.essence] ?? NODE_TYPE_COLOR_DARK.default) : NODE_TYPE_COLOR_DARK.default,
         },
       })),
       ...data.edges
