@@ -83,14 +83,21 @@ Cytoscape.js（渲染层）
 
 | 类型 | 语义 | 性质 |
 |------|------|------|
-| `isa` | 属于 | 反对称 + 传递 |
-| `partOf` | 组成部分 | 反对称 + 传递 |
-| `related` | 相关 | 对称 |
-| `prereq` | 前置依赖 | 反对称 |
-| `causes` | 导致 | 非对称 |
-| `treats` | 治疗 | 非对称 |
-| `similar` | 类似 | 对称 |
+| `isa` | 层级归属/概念归类（子→父、具体→抽象） | 反对称 + 传递 |
+| `has` | 物理/组合组成（整体→部分） | 反对称 + 传递 |
+| `prerequisite` | 前置依赖 | 反对称 |
+| `relates` | 相关/同级/横切 | 对称 |
+| `sibling` | 同级 | 对称 |
+| `activates` | 激活 | 非对称 |
+| `inhibits` | 抑制 | 非对称 |
+| `metabolizes` | 代谢 | 非对称 |
 | `mechanism` | 作用机制 | 非对称 |
+| `treats` | 治疗 | 非对称 |
+| `causes` | 导致 | 非对称 |
+| `interacts` | 相互作用 | 对称 |
+| `contraindicates` | 禁忌 | 非对称 |
+
+> **层级关系一律用 `isa`（子→父方向），不使用 `has` 表达"属于"。** `has` 仅用于物理/组合组成。详见 [ADR-0001](./ADR-0001-层级关系统一使用isa方向.md)。
 
 ### 5.2 视觉区分维度
 
@@ -107,13 +114,18 @@ Cytoscape.js（渲染层）
 | 关系 | 颜色 | 线型 | 箭头 |
 |------|------|------|------|
 | `isa` | 蓝色 | 实线 | 三角 |
-| `partOf` | 青色 | 实线 | 三角 |
-| `related` | 灰色 | 虚线 | 圆点 |
-| `prereq` | 橙色 | 点线 | 菱形 |
-| `causes` | 红色 | 虚线 | T形 |
-| `treats` | 绿色 | 实线 | 三角 |
-| `similar` | 黄色 | 虚线 | 圆点 |
+| `has` | 青色 | 实线 | 三角 |
+| `prerequisite` | 橙色 | 点线 | 菱形 |
+| `relates` | 灰色 | 虚线 | 圆点 |
+| `sibling` | 黄色 | 虚线 | 圆点 |
+| `activates` | 绿色 | 实线 | 三角 |
+| `inhibits` | 红色 | 实线 | T形 |
+| `metabolizes` | 紫色 | 实线 | 三角 |
 | `mechanism` | 紫色 | 实线 | 三角 |
+| `treats` | 绿色 | 实线 | 三角 |
+| `causes` | 红色 | 虚线 | T形 |
+| `interacts` | 黄色 | 虚线 | 圆点 |
+| `contraindicates` | 红色 | 实线 | T形 |
 
 ---
 

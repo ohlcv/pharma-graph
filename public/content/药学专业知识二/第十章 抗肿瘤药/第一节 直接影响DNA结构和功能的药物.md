@@ -5,12 +5,10 @@ data:
   essence: section
   field: pharmacology
   tier: management
-
   location:
     book: 药学专业知识二
     chapter: 第十章 抗肿瘤药
     section: 第一节 直接影响DNA结构和功能的药物
-
   tags:
     - 烷化剂
     - 铂类
@@ -18,14 +16,12 @@ data:
     - 拓扑异构酶抑制剂
     - 细胞毒
     - 化疗
-
   summary:
     short: 铂类药物是化疗的基石，烷化剂和拓扑酶抑制剂各有绝活。
     full: 这类药直接破坏肿瘤细胞的DNA。铂类（顺铂、卡铂、奥沙利铂）是化疗的"老大哥"，几乎所有实体瘤都可能用到，但有肾毒性和耳毒性。烷化剂（环磷酰胺）用得也很多，但可能导致出血性膀胱炎。拓扑异构酶抑制剂（伊立替康、依托泊苷）是后起之秀。
-
 edges_out:
   - target: antitumor-drugs-y2
-    type: has
+    type: isa
     reason: 本节属于抗肿瘤药章
   - target: antimetabolite-antitumor
     type: prerequisite
@@ -36,6 +32,8 @@ edges_out:
   - target: tumor-chemotherapy-management
     type: treats
     reason: DNA损伤药用于肿瘤化疗
+  - target: antitumor-drugs-y2
+    type: isa
 ---
 
 # 直接影响DNA结构和功能的药物

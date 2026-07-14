@@ -1,5 +1,7 @@
 # Frontmatter 审核报告
 
+> ⚠️ **ARCHIVED — 2026-07-14**：本文档是 ISA 迁移**前**生成的违规清单快照。所有 375 处"has→location 子级"违规已由 [`src/scripts/migrate-isa.ts`](../scripts/migrate-isa.ts) 修复完毕（has 边从 384 降至 0）。当前 frontmatter 校验通过状态见 [migration-report.md](../migration-report.md)。本文档**不再代表当前数据状态**。
+
 > 生成时间：2026/7/14 20:24:06
 > 总文件数：223 | 字段完成度：**99%**
 

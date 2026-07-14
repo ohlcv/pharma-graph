@@ -5,12 +5,10 @@ data:
   essence: section
   field: pharmacology
   tier: management
-
   location:
     book: 药学专业知识二
     chapter: 第十章 抗肿瘤药
     section: 第三节 干扰转录过程和阻止RNA合成的药物（作用于核酸转录药物）
-
   tags:
     - 蒽环类
     - 阿霉素
@@ -18,14 +16,12 @@ data:
     - 拓扑异构酶I
     - 伊立替康
     - RNA合成
-
   summary:
     short: 蒽环类是化疗"猛药"，效果强但心脏毒性大，伊立替康专治肠癌。
     full: 蒽环类（阿霉素、表阿霉素）是化疗里的"猛药"，对付多种实体瘤和淋巴瘤效果很好，但心脏毒性是它的"命门"——用多了会得心肌病。伊立替康是拓扑异构酶I抑制剂，对付肠癌效果不错，但可能导致严重腹泻。
-
 edges_out:
   - target: antitumor-drugs-y2
-    type: has
+    type: isa
     reason: 本节属于抗肿瘤药章
   - target: direct-dna-acting-antitumor
     type: prerequisite
@@ -33,6 +29,8 @@ edges_out:
   - target: cardiovascular-drugs-y2
     type: prerequisite
     reason: 理解蒽环类心脏毒性有助于心脏保护
+  - target: antitumor-drugs-y2
+    type: isa
 ---
 
 # 干扰转录过程和阻止RNA合成的药物（作用于核酸转录药物）

@@ -48,11 +48,11 @@ interface ValidationError {
 export async function validate(): Promise<void> {
   console.log("🔍 Running frontmatter validation...\n");
 
-  const contentDir = path.join(ROOT, "content");
+  const contentDir = path.join(ROOT, "public/content");
   const files = await scanContentDir(contentDir);
 
   if (files.length === 0) {
-    console.warn("⚠️  No .md files found in content/");
+    console.warn("⚠️  No .md files found in public/content/");
     return;
   }
 

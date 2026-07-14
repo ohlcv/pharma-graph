@@ -8,7 +8,7 @@ import { globSync } from 'glob';
 import { readFile, writeFile } from 'fs/promises';
 import path from 'path';
 
-const CONTENT_DIR = './content';
+const CONTENT_DIR = './public/content';
 
 async function fixDuplicateId(filePath: string): Promise<boolean> {
   const content = await readFile(filePath, 'utf-8');

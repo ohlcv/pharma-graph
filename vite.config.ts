@@ -3,7 +3,7 @@ import { readdir, readFile, writeFile, stat, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, relative, sep, posix } from 'node:path';
 
-const CONTENT_DIR = 'content';
+const CONTENT_DIR = 'public/content';
 const PUBLIC_DIR = 'public';
 const MANIFEST_FILENAME = 'content-manifest.json';
 

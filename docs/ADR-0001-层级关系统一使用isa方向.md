@@ -2,10 +2,11 @@
 
 | 字段 | 值 |
 |---|---|
-| **状态** | Accepted |
+| **状态** | Accepted · Implemented |
 | **日期** | 2026-07-14 |
 | **决策者** | 项目所有者 |
-| **影响范围** | `content/**` 所有 frontmatter、`src/parser/frontmatter.ts`、`src/scripts/validate.ts`、`docs/frontmatter.md` |
+| **影响范围** | `public/content/**` 所有 frontmatter、`src/parser/frontmatter.ts`、`src/scripts/validate.ts`、`docs/frontmatter.md` |
+| **实施** | 迁移脚本 `src/scripts/migrate-isa.ts` 已执行，has 边从 384 清零、isa 边新增 356 条（167 由 has 改写 + 189 子节点补），详见 `docs/migration-report.md` |
 
 ## 一、背景（Context）
 
@@ -186,7 +187,7 @@ class Dog extends Mammal {}  // 子类声明父类
 
 ```typescript
 // 伪代码
-for each content/**/*.md file:
+for each public/content/**/*.md file:
   parse frontmatter
   for each edge in edges_out:
     if edge.type === 'has':
