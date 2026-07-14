@@ -667,12 +667,26 @@ function exposeGlobals(renderer: Renderer, highlight: HighlightEngine, detailPan
 
 const graphManager = new GraphManager(MD_FILES as Record<string, string>);
 const data = graphManager.build();
+// Diagnostic — surfaces data shape so we can confirm parser→renderer pipeline
+// is producing edges in the browser. Remove once the missing-edges bug is
+// confirmed resolved.
+console.info('[pharma-graph] graph build:', {
+  mdFiles: Object.keys(MD_FILES).length,
+  nodes: data.nodes.length,
+  edges: data.edges.length,
+  sampleEdge: data.edges[0],
+});
 const container = document.getElementById('cy');
 if (!container) throw new Error('#cy container not found');
 
 try {
   uiState.renderer = new Renderer({ container, data, layoutName: 'cose', layoutConfigs: LAYOUTS });
   uiState.highlight = new HighlightEngine(uiState.renderer.getCy());
+  // Diagnostic — confirm cytoscape loaded the same number of edges as buildGraph produced.
+  console.info('[pharma-graph] cy after render:', {
+    nodes: uiState.renderer.getCy().nodes().length,
+    edges: uiState.renderer.getCy().edges().length,
+  });
 
   uiState.detailPanel = new DetailPanel(uiState.renderer.getCy(), uiState.highlight, {
     onNodeClick: (nodeId) => {
