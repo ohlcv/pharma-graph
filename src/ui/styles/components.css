@@ -192,7 +192,7 @@
 .sidebar-section__chevron { width: 14px; height: 14px; color: var(--muted); transition: transform 0.2s cubic-bezier(0.4,0,0.2,1), color 0.15s; flex-shrink: 0; }
 .sidebar-section__chevron.open { transform: rotate(90deg); transition: transform var(--dur-normal) var(--ease-out); }
 .sidebar-section__body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--dur-normal) var(--ease-out); padding: 0 14px; }
-[data-section-state="open"] .sidebar-section__body { grid-template-rows: 1fr; padding-bottom: 12px; }
+.sidebar-section[data-section-state="open"] .sidebar-section__body { grid-template-rows: 1fr; padding-bottom: 12px; }
 .sidebar-section__body > * { overflow: hidden; }
 
 .node-type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
@@ -211,12 +211,48 @@
 .node-type-item__count { font-size: 0.62rem; color: var(--muted); font-weight: 400; margin-left: auto; flex-shrink: 0; }
 
 /* ── Legend blocks (图例说明) ───────────────────────────────────────────────── */
-.legend-block { display: flex; flex-direction: column; gap: 5px; }
-.legend-block__label {
-  font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
-  color: var(--muted); padding: 4px 0 2px;
+/* `legend-block` is now a foldable sub-section. The header/grid-rows animation
+ * is identical to `.sidebar-section`, so the four axes (节点本质 / 学科领域 /
+ * 知识层级 / 关联关系) each become their own collapsible card without any
+ * extra JS. The chevron icon is shared via `.sidebar-section__chevron`. */
+.legend-block { display: flex; flex-direction: column; gap: 0; }
+.legend-block + .legend-block { margin-top: 8px; }
+.legend-block__label { display: none; }   /* legacy label class kept off the DOM */
+
+.legend-section__head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 8px; cursor: pointer; user-select: none;
+  border-radius: 7px; border: 1px solid transparent;
+  transition: background 0.14s, border-color 0.14s, color 0.14s;
 }
-.legend-block + .legend-block { margin-top: 10px; }
+.legend-section__head:hover {
+  background: rgba(255,255,255,0.04);
+  border-color: var(--border);
+  color: var(--text);
+}
+.legend-section__head:active {
+  background: rgba(99,102,241,0.12);
+  border-color: rgba(99,102,241,0.4);
+}
+.legend-section__title {
+  font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--muted);
+}
+.legend-section__title::before {
+  content: ''; display: inline-block; width: 3px; height: 10px; border-radius: 2px;
+  background: var(--accent); margin-right: 7px; vertical-align: middle;
+}
+.legend-section__body {
+  display: block;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height var(--dur-normal) var(--ease-out);
+  padding: 0 4px;
+}
+.legend-section[data-section-state="open"] .legend-section__body {
+  max-height: 1200px;       /* large enough for any single legend axis */
+  padding-bottom: 6px;
+}
 
 .legend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
 .legend-grid--2 { grid-template-columns: 1fr 1fr; }

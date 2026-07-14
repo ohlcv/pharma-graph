@@ -223,64 +223,63 @@
             <div class="legend-section__body" id="body-legend-edge">
               <div class="legend-grid legend-grid--2" id="legend-edge-grid">
                 <div class="legend-edge-row" data-edge="has">
-                <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#95a5a6" stroke-width="2"/></svg>
-                <span class="legend-edge-row__label">包含</span>
-                <span class="legend-edge-row__count" id="count-edge-has"></span>
+                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#95a5a6" stroke-width="2"/></svg>
+                  <span class="legend-edge-row__label">包含</span>
+                  <span class="legend-edge-row__count" id="count-edge-has"></span>
+                </div>
+                <div class="legend-edge-row" data-edge="isa">
+                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#4a90e2" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#4a90e2"/></svg>
+                  <span class="legend-edge-row__label">属于</span>
+                  <span class="legend-edge-row__count" id="count-edge-isa"></span>
+                </div>
+                <div class="legend-edge-row" data-edge="activates">
+                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#27ae60" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#27ae60"/></svg>
+                  <span class="legend-edge-row__label">激动</span>
+                  <span class="legend-edge-row__count" id="count-edge-activates"></span>
+                </div>
+                <div class="legend-edge-row" data-edge="inhibits">
+                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#c0392b" stroke-width="2"/><line x1="24" y1="2" x2="26" y2="5" stroke="#c0392b" stroke-width="2"/><line x1="24" y1="8" x2="26" y2="5" stroke="#c0392b" stroke-width="2"/></svg>
+                  <span class="legend-edge-row__label">抑制</span>
+                  <span class="legend-edge-row__count" id="count-edge-inhibits"></span>
+                </div>
+                <div class="legend-edge-row" data-edge="mechanism">
+                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#e27c3e" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#e27c3e"/></svg>
+                  <span class="legend-edge-row__label">机制</span>
+                  <span class="legend-edge-row__count" id="count-edge-mechanism"></span>
+                </div>
+                <div class="legend-edge-row" data-edge="metabolizes">
+                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#8e44ad" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#8e44ad"/></svg>
+                  <span class="legend-edge-row__label">代谢</span>
+                  <span class="legend-edge-row__count" id="count-edge-metabolizes"></span>
+                </div>
+                <div class="legend-edge-row" data-edge="treats">
+                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#2ecc71" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#2ecc71"/></svg>
+                  <span class="legend-edge-row__label">治疗</span>
+                  <span class="legend-edge-row__count" id="count-edge-treats"></span>
+                </div>
+                <div class="legend-edge-row" data-edge="causes">
+                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#e74c3c" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#e74c3c"/></svg>
+                  <span class="legend-edge-row__label">致因</span>
+                  <span class="legend-edge-row__count" id="count-edge-causes"></span>
+                </div>
+                <div class="legend-edge-row" data-edge="interacts">
+                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#f39c12" stroke-width="2" stroke-dasharray="4 3"/></svg>
+                  <span class="legend-edge-row__label">相互作用</span>
+                  <span class="legend-edge-row__count" id="count-edge-interacts"></span>
+                </div>
+                <div class="legend-edge-row" data-edge="contraindicates">
+                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#c0392b" stroke-width="2" stroke-dasharray="4 3"/></svg>
+                  <span class="legend-edge-row__label">禁忌</span>
+                  <span class="legend-edge-row__count" id="count-edge-contraindicates"></span>
+                </div>
+                <div class="legend-edge-row" data-edge="prerequisite">
+                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#9b59b6" stroke-width="2" stroke-dasharray="2 2"/><polygon points="26,5 21,2 21,8" fill="#9b59b6"/></svg>
+                  <span class="legend-edge-row__label">前置</span>
+                  <span class="legend-edge-row__count" id="count-edge-prerequisite"></span>
+                </div>
               </div>
-              <div class="legend-edge-row" data-edge="isa">
-                <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#4a90e2" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#4a90e2"/></svg>
-                <span class="legend-edge-row__label">属于</span>
-                <span class="legend-edge-row__count" id="count-edge-isa"></span>
-              </div>
-              <div class="legend-edge-row" data-edge="activates">
-                <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#27ae60" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#27ae60"/></svg>
-                <span class="legend-edge-row__label">激动</span>
-                <span class="legend-edge-row__count" id="count-edge-activates"></span>
-              </div>
-              <div class="legend-edge-row" data-edge="inhibits">
-                <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#c0392b" stroke-width="2"/><line x1="24" y1="2" x2="26" y2="5" stroke="#c0392b" stroke-width="2"/><line x1="24" y1="8" x2="26" y2="5" stroke="#c0392b" stroke-width="2"/></svg>
-                <span class="legend-edge-row__label">抑制</span>
-                <span class="legend-edge-row__count" id="count-edge-inhibits"></span>
-              </div>
-              <div class="legend-edge-row" data-edge="mechanism">
-                <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#e27c3e" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#e27c3e"/></svg>
-                <span class="legend-edge-row__label">机制</span>
-                <span class="legend-edge-row__count" id="count-edge-mechanism"></span>
-              </div>
-              <div class="legend-edge-row" data-edge="metabolizes">
-                <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#8e44ad" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#8e44ad"/></svg>
-                <span class="legend-edge-row__label">代谢</span>
-                <span class="legend-edge-row__count" id="count-edge-metabolizes"></span>
-              </div>
-              <div class="legend-edge-row" data-edge="treats">
-                <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#2ecc71" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#2ecc71"/></svg>
-                <span class="legend-edge-row__label">治疗</span>
-                <span class="legend-edge-row__count" id="count-edge-treats"></span>
-              </div>
-              <div class="legend-edge-row" data-edge="causes">
-                <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#e74c3c" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#e74c3c"/></svg>
-                <span class="legend-edge-row__label">致因</span>
-                <span class="legend-edge-row__count" id="count-edge-causes"></span>
-              </div>
-              <div class="legend-edge-row" data-edge="interacts">
-                <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#f39c12" stroke-width="2" stroke-dasharray="4 3"/></svg>
-                <span class="legend-edge-row__label">相互作用</span>
-                <span class="legend-edge-row__count" id="count-edge-interacts"></span>
-              </div>
-              <div class="legend-edge-row" data-edge="contraindicates">
-                <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#c0392b" stroke-width="2" stroke-dasharray="4 3"/></svg>
-                <span class="legend-edge-row__label">禁忌</span>
-                <span class="legend-edge-row__count" id="count-edge-contraindicates"></span>
-              </div>
-              <div class="legend-edge-row" data-edge="prerequisite">
-                <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#9b59b6" stroke-width="2" stroke-dasharray="2 2"/><polygon points="26,5 21,2 21,8" fill="#9b59b6"/></svg>
-                <span class="legend-edge-row__label">前置</span>
-                <span class="legend-edge-row__count" id="count-edge-prerequisite"></span>
-              </div>
-            </div>
             </div>
           </div>
-        </div>
         </div>
       </div>
 
