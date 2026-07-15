@@ -52,21 +52,27 @@
    global state class so the JS layer doesn't have to touch style.display. */
 .tour-state--idle    #tour-badge-play,
 .tour-state--idle    #tour-badge-play-dt,
+.tour-state--idle    #tour-icon-play,
 .tour-state--idle    #bs-tour-icon-play  { display: inline-flex; }
 .tour-state--idle    #tour-badge-pause,
 .tour-state--idle    #tour-badge-pause-dt,
+.tour-state--idle    #tour-icon-stop,
 .tour-state--idle    #bs-tour-icon-stop  { display: none; }
 .tour-state--running #tour-badge-play,
 .tour-state--running #tour-badge-play-dt,
+.tour-state--running #tour-icon-play,
 .tour-state--running #bs-tour-icon-play { display: none; }
 .tour-state--running #tour-badge-pause,
 .tour-state--running #tour-badge-pause-dt,
+.tour-state--running #tour-icon-stop,
 .tour-state--running #bs-tour-icon-stop { display: inline-flex; }
 .tour-state--paused  #tour-badge-play,
 .tour-state--paused  #tour-badge-play-dt,
+.tour-state--paused  #tour-icon-play,
 .tour-state--paused  #bs-tour-icon-play  { display: inline-flex; }
 .tour-state--paused  #tour-badge-pause,
 .tour-state--paused  #tour-badge-pause-dt,
+.tour-state--paused  #tour-icon-stop,
 .tour-state--paused  #bs-tour-icon-stop  { display: none; }
 
 /* The compact mobile-bar play/pause button mirrors the same logic. */
