@@ -323,7 +323,8 @@
   padding: 0 4px;
 }
 .legend-section[data-section-state="open"] .legend-section__body {
-  max-height: 1200px;
+  max-height: none;
+  overflow: visible;
   padding: 0 4px 6px;
 }
 
