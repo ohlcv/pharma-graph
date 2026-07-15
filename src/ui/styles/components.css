@@ -137,9 +137,9 @@
 
 /* ── Layout segmented switcher (toolbar) ─────────────────────────────────────── */
 /* A single "布局 · COSE ⌄" trigger in the toolbar opens a popover with all 7
- * options. The popover is the same glass surface as other panels and uses
- * `.layout-switcher__item.active` for the current selection. */
-.layout-switcher { position: relative; flex-shrink: 0; overflow: visible; }
+ * options. The popover is rendered outside the toolbar (body level, position:fixed)
+ * to avoid overflow clipping issues. */
+.layout-switcher { position: relative; flex-shrink: 0; }
 .layout-switcher__btn {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 5px 9px 5px 11px; border-radius: 8px;
@@ -161,10 +161,10 @@
   transition: transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
   color: var(--accent); opacity: 0.85;
 }
-.layout-switcher.open .layout-switcher__chev { transform: rotate(180deg); }
+.layout-switcher.visible .layout-switcher__chev { transform: rotate(180deg); }
 
 .layout-switcher__menu {
-  position: absolute; top: calc(100% + 6px); left: 0;
+  position: fixed;
   z-index: 30;
   min-width: 132px; padding: 4px;
   display: flex; flex-direction: column; gap: 1px;
@@ -179,7 +179,7 @@
   transform-origin: top left;
   transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
-.layout-switcher.open .layout-switcher__menu {
+.layout-switcher__menu.visible {
   opacity: 1; pointer-events: auto; transform: translateY(0) scale(1);
 }
 .layout-switcher__item {

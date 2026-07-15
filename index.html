@@ -74,15 +74,6 @@
             <polyline points="6 9 12 15 18 9"/>
           </svg>
         </button>
-        <div id="layout-switcher-menu" class="layout-switcher__menu" role="listbox" aria-label="选择布局">
-          <button class="layout-switcher__item active" role="option" aria-selected="true"  data-name="cose"        onclick="pickLayout(this)">COSE</button>
-          <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="concentric"  onclick="pickLayout(this)">同心圆</button>
-          <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="circle"      onclick="pickLayout(this)">环形</button>
-          <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="grid"        onclick="pickLayout(this)">网格</button>
-          <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="dagre"       onclick="pickLayout(this)">Dagre</button>
-          <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="breadthfirst" onclick="pickLayout(this)">广度</button>
-          <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="euler"       onclick="pickLayout(this)">Euler</button>
-        </div>
       </div>
     </div>
 
@@ -140,6 +131,17 @@
         <line x1="15" y1="3" x2="15" y2="21"/>
       </svg>
     </button>
+  </div>
+
+  <!-- Layout switcher popover (outside toolbar to avoid overflow clipping) -->
+  <div id="layout-switcher-menu" class="layout-switcher__menu" role="listbox" aria-label="选择布局">
+    <button class="layout-switcher__item active" role="option" aria-selected="true"  data-name="cose"         onclick="pickLayout(this)">COSE</button>
+    <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="concentric"   onclick="pickLayout(this)">同心圆</button>
+    <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="circle"      onclick="pickLayout(this)">环形</button>
+    <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="grid"        onclick="pickLayout(this)">网格</button>
+    <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="dagre"       onclick="pickLayout(this)">Dagre</button>
+    <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="breadthfirst" onclick="pickLayout(this)">广度</button>
+    <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="euler"       onclick="pickLayout(this)">Euler</button>
   </div>
 
   <!-- ── Main ───────────────────────────────────────────────────────── -->
