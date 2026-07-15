@@ -533,7 +533,10 @@
 .node-panel__tab.active        { background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.5); color: var(--accent); }
 .node-panel__tab:hover:not(.active) { background: rgba(255,255,255,0.06); border-color: var(--border-hi); color: var(--text-2); }
 
-.node-panel__body { padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.node-panel__body { padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.node-panel__body::-webkit-scrollbar { width: 3px; }
+.node-panel__body::-webkit-scrollbar-track { background: transparent; }
+.node-panel__body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
 .np-page { display: flex; flex-direction: column; gap: 12px; }
 .np-page .np-section { display: flex; flex-direction: column; gap: 6px; }
