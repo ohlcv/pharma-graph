@@ -91,11 +91,11 @@
     <div class="toolbar__group">
       <button id="btn-fit"    class="btn" onclick="fitGraph()" title="适应视图（F）— 自动缩放图谱到最佳视图">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-        <span>适应</span>
+        <span>适应</span><span class="key">F</span>
       </button>
       <button id="btn-random" class="btn" onclick="randomize()" title="随机布局（R）— 用 cose 算法重新打散所有节点位置">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
-        <span>随机</span>
+        <span>随机</span><span class="key">R</span>
       </button>
       <button id="btn-reset" class="btn" onclick="resetAll()" title="重置一切 — 布局回到 cose、清除形状筛选、取消高亮">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
@@ -118,7 +118,7 @@
         <circle cx="12" cy="12" r="10"/>
         <rect x="8" y="8" width="8" height="8" rx="1" fill="currentColor" stroke="none"/>
       </svg>
-      <span>漫游</span>
+      <span>漫游</span><span class="key">T</span>
     </button>
 
     <button id="btn-music" class="btn" title="播放背景音乐">

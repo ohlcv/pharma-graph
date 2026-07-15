@@ -49,6 +49,14 @@
   line-height: 1.5; letter-spacing: 0.02em;
   white-space: nowrap; flex-shrink: 0;
 }
+/* Key badge inside toolbar buttons — lighter weight to stay in the background */
+.btn .key {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.12);
+  border-bottom-color: rgba(255,255,255,0.18);
+  color: var(--muted);
+  font-size: 0.55rem;
+}
 
 /* ── Focus ring for keyboard-promoted divs (legend rows, chips) ──────────── */
 /* Use :focus-visible so mouse clicks don't show a ring, only Tab navigation. */
