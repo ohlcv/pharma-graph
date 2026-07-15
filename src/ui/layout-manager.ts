@@ -140,9 +140,11 @@ export function renderBsLayoutParams(name: string): void {
 export function toggleBsParams(): void {
   const block = document.getElementById('bs-params-block');
   const body = document.getElementById('bs-layout-params');
+  const applyBtn = document.getElementById('bs-apply-btn');
   if (!block || !body) return;
   const open = block.classList.toggle('open');
   body.style.display = open ? '' : 'none';
+  if (applyBtn) applyBtn.style.display = open ? '' : 'none';
   if (open) renderBsLayoutParams(_currentLayout);
 }
 
