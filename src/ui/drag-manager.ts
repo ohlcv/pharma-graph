@@ -1,6 +1,7 @@
 import { Renderer } from '../core/renderer.js';
 import { uiState } from './state.js';
 import { UiToggle } from './ui-toggle.js';
+import { renderLayoutParams } from './layout-manager.js';
 
 // ── Bottom sheet ───────────────────────────────────────────────────────────────
 
@@ -260,7 +261,9 @@ export function toggleSection(name: string): void {
   const section = document.querySelector(`[data-section="${name}"]`);
   const head = document.querySelector(`[data-section="${name}"] .sidebar-section__chevron`);
   if (!section) return;
-  const open = section.getAttribute('data-section-state') === 'open';
-  section.setAttribute('data-section-state', open ? 'closed' : 'open');
-  if (head) head.classList.toggle('open', !open);
+  const wasOpen = section.getAttribute('data-section-state') === 'open';
+  const nowOpen = !wasOpen;
+  section.setAttribute('data-section-state', nowOpen ? 'open' : 'closed');
+  if (head) head.classList.toggle('open', nowOpen);
+  if (nowOpen && name === 'params') renderLayoutParams(uiState.layout.current);
 }
