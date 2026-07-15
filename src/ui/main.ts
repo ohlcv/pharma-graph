@@ -337,8 +337,18 @@ function exposeGlobals(renderer: Renderer, highlight: HighlightEngine, detailPan
   }
   (window as any).pickLayout = (el: HTMLElement) => {
     const name = el.dataset.name ?? 'cose';
-    const rendererRef = (window as any)._renderer as Renderer | undefined;
-    if (rendererRef) runLayout(name, rendererRef);
+    runLayout(name, renderer);
+
+    // Sync button label + active item highlight
+    const label = el.textContent?.trim() ?? '';
+    const current = document.getElementById('layout-switcher-current');
+    if (current) current.textContent = label;
+    document.querySelectorAll<HTMLElement>('.layout-switcher__item').forEach((it) => {
+      const active = it === el;
+      it.classList.toggle('active', active);
+      it.setAttribute('aria-selected', String(active));
+    });
+
     closeLayoutMenu();
   };
   // Close on outside click + Esc
