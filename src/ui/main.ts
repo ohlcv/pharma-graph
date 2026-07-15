@@ -470,6 +470,23 @@ async function boot(): Promise<void> {
   initSheetDrag();
   initPanelDrag();
 
+  // ── Onboarding tip (shown once, 3 s after first load) ─────────────────────────
+  const TIPS = [
+    { text: '按 T 开始漫游，按 P 暂停，逐节点探索药学知识图谱', icon: 'tip' },
+    { text: '按 F 适应视图，或拖拽鼠标滚轮缩放图谱',            icon: 'tip' },
+    { text: '点击顶部搜索框，输入药名即可快速定位节点',         icon: 'tip' },
+  ];
+  const SEEN_KEY = 'pg_onboarding_tip_shown';
+  try {
+    if (!localStorage.getItem(SEEN_KEY)) {
+      const tip = TIPS[Math.floor(Math.random() * TIPS.length)];
+      setTimeout(() => {
+        showToast(tip.text, 'info');
+        try { localStorage.setItem(SEEN_KEY, String(Date.now())); } catch { /* ignore */ }
+      }, 3000);
+    }
+  } catch { /* localStorage blocked — skip tip */ }
+
 } catch (err) {
     const n = document.getElementById('stat-nodes');
     const e = document.getElementById('stat-edges');
