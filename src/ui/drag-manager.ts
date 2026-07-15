@@ -1,7 +1,7 @@
 import { Renderer } from '../core/renderer.js';
 import { uiState } from './state.js';
 import { UiToggle } from './ui-toggle.js';
-import { renderLayoutParams } from './layout-manager.js';
+import { getCurrentLayout, renderLayoutParams } from './layout-manager.js';
 
 // ── Bottom sheet ───────────────────────────────────────────────────────────────
 
@@ -265,5 +265,5 @@ export function toggleSection(name: string): void {
   const nowOpen = !wasOpen;
   section.setAttribute('data-section-state', nowOpen ? 'open' : 'closed');
   if (head) head.classList.toggle('open', nowOpen);
-  if (nowOpen && name === 'params') renderLayoutParams(uiState.layout.current);
+  if (nowOpen && name === 'params') renderLayoutParams(getCurrentLayout());
 }
