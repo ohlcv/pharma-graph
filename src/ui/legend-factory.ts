@@ -113,7 +113,7 @@ function updateCount(
 ): number {
   const selector = descriptor.countSelector.replace(/\$\{key\}/g, key);
   const scope = descriptor.countScope === 'nodes' ? cy.nodes() : cy.edges();
-  return scope.filter(selector).length;
+  return scope.filter(selector).not('.layer-parent').length;
 }
 
 /**
