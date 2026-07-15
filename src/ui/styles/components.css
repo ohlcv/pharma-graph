@@ -139,7 +139,7 @@
 /* A single "布局 · COSE ⌄" trigger in the toolbar opens a popover with all 7
  * options. The popover is the same glass surface as other panels and uses
  * `.layout-switcher__item.active` for the current selection. */
-.layout-switcher { position: relative; flex-shrink: 0; }
+.layout-switcher { position: relative; flex-shrink: 0; overflow: visible; }
 .layout-switcher__btn {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 5px 9px 5px 11px; border-radius: 8px;
