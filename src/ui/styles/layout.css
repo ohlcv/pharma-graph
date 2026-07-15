@@ -36,8 +36,6 @@
 #cy {
   width: 100%; height: 100%; display: block;
   background: transparent; cursor: grab; will-change: transform;
-  /* #cy stays below the toolbar (z-index: 35) and its popover (z-index: 40). */
-  z-index: 1;
 }
 #cy:active { cursor: grabbing; }
 
