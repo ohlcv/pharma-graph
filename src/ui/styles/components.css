@@ -319,12 +319,12 @@
   display: block;
   max-height: 0;
   overflow: hidden;
-  transition: max-height var(--dur-normal) var(--ease-out);
+  transition: max-height var(--dur-normal) var(--ease-out), padding var(--dur-normal) var(--ease-out);
   padding: 0 4px;
 }
 .legend-section[data-section-state="open"] .legend-section__body {
-  max-height: 1200px;       /* large enough for any single legend axis */
-  padding-bottom: 6px;
+  max-height: 1200px;
+  padding: 0 4px 6px;
 }
 
 .legend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
