@@ -502,7 +502,7 @@
 
 #node-panel {
   position: fixed; top: 72px; left: 16px; z-index: 20;
-  width: 320px; max-width: min(320px, calc(100vw - 24px));
+  width: 360px; max-width: min(360px, calc(100vw - 24px));
   background: rgba(10, 14, 28, 0.90); border-radius: 14px; border: 1px solid rgba(99,102,241,0.18);
   box-shadow: 0 20px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.05) inset, 0 0 40px rgba(99,102,241,0.06);
   display: flex; flex-direction: column; overflow: hidden;
@@ -569,7 +569,7 @@
 .np-section__toggle-arrow.rotated { transform: rotate(90deg); }
 
 .np-tags { display: flex; flex-wrap: wrap; gap: 4px; }
-.np-tag  { font-size: 0.64rem; font-weight: 500; color: var(--text-2); background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 2px 9px; transition: background 0.12s, color 0.12s, border-color 0.12s; cursor: default; }
+.np-tag  { font-size: 0.64rem; font-weight: 500; color: var(--text-2); background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 2px 9px; transition: background 0.12s, color 0.12s, border-color 0.12s; cursor: pointer; }
 .np-tag:hover { background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.4); color: var(--accent); }
 
 .np-edges { display: flex; flex-direction: column; gap: 4px; }
