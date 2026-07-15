@@ -63,13 +63,27 @@
   <!-- ── Toolbar ─────────────────────────────────────────────────────── -->
   <div class="toolbar">
     <div class="toolbar__group">
-      <button id="btn-cose"         class="btn layout-btn active" onclick="runLayout('cose')"     aria-pressed="true"><span>COSE</span></button>
-      <button id="btn-concentric"   class="btn layout-btn" onclick="runLayout('concentric')"  aria-pressed="false"><span>同心圆</span></button>
-      <button id="btn-circle"       class="btn layout-btn" onclick="runLayout('circle')"      aria-pressed="false"><span>环形</span></button>
-      <button id="btn-grid"         class="btn layout-btn" onclick="runLayout('grid')"        aria-pressed="false"><span>网格</span></button>
-      <button id="btn-dagre"        class="btn layout-btn" onclick="runLayout('dagre')"       aria-pressed="false"><span>Dagre</span></button>
-      <button id="btn-breadthfirst" class="btn layout-btn" onclick="runLayout('breadthfirst')" aria-pressed="false"><span>广度</span></button>
-      <button id="btn-euler"        class="btn layout-btn" onclick="runLayout('euler')"       aria-pressed="false"><span>Euler</span></button>
+      <div id="layout-switcher" class="layout-switcher">
+        <button id="layout-switcher-btn" class="btn layout-btn active layout-switcher__btn"
+                aria-haspopup="listbox" aria-expanded="false" aria-controls="layout-switcher-menu"
+                onclick="toggleLayoutMenu(event)">
+          <span class="layout-switcher__label">布局</span>
+          <span class="layout-switcher__sep">·</span>
+          <span class="layout-switcher__current" id="layout-switcher-current">COSE</span>
+          <svg class="layout-switcher__chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </button>
+        <div id="layout-switcher-menu" class="layout-switcher__menu" role="listbox" aria-label="选择布局">
+          <button class="layout-switcher__item active" role="option" aria-selected="true"  data-name="cose"        onclick="pickLayout(this)">COSE</button>
+          <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="concentric"  onclick="pickLayout(this)">同心圆</button>
+          <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="circle"      onclick="pickLayout(this)">环形</button>
+          <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="grid"        onclick="pickLayout(this)">网格</button>
+          <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="dagre"       onclick="pickLayout(this)">Dagre</button>
+          <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="breadthfirst" onclick="pickLayout(this)">广度</button>
+          <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="euler"       onclick="pickLayout(this)">Euler</button>
+        </div>
+      </div>
     </div>
 
     <div class="toolbar__sep"></div>

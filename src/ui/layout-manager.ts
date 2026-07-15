@@ -15,6 +15,19 @@ import { forEachStatic } from './dom-cache.js';
 
 let _currentLayout = 'cose';
 
+// Display labels for the toolbar segmented switcher. Source of truth stays in
+// LAYOUTS (key + cytoscape config); this map only carries the user-facing
+// name shown on the segmented control.
+const LAYOUT_LABELS: Record<string, string> = {
+  cose:         'COSE',
+  concentric:   '同心圆',
+  circle:       '环形',
+  grid:         '网格',
+  dagre:        'Dagre',
+  breadthfirst: '广度',
+  euler:        'Euler',
+};
+
 export function getCurrentLayout(): string {
   return _currentLayout;
 }
@@ -35,6 +48,17 @@ export function runLayout(name: string, renderer: Renderer): void {
   const desc = document.getElementById('layout-desc');
   const layout = LAYOUTS[name];
   if (desc) desc.textContent = layout?.description ?? '';
+  // Keep the toolbar segmented switcher in sync (label + active item).
+  const layoutObj = LAYOUTS[name];
+  if (layoutObj) {
+    const current = document.getElementById('layout-switcher-current');
+    if (current) current.textContent = LAYOUT_LABELS[name] ?? name;
+    document.querySelectorAll<HTMLElement>('.layout-switcher__item').forEach((it) => {
+      const active = it.dataset.name === name;
+      it.classList.toggle('active', active);
+      it.setAttribute('aria-selected', String(active));
+    });
+  }
   renderLayoutParams(name);
   // Keep bottom-sheet params in sync if the panel is open
   const paramsBlock = document.getElementById('bs-params-block');

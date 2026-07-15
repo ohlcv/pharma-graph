@@ -135,6 +135,73 @@
 #btn-music.active { background: rgba(99,102,241,0.18); border-color: var(--accent); color: var(--accent); box-shadow: 0 0 12px rgba(99,102,241,0.25); }
 #btn-music.active svg { stroke: var(--accent); }
 
+/* ── Layout segmented switcher (toolbar) ─────────────────────────────────────── */
+/* A single "布局 · COSE ⌄" trigger in the toolbar opens a popover with all 7
+ * options. The popover is the same glass surface as other panels and uses
+ * `.layout-switcher__item.active` for the current selection. */
+.layout-switcher { position: relative; flex-shrink: 0; }
+.layout-switcher__btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 9px 5px 11px; border-radius: 8px;
+  border: 1px solid var(--accent); color: var(--accent);
+  background: rgba(99,102,241,0.12);
+  box-shadow: 0 0 10px rgba(99,102,241,0.22);
+  font-size: 0.73rem; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+  font-family: inherit; line-height: 1.4;
+  transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+.layout-switcher__btn:hover { background: rgba(99,102,241,0.18); box-shadow: 0 0 14px rgba(99,102,241,0.32); }
+.layout-switcher__btn:active { transform: scale(0.97); }
+.layout-switcher__label { color: var(--muted); font-weight: 500; letter-spacing: 0.04em; }
+.layout-switcher__sep   { color: var(--muted); opacity: 0.6; font-weight: 400; }
+.layout-switcher__current { font-family: 'SF Mono', 'Fira Code', monospace; letter-spacing: -0.01em; }
+.layout-switcher__chev {
+  width: 12px; height: 12px;
+  transition: transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
+  color: var(--accent); opacity: 0.85;
+}
+.layout-switcher.open .layout-switcher__chev { transform: rotate(180deg); }
+
+.layout-switcher__menu {
+  position: absolute; top: calc(100% + 6px); left: 0;
+  z-index: 30;
+  min-width: 132px; padding: 4px;
+  display: flex; flex-direction: column; gap: 1px;
+  background: rgba(12, 18, 34, 0.92);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--border-hi);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04) inset, 0 0 24px rgba(99,102,241,0.08);
+  opacity: 0; pointer-events: none;
+  transform: translateY(-4px) scale(0.97);
+  transform-origin: top left;
+  transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.layout-switcher.open .layout-switcher__menu {
+  opacity: 1; pointer-events: auto; transform: translateY(0) scale(1);
+}
+.layout-switcher__item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border-radius: 7px;
+  border: 1px solid transparent; background: transparent;
+  color: var(--text-2); font-size: 0.72rem; font-weight: 500;
+  font-family: inherit; cursor: pointer; text-align: left;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.layout-switcher__item:hover  { background: rgba(255,255,255,0.06); color: var(--text); border-color: var(--border); }
+.layout-switcher__item.active {
+  background: rgba(99,102,241,0.18); color: var(--accent); border-color: rgba(99,102,241,0.4);
+  box-shadow: 0 0 10px rgba(99,102,241,0.2);
+}
+.layout-switcher__item.active::before {
+  content: ''; display: inline-block; width: 4px; height: 4px;
+  border-radius: 50%; background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+  margin-right: 2px; flex-shrink: 0;
+}
+
 }
 
 /* ── Sidebar ────────────────────────────────────────────────────────────── */

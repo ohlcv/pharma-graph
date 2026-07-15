@@ -302,6 +302,53 @@ function exposeGlobals(renderer: Renderer, highlight: HighlightEngine, detailPan
   (window as any).applyLayoutParams = () => applyLayoutParams(renderer);
   (window as any).applyBsParams = () => applyBsParams(renderer);
   (window as any).runLayout = (name: string) => runLayout(name, renderer);
+
+  // Toolbar layout switcher (segmented dropdown). Kept as inline globals so the
+  // existing `onclick` handlers in index.html work without refactoring.
+  (window as any).toggleLayoutMenu = (ev?: MouseEvent) => {
+    ev?.stopPropagation();
+    const root = document.getElementById('layout-switcher');
+    const btn = document.getElementById('layout-switcher-btn');
+    if (!root || !btn) return;
+    const open = !root.classList.contains('open');
+    root.classList.toggle('open', open);
+    btn.setAttribute('aria-expanded', String(open));
+  };
+  (window as any).pickLayout = (el: HTMLElement) => {
+    const name = el.dataset.name ?? 'cose';
+    const rendererRef = (window as any)._renderer as Renderer | undefined;
+    if (rendererRef) runLayout(name, rendererRef);
+    // Sync the segmented control's label + active item
+    const label = el.textContent?.trim() ?? '';
+    const current = document.getElementById('layout-switcher-current');
+    if (current) current.textContent = label;
+    document.querySelectorAll<HTMLElement>('.layout-switcher__item').forEach((it) => {
+      const active = it === el;
+      it.classList.toggle('active', active);
+      it.setAttribute('aria-selected', String(active));
+    });
+    const root = document.getElementById('layout-switcher');
+    const btn = document.getElementById('layout-switcher-btn');
+    root?.classList.remove('open');
+    btn?.setAttribute('aria-expanded', 'false');
+  };
+  // Close on outside click + Esc
+  document.addEventListener('click', (e) => {
+    const root = document.getElementById('layout-switcher');
+    if (!root || !root.classList.contains('open')) return;
+    const target = e.target as Node | null;
+    if (target && !root.contains(target)) {
+      root.classList.remove('open');
+      document.getElementById('layout-switcher-btn')?.setAttribute('aria-expanded', 'false');
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const root = document.getElementById('layout-switcher');
+    if (!root || !root.classList.contains('open')) return;
+    root.classList.remove('open');
+    document.getElementById('layout-switcher-btn')?.setAttribute('aria-expanded', 'false');
+  });
   (window as any)._dbg = {
     overlay: () => {
       setDebugActive(!debugOverlayActive);
