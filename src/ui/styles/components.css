@@ -471,7 +471,7 @@
 .tag { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px; border: 1px solid var(--border); background: rgba(255,255,255,0.04); font-size: 0.65rem; font-weight: 500; color: var(--text-2); cursor: pointer; transition: background 0.14s, color 0.14s; }
 .tag:active { background: rgba(99,102,241,0.15); color: var(--accent); }
 
-.layout-info { margin-top: 8px; padding: 10px 12px; background: rgba(255,255,255,0.025); border: 1px solid var(--border); border-radius: 9px; display: flex; flex-direction: column; gap: 4px; }
+.layout-info { margin-top: 8px; padding: 10px 12px; background: rgba(255,255,255,0.025); border: 1px solid var(--border); border-radius: 9px; display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
 .layout-info__header { display: flex; align-items: center; gap: 6px; }
 .layout-info__label  { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); flex-shrink: 0; }
 .layout-info__badge  { font-size: 1.05rem; font-weight: 800; letter-spacing: 0.04em; color: var(--text); font-family: 'SF Mono', 'Fira Code', monospace; line-height: 1; }
