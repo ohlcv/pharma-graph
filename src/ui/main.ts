@@ -312,8 +312,9 @@ function exposeGlobals(renderer: Renderer, highlight: HighlightEngine, detailPan
     const open = !menu.classList.contains('visible');
     if (open) {
       const r = btn.getBoundingClientRect();
-      menu.style.top  = `${r.bottom + 6}px`;
-      menu.style.left = `${r.left}px`;
+      menu.style.top      = `${r.bottom + 6}px`;
+      menu.style.left     = `${r.left}px`;
+      menu.style.maxWidth = `${r.width}px`;
       btn.setAttribute('aria-expanded', 'true');
       root?.classList.add('visible');
       menu.classList.add('visible');
@@ -328,8 +329,9 @@ function exposeGlobals(renderer: Renderer, highlight: HighlightEngine, detailPan
     root?.classList.remove('visible');
     menu?.classList.remove('visible');
     if (menu) {
-      menu.style.top  = '';
-      menu.style.left = '';
+      menu.style.top      = '';
+      menu.style.left     = '';
+      menu.style.maxWidth = '';
     }
     if (btn) btn.setAttribute('aria-expanded', 'false');
   }
