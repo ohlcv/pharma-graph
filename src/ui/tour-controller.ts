@@ -34,7 +34,10 @@ interface SliderBind {
   range: HTMLInputElement;
   fill?: HTMLElement | null;       // optional: vertical track fill (#tour-interval-fill / depth-fill)
   value?: HTMLElement | null;      // optional: external value label
-  bgRange?: HTMLInputElement | null;// optional: a second range whose background gradient mirrors this slider (desktop dual-input setup)
+  /** All additional mirrors to keep in sync (values + labels) */
+  extraMirrors?: HTMLInputElement[];
+  /** All additional value labels to update */
+  extraMirrorLabels?: (HTMLElement | null)[];
   format: (v: number) => string;
   onCommit: (v: number) => void;
 }
@@ -144,11 +147,17 @@ export class TourController {
   /** Set the tour strategy. If currently running, restart with the new strategy. */
   setStrategy(next: TourStrategy): void {
     uiState.tour.strategy = next;
-    const sel = document.getElementById('tour-strategy-select-dt') as HTMLSelectElement | null;
-    if (sel) sel.value = next;
+    // Sync both desktop selects
+    for (const id of ['tour-strategy-select-dt', 'tour-strategy-select-dt2']) {
+      const sel = document.getElementById(id) as HTMLSelectElement | null;
+      if (sel) sel.value = next;
+    }
     this.syncMobileStrategyLabel(next);
-    this.flashStrategyButton(sel);
-    this.flashStrategyButton(document.getElementById('tour-strategy-toggle-mob'));
+    // Flash all strategy controls
+    for (const id of ['tour-strategy-select-dt', 'tour-strategy-select-dt2',
+                       'tour-strategy-toggle-mob', 'tour-strategy-toggle-mob2']) {
+      this.flashStrategyButton(document.getElementById(id));
+    }
     if (this.running || this.paused) this.start();
   }
 
@@ -177,31 +186,43 @@ export class TourController {
   }
 
   private bindSliders(): void {
-    // Mobile sliders drive values; desktop sliders mirror them. We bind mobile
-    // first and replicate input/change events to the desktop counterparts.
-    const mobileInterval = document.getElementById('tour-interval') as HTMLInputElement | null;
-    const mobileDepth    = document.getElementById('tour-maxdepth')  as HTMLInputElement | null;
+    // Desktop sliders (top + bottom) act as mirrors for all mobile sliders
     const desktopInterval = document.getElementById('tour-interval-dt') as HTMLInputElement | null;
     const desktopDepth    = document.getElementById('tour-maxdepth-dt')  as HTMLInputElement | null;
+    const desktopInterval2 = document.getElementById('tour-interval-dt2') as HTMLInputElement | null;
+    const desktopDepth2    = document.getElementById('tour-maxdepth-dt2')  as HTMLInputElement | null;
 
-    if (mobileInterval) {
+    // Bind ALL mobile interval sliders (there are two: top + bottom bars) to both desktop sliders
+    for (const mobileInterval of [
+      document.getElementById('tour-interval') as HTMLInputElement | null,
+      document.getElementById('tour-interval-mob2') as HTMLInputElement | null,
+    ].filter(Boolean) as HTMLInputElement[]) {
       this.sliders.push(this.bindSlider(
         mobileInterval, desktopInterval,
-        document.getElementById('tour-interval-fill'),
-        document.getElementById('tour-interval-val'),
+        document.getElementById(mobileInterval.id + '-fill'),
+        document.getElementById(mobileInterval.id + '-val'),
         document.getElementById('tour-interval-val-dt'),
         (v) => Math.round(v / 1000) + 's',
         (v) => this.engine?.setInterval(v),
+        [desktopInterval2].filter(Boolean) as HTMLInputElement[],
+        [document.getElementById('tour-interval-val-dt2')],
       ));
     }
-    if (mobileDepth) {
+
+    // Bind ALL mobile depth sliders
+    for (const mobileDepth of [
+      document.getElementById('tour-maxdepth') as HTMLInputElement | null,
+      document.getElementById('tour-maxdepth-mob2') as HTMLInputElement | null,
+    ].filter(Boolean) as HTMLInputElement[]) {
       this.sliders.push(this.bindSlider(
         mobileDepth, desktopDepth,
-        document.getElementById('tour-depth-fill'),
-        document.getElementById('tour-depth-val'),
+        document.getElementById(mobileDepth.id + '-fill'),
+        document.getElementById(mobileDepth.id + '-val'),
         document.getElementById('tour-depth-val-dt'),
         (v) => v >= 10 ? '\u221e' : String(v),
         (v) => this.engine?.setMaxDepth(v >= 10 ? -1 : v),
+        [desktopDepth2].filter(Boolean) as HTMLInputElement[],
+        [document.getElementById('tour-depth-val-dt2')],
       ));
     }
 
@@ -222,21 +243,30 @@ export class TourController {
     mirrorValueLabel: HTMLElement | null,
     format: (v: number) => string,
     onCommit: (v: number) => void,
+    extraMirrors?: HTMLInputElement[],
+    extraMirrorLabels?: (HTMLElement | null)[],
   ): SliderBind {
     const bind: SliderBind = {
       range: primary,
       fill: primaryFill,
       value: primaryValueLabel,
-      bgRange: mirror ?? null,
+      extraMirrors: extraMirrors ?? [],
+      extraMirrorLabels: extraMirrorLabels ?? [],
       format,
       onCommit,
     };
 
     const applyInput = () => {
-      if (mirror) mirror.value = primary.value;
       const text = format(primary.valueAsNumber);
       if (primaryValueLabel) primaryValueLabel.textContent = text;
       if (mirrorValueLabel) mirrorValueLabel.textContent = text;
+      for (let i = 0; i < (bind.extraMirrors?.length ?? 0); i++) {
+        const em = bind.extraMirrors![i];
+        const el = bind.extraMirrorLabels![i];
+        if (em) em.value = primary.value;
+        if (el)  el.textContent = text;
+      }
+      if (mirror) mirror.value = primary.value;
       this.paintFill(bind);
     };
 
@@ -251,6 +281,14 @@ export class TourController {
       mirror.addEventListener('change', () => onCommit(mirror.valueAsNumber));
     }
 
+    for (const em of bind.extraMirrors ?? []) {
+      em.addEventListener('input', () => {
+        primary.value = em.value;
+        applyInput();
+      });
+      em.addEventListener('change', () => onCommit(em.valueAsNumber));
+    }
+
     return bind;
   }
 
@@ -260,27 +298,39 @@ export class TourController {
     if (s.fill && s.fill.style.height !== undefined) {
       // Vertical track (mobile)
       s.fill.style.height = pct + '%';
-    } else if (s.bgRange) {
-      // Horizontal track (desktop) — paint via gradient background
-      s.bgRange.style.background =
-        `linear-gradient(to right, var(--tour-accent) 0%, var(--tour-accent) ${pct}%, rgba(255,255,255,0.1) ${pct}%, rgba(255,255,255,0.1) 100%)`;
+    } else {
+      // Horizontal track (desktop) — paint gradient background on all mirrors
+      const bg = `linear-gradient(to right, var(--tour-accent) 0%, var(--tour-accent) ${pct}%, rgba(255,255,255,0.1) ${pct}%, rgba(255,255,255,0.1) 100%)`;
+      // Primary mirror (the original desktop slider)
+      if (s.range.id.endsWith('-dt') || s.range.id.endsWith('-dt2')) {
+        s.range.style.background = bg;
+      }
     }
   }
 
   private bindStrategyToggle(): void {
-    // Desktop <select> (change on its own value)
-    const sel = document.getElementById('tour-strategy-select-dt') as HTMLSelectElement | null;
-    sel?.addEventListener('change', () => this.setStrategy(sel.value as TourStrategy));
+    // Desktop <select> (top + bottom — both respond to changes)
+    for (const sel of [
+      document.getElementById('tour-strategy-select-dt') as HTMLSelectElement | null,
+      document.getElementById('tour-strategy-select-dt2') as HTMLSelectElement | null,
+    ].filter(Boolean) as HTMLSelectElement[]) {
+      sel.addEventListener('change', () => this.setStrategy(sel.value as TourStrategy));
+    }
 
-    // Mobile compact button (toggles between the two)
-    const mobBtn = document.getElementById('tour-strategy-toggle-mob');
-    mobBtn?.addEventListener('click', () => this.toggleStrategy());
+    // Mobile compact buttons (top + bottom — both toggle between strategies)
+    for (const mobBtn of [
+      document.getElementById('tour-strategy-toggle-mob'),
+      document.getElementById('tour-strategy-toggle-mob2'),
+    ].filter(Boolean) as HTMLElement[]) {
+      mobBtn.addEventListener('click', () => this.toggleStrategy());
+    }
   }
 
   private syncMobileStrategyLabel(strategy: TourStrategy): void {
-    const valueEl = document.getElementById('tour-strategy-value-mob');
-    if (valueEl) {
-      valueEl.textContent = strategy === 'has-dfs' ? '教材' : '层级';
+    const label = strategy === 'has-dfs' ? '教材' : '层级';
+    for (const id of ['tour-strategy-value-mob', 'tour-strategy-value-mob2']) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = label;
     }
   }
 
@@ -304,7 +354,7 @@ export class TourController {
       initial: uiState.tourBarCollapsed,
       persist: 'tourBar.collapsed',
       cssClass: 'collapsed',
-      applyTo: bar && chev ? [bar, chev] : (bar ?? chev ?? handle),
+      applyTo: (bar && chev ? [bar, chev as unknown as HTMLElement] : (bar ?? chev ?? handle)) as HTMLElement | HTMLElement[],
       onChange: (on) => { uiState.tourBarCollapsed = on; },
     });
     handle.addEventListener('click', (e) => {
@@ -324,15 +374,22 @@ export class TourController {
     if (prev.length > 0) ph.push(prev[prev.length - 1], info.nodeId);
     else                 ph.push(info.nodeId);
 
-    // Mobile badges
-    this.setText('tour-depth-badge',     String(info.layerIndex));
-    this.setText('tour-count-badge',     String(info.layerIndex));
-    this.setText('tour-cycle-num',       String(info.cycleCount + 1));
-    // Desktop badges
-    this.setText('tour-depth-badge-dt',  String(info.layerIndex));
-    this.setText('tour-count-badge-dt',  String(info.layerIndex));
-    this.setText('tour-cycle-num-dt',    String(info.cycleCount + 1));
-    this.setText('tour-dt-node-name',    this.labelOf(info.nodeId) || info.nodeId);
+    // Mobile bars (top + bottom — both exist in DOM with unique IDs)
+    this.setText('tour-depth-badge',        String(info.layerIndex));
+    this.setText('tour-depth-badge-mob2',  String(info.layerIndex));
+    this.setText('tour-count-badge',        String(info.layerIndex));
+    this.setText('tour-count-badge-mob2',  String(info.layerIndex));
+    this.setText('tour-cycle-num',         String(info.cycleCount + 1));
+    this.setText('tour-cycle-num-mob2',    String(info.cycleCount + 1));
+    // Desktop bars (top + bottom)
+    this.setText('tour-depth-badge-dt',     String(info.layerIndex));
+    this.setText('tour-depth-badge-dt2',    String(info.layerIndex));
+    this.setText('tour-count-badge-dt',     String(info.layerIndex));
+    this.setText('tour-count-badge-dt2',    String(info.layerIndex));
+    this.setText('tour-cycle-num-dt',       String(info.cycleCount + 1));
+    this.setText('tour-cycle-num-dt2',      String(info.cycleCount + 1));
+    this.setText('tour-dt-node-name',       this.labelOf(info.nodeId) || info.nodeId);
+    this.setText('tour-dt-node-name2',     this.labelOf(info.nodeId) || info.nodeId);
     // Progress: current step / total steps in the sequence. We read totals
     // from the engine rather than info.totalToExplore because totalToExplore
     // shrinks when maxDepth caps the run.
@@ -349,26 +406,38 @@ export class TourController {
   private renderTimeline(current: number, total: number): void {
     if (total <= 0) return;
     const ratio = Math.max(0, Math.min(1, current / total));
-    this.setProgress('tour-progress-fill-dt', ratio);
-    this.setText('tour-progress-label-dt', `${current} / ${total}`);
-    const marker = document.getElementById('tour-progress-marker-dt');
-    if (marker) marker.style.left = (ratio * 100).toFixed(2) + '%';
+    // Update both desktop bars' progress
+    for (const suffix of ['', '2']) {
+      this.setProgress(`tour-progress-fill-dt${suffix}`, ratio);
+      this.setText(`tour-progress-label-dt${suffix}`, `${current} / ${total}`);
+      const marker = document.getElementById(`tour-progress-marker-dt${suffix}`);
+      if (marker) marker.style.left = (ratio * 100).toFixed(2) + '%';
+    }
     // Mobile uses a compact "current/total" stat in place of the bar.
-    this.setText('tour-step-badge', String(current));
-    this.setText('tour-step-total', String(total));
+    this.setText('tour-step-badge',       String(current));
+    this.setText('tour-step-badge-mob2', String(current));
+    this.setText('tour-step-total',       String(total));
+    this.setText('tour-step-total-mob2', String(total));
   }
 
   private onComplete(): void {
     this.running = false;
     this.paused = false;
 
-    this.setText('tour-depth-badge',     '\u2713');
-    this.setText('tour-count-badge',     '—');
-    this.setText('tour-depth-badge-dt',  '\u2713');
-    this.setText('tour-count-badge-dt',  '—');
-    this.setText('tour-dt-node-name',    '完成');
-    const fillEl = document.getElementById('tour-progress-fill-dt');
-    if (fillEl) fillEl.style.width = '100%';
+    this.setText('tour-depth-badge',        '\u2713');
+    this.setText('tour-depth-badge-mob2',  '\u2713');
+    this.setText('tour-count-badge',        '—');
+    this.setText('tour-count-badge-mob2',  '—');
+    this.setText('tour-depth-badge-dt',     '\u2713');
+    this.setText('tour-depth-badge-dt2',    '\u2713');
+    this.setText('tour-count-badge-dt',     '—');
+    this.setText('tour-count-badge-dt2',    '—');
+    this.setText('tour-dt-node-name',      '完成');
+    this.setText('tour-dt-node-name2',    '完成');
+    for (const suffix of ['', '2']) {
+      const fillEl = document.getElementById(`tour-progress-fill-dt${suffix}`);
+      if (fillEl) fillEl.style.width = '100%';
+    }
 
     this.setIdleUI();
   }

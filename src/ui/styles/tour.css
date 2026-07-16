@@ -38,13 +38,15 @@
    then the @media queries pick the physical bar for the current breakpoint. */
 .tour-state--running .tour-state-target,
 .tour-state--paused  .tour-state-target { display: flex; }
+/* On desktop, only the first .tour-dt (via #tour-dt) should show; hide all others */
 @media (max-width: 640px) {
-  .tour-state--running .tour-dt,
-  .tour-state--paused  .tour-dt { display: none; }
+  #tour-dt { display: none; }
 }
 @media (min-width: 641px) {
   .tour-state--running .tour-mob,
   .tour-state--paused  .tour-mob { display: none; }
+  /* Also hide the second desktop bar (it has no id="tour-dt") */
+  .tour-dt:not(#tour-dt) { display: none !important; }
 }
 
 /* ── Play / pause icon swap ──────────────────────────────────────────────────
@@ -52,28 +54,40 @@
    global state class so the JS layer doesn't have to touch style.display. */
 .tour-state--idle    #tour-badge-play,
 .tour-state--idle    #tour-badge-play-dt,
+.tour-state--idle    #tour-badge-play-dt2,
+.tour-state--idle    #tour-badge-play-mob2,
 .tour-state--idle    #tour-icon-play,
 .tour-state--idle    #bs-tour-icon-play  { display: inline-flex; }
 .tour-state--idle    #tour-badge-pause,
 .tour-state--idle    #tour-badge-pause-dt,
+.tour-state--idle    #tour-badge-pause-dt2,
+.tour-state--idle    #tour-badge-pause-mob2,
 .tour-state--idle    #tour-icon-stop,
 .tour-state--idle    #bs-tour-icon-stop  { display: none; }
 .tour-state--running #tour-badge-play,
 .tour-state--running #tour-badge-play-dt,
+.tour-state--running #tour-badge-play-dt2,
+.tour-state--running #tour-badge-play-mob2,
 .tour-state--running #tour-icon-play,
 .tour-state--running #bs-tour-icon-play { display: none; }
 .tour-state--running #tour-badge-pause,
 .tour-state--running #tour-badge-pause-dt,
+.tour-state--running #tour-badge-pause-dt2,
+.tour-state--running #tour-badge-pause-mob2,
 .tour-state--running #tour-icon-stop,
 .tour-state--running #bs-tour-icon-stop { display: inline-flex; }
 .tour-state--paused  #tour-badge-play,
 .tour-state--paused  #tour-badge-play-dt,
+.tour-state--paused  #tour-badge-play-dt2,
+.tour-state--paused  #tour-badge-play-mob2,
 .tour-state--paused  #tour-icon-play,
 .tour-state--paused  #bs-tour-icon-play  { display: inline-flex; }
 .tour-state--paused  #tour-badge-pause,
 .tour-state--paused  #tour-badge-pause-dt,
+.tour-state--paused  #tour-badge-pause-dt2,
+.tour-state--paused  #tour-badge-pause-mob2,
 .tour-state--paused  #tour-icon-stop,
-.tour-state--paused  #bs-tour-icon-stop  { display: none; }
+.tour-state--paused  #bs-tour-icon-stop { display: none; }
 
 /* The compact mobile-bar play/pause button mirrors the same logic. */
 .tour-state--idle    .tour-mob__badge { background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.4); }
