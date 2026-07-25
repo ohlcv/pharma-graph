@@ -86,3 +86,141 @@ describe('TourEngine onComplete reason routing (issue #16)', () => {
     expect(seen).toEqual(['depth-reached', 'no-more-restarts', 'no-root']);
   });
 });
+
+describe('TourEngine totalExplored live sync (issue #15 fix)', () => {
+  function makeCy() {
+    const cy = cytoscape({ headless: true, styleEnabled: false });
+    cy.add([
+      { group: 'nodes', data: { id: 'a' } },
+      { group: 'nodes', data: { id: 'b' } },
+      { group: 'nodes', data: { id: 'c' } },
+    ]);
+    return cy;
+  }
+
+  it('initial totalExplored equals cy.nodes().size() at start()', () => {
+    const cy = makeCy();
+    const engine = new TourEngine(cy);
+    engine.start('a', {
+      interval: 1,
+      maxDepth: 0, // instant stop — we just want the listeners attached
+      strategy: 'has-dfs',
+      onComplete: () => {},
+    });
+    expect(engine['totalExplored']).toBe(3);
+    engine.stop();
+  });
+
+  it('removing a node mid-tour updates totalExplored', () => {
+    const cy = makeCy();
+    const engine = new TourEngine(cy);
+    engine.start('a', {
+      interval: 1,
+      maxDepth: 1,
+      strategy: 'has-dfs',
+      onComplete: () => {},
+    });
+    expect(engine['totalExplored']).toBe(3);
+
+    cy.getElementById('b').remove();
+
+    // Resync runs synchronously inside the cytoscape 'remove' event.
+    expect(engine['totalExplored']).toBe(2);
+    engine.stop();
+  });
+
+  it('adding a node mid-tour updates totalExplored', () => {
+    const cy = makeCy();
+    const engine = new TourEngine(cy);
+    engine.start('a', {
+      interval: 1,
+      maxDepth: 1,
+      strategy: 'has-dfs',
+      onComplete: () => {},
+    });
+    expect(engine['totalExplored']).toBe(3);
+
+    cy.add({ group: 'nodes', data: { id: 'd' } });
+    expect(engine['totalExplored']).toBe(4);
+    engine.stop();
+  });
+
+  it('removing then adding back updates totalExplored twice (proves listener is live)', () => {
+    const cy = makeCy();
+    const engine = new TourEngine(cy);
+    engine.start('a', {
+      interval: 1,
+      maxDepth: 1,
+      strategy: 'has-dfs',
+      onComplete: () => {},
+    });
+    expect(engine['totalExplored']).toBe(3);
+
+    cy.getElementById('a').remove();
+    expect(engine['totalExplored']).toBe(2);
+    cy.add({ group: 'nodes', data: { id: 'd' } });
+    expect(engine['totalExplored']).toBe(3);
+    engine.stop();
+  });
+
+  it('stop() detaches listeners — post-stop mutations no longer update totalExplored', () => {
+    const cy = makeCy();
+    const engine = new TourEngine(cy);
+    engine.start('a', {
+      interval: 1,
+      maxDepth: 1,
+      strategy: 'has-dfs',
+      onComplete: () => {},
+    });
+    const frozen = engine['totalExplored'];
+    engine.stop();
+
+    // After stop, mutating the graph should NOT update totalExplored —
+    // otherwise a stale engine would keep writing to memory.
+    cy.getElementById('b').remove();
+    expect(engine['totalExplored']).toBe(frozen);
+  });
+
+  it('starting a new tour re-attaches listeners (no leaks across restarts)', () => {
+    const cy = makeCy();
+    const engine = new TourEngine(cy);
+    engine.start('a', {
+      interval: 1,
+      maxDepth: 1,
+      strategy: 'has-dfs',
+      onComplete: () => {},
+    });
+    engine.stop();
+    // Second start — listeners must be re-installed.
+    engine.start('a', {
+      interval: 1,
+      maxDepth: 1,
+      strategy: 'has-dfs',
+      onComplete: () => {},
+    });
+    cy.getElementById('b').remove();
+    expect(engine['totalExplored']).toBe(2);
+    engine.stop();
+  });
+
+  it('does not leak handlers: attach→detach leaves no active listeners on cy', () => {
+    const cy = makeCy();
+    const engine = new TourEngine(cy);
+    engine.start('a', {
+      interval: 1,
+      maxDepth: 1,
+      strategy: 'has-dfs',
+      onComplete: () => {},
+    });
+    // Remove before stop() — should still update (start attached).
+    cy.getElementById('b').remove();
+    expect(engine['totalExplored']).toBe(2);
+
+    // Stop tears down the listeners. Mutating after stop should not
+    // change totalExplored — proving the listener was removed.
+    engine.stop();
+    const previous = engine['totalExplored'];
+    cy.getElementById('c').remove();
+    expect(engine['totalExplored']).toBe(previous);
+  });
+});

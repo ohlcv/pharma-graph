@@ -407,11 +407,17 @@ export class TourEngine {
   private pulsingNode: cytoscape.NodeSingular | null = null;
   private strategyName = '';
   // Tracks how many times we've rebuilt the visit sequence in the *current*
+  private _restartAttempts = 0;
+  // Bound handlers for cy graph-mutation events. Stored so that stop() can
+  // remove them on engine teardown (fixes issue #15: totalExplored was a
+  // snapshot from start() and never updated when nodes were added / removed
+  // mid-tour — e.g. via the Delete key in keyboard-shortcuts).
+  private _onNodeAdded: ((e: cytoscape.EventObject) => void) | null = null;
+  private _onNodeRemoved: ((e: cytoscape.EventObject) => void) | null = null;
   // tour invocation, when infinite mode (maxDepth < 0) loops back. Caps at 3
   // to prevent pathological re-runs from locking the UI. Resets in start() and
   // when the tour ends naturally. Previously misnamed `_recursionCount` —
   // it is not a recursion counter in the call-stack sense.
-  private _restartAttempts = 0;
 
   constructor(cy: cytoscape.Core) {
     this.cy = cy;
@@ -462,6 +468,10 @@ export class TourEngine {
     this.seqIndex = 1; // seq[0] is visited below; visitNext should start from seq[1]
     this.currentStep = 1;
     this.totalExplored = this.cy.nodes().size();
+
+    // Keep totalExplored in sync with live graph mutations (issue #15).
+    // Listeners are removed on stop() so they don't outlive the engine.
+    this.attachGraphMutators();
 
     // silent=false: fire onStep immediately so the detail panel appears right away
     this.highlightAndFocus(this.seq[0], [this.seq[0]], 0, this.seq.length, 1, false);
@@ -517,8 +527,43 @@ export class TourEngine {
     if (this.timer) { clearTimeout(this.timer); this.timer = undefined; }
     if (this.pulsingNode) this.stopTourPulse();
     this.clearAllNodeInlineStyles();
+    // Detach graph-mutation listeners (issue #15) so a stale engine
+    // doesn't keep rewriting totalExplored after the tour has stopped.
+    this.detachGraphMutators();
     this.stopped = true;
     this.paused = false;
+  }
+
+  /**
+   * Update `totalExplored` to the live node count. Called when the user
+   * adds or removes nodes mid-tour (issue #15). The tour *sequence* is
+   * not regenerated here — adding a node after `start()` won't make it
+   * appear in the visit order, but the UI badge shown to the user stops
+   * lying about the graph size.
+   */
+  private resyncTotalExplored(): void {
+    this.totalExplored = this.cy.nodes().size();
+  }
+
+  private attachGraphMutators(): void {
+    // Defensive: if a previous tour never detached for some reason, clear
+    // before re-attaching so we don't leak handlers.
+    this.detachGraphMutators();
+    this._onNodeAdded = () => { this.resyncTotalExplored(); };
+    this._onNodeRemoved = () => { this.resyncTotalExplored(); };
+    this.cy.on('add', this._onNodeAdded);
+    this.cy.on('remove', this._onNodeRemoved);
+  }
+
+  private detachGraphMutators(): void {
+    if (this._onNodeAdded) {
+      this.cy.removeListener('add', this._onNodeAdded);
+      this._onNodeAdded = null;
+    }
+    if (this._onNodeRemoved) {
+      this.cy.removeListener('remove', this._onNodeRemoved);
+      this._onNodeRemoved = null;
+    }
   }
 
   isRunning(): boolean {

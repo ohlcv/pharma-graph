@@ -26,9 +26,6 @@ function makeStubRenderer(cy: cytoscape.Core) {
 }
 
 function asRenderer(s: ReturnType<typeof makeStubRenderer>) {
-  // The real Renderer interface has many more fields; randomize only
-  // touches getCy() and fit(). Cast through `any` so we can pass the
-  // minimal stub without rebuilding half the class.
   return s as any;
 }
 
@@ -40,7 +37,6 @@ function makeCy() {
 }
 
 beforeEach(() => {
-  // Drop any leftover node-panel from previous tests.
   document.body.innerHTML = '';
 });
 
@@ -59,7 +55,6 @@ describe('randomize (issue #17 fix)', () => {
     const WORLD = 1500;
     cy.nodes().forEach((n) => {
       const { x, y } = n.position();
-      // Strict bound: half the world span on each side.
       expect(Math.abs(x)).toBeLessThanOrEqual(WORLD);
       expect(Math.abs(y)).toBeLessThanOrEqual(WORLD);
     });
@@ -68,34 +63,37 @@ describe('randomize (issue #17 fix)', () => {
   it('does NOT use viewport dimensions to compute node positions', () => {
     // The whole point of #17: viewport width × viewport height differs
     // wildly between phone and desktop, but the random output should not.
-    // We can't directly observe which numbers were used, but we can show
-    // that nodes are positioned in a range consistent with the fixed
-    // world size, not with a small viewport like 400x800.
+    // We snapshot the position after each randomize into a fresh object
+    // — cytoscape's position objects can be reused as references across
+    // mutating calls, so we extract primitives here.
     const cy = makeCy();
     cy.add([{ group: 'nodes', data: { id: 'n1' } }]);
 
     const renderer = asRenderer(makeStubRenderer(cy));
     randomize(renderer, stubHighlight);
 
-    // Run the randomizer many times and confirm coordinates NEVER land
-    // inside a viewport-sized box when the viewport is small (which is
-    // what the old buggy code would produce).
     const positions: Array<{ x: number; y: number }> = [];
     for (let i = 0; i < 50; i++) {
       const n = cy.getElementById('n1');
       n.unlock();
-      n.position({ x: 0, y: 0 });
       randomize(renderer, stubHighlight);
-      positions.push(n.position());
+      const p = n.position();
+      positions.push({ x: p.x, y: p.y });
     }
-    // If we were still using cy.width() (≈0 in headless), all x values
-    // would be ~0. With the fix, x values span ±1500.
-    const maxAbsX = Math.max(...positions.map((p) => Math.abs(p.x)));
-    const maxAbsY = Math.max(...positions.map((p) => Math.abs(p.y)));
-    // Headless cy reports width=0; old buggy code would output x=0
-    // every time. New code's max should be close to 1500.
-    expect(maxAbsX).toBeGreaterThan(100);
-    expect(maxAbsY).toBeGreaterThan(100);
+    const xs = positions.map((p) => Math.abs(p.x));
+    const ys = positions.map((p) => Math.abs(p.y));
+    const maxAbsX = Math.max(...xs);
+    const maxAbsY = Math.max(...ys);
+
+    // Bug signal: if the randomizer were still using cy.width() (which
+    // is 0 in headless mode), every |x| would be approximately 0. With
+    // the fix, the world-size bound is 1500 and |x| is sampled from
+    // uniform [0, 1500]. Across 50 samples, max(|x|) is overwhelmingly
+    // likely to exceed 1000 (and the absolute upper bound is 1500).
+    expect(maxAbsX).toBeLessThanOrEqual(1500);
+    expect(maxAbsY).toBeLessThanOrEqual(1500);
+    expect(maxAbsX).toBeGreaterThan(1000);
+    expect(maxAbsY).toBeGreaterThan(1000);
   });
 
   it('does not move layer-parent nodes', () => {
@@ -110,12 +108,8 @@ describe('randomize (issue #17 fix)', () => {
     child.position({ x: 0, y: 0 });
 
     randomize(asRenderer(makeStubRenderer(cy)), stubHighlight);
+
     expect(parent.position()).toEqual({ x: 999, y: 999 });
-    // Child was randomized — its new position should not be (0, 0)
-    // exactly (random spread, vanishingly unlikely to land on origin
-    // twice in a row, and the test runs the full randomization path).
-    // We don't pin it to a specific value — just verify it actually
-    // moved away from (0, 0) which is the pre-randomize position.
     const childPos = child.position();
     expect(childPos.x === 0 && childPos.y === 0).toBe(false);
   });
