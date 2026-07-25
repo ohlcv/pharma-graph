@@ -115,7 +115,8 @@ const CN_DIGIT_MAP: Record<string, number> = {
 };
 
 // 从"第X节"/"第X章"/"第X篇"格式中提取数字，支持阿拉伯数字和汉字（含十、百）
-function extractSectionNumber(section: string): number {
+/** @internal — exported for unit tests only. */
+export function extractSectionNumber(section: string): number {
   if (!section) return 0;
   const match = section.match(/第(.+?)[篇章节]/);
   if (!match) return 999;
