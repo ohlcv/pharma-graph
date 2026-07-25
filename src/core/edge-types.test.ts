@@ -28,7 +28,7 @@ describe('edge-types SSOT', () => {
     // types.
     const labelKeys = Object.keys(EDGE_TYPE_LABEL);
     for (const k of labelKeys) {
-      expect(EDGE_TYPES, `label "${k}" missing from canonical list`).toContain(k as any);
+      expect(EDGE_TYPES, `label "${k}" missing from canonical list`).toContain(k as string);
     }
   });
 
@@ -48,8 +48,10 @@ describe('edge-types SSOT', () => {
 
   it('returns the same string for canonically recognised types', () => {
     for (const t of EDGE_TYPES) {
-      // Use any: exhaustive narrowing inside the loop is overkill here.
-      expect(isEdgeType(t as any)).toBe(true);
+      // `EDGE_TYPES` is a `readonly` literal tuple whose element type
+      // is exactly `EdgeType`, so `isEdgeType(t)` typechecks without
+      // any cast.
+      expect(isEdgeType(t)).toBe(true);
     }
   });
 });

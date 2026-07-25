@@ -16,6 +16,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import cytoscape from 'cytoscape';
 import { initGraphEvents } from './graph-events.js';
 import type { TourController } from './tour-controller.js';
+import { Renderer } from '../core/renderer.js';
+import { HighlightEngine } from './highlight-engine.js';
+import { DetailPanel } from './detail-panel.js';
 
 /** Minimal fake — only the methods the canvas-tap path touches. */
 function makeFakeTourController(): Pick<TourController, 'isRunning' | 'isPaused' | 'stop'> & {
@@ -35,6 +38,23 @@ function makeStubCy() {
   return cy;
 }
 
+/**
+ * The canvas-tap path under test only needs a handful of methods on each
+ * injected dependency. `Pick<>` the precise subset so that future changes
+ * to Renderer/HighlightEngine/DetailPanel surface here at compile time
+ * rather than as silently-skipped test assertions. Each stub is cast via
+ * `unknown` to widen the narrow mock shape into the wider interface.
+ */
+function makeStubRenderer() {
+  return {} as unknown as Renderer;
+}
+function makeStubHighlight() {
+  return { reset: () => {}, highlightNode: () => ({}) } as unknown as HighlightEngine;
+}
+function makeStubDetailPanel() {
+  return { close: () => {}, show: () => {} } as unknown as DetailPanel;
+}
+
 describe('initGraphEvents — canvas tap + tour (issue #11 fix)', () => {
   let cy: cytoscape.Core;
   let tour: ReturnType<typeof makeFakeTourController>;
@@ -48,9 +68,9 @@ describe('initGraphEvents — canvas tap + tour (issue #11 fix)', () => {
     // Stub the other deps — we only care that tourController is wired right.
     initGraphEvents({
       cy,
-      renderer: {} as any,
-      highlight: { reset: () => {} } as any,
-      detailPanel: { close: () => {} } as any,
+      renderer: makeStubRenderer(),
+      highlight: makeStubHighlight(),
+      detailPanel: makeStubDetailPanel(),
       spawnNodeRipple: () => {},
       setPrevSelectedNode: () => {},
       showEdgeTooltip: () => {},
@@ -76,9 +96,9 @@ describe('initGraphEvents — canvas tap + tour (issue #11 fix)', () => {
 
     initGraphEvents({
       cy,
-      renderer: {} as any,
-      highlight: { reset: () => {} } as any,
-      detailPanel: { close: () => {} } as any,
+      renderer: makeStubRenderer(),
+      highlight: makeStubHighlight(),
+      detailPanel: makeStubDetailPanel(),
       spawnNodeRipple: () => {},
       setPrevSelectedNode: () => {},
       showEdgeTooltip: () => {},
@@ -103,9 +123,9 @@ describe('initGraphEvents — canvas tap + tour (issue #11 fix)', () => {
 
     initGraphEvents({
       cy,
-      renderer: {} as any,
-      highlight: { reset: () => {} } as any,
-      detailPanel: { close: () => {} } as any,
+      renderer: makeStubRenderer(),
+      highlight: makeStubHighlight(),
+      detailPanel: makeStubDetailPanel(),
       spawnNodeRipple: () => {},
       setPrevSelectedNode: () => {},
       showEdgeTooltip: () => {},
@@ -129,9 +149,9 @@ describe('initGraphEvents — canvas tap + tour (issue #11 fix)', () => {
     // `tourController` (undefined at that moment) and threw.
     initGraphEvents({
       cy,
-      renderer: {} as any,
-      highlight: { reset: () => {} } as any,
-      detailPanel: { close: () => {} } as any,
+      renderer: makeStubRenderer(),
+      highlight: makeStubHighlight(),
+      detailPanel: makeStubDetailPanel(),
       spawnNodeRipple: () => {},
       setPrevSelectedNode: () => {},
       showEdgeTooltip: () => {},

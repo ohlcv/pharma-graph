@@ -27,6 +27,9 @@ beforeEach(() => {
   _resetForTests();
   document.body.innerHTML = '';
   // Make DEV true so warnings get logged (default in vitest test env).
+  // `import.meta.env` is Vite's readonly env namespace; mutating it
+  // requires an `any` cast because Vite intentionally types the field
+  // as `ImportMetaEnv` (no writable shape).
   (import.meta as any).env = { DEV: true };
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });

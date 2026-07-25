@@ -15,7 +15,13 @@ const APPLY = process.argv.includes('--apply');
 // location 字段集（来自 docs/frontmatter.md）
 const LOC_KEYS = ['book', 'part', 'chapter', 'section', 'subsection', 'item'] as const;
 type LocKey = typeof LOC_KEYS[number];
-const LOC_RANK: Record<LocKey, number> = Object.fromEntries(LOC_KEYS.map((k, i) => [k, i])) as any;
+// `Object.fromEntries` infers `{ [k: string]: number }`; we constrain
+// the key type explicitly because every key comes from LOC_KEYS (a
+// narrow `as const` tuple). `as Record<LocKey, number>` is a structural
+// cast — safe because LOC_KEYS is the only input to `fromEntries`.
+const LOC_RANK: Record<LocKey, number> = Object.fromEntries(
+  LOC_KEYS.map((k, i) => [k, i]),
+) as Record<LocKey, number>;
 
 interface Loc { book?: string; part?: string; chapter?: string; section?: string; subsection?: string; item?: string; }
 interface Edge { target: string; type: string; reason?: string; }
@@ -42,7 +48,7 @@ function readFile(rel: string): ParsedFile | null {
   try { root = (yamlParse(m[1]) as Record<string, unknown>) ?? {}; } catch { return null; }
 
   const nested = root['data'];
-  const hasDataBlock = nested && typeof nested === 'object' && !Array.isArray(nested);
+  const hasDataBlock = !!(nested && typeof nested === 'object' && !Array.isArray(nested));
   const fm = (hasDataBlock ? (nested as Record<string, unknown>) : root);
 
   const idRaw = fm['id'];

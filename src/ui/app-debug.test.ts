@@ -16,13 +16,19 @@ import {
   isDebugActive,
   setDebugActive,
 } from './app-debug.js';
+import type { Renderer } from '../core/renderer.js';
 
 function makeStubRenderer() {
   // Real headless cytoscape so updateForensicPanel's `$()` / `.nodes()` calls
   // don't crash. The panel rendering inside updateForensicPanel isn't being
   // asserted here — only the state-machine of toggleDebugOverlay.
   const cy = cytoscape({ headless: true, styleEnabled: false });
-  return { getCy: () => cy } as any;
+  // Cast through unknown: `Renderer` is a class type with private fields
+  // (cy / currentLayout / etc.), so a partial mock cannot satisfy its
+  // structural shape. We widen the mock via `unknown` and document the
+  // narrow contract here — only `getCy` is consumed by the code paths
+  // under test.
+  return { getCy: () => cy } as unknown as Renderer;
 }
 
 function setupOverlay() {

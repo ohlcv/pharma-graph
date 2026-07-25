@@ -25,6 +25,9 @@ if (typeof globalThis.requestAnimationFrame !== 'function') {
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import cytoscape from 'cytoscape';
 import { TourController } from './tour-controller.js';
+import { Renderer } from '../core/renderer.js';
+import { DetailPanel } from './detail-panel.js';
+import type { TourEngine } from '../core/tour.js';
 
 const BADGE_IDS = [
   'tour-depth-badge',
@@ -58,20 +61,39 @@ function setupDom() {
 function makeController(): TourController {
   const cy = cytoscape({ headless: true, styleEnabled: false });
   cy.add({ group: 'nodes', data: { id: 'a', label: 'A' } });
-  const renderer = { getCy: () => cy } as any;
-  const detailPanel = { close: () => {}, show: () => {} } as any;
+  const renderer = { getCy: () => cy } as unknown as Renderer;
+  const detailPanel = { close: () => {}, show: () => {} } as unknown as DetailPanel;
   return new TourController(cy, renderer, detailPanel);
+}
+
+/**
+ * Reach into the controller's private fields. The tests need to flip
+ * `running` / `paused` and invoke the private `onComplete` directly
+ * because real `start()` requires DOM sliders and a tour engine that
+ * wants real cytoscape positions. The cast widens the type via
+ * `unknown`, listing each touched field so future renames surface here
+ * at compile time rather than as silently-skipped tests.
+ */
+type PrivateControllerFields = {
+  engine: Pick<TourEngine, 'start' | 'isRunning' | 'isPaused' | 'stop'> | null;
+  running: boolean;
+  paused: boolean;
+  onComplete: (reason: 'depth-reached' | 'no-more-restarts' | 'no-root') => void;
+};
+function poke(c: TourController): PrivateControllerFields {
+  return c as unknown as PrivateControllerFields;
 }
 
 function captureOnComplete(controller: TourController) {
   // Replace `start()` with a stub that never reaches the real engine, but
   // still hands us back the `onComplete` callback the controller would
   // have given to the engine.
-  let captured: ((reason: string) => void) | null = null;
+  type Reason = 'depth-reached' | 'no-more-restarts' | 'no-root';
+  let captured: ((reason: Reason) => void) | null = null;
   const fakeEngine = {
     start: (
       _rootId: string,
-      opts: { onComplete?: (reason: string) => void },
+      opts: { onComplete?: (reason: Reason) => void },
     ) => {
       captured = opts.onComplete ?? null;
     },
@@ -79,21 +101,12 @@ function captureOnComplete(controller: TourController) {
     isPaused: () => false,
     stop: () => {},
   };
-  // Inject the fake engine: easier to just call `start()` and intercept
-  // the engine creation. Since the controller's `start()` constructs the
-  // engine, we replace the `pickRoot` path indirectly by stubbing
-  // TourEngine. The cleanest way: spy on the constructor.
-  // We use vi.mock-equivalent at runtime by replacing the module's
-  // exported class — but that requires hoisted mocking. Simpler: use
-  // the controller's `start()` method? Actually start() throws because
-  // it requires sliders/inputs that don't exist. So:
-  // We reach in: poke the controller's onComplete callback by manually
-  // swapping the engine after construction.
-  (controller as any).engine = fakeEngine;
-  // The `onComplete` callback is what we want to test. We grab it from
-  // the private method. To avoid exposing it, we drive the test through
-  // a different route: call the controller's `onComplete` directly via
-  // `(controller as any).onComplete(reason)`.
+  // Inject the fake engine by reaching into the controller's private
+  // `engine` slot — see `poke()` for why this is type-safe at compile
+  // time despite going through `unknown`.
+  poke(controller).engine = fakeEngine;
+  // The `onComplete` callback is what we want to test. We drive the
+  // test through it directly via poke(controller).onComplete(reason).
   return { capture: () => captured, fakeEngine };
 }
 
@@ -103,9 +116,10 @@ describe('TourController.onComplete — issue #16 reason branching', () => {
   it('shows ✓ / "完成" on the normal depth-reached path', () => {
     const c = makeController();
     // Mark controller as running so onComplete flips the right state.
-    (c as any).running = true;
-    (c as any).paused = false;
-    (c as any).onComplete('depth-reached');
+    const p = poke(c);
+    p.running = true;
+    p.paused = false;
+    p.onComplete('depth-reached');
 
     for (const id of BADGE_IDS) {
       expect(document.getElementById(id)?.textContent).toBe('\u2713');
@@ -113,15 +127,16 @@ describe('TourController.onComplete — issue #16 reason branching', () => {
     for (const id of NAME_IDS) {
       expect(document.getElementById(id)?.textContent).toBe('完成');
     }
-    expect((c as any).running).toBe(false);
-    expect((c as any).paused).toBe(false);
+    expect(p.running).toBe(false);
+    expect(p.paused).toBe(false);
   });
 
   it('shows ⏹ / "已停止 · 已试 3 轮" when the restart loop exhausts itself', () => {
     const c = makeController();
-    (c as any).running = true;
-    (c as any).paused = false;
-    (c as any).onComplete('no-more-restarts');
+    const p = poke(c);
+    p.running = true;
+    p.paused = false;
+    p.onComplete('no-more-restarts');
 
     for (const id of BADGE_IDS) {
       expect(document.getElementById(id)?.textContent).toBe('⏹');
@@ -129,14 +144,15 @@ describe('TourController.onComplete — issue #16 reason branching', () => {
     for (const id of NAME_IDS) {
       expect(document.getElementById(id)?.textContent).toBe('已停止 · 已试 3 轮');
     }
-    expect((c as any).running).toBe(false);
-    expect((c as any).paused).toBe(false);
+    expect(p.running).toBe(false);
+    expect(p.paused).toBe(false);
   });
 
   it('clears count badges and fills progress bar to 100% on either path', () => {
     const c = makeController();
-    (c as any).running = true;
-    (c as any).onComplete('no-more-restarts');
+    const p = poke(c);
+    p.running = true;
+    p.onComplete('no-more-restarts');
 
     for (const id of COUNT_IDS) {
       expect(document.getElementById(id)?.textContent).toBe('—');
@@ -149,14 +165,16 @@ describe('TourController.onComplete — issue #16 reason branching', () => {
 
   it('two distinct reasons produce two distinct UI states (no aliasing)', () => {
     const c1 = makeController();
-    (c1 as any).running = true;
-    (c1 as any).onComplete('depth-reached');
+    const p1 = poke(c1);
+    p1.running = true;
+    p1.onComplete('depth-reached');
     const depthName = document.getElementById('tour-dt-node-name')?.textContent;
 
     setupDom();
     const c2 = makeController();
-    (c2 as any).running = true;
-    (c2 as any).onComplete('no-more-restarts');
+    const p2 = poke(c2);
+    p2.running = true;
+    p2.onComplete('no-more-restarts');
     const exhaustedName = document.getElementById('tour-dt-node-name')?.textContent;
 
     expect(depthName).toBe('完成');
@@ -166,16 +184,17 @@ describe('TourController.onComplete — issue #16 reason branching', () => {
 
   it('does not throw for unknown reason strings (forward-compat)', () => {
     const c = makeController();
-    (c as any).running = true;
+    const p = poke(c);
+    p.running = true;
     // Cast through unknown to bypass the type narrowing — the controller
     // types the reason as a union, but the JSDoc says future enum values
     // may be added and should not crash.
     expect(() =>
-      (c as any).onComplete('some-future-reason'),
+      p.onComplete('some-future-reason' as unknown as 'depth-reached'),
     ).not.toThrow();
     // Default branch: badge stays at the original value (depth-style ✓),
     // name stays at its prior value. We just assert onComplete finishes
     // cleanly and resets the running flag.
-    expect((c as any).running).toBe(false);
+    expect(p.running).toBe(false);
   });
 });

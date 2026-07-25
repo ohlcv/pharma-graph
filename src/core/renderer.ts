@@ -257,14 +257,19 @@ export class Renderer {
 
     // Canvas renderer: 200+ 节点时比默认 SVG 快 3~5 倍，所有节点/边作为像素绘制而非 DOM 元素，
     // 大幅降低 CPU 绘制开销。Cytoscape API（addClass/removeClass/style）完全兼容，无需改动业务逻辑。
-    // 注意：renderer 不在 CytoscapeOptions 的 TypeScript 类型定义中，as unknown 绕过类型检查。
+    //
+    // cytoscape's TypeScript types don't declare `renderer` on
+    // CytoscapeOptions, so we narrow through `unknown` rather than
+    // `any`: the value is a `{ name: 'canvas' }` literal at the call
+    // site, so a structural cast can't lie to a later reader.
     const cyOptions = {
       container,
       elements: this.buildElements(data),
       style: STYLESHEET,
       layout: { name: 'preset' },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      renderer: { name: 'canvas' } as any,
+      // Cast through unknown because cytoscape's `CytoscapeOptions` type
+      // omits the `renderer` field (it's only documented in their JS API).
+      renderer: { name: 'canvas' } as unknown as { name: string },
       minZoom,
       maxZoom,
       wheelSensitivity: 3.0,

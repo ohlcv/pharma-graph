@@ -10,6 +10,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import cytoscape from 'cytoscape';
 import { randomize } from './layout-manager.js';
+import { Renderer } from '../core/renderer.js';
+import { HighlightEngine } from './highlight-engine.js';
 
 /** Minimal Renderer stub — only `getCy()` and `fit()` are touched. */
 function makeStubRenderer(cy: cytoscape.Core) {
@@ -26,11 +28,17 @@ function makeStubRenderer(cy: cytoscape.Core) {
 }
 
 function asRenderer(s: ReturnType<typeof makeStubRenderer>) {
-  return s as any;
+  // Test stubs intentionally implement only the slice of Renderer that
+  // `randomize` actually calls. The intersection type widens Renderer to
+  // include the stub's test-only `fitCalls` counter, so callers can
+  // assert on it. Cast through `unknown` rather than `any` so a future
+  // refactor that needs an additional Renderer method will surface here
+  // at compile time instead of failing at runtime.
+  return s as unknown as Renderer & { readonly fitCalls: number };
 }
 
 /** Highlight stub — only `reset()` is called. */
-const stubHighlight = { reset: () => {} } as any;
+const stubHighlight = { reset: () => {} } as unknown as HighlightEngine;
 
 function makeCy() {
   return cytoscape({ headless: true, styleEnabled: false });
@@ -129,7 +137,7 @@ describe('randomize (issue #17 fix)', () => {
     cy.add([{ group: 'nodes', data: { id: 'a' } }]);
 
     let resetCalled = 0;
-    const highlight = { reset: () => { resetCalled++; } } as any;
+    const highlight = { reset: () => { resetCalled++; } } as unknown as HighlightEngine;
 
     randomize(asRenderer(makeStubRenderer(cy)), highlight);
     expect(resetCalled).toBe(1);
