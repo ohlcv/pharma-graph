@@ -3,6 +3,7 @@
 import fs from 'fs/promises';
 import { scanContentDir } from "../parser/content-manager.js";
 import { parseFrontmatterWithWarnings } from "../parser/frontmatter.js";
+import { EDGE_TYPES } from "../core/edge-types.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
@@ -31,12 +32,12 @@ const VALID_TIER = [
   'foundation', 'system', 'clinical',
 ];
 
-const VALID_EDGE_TYPES = [
-  'has', 'isa',
-  'activates', 'inhibits', 'mechanism', 'metabolizes',
-  'treats', 'causes', 'interacts', 'contraindicates',
-  'prerequisite', 'relates', 'sibling',
-];
+// Issue #9: previously this list was hand-maintained alongside the
+// EDGE_TYPE_STYLE / EDGE_TYPE_LABEL keys in config.ts; the three lists
+// silently agreed until somebody added a new type to one and forgot
+// the others. Now it's a re-export of the canonical tuple, kept as a
+// named binding so the existing .includes() call sites read naturally.
+const VALID_EDGE_TYPES: readonly string[] = EDGE_TYPES;
 
 interface ValidationError {
   file: string;

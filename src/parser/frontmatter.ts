@@ -10,6 +10,7 @@
 // safely by treating the nested map as the source of truth when present.
 
 import { parse as yamlParse } from 'yaml';
+import { DEFAULT_EDGE_TYPE } from '../core/edge-types.js';
 
 // --- frontmatter 字段类型 ---
 
@@ -204,8 +205,8 @@ export function parseFrontmatterWithWarnings(
     }
     const rawType = obj['type'];
     const typeStr = rawType === undefined || rawType === null
-      ? 'related'
-      : String(rawType).trim() || 'related';
+      ? DEFAULT_EDGE_TYPE
+      : String(rawType).trim() || DEFAULT_EDGE_TYPE;
     const reasonRaw = obj['reason'];
     edges.push({
       target: String(rawTarget).trim(),

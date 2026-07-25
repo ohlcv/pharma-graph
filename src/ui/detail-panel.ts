@@ -4,6 +4,7 @@
 import cytoscape from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
 import { NODE_TYPE_COLOR, ESSENCE_LABEL, FIELD_COLOR, FIELD_LABEL, TIER_LABEL, NODE_TIER_STYLE, EDGE_TYPE_LABEL } from '../core/config.js';
+import { DEFAULT_EDGE_TYPE, isEdgeType } from '../core/edge-types.js';
 import { uiState } from './state.js';
 import { forEachStatic } from './dom-cache.js';
 import { UiToggle } from './ui-toggle.js';
@@ -254,10 +255,11 @@ function buildEdgesHtml(node: cytoscape.NodeSingular, cy: cytoscape.Core): strin
     const targetId = edge.data('target') as string;
     const targetNode = cy.getElementById(targetId);
     const targetLabel = targetNode.empty() ? targetId : (targetNode.data('label') || targetId);
-    const edgeType = (edge.data('edgeType') as string) ?? 'relates';
+    const edgeType = (edge.data('edgeType') as string) ?? DEFAULT_EDGE_TYPE;
     const reason = edge.data('reason') as string | undefined;
+    const edgeTypeLabel = isEdgeType(edgeType) ? EDGE_TYPE_LABEL[edgeType] : edgeType;
     return `<div class="np-edge-item" data-target="${escAttr(targetId)}">
-  <span class="np-edge-item__type">${EDGE_TYPE_LABEL[edgeType] ?? edgeType}</span>
+  <span class="np-edge-item__type">${edgeTypeLabel}</span>
   <div class="np-edge-item__body">
     <div class="np-edge-item__target">${escHtml(targetLabel)}</div>
     ${reason ? `<div class="np-edge-item__reason">${escHtml(reason)}</div>` : ''}
@@ -269,10 +271,11 @@ function buildEdgesHtml(node: cytoscape.NodeSingular, cy: cytoscape.Core): strin
     const srcId = edge.data('source') as string;
     const srcNode = cy.getElementById(srcId);
     const srcLabel = srcNode.empty() ? srcId : (srcNode.data('label') || srcId);
-    const edgeType = (edge.data('edgeType') as string) ?? 'relates';
+    const edgeType = (edge.data('edgeType') as string) ?? DEFAULT_EDGE_TYPE;
     const reason = edge.data('reason') as string | undefined;
+    const edgeTypeLabel = isEdgeType(edgeType) ? EDGE_TYPE_LABEL[edgeType] : edgeType;
     return `<div class="np-edge-item np-edge-item--incoming" data-target="${escAttr(srcId)}">
-  <span class="np-edge-item__type">${EDGE_TYPE_LABEL[edgeType] ?? edgeType}</span>
+  <span class="np-edge-item__type">${edgeTypeLabel}</span>
   <div class="np-edge-item__body">
     <div class="np-edge-item__target">${escHtml(srcLabel)}</div>
     ${reason ? `<div class="np-edge-item__reason">${escHtml(reason)}</div>` : ''}

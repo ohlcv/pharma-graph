@@ -13,6 +13,7 @@
 //   - Tier 填充色：从大众到稀有（基础=灰蓝、药物=浅蓝、疾病=浅红、管理=浅黄、服务=浅青、法规=浅紫）
 
 import cytoscape from 'cytoscape';
+import { EDGE_TYPES, type EdgeType } from './edge-types.js';
 
 // ── Essence → visual style（节点本质决定形状）──────────────────────────────────
 // 8 种本质，与 frontmatter.md 的 essence 枚举一一对应
@@ -110,6 +111,9 @@ export const TIER_LABEL: Record<string, string> = {
 };
 
 // ── Edge type → visual style ────────────────────────────────────────────────
+// Style lookup keyed by EdgeType. The `default` entry is a *separate*
+// fallback for unknown type strings the runtime may encounter — it is
+// NOT part of the canonical vocabulary (see edge-types.ts).
 
 export const EDGE_TYPE_STYLE: Record<string, { color: string; lineStyle: string; arrow: string }> = {
   // 结构与组成
@@ -134,8 +138,10 @@ export const EDGE_TYPE_STYLE: Record<string, { color: string; lineStyle: string;
 
 // ── Edge type → 中文标签 ─────────────────────────────────────────────────────
 // Single source of truth: 详情面板、图例、节点关联都查这里。
+// Keys must be a subset of EDGE_TYPES; the validator (validate.ts) reads
+// the canonical list from edge-types.ts so these two cannot drift.
 
-export const EDGE_TYPE_LABEL: Record<string, string> = {
+export const EDGE_TYPE_LABEL: Record<EdgeType, string> = {
   has:              '包含',
   isa:              '属于',
   activates:        '激动',

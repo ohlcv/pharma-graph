@@ -4,6 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { parseFrontmatter, parseFrontmatterWithWarnings } from './frontmatter.js';
+import { DEFAULT_EDGE_TYPE, EDGE_TYPES } from '../core/edge-types.js';
 
 describe('parseFrontmatter', () => {
   it('parses top-level keys with required fields', () => {
@@ -146,7 +147,7 @@ body`;
     expect(warnings[0].field).toBe('edges_out[0].target');
   });
 
-  it('defaults edge type to "related" when missing', () => {
+  it('defaults edge type to DEFAULT_EDGE_TYPE when missing', () => {
     const raw = `---
 id: pharm-5
 label: edge-type-default
@@ -156,7 +157,10 @@ edges_out:
 
 body`;
     const fm = parseFrontmatter(raw, 'g.md');
-    expect(fm.edges_out?.[0].type).toBe('related');
+    expect(fm.edges_out?.[0].type).toBe(DEFAULT_EDGE_TYPE);
+    // Sanity: the default must be a canonical edge type. If this fails,
+    // the parser is emitting a value the validator would reject.
+    expect(EDGE_TYPES).toContain(DEFAULT_EDGE_TYPE);
   });
 
   it('accepts summary as object with short/full fields', () => {
