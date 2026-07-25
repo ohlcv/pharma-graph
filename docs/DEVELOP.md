@@ -156,6 +156,26 @@ pharma-graph/
 │   │   ├── config.ts            ← 全局配置（默认布局、颜色映射、边类型映射）
 │   │   ├── graph.ts            ← 节点/边数据结构定义
 │   │   ├── node-builder.ts     ← 从 frontmatter 构建节点数据
+│   │   ├── edge-builder.ts     ← 从 frontmatter 构建边数据
+│   │   ├── renderer.ts         ← Cytoscape 实例 + 样式表 + 布局
+│   │   └── tour.ts             ← 章节导览逻辑
+│   │
+│   ├── ui/                       ← 浏览器层 UI 代码（详见 DEVELOP.md 下半部分）
+│   │
+│   └── scripts/                  ← 工具脚本（详见下文"scripts/"小节）
+│       ├── validate.ts          ← 严格 schema 校验（`npm run validate`）
+│       ├── audit-frontmatter.ts ← ADR-0001 评分 + 关系方向审查（`npm run audit`）
+│       ├── extract-all-frontmatter.ts
+│       ├── migrate-frontmatter.ts
+│       ├── migrate-isa.ts
+│       ├── fix-duplicate-id.ts
+│       ├── batch-fix.ts
+│       └── serve.ts             ← 静态服务器（`npm run view`）
+│
+├── content/                      ← 知识内容（Markdown + frontmatter）
+│   │   ├── config.ts            ← 全局配置（默认布局、颜色映射、边类型映射）
+│   │   ├── graph.ts            ← 节点/边数据结构定义
+│   │   ├── node-builder.ts     ← 从 frontmatter 构建节点数据
 │   │   ├── edge-builder.ts     ← 汇总 edges_out 构建边数据
 │   │   └── renderer.ts          ← Cytoscape.js 渲染封装
 │   │
@@ -194,19 +214,7 @@ pharma-graph/
 │
 ├── public/                       ← 静态资源（图片等）
 │
-├── scripts/                      ← 工具脚本
-│   ├── scan.ts                   ← 扫描 content 目录，生成图谱数据
-│   ├── export-image.ts          ← 导出图谱为图片
-│   ├── validate.ts              ← frontmatter schema 校验（CI 用）
-│   └── dev.ts                   ← 开发热重载脚本
-│
-├── tests/                        ← 测试
-│   ├── parser.test.ts           ← frontmatter 解析测试
-│   └── graph.test.ts            ← 图谱构建测试
-│
 ├── dist/                         ← 构建输出（CI 生成，不提交）
-│
-├── .env.example                 ← 环境变量示例
 │
 ├── archive/                      ← 归档文件
 │
@@ -232,9 +240,36 @@ pharma-graph/
   - `styles/` 统一管理样式变量和组件样式，CSS 变量集中定义颜色和间距，方便换主题
   - `cytoscape-overrides.css` 覆盖 Cytoscape.js 的默认背景色、滚动条等 UI 元素
 
-**`scripts/`** — 独立工具脚本，可单独运行或集成到 CI：
-- `validate.ts` 校验所有 frontmatter 的 schema（缺失字段、类型错误），CI 中自动检查内容质量
-- `dev.ts` 开发时监听 content 目录变更，自动重新构建图谱数据并刷新页面
+**`scripts/`** — 独立工具脚本，可单独运行或集成到 CI。代码位于 `src/scripts/`，通过 `npm run <name>` 调用：
+
+| 命令 | 脚本 | 用途 | 退出码 |
+|---|---|---|---|
+| `npm run validate` | `validate.ts` | 严格 schema/类型校验；CI 必跑 | 0 = 通过；非 0 = 有 ❌ |
+| `npm run audit` | `audit-frontmatter.ts` | 评分 + ADR-0001 关系方向 + 双向配对；输出 `docs/frontmatter-audit.md` | 永远 0（人工修正用） |
+| `npm run view` | `serve.ts` | 启动开发静态服务器（无 HMR）+ `/api/graph` 端点 | — |
+
+### `audit` 与 `validate` 的差异
+
+两者都扫描 `content/**/*.md` 的 frontmatter，但**口径不同**：
+
+- **`validate`** 是**门禁**：缺失必填字段、值非法（不在 schema 白名单）、跨文件引用 id 不存在等情况会**让进程退出非零**。这是给 CI 用的硬约束，新提交的 markdown 必须 0 ❌ 才能合并。
+- **`audit`** 是**度量**：给每篇 markdown 打 0/1/2/3 的字段分，并按目录分组输出 markdown 报告。它**永远** exit 0，因为字段缺失是常态（增量写作中）。报告是手动修 frontmatter 时的真值来源，包含修复策略和修正进度跟踪。
+
+简短决策树：
+- 改了 markdown → 先 `npm run validate`（防 schema 回归）
+- 集中批量修一批 markdown → 中途用 `npm run audit` 看整体进度和 ADR-0001 合规率
+- 修完提交前 → 再 `npm run validate`（兜底）
+
+### 一次性脚本（不在 npm scripts 里）
+
+`src/scripts/` 下还有几个一次性改造工具，**只在大型重构时使用**，日常开发不需要：
+
+- `migrate-frontmatter.ts` — 把 frontmatter 统一迁到新 schema（位置/字段顺序）；`--dry-run` 默认
+- `migrate-isa.ts` — 按 ADR-0001 把 has 边统一为 isa；默认 dry-run，`--apply` 才落盘
+- `extract-all-frontmatter.ts` — 把全库 frontmatter 聚合成一份 markdown（人工审查用）
+- `fix-duplicate-id.ts` / `batch-fix.ts` — 历史遗留修复工具，仅在已知问题复发时跑
+
+跑法统一为 `npx tsx src/scripts/<name>.ts [--flags]`。
 
 **`tests/`** — 测试代码，保证 parser 和 graph 构建逻辑的正确性，防止解析错误导致图谱数据损坏
 

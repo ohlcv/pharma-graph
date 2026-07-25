@@ -6,6 +6,18 @@
 //   2) ADR-0001 关系方向合规（has 仅用于物理组成；层级关系一律用 isa 子→父）
 //   3) 双向 has/isa/relates 配对
 //   4) 非 book 节点缺少 isa 边（warning 级别）
+//
+// 用法：
+//   npm run audit                   ← 推荐，通过 package.json scripts 入口
+//   npx tsx src/scripts/audit-frontmatter.ts
+//
+// 输入：content/ 目录（脚本内硬编码，相对 cwd）
+// 输出：docs/frontmatter-audit.md   ← 人工审核 + 修正进度的真值来源
+//
+// 与 `npm run validate` 的区别：
+//   validate — 严格的 schema/类型校验，**会**因 ❌ 退出非零（CI 用）
+//   audit    — 评分 + ADR-0001 关系方向 + 双向配对，**永远** exit 0，
+//              输出 markdown 报告供人工参照修正
 
 import fs from 'node:fs';
 import path from 'node:path';
