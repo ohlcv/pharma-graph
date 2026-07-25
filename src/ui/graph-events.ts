@@ -7,6 +7,7 @@ import type cytoscape from 'cytoscape';
 import { Renderer } from '../core/renderer.js';
 import { HighlightEngine } from './highlight-engine.js';
 import { DetailPanel } from './detail-panel.js';
+import { TourController } from './tour-controller.js';
 import { updateStats, syncBottomSheetStats } from './graph-stats.js';
 import { clearShapeFilter } from './legend-manager.js';
 
@@ -22,8 +23,10 @@ export interface GraphEventDeps {
   showZoomIndicator: (cy: cytoscape.Core) => void;
   isDebugOverlayActive: () => boolean;
   updateForensicPanel: (renderer: Renderer) => void;
-  onCanvasTapWhileTour: () => boolean;
-  onCanvasTapWhileTourClear: () => void;
+  /** Tour controller — must be constructed BEFORE this is called. Required so
+   *  the canvas-tap handler can ask "is a tour running?" without racing against
+   *  the boot sequence (issue #11). */
+  tourController: TourController;
   setDragging: (dragging: boolean) => void;
   setDragMode: (dragMode: boolean) => void;
 }
@@ -72,7 +75,12 @@ export function initGraphEvents(deps: GraphEventDeps): void {
       clearShapeFilter();
       deps.highlight.reset();
       deps.detailPanel.close();
-      if (deps.onCanvasTapWhileTour()) deps.onCanvasTapWhileTourClear();
+      // Tapping the empty canvas while a tour is active stops the tour.
+      // (Issue #11: tourController is guaranteed non-null here because
+      // main.ts constructs it before calling initGraphEvents.)
+      if (deps.tourController.isRunning() || deps.tourController.isPaused()) {
+        deps.tourController.stop();
+      }
     }
   });
 
