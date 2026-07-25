@@ -4,7 +4,7 @@
 // mapping from cytoscape events to UI actions.
 
 import type cytoscape from 'cytoscape';
-import { Renderer } from '../core/renderer.js';
+import { Renderer, CLASSES } from '../core/renderer.js';
 import { HighlightEngine } from './highlight-engine.js';
 import { DetailPanel } from './detail-panel.js';
 import { TourController } from './tour-controller.js';
@@ -28,7 +28,32 @@ export interface GraphEventDeps {
    *  the boot sequence (issue #11). */
   tourController: TourController;
   setDragging: (dragging: boolean) => void;
-  setDragMode: (dragMode: boolean) => void;
+}
+
+/**
+ * Issue #19 (removed): Renderer previously exposed
+ * `getEdgeReason` / `getEdgeMidpoint` / `setDragMode` — three single-purpose
+ * helpers that only ever had one caller (this file). The reason lookup was a
+ * one-liner over `edge.data('reason')`; the midpoint was a pure geometry
+ * calc; the drag-mode toggle was a class flip meaningful only in the
+ * context of node-drag events. All three now live here, next to the
+ * bindings that use them, so Renderer is reduced to "container +
+ * stylesheet + layout".
+ */
+function edgeMidpoint(edge: cytoscape.EdgeSingular): { x: number; y: number } {
+  const src = edge.source().renderedPosition();
+  const tgt = edge.target().renderedPosition();
+  if (!src || !tgt) return { x: 0, y: 0 };
+  return { x: (src.x + tgt.x) / 2, y: (src.y + tgt.y) / 2 };
+}
+
+function setCytoscapeDragMode(cy: cytoscape.Core, on: boolean): void {
+  // Adds/removes the simplified-visual CSS class on every node. Lives next
+  // to the `grab`/`free`/`dragfree` event bindings below because the toggle
+  // is meaningful only while a node is being dragged through cytoscape's
+  // own gesture pipeline.
+  const op = on ? 'addClass' : 'removeClass';
+  cy.nodes()[op](CLASSES.DRAGGING_SIMPLIFIED);
 }
 
 export function initGraphEvents(deps: GraphEventDeps): void {
@@ -98,19 +123,31 @@ export function initGraphEvents(deps: GraphEventDeps): void {
   });
 
   cy.on('mouseover', 'edge', (evt) => {
-    const reason = deps.renderer.getEdgeReason(evt.target);
+    // Issue #19: was `deps.renderer.getEdgeReason(evt.target)` and
+    // `deps.renderer.getEdgeMidpoint(...)`; both helpers only existed
+    // for this single caller, so the logic moved file-local.
+    const reason = evt.target.data('reason') as string | undefined;
     if (!reason) return;
-    const mid = deps.renderer.getEdgeMidpoint(evt.target);
+    const mid = edgeMidpoint(evt.target);
     deps.showEdgeTooltip(reason, mid.x, mid.y);
   });
 
   cy.on('mouseout', 'edge', () => { deps.hideEdgeTooltip(); });
 
-  cy.on('grab', 'node', () => { deps.setDragging(true); deps.setDragMode(true); });
-  cy.on('free', 'node', () => { deps.setDragging(false); deps.setDragMode(false); });
+  cy.on('grab', 'node', () => {
+    deps.setDragging(true);
+    // Issue #19: was `deps.setDragMode(true)`, a passthrough to
+    // Renderer. Toggling the simplified class is meaningful only in the
+    // context of cytoscape's grab/free gesture, so it's done inline here.
+    setCytoscapeDragMode(cy, true);
+  });
+  cy.on('free', 'node', () => {
+    deps.setDragging(false);
+    setCytoscapeDragMode(cy, false);
+  });
   cy.on('dragfree', () => {
     deps.setDragging(false);
-    deps.setDragMode(false);
+    setCytoscapeDragMode(cy, false);
     updateStats(cy);
     syncBottomSheetStats(cy);
   });

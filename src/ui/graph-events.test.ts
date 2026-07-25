@@ -60,7 +60,9 @@ describe('initGraphEvents — canvas tap + tour (issue #11 fix)', () => {
       updateForensicPanel: () => {},
       tourController: tour as unknown as TourController,
       setDragging: () => {},
-      setDragMode: () => {},
+      // Issue #19: setDragMode mock removed — Renderer.setDragMode and
+      // GraphEventDeps.setDragMode were both removed. Drag-mode styling
+      // now happens inside graph-events.ts via a file-local helper.
     });
 
     // Tap the empty canvas (target = cy itself).
@@ -86,7 +88,9 @@ describe('initGraphEvents — canvas tap + tour (issue #11 fix)', () => {
       updateForensicPanel: () => {},
       tourController: tour as unknown as TourController,
       setDragging: () => {},
-      setDragMode: () => {},
+      // Issue #19: setDragMode mock removed — Renderer.setDragMode and
+      // GraphEventDeps.setDragMode were both removed. Drag-mode styling
+      // now happens inside graph-events.ts via a file-local helper.
     });
 
     cy.emit('tap', { target: cy } as any);
@@ -111,7 +115,9 @@ describe('initGraphEvents — canvas tap + tour (issue #11 fix)', () => {
       updateForensicPanel: () => {},
       tourController: tour as unknown as TourController,
       setDragging: () => {},
-      setDragMode: () => {},
+      // Issue #19: setDragMode mock removed — Renderer.setDragMode and
+      // GraphEventDeps.setDragMode were both removed. Drag-mode styling
+      // now happens inside graph-events.ts via a file-local helper.
     });
 
     cy.emit('tap', { target: cy } as any);
@@ -135,7 +141,9 @@ describe('initGraphEvents — canvas tap + tour (issue #11 fix)', () => {
       updateForensicPanel: () => {},
       tourController: tour as unknown as TourController,
       setDragging: () => {},
-      setDragMode: () => {},
+      // Issue #19: setDragMode mock removed — Renderer.setDragMode and
+      // GraphEventDeps.setDragMode were both removed. Drag-mode styling
+      // now happens inside graph-events.ts via a file-local helper.
     });
 
     // Fire a tap right away — the controller is provided, not deferred.
@@ -163,7 +171,9 @@ describe('initGraphEvents — canvas tap + tour (issue #11 fix)', () => {
       updateForensicPanel: () => {},
       tourController: tour as unknown as TourController,
       setDragging: () => {},
-      setDragMode: () => {},
+      // Issue #19: setDragMode mock removed — Renderer.setDragMode and
+      // GraphEventDeps.setDragMode were both removed. Drag-mode styling
+      // now happens inside graph-events.ts via a file-local helper.
     });
 
     // Add a second listener that counts canvas-tap calls so we can prove

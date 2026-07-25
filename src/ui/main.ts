@@ -161,9 +161,9 @@ async function boot(): Promise<void> {
       setDragging: (d) => {
         uiState.isDragging = d;
       },
-      setDragMode: (d) => {
-        uiState.renderer!.setDragMode(d);
-      },
+      // Issue #19: `setDragMode` was removed from GraphEventDeps.
+      // cytoscape drag-mode styling now happens inline in graph-events.ts,
+      // where it's coupled to the grab/free/dragfree event bindings.
     });
 
     initEdgeTooltip();

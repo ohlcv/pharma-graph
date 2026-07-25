@@ -358,28 +358,6 @@ export class Renderer {
     layoutInstance.run();
   }
 
-  setDragMode(on: boolean): void {
-    if (on) {
-      this.cy.nodes().addClass(CLASSES.DRAGGING_SIMPLIFIED);
-    } else {
-      this.cy.nodes().removeClass(CLASSES.DRAGGING_SIMPLIFIED);
-    }
-  }
-
-  getEdgeReason(edge: cytoscape.EdgeSingular): string | undefined {
-    return edge.data('reason');
-  }
-
-  getEdgeMidpoint(edge: cytoscape.EdgeSingular): { x: number; y: number } {
-    const src = edge.source().renderedPosition();
-    const tgt = edge.target().renderedPosition();
-    if (!src || !tgt) return { x: 0, y: 0 };
-    return {
-      x: (src.x + tgt.x) / 2,
-      y: (src.y + tgt.y) / 2,
-    };
-  }
-
   currentLayoutName(): string {
     return this.currentLayout;
   }
