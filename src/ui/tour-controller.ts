@@ -24,7 +24,7 @@ import cytoscape from 'cytoscape';
 import { TourEngine, TourStrategy, TourStepInfo } from '../core/tour.js';
 import { Renderer } from '../core/renderer.js';
 import { DetailPanel } from './detail-panel.js';
-import { uiState } from './state.js';
+import { uiState, registerTourBarToggle } from './state.js';
 import { UiToggle } from './ui-toggle.js';
 
 const SEARCH_INPUT_DEBOUNCE_MS = 220;
@@ -359,15 +359,17 @@ export class TourController {
     const bar = document.getElementById('tour-status');
     const chev = handle.querySelector<SVGElement>('.tour-mob__chev');
     // Centralised toggle: persists across reloads, applies `collapsed` to
-    // both the bar and its chevron, mirrors into uiState.tourBarCollapsed
-    // for any legacy readers.
+    // both the bar and its chevron. Issue #6: previously this also
+    // mirrored into `uiState.tourBarCollapsed`, but nothing ever *read*
+    // that field — it was a dead mirror. The toggle is now registered
+    // with uiState (as a no-op for `tourBarCollapsed` since the field
+    // has been removed) but the live value lives in the toggle alone.
     this.barToggle = new UiToggle({
-      initial: uiState.tourBarCollapsed,
       persist: 'tourBar.collapsed',
       cssClass: 'collapsed',
       applyTo: (bar && chev ? [bar, chev as unknown as HTMLElement] : (bar ?? chev ?? handle)) as HTMLElement | HTMLElement[],
-      onChange: (on) => { uiState.tourBarCollapsed = on; },
     });
+    registerTourBarToggle(this.barToggle);
     handle.addEventListener('click', (e) => {
       e.stopPropagation();
       this.barToggle.toggle();

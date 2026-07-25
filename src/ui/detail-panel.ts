@@ -5,7 +5,7 @@ import cytoscape from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
 import { NODE_TYPE_COLOR, ESSENCE_LABEL, FIELD_COLOR, FIELD_LABEL, TIER_LABEL, NODE_TIER_STYLE, EDGE_TYPE_LABEL } from '../core/config.js';
 import { DEFAULT_EDGE_TYPE, isEdgeType } from '../core/edge-types.js';
-import { uiState } from './state.js';
+import { uiState, registerPinToggle } from './state.js';
 import { forEachStatic } from './dom-cache.js';
 import { UiToggle } from './ui-toggle.js';
 
@@ -49,23 +49,25 @@ export class DetailPanel {
     this.bodyTab = bodyTab;
     this.pinBtn = pinBtn;
 
-    // Centralised boolean toggle — syncs the pin button's `active` class and
-    // mirrors its state into uiState.isPanelPinned (kept for legacy readers
-    // such as drag-manager that read it directly).
+    // Centralised boolean toggle — owns the pin button's `active` class,
+    // persistence to localStorage, and the *sole* source of truth for the
+    // pinned state. Issue #6: previously this toggle also mirrored its
+    // value into `uiState.isPanelPinned` and the click handler wrote the
+    // mirror again, giving two write paths to keep in sync. Now the
+    // toggle is registered with uiState so reads (`uiState.isPanelPinned`)
+    // proxy through it, and the click handler just calls `toggle()`.
     this.pinToggle = new UiToggle({
-      initial: uiState.isPanelPinned,
       persist: 'detailPanel.pinned',
       cssClass: 'active',
       applyTo: this.pinBtn,
-      onChange: (on) => { uiState.isPanelPinned = on; },
     });
+    registerPinToggle(this.pinToggle);
 
     this.overviewTab.addEventListener('click', () => switchDesktopTab('overview'));
     this.bodyTab.addEventListener('click', () => switchDesktopTab('body'));
 
     this.pinBtn.addEventListener('click', () => {
       this.pinToggle.toggle();
-      uiState.isPanelPinned = this.pinToggle.value;
     });
 
     this.panel.addEventListener('click', (e) => {
