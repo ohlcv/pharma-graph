@@ -322,16 +322,50 @@ function escAttr(s: string): string {
   return s.replace(/"/g, '&quot;');
 }
 
-function parseBodyQuestions(body: string): Array<{ label: string; answer: string }> {
-  const SKIP = new Set(['它在整套框架里属于哪一层、放在哪一块？']);
-  return body.split(/^## /m).slice(1)
-    .map((section) => {
-      const nlIdx = section.indexOf('\n');
-      if (nlIdx === -1) return null;
-      const label = section.slice(0, nlIdx).trim();
-      const answer = section.slice(nlIdx + 1).trim();
-      if (SKIP.has(label)) return null;
-      return { label, answer };
-    })
-    .filter(Boolean) as Array<{ label: string; answer: string }>;
+// Sentinel placed on its own line immediately before an H2 to mark it as
+// hidden from the node detail panel. Authors opt in by inserting:
+//
+//     <!-- @np-skip -->
+//     ## 它在整套框架里属于哪一层、放在哪一块？
+//     这个章节的回答...
+//
+// Issue #8: replacing the previous hard-coded Chinese title match.
+// Coincidentally-named user sections used to be silently dropped; now the
+// only way to skip is to drop this explicit marker, which is invisible in
+// rendered Markdown and impossible to trigger by accident.
+const PANEL_SKIP_SENTINEL = /^[ \t]*<!--\s*@np-skip\s*-->[ \t]*$/m;
+
+export function parseBodyQuestions(body: string): Array<{ label: string; answer: string }> {
+  // Find every H2 boundary and walk the body in one pass. The split+filter
+  // approach loses the position information needed to check the line that
+  // precedes each H2 for the sentinel.
+  const out: Array<{ label: string; answer: string }> = [];
+  // `re` matches "## <title>" at the start of a line. Lookahead ensures we
+  // start at H2 boundaries, not arbitrary "## " inside a paragraph.
+  const h2 = /^## (.*)$/gm;
+  const matches: { label: string; start: number; end: number }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = h2.exec(body)) !== null) {
+    matches.push({ label: m[1].trim(), start: m.index, end: h2.lastIndex });
+  }
+  for (let i = 0; i < matches.length; i++) {
+    const cur = matches[i];
+    const next = matches[i + 1];
+    // Answer text spans from the end of the current H2 line to the start
+    // of the next H2 (or the end of the body).
+    const answerStart = cur.end;
+    const answerEnd = next ? next.start : body.length;
+    const answer = body.slice(answerStart, answerEnd).trim();
+
+    // Detect the sentinel on the line just before this H2.
+    // The text between the previous H2's end (or body start) and this
+    // H2's start is the "preamble"; if it contains the sentinel, the
+    // author has flagged this section as hidden.
+    const prevEnd = i === 0 ? 0 : matches[i - 1].end;
+    const preamble = body.slice(prevEnd, cur.start);
+    if (PANEL_SKIP_SENTINEL.test(preamble)) continue;
+
+    out.push({ label: cur.label, answer });
+  }
+  return out;
 }
