@@ -3,13 +3,15 @@
 // the file path, and produces NodeData via the shared buildGraph helper.
 
 import fs from 'fs/promises';
-import { parseFrontmatter } from '../parser/frontmatter.js';
+import { parseFrontmatter, parseFrontmatterWithWarnings } from '../parser/frontmatter.js';
 import { NodeData, NodeLocation } from './graph.js';
 import { buildGraph } from './build-graph.js';
-import type { ParsedFrontmatter } from '../parser/frontmatter.js';
+import type { ParsedFrontmatter, ParseWarning } from '../parser/frontmatter.js';
 
 /**
  * Load and parse all frontmatter in parallel, returning a reusable map.
+ * Soft warnings are dropped — call {@link loadAllFrontmatterWithWarnings}
+ * if you need to surface them.
  */
 export async function loadAllFrontmatter(filePaths: string[]): Promise<Map<string, ParsedFrontmatter>> {
   const results = await Promise.all(
@@ -19,6 +21,28 @@ export async function loadAllFrontmatter(filePaths: string[]): Promise<Map<strin
     })
   );
   return new Map(results.map(({ fp, fm }) => [fp, fm]));
+}
+
+/**
+ * Same as {@link loadAllFrontmatter} but also returns parser warnings
+ * so CLI scripts (audit, export) can surface them in their output.
+ */
+export async function loadAllFrontmatterWithWarnings(
+  filePaths: string[],
+): Promise<{ frontmatters: Map<string, ParsedFrontmatter>; warnings: ParseWarning[] }> {
+  const warnings: ParseWarning[] = [];
+  const entries: Array<{ fp: string; fm: ParsedFrontmatter }> = await Promise.all(
+    filePaths.map(async (fp) => {
+      const raw = await fs.readFile(fp, 'utf-8');
+      const { fm, warnings: fileWarnings } = parseFrontmatterWithWarnings(raw, fp);
+      for (const w of fileWarnings) warnings.push(w);
+      return { fp, fm };
+    }),
+  );
+  return {
+    frontmatters: new Map(entries.map(({ fp, fm }) => [fp, fm])),
+    warnings,
+  };
 }
 
 /**

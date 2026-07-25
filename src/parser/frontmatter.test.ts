@@ -3,7 +3,7 @@
 // both required-field validation, edges_out extraction, location, and tags.
 
 import { describe, it, expect } from 'vitest';
-import { parseFrontmatter } from '../parser/frontmatter.js';
+import { parseFrontmatter, parseFrontmatterWithWarnings } from './frontmatter.js';
 
 describe('parseFrontmatter', () => {
   it('parses top-level keys with required fields', () => {
@@ -105,7 +105,7 @@ body`;
     expect(fm.edges_out?.[0].target).toBe('pharm-2');
   });
 
-  it('drops edges with empty target', () => {
+  it('reports edges with empty target as errors (issue #14)', () => {
     const raw = `---
 id: pharm-4
 label: edge-test
@@ -117,9 +117,33 @@ edges_out:
 ---
 
 body`;
-    const fm = parseFrontmatter(raw, 'f.md');
+    // Issue #14: previously the parser silently dropped the empty-target
+    // edge so the CLI and the browser gave different feedback. Now the
+    // parser escalates empty-target edges to errors and the legacy
+    // parseFrontmatter() re-throws so callers can't ignore it.
+    expect(() => parseFrontmatter(raw, 'f.md')).toThrow(/target 为空/);
+  });
+
+  it('parseFrontmatterWithWarnings returns the surviving edges + warnings list', () => {
+    const raw = `---
+id: pharm-4b
+label: edge-test
+edges_out:
+  - target: ""
+    type: relates
+  - target: pharm-1
+    type: relates
+---
+
+body`;
+    const { fm, warnings } = parseFrontmatterWithWarnings(raw, 'g.md');
+    // The malformed edge is dropped from `fm` (still silent at the graph
+    // level) but the warning list carries the diagnostic.
     expect(fm.edges_out).toHaveLength(1);
     expect(fm.edges_out?.[0].target).toBe('pharm-1');
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0].severity).toBe('error');
+    expect(warnings[0].field).toBe('edges_out[0].target');
   });
 
   it('defaults edge type to "related" when missing', () => {

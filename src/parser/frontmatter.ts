@@ -46,6 +46,31 @@ export interface ParsedFrontmatter extends NodeMeta {
   body?: string;   // 正文内容（在 frontmatter 分隔线之后）
 }
 
+/**
+ * Non-fatal issues the parser noticed but decided not to throw on.
+ *
+ * Issue #14: previously the parser silently dropped malformed edges
+ * (missing `target`, non-object entries) so the UI happily rendered a
+ * graph with fewer edges than the source files declared. The CLI
+ * validator caught the same problems after the fact and complained, so
+ * authors got *different* feedback depending on which surface they ran.
+ * Now both surfaces get the same structural warnings — the parser emits
+ * a `ParseResult` with the cleaned `fm` plus an array of warnings the
+ * caller can route to console, the on-screen toast, or the CLI summary.
+ */
+export interface ParseWarning {
+  file: string;
+  /** `edges_out[2].target` etc — null when the issue is file-level */
+  field: string | null;
+  message: string;
+  severity: 'error' | 'warning';
+}
+
+export interface ParseResult {
+  fm: ParsedFrontmatter;
+  warnings: ParseWarning[];
+}
+
 function parseFrontmatterRaw(raw: string): { data: Record<string, unknown>; content: string } {
   const trimmed = raw.replace(/^\uFEFF/, ''); // Remove BOM
   const match = trimmed.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)/);
@@ -97,9 +122,23 @@ function pickSource(yamlRoot: Record<string, unknown>): Record<string, unknown> 
     : yamlRoot;
 }
 
-export function parseFrontmatter(raw: string, filePath: string): ParsedFrontmatter {
+/**
+ * Like {@link parseFrontmatter} but also returns a list of non-fatal
+ * structural warnings (issue #14). Hard errors (missing `id`) still throw.
+ *
+ * `softFail` controls what happens to warnings inside the legacy
+ * `parseFrontmatter` wrapper: when true, warnings are emitted to
+ * `console.warn`; when false (default), they're swallowed silently —
+ * matching the previous behaviour so existing callers don't break.
+ */
+export function parseFrontmatterWithWarnings(
+  raw: string,
+  filePath: string,
+  options: { softFail?: boolean } = {},
+): ParseResult {
   const { data, content } = parseFrontmatterRaw(raw);
   const fm = pickSource(data);
+  const warnings: ParseWarning[] = [];
 
   const missing = REQUIRED_FIELDS.filter((f) => !(f in fm));
   if (missing.length > 0) {
@@ -132,17 +171,48 @@ export function parseFrontmatter(raw: string, filePath: string): ParsedFrontmatt
     (data['edges_out'] as unknown[] | undefined) ??
     (fm['edges_out'] as unknown[] | undefined) ??
     [];
-  const edges: EdgeDef[] = edgesRaw
-    .filter(
-      (e): e is Record<string, unknown> =>
-        typeof e === 'object' && e !== null && !Array.isArray(e)
-    )
-    .map((e): EdgeDef => ({
-      target: String(e['target'] ?? ''),
-      type: String(e['type'] ?? 'related'),
-      reason: typeof e['reason'] === 'string' ? e['reason'] : undefined,
-    }))
-    .filter((e): e is EdgeDef => Boolean(e.target));
+  if (!Array.isArray(edgesRaw)) {
+    warnings.push({
+      file: filePath,
+      field: 'edges_out',
+      message: `edges_out 必须是数组，得到 ${typeof edgesRaw}，已忽略整个 edges_out`,
+      severity: 'warning',
+    });
+  }
+  const sourceEdges = Array.isArray(edgesRaw) ? edgesRaw : [];
+  const edges: EdgeDef[] = [];
+  sourceEdges.forEach((e, idx) => {
+    if (e === null || typeof e !== 'object' || Array.isArray(e)) {
+      warnings.push({
+        file: filePath,
+        field: `edges_out[${idx}]`,
+        message: `edges_out[${idx}] 不是对象（得到 ${describe(e)}），已忽略`,
+        severity: 'warning',
+      });
+      return;
+    }
+    const obj = e as Record<string, unknown>;
+    const rawTarget = obj['target'];
+    if (rawTarget === undefined || rawTarget === null || String(rawTarget).trim() === '') {
+      warnings.push({
+        file: filePath,
+        field: `edges_out[${idx}].target`,
+        message: `edges_out[${idx}].target 为空，已忽略这条边`,
+        severity: 'error',
+      });
+      return;
+    }
+    const rawType = obj['type'];
+    const typeStr = rawType === undefined || rawType === null
+      ? 'related'
+      : String(rawType).trim() || 'related';
+    const reasonRaw = obj['reason'];
+    edges.push({
+      target: String(rawTarget).trim(),
+      type: typeStr,
+      reason: typeof reasonRaw === 'string' ? reasonRaw : undefined,
+    });
+  });
 
   const location = fm['location'] as Record<string, unknown> | undefined;
   const tagsRaw = fm['tags'] as unknown[] | undefined;
@@ -150,26 +220,61 @@ export function parseFrontmatter(raw: string, filePath: string): ParsedFrontmatt
     ? tagsRaw.filter((t): t is string => typeof t === 'string')
     : [];
 
-  return {
-    id,
-    label,
-    essence,
-    field,
-    tier,
-    summary,
-    edges_out: edges.length > 0 ? edges : undefined,
-    tags: tags.length > 0 ? tags : undefined,
-    location: location
-      ? {
-          book: getField(location, 'book'),
-          part: getField(location, 'part'),
-          chapter: getField(location, 'chapter'),
-          section: getField(location, 'section'),
-          point: getField(location, 'point'),
-          item: getField(location, 'item'),
-          subsection: getField(location, 'subsection'),
-        }
-      : undefined,
-    body: content.trim(),
+  const result: ParseResult = {
+    fm: {
+      id,
+      label,
+      essence,
+      field,
+      tier,
+      summary,
+      edges_out: edges.length > 0 ? edges : undefined,
+      tags: tags.length > 0 ? tags : undefined,
+      location: location
+        ? {
+            book: getField(location, 'book'),
+            part: getField(location, 'part'),
+            chapter: getField(location, 'chapter'),
+            section: getField(location, 'section'),
+            point: getField(location, 'point'),
+            item: getField(location, 'item'),
+            subsection: getField(location, 'subsection'),
+          }
+        : undefined,
+      body: content.trim(),
+    },
+    warnings,
   };
+
+  if (options.softFail) {
+    for (const w of warnings) {
+      const tag = w.severity === 'error' ? '[error]' : '[warn]';
+      // eslint-disable-next-line no-console
+      console.warn(`${tag} ${w.file} ${w.field ? `[${w.field}]` : ''} — ${w.message}`);
+    }
+  }
+
+  return result;
+}
+
+export function parseFrontmatter(raw: string, filePath: string): ParsedFrontmatter {
+  const { fm, warnings } = parseFrontmatterWithWarnings(raw, filePath, { softFail: false });
+  if (warnings.length > 0) {
+    // Hard errors must propagate (issue #14 contract: the parser never
+    // swallows edges that the user wrote — it just forgets about them).
+    const fatal = warnings.find((w) => w.severity === 'error');
+    if (fatal) {
+      throw new Error(`${fatal.message}（文件: ${fatal.file}）`);
+    }
+    // Non-fatal: keep the old silent behaviour for callers that haven't
+    // migrated to parseFrontmatterWithWarnings yet. The fix only takes
+    // full effect once validate.ts / graph-manager.ts opt in.
+  }
+  return fm;
+}
+
+function describe(v: unknown): string {
+  if (v === null) return 'null';
+  if (Array.isArray(v)) return 'array';
+  return typeof v;
 }

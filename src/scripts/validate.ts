@@ -2,7 +2,7 @@
 // 校验 content/ 下所有 Markdown 文件的 frontmatter 格式和跨文件引用
 import fs from 'fs/promises';
 import { scanContentDir } from "../parser/content-manager.js";
-import { parseFrontmatter } from "../parser/frontmatter.js";
+import { parseFrontmatterWithWarnings } from "../parser/frontmatter.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
@@ -66,12 +66,26 @@ export async function validate(): Promise<void> {
     const raw = await fs.readFile(fp, 'utf-8');
     const relPath = toRelativePath(fp);
 
-    let fm: ReturnType<typeof parseFrontmatter>;
+    let result: ReturnType<typeof parseFrontmatterWithWarnings>;
     try {
-      fm = parseFrontmatter(raw, fp);
+      result = parseFrontmatterWithWarnings(raw, fp);
     } catch (err: any) {
       errors.push({ file: relPath, message: err.message, severity: "error" });
       continue;
+    }
+    const { fm, warnings } = result;
+
+    // Surface parser-emitted warnings so the CLI output mirrors what the
+    // browser sees (issue #14). The parser decides *structural* problems
+    // (missing target, non-object edge); this script keeps *value-list*
+    // problems (essence/field/tier/edge-type not in the whitelist).
+    for (const w of warnings) {
+      errors.push({
+        file: relPath,
+        field: w.field ?? undefined,
+        message: w.message,
+        severity: w.severity,
+      });
     }
 
     // Collect node IDs for cross-reference validation
@@ -107,26 +121,18 @@ export async function validate(): Promise<void> {
       });
     }
 
-    // Validate edges_out structure
+    // Validate edges_out structure (value-list check stays here; structural
+    // issues are already covered by the parser-emitted warnings above).
     if (fm.edges_out && Array.isArray(fm.edges_out)) {
       for (let i = 0; i < fm.edges_out.length; i++) {
         const edge = fm.edges_out[i];
-
-        if (!edge.target || String(edge.target).trim() === "") {
-          errors.push({
-            file: relPath,
-            field: `edges_out[${i}].target`,
-            message: `edges_out[${i}].target 不能为空`,
-            severity: "error",
-          });
-        }
 
         if (edge.type && !VALID_EDGE_TYPES.includes(edge.type)) {
           errors.push({
             file: relPath,
             field: `edges_out[${i}].type`,
             message: `edges_out[${i}].type 值 "${edge.type}" 不在已知类型列表中`,
-            severity: "warning",
+            severity: 'warning',
           });
         }
       }
@@ -139,7 +145,7 @@ export async function validate(): Promise<void> {
     const relPath = toRelativePath(fp);
 
     try {
-      const fm = parseFrontmatter(raw, fp);
+      const { fm } = parseFrontmatterWithWarnings(raw, fp);
       if (!fm.edges_out) continue;
 
       for (let i = 0; i < fm.edges_out.length; i++) {
