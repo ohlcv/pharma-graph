@@ -150,7 +150,6 @@ pharma-graph/
 ├── src/                          ← 源代码
 │   ├── parser/                   ← Markdown 解析层
 │   │   ├── content-manager.ts   ← 扫描 content 目录，读文件列表
-│   │   ├── markdown-parser.ts   ← 解析 Markdown 本身（提取标题、正文等）
 │   │   └── frontmatter.ts       ← frontmatter 解析器
 │   │
 │   ├── core/                     ← 图谱核心逻辑
@@ -222,8 +221,7 @@ pharma-graph/
 **`src/`** — 核心源代码，按职责分层：
 - `parser/` 负责扫描内容目录、解析 Markdown 文件和 frontmatter
   - `content-manager.ts` 读取 content 目录的文件列表，支持递归扫描
-  - `markdown-parser.ts` 解析 Markdown 正文内容，提取标题、代码块等结构
-  - `frontmatter.ts` 解析 frontmatter 元数据
+  - `frontmatter.ts` 解析 frontmatter 元数据（标题、正文等结构已被内化到这里——曾经的 `markdown-parser.ts` 已删，#18）
 - `core/` 负责从解析结果构建图谱数据：
   - `config.ts` 集中管理全局配置（默认布局、节点颜色映射、边类型样式映射），后续换主题/改样式只需改这里
   - `node-builder.ts` 将 frontmatter 映射为 Cytoscape 节点数据
