@@ -1,0 +1,8 @@
+dist/
+node_modules/
+public/
+archive/
+coverage/
+content-manifest.json
+*.min.js
+*.min.css
