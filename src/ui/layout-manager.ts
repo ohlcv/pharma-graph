@@ -224,15 +224,40 @@ export function fitGraph(renderer: Renderer): void {
   renderer.fit();
 }
 
+// Fixed "world-space" random range. We deliberately do NOT use
+// `cy.width()`/`cy.height()` here — those are the *viewport* dimensions,
+// which depend on the user's device (mobile vs. desktop vs. resized
+// window). Coupling the random spread to the viewport means the same
+// logical layout looks radically different on a phone vs. a desktop
+// monitor (issue #17), and resizing the window mid-session would also
+// reshuffle the visual range.
+//
+// A constant ±1500 world units is wide enough that 200+ nodes don't
+// visibly pile up, and it matches the magnitude that cose / dagre
+// produce in their default configs — so subsequent `reset-all` and
+// layout switches don't yank the camera around.
+const RANDOMIZE_WORLD_SIZE = 1500;
+
 export function randomize(renderer: Renderer, highlight: HighlightEngine): void {
   highlight.reset();
   const cy = renderer.getCy();
-  cy.nodes().not('.layer-parent').forEach((node: cytoscape.NodeSingular) => { node.unlock(); });
+  cy.nodes().not('.layer-parent').forEach((node: cytoscape.NodeSingular) => {
+    node.unlock();
+  });
   const nodePanel = document.getElementById('node-panel');
   if (nodePanel) nodePanel.classList.remove('visible');
   const container = cy.container();
   if (container) container.style.filter = 'none';
-  cy.nodes().not('.layer-parent').positions(() => ({ x: Math.random() * cy.width(), y: Math.random() * cy.height() }));
+  cy.nodes()
+    .not('.layer-parent')
+    .positions(() => ({
+      x: (Math.random() - 0.5) * 2 * RANDOMIZE_WORLD_SIZE,
+      y: (Math.random() - 0.5) * 2 * RANDOMIZE_WORLD_SIZE,
+    }));
+  // Fit so the user actually sees the new spread (previously the camera
+  // stayed on its pre-randomize viewport and the new layout appeared as a
+  // tiny clump in one corner).
+  renderer.fit();
 }
 
 // ── Animation ──────────────────────────────────────────────────────────────────
