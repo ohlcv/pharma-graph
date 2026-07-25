@@ -11,9 +11,8 @@
 import cytoscape from 'cytoscape';
 import { Renderer } from '../core/renderer.js';
 import {
-  setDebugActive,
+  toggleDebugOverlay,
   debugOverlayActive,
-  updateForensicPanel,
 } from './app-debug.js';
 
 declare global {
@@ -33,14 +32,7 @@ export function installDebugBridge(renderer: Renderer): void {
 
   const bridge: DebugBridge = {
     overlay: () => {
-      setDebugActive(!debugOverlayActive);
-      const btn = document.getElementById('debug-toggle');
-      if (btn) btn.classList.toggle('active', debugOverlayActive);
-      const panel = document.getElementById('debug-panel');
-      if (panel) panel.style.display = debugOverlayActive ? '' : 'none';
-      if (debugOverlayActive) {
-        updateForensicPanel(renderer);
-      }
+      toggleDebugOverlay(renderer);
     },
     node: (id: string) => {
       const n = cy.getElementById(id);

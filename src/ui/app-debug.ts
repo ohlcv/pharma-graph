@@ -29,21 +29,36 @@ export function setPrevSelectedNode(id: string | null, name: string | null): voi
   _prevSelectedNodeName = name;
 }
 
+/**
+ * Toggle the forensic panel on/off and keep every piece of state in sync:
+ *   - the module-level `debugOverlayActive` flag (read by graph-events).
+ *   - the `#debug-toggle` button's `.active` class.
+ *   - the `#debug-panel` element's `display`.
+ *   - the panel contents (only when activating).
+ *
+ * Returns the new state. Single source of truth for both the button click
+ * handler and the `window._dbg.overlay()` console API — fixes issue #13
+ * where the two paths each managed their own slice of state and could
+ * drift apart.
+ */
+export function toggleDebugOverlay(renderer: Renderer): boolean {
+  const next = !debugOverlayActive;
+  setDebugActive(next);
+  const btn = document.getElementById('debug-toggle');
+  if (btn) btn.classList.toggle('active', next);
+  const panel = document.getElementById('debug-panel');
+  if (panel) panel.style.display = next ? '' : 'none';
+  if (next) updateForensicPanel(renderer);
+  return next;
+}
+
 export function initDebugOverlay(renderer: Renderer): void {
   // ── Inject button into shortcuts sidebar ──────────────────────────────
   const btn = document.createElement('button');
   btn.id = 'debug-toggle';
   btn.textContent = '取证面板 🔍';
   btn.addEventListener('click', () => {
-    const active = btn.classList.toggle('active');
-    const panel = document.getElementById('debug-panel');
-    if (panel) panel.style.display = active ? '' : 'none';
-    if (active) {
-      debugOverlayActive = true;
-      updateForensicPanel(renderer);
-    } else {
-      debugOverlayActive = false;
-    }
+    toggleDebugOverlay(renderer);
   });
   document.querySelector('.shortcuts-list')?.appendChild(btn);
 
