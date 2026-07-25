@@ -96,6 +96,15 @@ export class TourController {
     this.setRunningUI();
   }
 
+  /**
+   * Toggle the tour on/off. If running or paused, stop. Otherwise start.
+   * Replaces the old `toggleTour()` global wrapper in main.ts.
+   */
+  toggle(): void {
+    if (this.running || this.paused) this.stop();
+    else                             this.start();
+  }
+
   stop(): void {
     if (this.engine) this.engine.stop();
     this.engine = null;
@@ -176,11 +185,13 @@ export class TourController {
       if (!target) return;
       const action = target.dataset['tourAction'];
       switch (action) {
-        case 'start':  this.start();      break;
+        case 'start':       this.start();       break;
+        case 'toggle':      this.toggle();      break;
         case 'toggle-pause': this.togglePause(); break;
-        case 'stop':   this.stop();       break;
-        case 'prev':   this.prev();       break;
-        case 'next':   this.next();       break;
+        case 'stop':        this.stop();        break;
+        case 'prev':        this.prev();        break;
+        case 'next':        this.next();        break;
+        case 'toggle-strategy': this.toggleStrategy(); break;
       }
     });
   }
