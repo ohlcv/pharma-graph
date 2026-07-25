@@ -330,9 +330,15 @@ export function updateForensicPanel(renderer: Renderer): void {
   if (propsEl) propsEl.innerHTML = currentNode ? nodeProps(currentNode) : '<span style="color:#64748b">点击图谱中的节点以启动取证</span>';
 
   // ── Prev node ─────────────────────────────────────────────────────
+  // Issue #7: prevNodeName() returned null unconditionally (its
+  // implementation was a TODO placeholder). The render path was relying
+  // on `_prevSelectedNodeId` as a fallback anyway, so we now read the
+  // already-captured `_prevSelectedNodeName` directly — it's populated
+  // by setPrevSelectedNode() and is a faithful snapshot of the previous
+  // node's label, no extra cy lookup required.
   const prevNode = _prevSelectedNodeId ? cy.getElementById(_prevSelectedNodeId) : null;
-  setEl('dbg-prev-name', prevNode
-    ? (prevNodeName(_prevSelectedNodeId) || _prevSelectedNodeId!).slice(0, 20)
+  setEl('dbg-prev-name', _prevSelectedNodeName
+    ? _prevSelectedNodeName.slice(0, 20)
     : '—');
 
   const prevPropsEl = el('dbg-prev-props');
@@ -366,12 +372,6 @@ export function updateForensicPanel(renderer: Renderer): void {
 
   _prevSelectedNodeId = null;
   _prevSelectedNodeName = null;
-}
-
-function prevNodeName(id: string | null): string | null {
-  if (!id) return null;
-  // accessed via renderer cy below — this fn is only called after renderer's cy is available
-  return null; // name is stored in the closure via _prevSelectedNodeName
 }
 
 export function runDebugUpdate(renderer: Renderer, highlight: HighlightEngine): void {
