@@ -1,6 +1,8 @@
 // src/core/tour.ts
 // Auto-exploration engine — Strategy pattern, 2 built-in strategies.
 
+export type TourCompleteReason = 'depth-reached' | 'no-more-restarts' | 'no-root';
+
 export interface TourOptions {
   interval: number;
   maxDepth: number;
@@ -8,7 +10,14 @@ export interface TourOptions {
   onStep?: (info: TourStepInfo) => void;
   /** Called after the pan animation completes */
   onStepAfterCenter?: (info: TourStepInfo) => void;
-  onComplete?: () => void;
+  /**
+   * Called when the engine stops. The reason tells the controller whether
+   * the user reached the configured depth (normal completion), the
+   * infinite-mode restart loop exhausted itself (issue #16 — the user
+   * was getting a silent stop and didn't know why), or there was no
+   * root node to start from.
+   */
+  onComplete?: (reason: TourCompleteReason) => void;
   onPause?: () => void;
   onResume?: () => void;
 }
@@ -599,7 +608,7 @@ export class TourEngine {
           this.highlightAndFocus(id, [id], depth, this.seq.length, this.seqIndex);
           if (this.maxDepth > 0 && this.seqIndex >= this.maxDepth) {
             this.stopped = true;
-            this.onComplete?.();
+            this.onComplete?.('depth-reached');
           }
           return;
         }
@@ -627,7 +636,11 @@ export class TourEngine {
 
       this._restartAttempts = 0;
       this.stopped = true;
-      this.onComplete?.();
+      // Distinguish the "tried 3 times, giving up" path from the normal
+      // depth-reached path so the controller can tell the user why the
+      // tour stopped (issue #16).
+      const reason: TourCompleteReason = this.maxDepth < 0 ? 'no-more-restarts' : 'depth-reached';
+      this.onComplete?.(reason);
       return;
     }
   }

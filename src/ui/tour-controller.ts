@@ -81,7 +81,7 @@ export class TourController {
       strategy: uiState.tour.strategy,
       onStep:           (info) => this.onStep(info),
       onStepAfterCenter:(info) => { this.detailPanel.show(info.nodeId); },
-      onComplete:       () => this.onComplete(),
+      onComplete:       (reason) => this.onComplete(reason),
     });
     this.running = true;
     this.paused = false;
@@ -431,23 +431,39 @@ export class TourController {
     this.setText('tour-step-total-mob2', String(total));
   }
 
-  private onComplete(): void {
+  private onComplete(reason: 'depth-reached' | 'no-more-restarts' | 'no-root'): void {
     this.running = false;
     this.paused = false;
 
-    this.setText('tour-depth-badge',        '\u2713');
-    this.setText('tour-depth-badge-mob2',  '\u2713');
+    // Issue #16: distinguish between the user finishing the configured
+    // depth (normal completion, show ✓) and the infinite-mode restart loop
+    // burning out (show ⏹ and a hint so the user understands why the tour
+    // stopped on its own).
+    const exhausted = reason === 'no-more-restarts';
+    const badge = exhausted ? '⏹' : '\u2713';
+    const nameLabel = exhausted ? '已停止' : '完成';
+
+    this.setText('tour-depth-badge',        badge);
+    this.setText('tour-depth-badge-mob2',  badge);
     this.setText('tour-count-badge',        '—');
     this.setText('tour-count-badge-mob2',  '—');
-    this.setText('tour-depth-badge-dt',     '\u2713');
-    this.setText('tour-depth-badge-dt2',    '\u2713');
+    this.setText('tour-depth-badge-dt',     badge);
+    this.setText('tour-depth-badge-dt2',    badge);
     this.setText('tour-count-badge-dt',     '—');
     this.setText('tour-count-badge-dt2',    '—');
-    this.setText('tour-dt-node-name',      '完成');
-    this.setText('tour-dt-node-name2',    '完成');
+    this.setText('tour-dt-node-name',      nameLabel);
+    this.setText('tour-dt-node-name2',    nameLabel);
     for (const suffix of ['', '2']) {
       const fillEl = document.getElementById(`tour-progress-fill-dt${suffix}`);
       if (fillEl) fillEl.style.width = '100%';
+    }
+
+    // If the tour exhausted itself, surface a title so the bar reads
+    // "已停止 — 已试 3 轮" instead of just "已停止". The tooltip stays
+    // bounded so the bar never grows taller than the running layout.
+    if (exhausted) {
+      this.setText('tour-dt-node-name',   '已停止 · 已试 3 轮');
+      this.setText('tour-dt-node-name2', '已停止 · 已试 3 轮');
     }
 
     this.setIdleUI();
