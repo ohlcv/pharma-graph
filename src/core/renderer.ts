@@ -110,6 +110,14 @@ const STYLESHEET: any[] = (() => {
         'background-blacken': 0,
         shape: 'ellipse',
         'text-events': 'yes',
+        // Stagger entrance: when the `.entering` class is removed, opacity
+        // fades back in over ~280ms with ease-out. Width/height are NOT
+        // transitioned (cy's transition machinery doesn't scale up node
+        // radii smoothly without layout races — see anim-pulse.ts for
+        // the dedicated width/height pipeline).
+        'transition-property': 'opacity, border-color, border-width, background-color',
+        'transition-duration': '280ms',
+        'transition-timing-function': 'ease-out',
       },
     },
     // ② field 边框色 (学科色, 1.5px ring 表达"属哪一科")
@@ -149,8 +157,13 @@ const STYLESHEET: any[] = (() => {
         'arrow-scale': 0.7,
         opacity: 0.6,
         'haystack-radius': 0,
-        'transition-property': 'line-color, opacity, width',
-        'transition-duration': '0.15s',
+        // Edge entrance: when the `.entering` class is removed on a per-edge
+        // delay, opacity eases 0 → 0.6 over 400ms. Matches the wider node
+        // stagger so the graph "lights up like a constellation" rather
+        // than popping on as a static network.
+        'transition-property': 'line-color, opacity, width, target-arrow-color',
+        'transition-duration': '400ms',
+        'transition-timing-function': 'ease-out',
       },
     },
     // 边类型样式
