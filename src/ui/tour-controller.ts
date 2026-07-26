@@ -364,15 +364,34 @@ export class TourController {
     // that field — it was a dead mirror. The toggle is now registered
     // with uiState (as a no-op for `tourBarCollapsed` since the field
     // has been removed) but the live value lives in the toggle alone.
+    //
+    // Issue #29: advertise as a collapse/expand toggle
+    // (`aria-expanded` on the handle, not `aria-pressed`). The handle
+    // is a `<div>` styled to look like a button; we add
+    // `role="button"` + `tabindex="0"` + Enter/Space keyboard support
+    // in HTML so screen-reader users land on it.
     this.barToggle = new UiToggle({
       persist: 'tourBar.collapsed',
       cssClass: 'collapsed',
+      // Collapse-handle is a div styled as a button; aria-pressed would
+      // suggest a sticky on/off toggle, but collapse semantics need
+      // aria-expanded.
+      ariaPressed: false,
+      ariaExpanded: true,
       applyTo: (bar && chev ? [bar, chev as unknown as HTMLElement] : (bar ?? chev ?? handle)) as HTMLElement | HTMLElement[],
     });
     registerTourBarToggle(this.barToggle);
     handle.addEventListener('click', (e) => {
       e.stopPropagation();
       this.barToggle.toggle();
+    });
+    // Issue #29: keyboard activation for the div-as-button handle.
+    handle.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        e.stopPropagation();
+        this.barToggle.toggle();
+      }
     });
   }
 
@@ -468,7 +487,24 @@ export class TourController {
       this.setText('tour-dt-node-name2', '已停止 · 已试 3 轮');
     }
 
+    // Issue #29: announce terminal tour state to screen readers. This
+    // is the only tour event that should reach AT — per-step updates
+    // would be too noisy.
+    this.announceStatus(
+      exhausted
+        ? '漫游已停止 · 已试 3 轮'
+        : '漫游已完成',
+    );
+
     this.setIdleUI();
+  }
+
+  /** Issue #29: write to the `#tour-status-announcer` live region. */
+  private announceStatus(msg: string): void {
+    const el = document.getElementById('tour-status-announcer');
+    if (!el) return;
+    el.textContent = '';
+    el.textContent = msg;
   }
 
   // ── UI broadcasting ───────────────────────────────────────────────────────

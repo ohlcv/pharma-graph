@@ -161,9 +161,13 @@
     <div id="node-panel" class="node-panel" role="dialog" aria-label="节点详情">
       <div class="node-panel__header" id="node-panel-header" onpointerdown="startPanelDrag(event)">
         <span class="node-panel__title">节点详情</span>
-        <div class="node-panel__tabs">
-          <button class="node-panel__tab active" id="lp-tab-overview" aria-label="概述">概</button>
-          <button class="node-panel__tab" id="lp-tab-body" aria-label="正文">文</button>
+        <div class="node-panel__tabs" role="tablist" aria-label="详情面板标签">
+          <button class="node-panel__tab active" id="lp-tab-overview"
+                  role="tab" aria-selected="true"  aria-controls="lp-overview-page"
+                  aria-label="概述" tabindex="0">概</button>
+          <button class="node-panel__tab"        id="lp-tab-body"
+                  role="tab" aria-selected="false" aria-controls="lp-body-page"
+                  aria-label="正文" tabindex="-1">文</button>
         </div>
         <button class="node-panel__pin" id="lp-btn-pin" aria-label="固定位置" title="固定位置">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
@@ -179,8 +183,8 @@
         </button>
       </div>
       <div class="node-panel__body">
-        <div id="lp-overview-page" class="np-page"></div>
-        <div id="lp-body-page" class="np-page" style="display:none"></div>
+        <div id="lp-overview-page" class="np-page" role="tabpanel" aria-labelledby="lp-tab-overview"></div>
+        <div id="lp-body-page"    class="np-page" role="tabpanel" aria-labelledby="lp-tab-body"     style="display:none"></div>
       </div>
     </div>
 
@@ -562,15 +566,25 @@
   </div>
 
   <!-- 漫游状态条：桌面端浮动底部，移动端独立卡片 -->
-  <div id="tour-status" class="tour-status tour-mob tour-state-target" aria-live="polite">
-    <!-- 折叠把手（移动端专属） -->
-    <div class="tour-mob__handle" id="tour-status-handle">
+  <!-- `aria-live="polite"` lives on a small status region below (see
+       `#tour-status-announcer`), not on the container itself —
+       announcing every per-tick stat update is too noisy for screen
+       readers (issue #29). -->
+  <div id="tour-status" class="tour-status tour-mob tour-state-target">
+    <!-- 折叠把手（移动端专属）。div-as-button because the chevron chev
+         is part of an SVG; we supply `role="button"` + `tabindex="0"`
+         + `aria-expanded` + `aria-controls` so keyboard / screen-reader
+         users have a discoverable target (issue #29). -->
+    <div class="tour-mob__handle" id="tour-status-handle"
+         role="button" tabindex="0"
+         aria-expanded="true" aria-controls="tour-status-inner"
+         aria-label="折叠漫游状态条">
       <svg class="tour-mob__chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="6 9 12 15 18 9"/>
       </svg>
     </div>
     <!-- 内容区 -->
-    <div class="tour-mob__inner">
+    <div class="tour-mob__inner" id="tour-status-inner">
       <!-- 控制按钮 -->
       <div class="tour-mob__ctrl">
         <button class="tour-mob__close" id="tour-close-btn" data-tour-action="stop">
@@ -649,7 +663,15 @@
         </div>
       </div>
     </div>
+    <!-- Issue #29: hidden live region. Spans tour state changes ("漫游
+         已停止 · 已试 3 轮") and search navigation ("第 3 / 共 5 个结果")
+         without announcing every per-tick stat update. -->
+    <div id="tour-status-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
   </div>
+
+  <!-- Hidden live region for search-result navigation (issue #29).
+       `Search` writes "第 N / 共 M 个结果" here on each navigate. -->
+  <div id="search-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
   <!-- 桌面版漫游条（和移动版平级，独立控制显示） -->
   <div id="tour-dt" class="tour-dt tour-state-target">

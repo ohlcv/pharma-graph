@@ -50,4 +50,21 @@ html, body {
 #sidebar::-webkit-scrollbar   { width: 4px; }
 * { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 
+/* Screen-reader-only utility (issue #29): visually hidden but readable
+   by assistive tech. Used by aria-live regions for tour + search
+   announcements. The `clip-path` rule is the modern clip; the legacy
+   `clip` rule covers older AT that hasn't caught up. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  clip-path: inset(50%);
+}
+
 }

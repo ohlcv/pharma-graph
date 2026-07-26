@@ -29,8 +29,20 @@ export interface UiToggleOptions {
   applyTo?: HTMLElement | HTMLElement[];
   /** Class added when on, removed when off. Default 'is-active'. */
   cssClass?: string;
-  /** Attribute that mirrors the state via `aria-pressed`. Default true. */
+  /**
+   * Attribute that mirrors the state via `aria-pressed`. Default true.
+   * Set to false for elements that should advertise themselves as
+   * collapse/expand toggles via `aria-expanded` instead
+   * (`ariaExpanded: true`).
+   */
   ariaPressed?: boolean;
+  /**
+   * Mirror state via `aria-expanded`. Use for collapse/expand toggles
+   * where `aria-pressed` would be semantically wrong. Mutually
+   * exclusive with `ariaPressed` — if both are set, `aria-expanded`
+   * wins for the elements in `applyTo`. Default false.
+   */
+  ariaExpanded?: boolean;
   /** Optional change listener. */
   onChange?: (on: boolean) => void;
 }
@@ -65,6 +77,7 @@ export class UiToggle {
       initial: opts.initial ?? false,
       cssClass: opts.cssClass ?? 'is-active',
       ariaPressed: opts.ariaPressed ?? true,
+      ariaExpanded: opts.ariaExpanded ?? false,
       persist: opts.persist,
       applyTo: opts.applyTo,
       onChange: opts.onChange,
@@ -103,10 +116,17 @@ export class UiToggle {
   private syncDom(on: boolean): void {
     const el = this.options.applyTo;
     if (!el) return;
+    const ariaExpanded = this.options.ariaExpanded;
+    const ariaPressed = this.options.ariaPressed && !ariaExpanded;
     const apply = (e: HTMLElement) => {
       e.classList.toggle(this.options.cssClass, on);
-      if (this.options.ariaPressed && 'setAttribute' in e) {
-        e.setAttribute('aria-pressed', String(on));
+      if ('setAttribute' in e) {
+        // `aria-expanded` wins when both are set — see `ariaExpanded`
+        // JSDoc. We still emit `aria-pressed` only when `aria-expanded`
+        // is off, so the toggle's element doesn't carry both attributes
+        // (screen readers can disagree about which to announce).
+        if (ariaExpanded) e.setAttribute('aria-expanded', String(on));
+        else if (ariaPressed) e.setAttribute('aria-pressed', String(on));
       }
     };
     if (Array.isArray(el)) el.forEach(apply);
