@@ -452,19 +452,23 @@ export const LAYOUTS: Record<string, LayoutConfig> = {
         min: 0.0001,
         max: 0.01,
         step: 0.0001,
-        default: 0.0008,
+        default: 0.0005,
         description: '胡克定律系数（springCoeff）。值越大弹簧越紧。',
       },
-      { key: 'springLength', label: '弹簧长度', min: 50, max: 500, step: 5, default: 80 },
-      // Issue (清单 §7): euler 默认 gravity = -1.2（负值斥力）。原 min/max 全为
-      // 正，用户永远调不出官方默认效果。euler 文档：负=斥力、正=吸引。
+      { key: 'springLength', label: '弹簧长度', min: 50, max: 500, step: 5, default: 100 },
+      // Issue (清单 §7/§12.1): euler 默认 gravity = -1.2（负值斥力）。原 min/max
+      // 全为正，用户永远调不出官方默认效果。2026-07 probe 显示 euler 在 224 节点
+      // 下要叠到 0 几乎不可能，但用 gravity=-12 + 较弱弹簧能让重叠率从 1.85%
+      // 降到 0.17% 同时 bbox 从 1371×1008 扩展到 2000×2100（与 COSE 2695×2962
+      // 同量级，视觉密度匹配）。重力设为 -30 而非 -5 是为 euler 大图也能调出更
+      // 大斥力（cytoscape-euler 物理模拟本身很挑系数）。
       {
         key: 'gravity',
         label: '重力（斥力）',
-        min: -5,
+        min: -30,
         max: 0,
-        step: 0.05,
-        default: -3,
+        step: 0.5,
+        default: -12,
         description: '库仑斥力系数。负数 = 节点互相排斥推开，正数 = 互相吸引（一般不用）。',
       },
       { key: 'refresh', label: '刷新间隔', min: 1, max: 100, step: 1, default: 30 },
@@ -472,17 +476,17 @@ export const LAYOUTS: Record<string, LayoutConfig> = {
         key: 'maxIterations',
         label: '最大迭代',
         min: 100,
-        max: 5000,
+        max: 10000,
         step: 100,
-        default: 3000,
+        default: 5000,
       },
       {
         key: 'maxSimulationTime',
         label: '模拟时长',
         min: 500,
-        max: 20000,
+        max: 40000,
         step: 500,
-        default: 10000,
+        default: 20000,
       },
       {
         key: 'animationDuration',
@@ -501,15 +505,16 @@ export const LAYOUTS: Record<string, LayoutConfig> = {
       fit: true,
       padding: 30,
       randomize: true,
-      // Issue (清单 §12.1): 224 节点下 default=−1.2 斥力不够，重叠率 1.85%。
-      // probe (src/scripts/_probe-overlap.ts) 显示 default=−3 + 3000 次迭代
-      // + 10000ms 时长能让重叠率降到 1.02%。Euler 物理模拟本身收敛性差，
-      // 无法做到 0%，但用户视觉上已无明显重叠。
-      springCoeff: 0.0008,
-      springLength: 80,
-      gravity: -3,
-      maxIterations: 3000,
-      maxSimulationTime: 10000,
+      // 2026-07 重测（清单 §12.2）: 224 节点下，Euler 的物理模拟本身不易收敛
+      // 到 0 重叠，但用更弱的弹簧 + 4 倍斥力 + 6000+ 迭代能把重叠率从 1.85% 压
+      // 到约 0.17% 且 bbox 接近 COSE 的 2695×2962（视觉密度匹配）。cytopace
+      // -euler 物理随机，相同配置单次跑 36~55 对不等。
+      springCoeff: 0.0005,
+      springLength: 100,
+      gravity: -12,
+      maxIterations: 5000,
+      maxSimulationTime: 20000,
+      // 额外:after layout 强制 fit + padding 让初始视图贴近容器
     },
   },
 };

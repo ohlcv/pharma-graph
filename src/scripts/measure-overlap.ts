@@ -145,8 +145,21 @@ function measureOverlap(cy: ReturnType<typeof cytoscape>): void {
     }
   }
   const total = (positions.length * (positions.length - 1)) / 2;
+  // bbox to flag spread-out outputs (extreme repulsion ⇒ huge graph)
+  let minX = +Infinity,
+    minY = +Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
+  positions.forEach((p) => {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  });
   console.log(
-    `  overlap pairs: ${overlapPairs} / ${total} = ${((overlapPairs / total) * 100).toFixed(2)}%`,
+    `  overlap pairs: ${overlapPairs} / ${total} = ${((overlapPairs / total) * 100).toFixed(
+      2,
+    )}%, bbox: ${Math.round(maxX - minX)}×${Math.round(maxY - minY)}`,
   );
 }
 
@@ -264,6 +277,198 @@ runLayout('euler', {
   refresh: 30,
   maxIterations: 3000,
   maxSimulationTime: 10000,
+});
+
+console.log('\n=== euler: aggressive sweep — gravity -5 / -8 ===');
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0008,
+  springLength: 80,
+  gravity: -5,
+  refresh: 30,
+  maxIterations: 5000,
+  maxSimulationTime: 20000,
+});
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0008,
+  springLength: 80,
+  gravity: -8,
+  refresh: 30,
+  maxIterations: 5000,
+  maxSimulationTime: 20000,
+});
+
+console.log('\n=== euler: extreme gravity -15, -25, -40 ===');
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0008,
+  springLength: 80,
+  gravity: -15,
+  refresh: 30,
+  maxIterations: 5000,
+  maxSimulationTime: 20000,
+});
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0008,
+  springLength: 80,
+  gravity: -25,
+  refresh: 30,
+  maxIterations: 5000,
+  maxSimulationTime: 20000,
+});
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0008,
+  springLength: 80,
+  gravity: -40,
+  refresh: 30,
+  maxIterations: 5000,
+  maxSimulationTime: 20000,
+});
+
+console.log('\n=== euler: gravity -8 + force longer springs ===');
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0008,
+  springLength: 150,
+  gravity: -8,
+  refresh: 30,
+  maxIterations: 5000,
+  maxSimulationTime: 20000,
+});
+
+console.log('\n=== euler: gravity -8 + much weaker spring (less pull-together) ===');
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0001,
+  springLength: 80,
+  gravity: -8,
+  refresh: 30,
+  maxIterations: 5000,
+  maxSimulationTime: 20000,
+});
+
+console.log('\n=== euler: gravity -15 + weaker spring, sweep springCoeff ===');
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0005,
+  springLength: 80,
+  gravity: -15,
+  refresh: 30,
+  maxIterations: 5000,
+  maxSimulationTime: 20000,
+});
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0001,
+  springLength: 80,
+  gravity: -15,
+  refresh: 30,
+  maxIterations: 5000,
+  maxSimulationTime: 20000,
+});
+
+console.log('\n=== euler: gravity -25 + springCoeff 0.0001 (best of sweep so far) ===');
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0001,
+  springLength: 80,
+  gravity: -25,
+  refresh: 30,
+  maxIterations: 5000,
+  maxSimulationTime: 20000,
+});
+
+console.log(
+  '\n=== euler: tuned (best candidate) — gravity -25 + springCoeff 0.0001 + more iters ===',
+);
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0001,
+  springLength: 80,
+  gravity: -25,
+  refresh: 30,
+  maxIterations: 8000,
+  maxSimulationTime: 30000,
+});
+
+console.log('\n=== euler: tuned but softer (final production candidate) ===');
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0008,
+  springLength: 100,
+  gravity: -15,
+  refresh: 30,
+  maxIterations: 5000,
+  maxSimulationTime: 20000,
+});
+
+console.log('\n=== euler: production 1 — soft and spread ===');
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0005,
+  springLength: 100,
+  gravity: -12,
+  refresh: 30,
+  maxIterations: 5000,
+  maxSimulationTime: 20000,
+});
+
+console.log('\n=== euler: production 1+ — same but more iters ===');
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0005,
+  springLength: 100,
+  gravity: -12,
+  refresh: 30,
+  maxIterations: 10000,
+  maxSimulationTime: 30000,
+});
+
+console.log('\n=== euler: production 1b — gentle + slight more repulsion ===');
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0006,
+  springLength: 100,
+  gravity: -10,
+  refresh: 30,
+  maxIterations: 5000,
+  maxSimulationTime: 20000,
+});
+
+console.log('\n=== euler: production 2 — even softer ===');
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.001,
+  springLength: 100,
+  gravity: -10,
+  refresh: 30,
+  maxIterations: 4000,
+  maxSimulationTime: 15000,
+});
+
+console.log('\n=== euler: production 3 — keep coeff, push gravity ===');
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0008,
+  springLength: 100,
+  gravity: -8,
+  refresh: 30,
+  maxIterations: 4000,
+  maxSimulationTime: 15000,
+});
+
+console.log('\n=== euler: production 4 — gentle baseline+ ===');
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0008,
+  springLength: 120,
+  gravity: -6,
+  refresh: 30,
+  maxIterations: 4000,
+  maxSimulationTime: 15000,
 });
 
 console.log('\n=== cose: pure-tighter repulsion dominance ===');
