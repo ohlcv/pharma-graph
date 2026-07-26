@@ -211,8 +211,16 @@ const STYLESHEET: any[] = (() => {
       opacity: 0.95,
       'border-width': 2,
       'border-color': '#fbbf24',
-      'overlay-color': 'rgba(251, 191, 36, 0.45)',
-      'overlay-opacity': 0.45,
+      // Outer halo to make matched nodes stand out even when many are
+      // packed in a tight cluster — underlay lives outside the node,
+      // so adjacent labels don't get visually collided into the halo.
+      'underlay-color': 'rgba(251, 191, 36, 0.30)',
+      'underlay-opacity': 0.85,
+      'underlay-padding': 10,
+      'underlay-shape': 'ellipse',
+      // Foreground ring for the sharp focus cue.
+      'overlay-color': 'rgba(251, 191, 36, 0.55)',
+      'overlay-opacity': 0.65,
       'overlay-padding': 6,
       'overlay-shape': 'ellipse',
     }},
