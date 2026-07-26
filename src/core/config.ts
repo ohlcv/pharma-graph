@@ -96,13 +96,18 @@ export const FIELD_LABEL: Record<string, string> = {
 // tier 回答"在哪一层"——基础层最大众、法规层最稀有
 // 填充色辅助识别层次
 
-export const NODE_TIER_STYLE: Record<string, { bgColor: string; glow: string; halo: string }> = {
-  basic:      { bgColor: '#cbd5e1', glow: 'rgba(203,213,225,0.25)', halo: 'rgba(203,213,225,0.55)' },  // 灰蓝 — 基础层
-  drug:       { bgColor: '#93c5fd', glow: 'rgba(147,197,253,0.30)', halo: 'rgba(147,197,253,0.70)' },  // 浅蓝 — 药物层
-  disease:    { bgColor: '#fca5a5', glow: 'rgba(252,165,165,0.30)', halo: 'rgba(252,165,165,0.70)' },  // 浅红 — 疾病层
-  management: { bgColor: '#fde68a', glow: 'rgba(253,230,138,0.30)', halo: 'rgba(253,230,138,0.70)' },  // 浅黄 — 管理层
-  service:    { bgColor: '#6ee7b7', glow: 'rgba(110,231,183,0.30)', halo: 'rgba(110,231,183,0.70)' },  // 浅青 — 服务层
-  legal:      { bgColor: '#d8b4fe', glow: 'rgba(216,180,254,0.30)', halo: 'rgba(216,180,254,0.70)' },  // 浅紫 — 法规层
+// `bgColor` is the only visual property tiers control now — halo/glow
+// fields were removed in Batch G alongside the underlay styles. Node
+// shapes vary (hexagon, star, tag, etc.) and cytoscape's underlay can
+// only be ellipse or round-rectangle, so a uniform halo looked
+// inconsistent across essence types.
+export const NODE_TIER_STYLE: Record<string, { bgColor: string }> = {
+  basic:      { bgColor: '#cbd5e1' },  // 灰蓝 — 基础层
+  drug:       { bgColor: '#93c5fd' },  // 浅蓝 — 药物层
+  disease:    { bgColor: '#fca5a5' },  // 浅红 — 疾病层
+  management: { bgColor: '#fde68a' },  // 浅黄 — 管理层
+  service:    { bgColor: '#6ee7b7' },  // 浅青 — 服务层
+  legal:      { bgColor: '#d8b4fe' },  // 浅紫 — 法规层
 };
 
 export const TIER_LABEL: Record<string, string> = {

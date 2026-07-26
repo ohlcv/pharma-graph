@@ -45,19 +45,13 @@ describe('cytoscape stylesheet color tokens (split on whitespace)', () => {
     }
   });
 
-  it('NODE_TIER_STYLE — base + halo colors all parseable', () => {
+  it('NODE_TIER_STYLE — bgColor all parseable as hex', () => {
+    // halo/glow removed in Batch G (Batch A reintroduced underlay,
+    // Batch G removed it because cytoscape's underlay-shape only
+    // supports round-rectangle / ellipse and doesn't track the 8
+    // node essence shapes). bgColor is the only thing left.
     for (const [tier, s] of Object.entries(NODE_TIER_STYLE)) {
-      // halo may be rgba with spaces; tokens split on whitespace
-      const stopColors = `${s.bgColor} ${s.halo}`;
-      const tokens = stopColors.split(/\s+/);
-      for (const tok of tokens) {
-        // base color must be hex OR rgba WITHOUT spaces inside (won't work
-        // if rgba contains spaces; use HEX ONLY for stop)
-        // In our case bgColor is hex and halo may be rgba with spaces — but
-        // halo isn't used in node-gradient stops (only line stops).
-        expect(parseToken(tok) || HEX_RE.test(tok),
-          `NODE_TIER_STYLE[${tier}] token "${tok}" not parseable`).toBe(true);
-      }
+      expect(HEX_RE.test(s.bgColor), `NODE_TIER_STYLE[${tier}].bgColor "${s.bgColor}" must be hex`).toBe(true);
     }
   });
 

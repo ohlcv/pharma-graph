@@ -48,9 +48,10 @@ export const CLASSES = {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const STYLESHEET: any[] = (() => {
-  // Tier 填充色 + 外圈 glow 色（radial-gradient 形成"内核+外晕"）
+  // Default fill for nodes without an explicit tier. Halo/glow was
+  // removed in Batch G — cytoscape's underlay can only be ellipse or
+  // round-rectangle and looks inconsistent across node shapes.
   const TIER_DEFAULT_FILL = '#f8fafc';
-  const TIER_DEFAULT_GLOW = 'rgba(248,250,252,0.20)';
 
   // Essence 规则 — 仅形状（填充色由 tier 统一管理）
   const nodeTypeRules = Object.entries(NODE_TYPE_SHAPE).map(([key, shape]) => {
@@ -112,12 +113,11 @@ const STYLESHEET: any[] = (() => {
         'text-background-color': 'rgba(15,17,23,0.82)',
         'text-background-shape': 'roundrectangle',
         'text-background-padding': '3px',
-        // Halo: cytoscape 3.20+ supports `underlay-*` properties — a second
-        // shape rendered *behind* the node with `underlay-padding` leaving
-        // a visible gap between node body and halo. Cleaner than a fake
-        // "radial-gradient inside the node" trick: halo lives OUTSIDE the
-        // node and doesn't distort the body fill.
-        // Fallback defaults for nodes without an explicit tier.
+        // No underlay halo — cytoscape 3.20+ underlay can only be
+        // round-rectangle or ellipse (per `underlay-shape` enum), which
+        // doesn't track per-node shapes (hexagon / star / tag etc.) and
+        // looks inconsistent. Halo was removed in Batch G; we lean on
+        // border-color + opacity for the visual emphasis instead.
         'border-width': 1.5,
         'border-color': '#475569',
         'background-color': TIER_DEFAULT_FILL,
@@ -125,16 +125,12 @@ const STYLESHEET: any[] = (() => {
         'background-blacken': 0,
         shape: 'ellipse',
         'text-events': 'yes',
-        'underlay-color': TIER_DEFAULT_GLOW,
-        'underlay-opacity': 0.55,
-        'underlay-padding': 6,
-        'underlay-shape': 'ellipse',
         // Stagger entrance: when the `.entering` class is removed, opacity
         // fades back in over ~280ms with ease-out. Width/height are NOT
         // transitioned (cy's transition machinery doesn't scale up node
         // radii smoothly without layout races — see anim-pulse.ts for
         // the dedicated width/height pipeline).
-        'transition-property': 'opacity, border-color, border-width, background-color, underlay-color, underlay-opacity',
+        'transition-property': 'opacity, border-color, border-width, background-color',
         'transition-duration': '280ms',
         'transition-timing-function': 'ease-out',
       },
@@ -143,14 +139,11 @@ const STYLESHEET: any[] = (() => {
     ...fieldRules,
     // ③ essence 形状（节点本质决定形状）
     ...nodeTypeRules,
-    // ④ tier 填充色 + halo (内核 + 同色外晕 — 用 underlay 替代之前的 radial-gradient)
+    // ④ tier 填充色 — halo 已移除 (Batch G), 形状各异的节点不强制套椭圆外圈
     ...Object.entries(NODE_TIER_STYLE).map(([key, style]) => ({
       selector: `node[tier = "${key}"]`,
       style: {
         'background-color': style.bgColor,
-        'underlay-color': style.halo,
-        'underlay-opacity': 0.7,
-        'underlay-padding': 6,
       },
     })),
     // 虚拟层父节点
@@ -208,42 +201,25 @@ const STYLESHEET: any[] = (() => {
       'color': 'rgba(226,232,240,0.25)',
     }},
     { selector: '.entering', style: { opacity: 0 } },
-    // Hover / select / highlight use cytoscape 3.20+ `overlay-*` to paint
-    // a soft ring *on top* of the node (rather than just bumping border-
-    // width which makes the icon look heavier). Underlay is the halo
-    // (Batch A); overlay is the *foreground* focus state.
+    // Hover / select / highlight all use border-color + border-width
+    // (Batch G). overlay-* and underlay-* were both removed because
+    // cytoscape's overlay/underlay-shape only supports round-rectangle
+    // and ellipse, which look inconsistent on the 8 essence shapes
+    // (hexagon, star, tag, etc.). Border tracks the node shape exactly.
     { selector: '.hovered', style: {
       opacity: 1,
-      'border-width': 2,
-      'overlay-color': 'rgba(129, 140, 248, 0.55)', // indigo-400 @ 55%
-      'overlay-opacity': 0.55,
-      'overlay-padding': 8,
-      'overlay-shape': 'ellipse',
+      'border-width': 3,
+      'border-color': '#818cf8', // indigo-400
     }},
     { selector: '.selected-node', style: {
       opacity: 1,
-      'border-width': 3,
-      'overlay-color': 'rgba(251, 191, 36, 0.85)', // amber-400 @ 85%
-      'overlay-opacity': 0.9,
-      'overlay-padding': 10,
-      'overlay-shape': 'ellipse',
+      'border-width': 4,
+      'border-color': '#fbbf24', // amber-400
     }},
     { selector: '.highlighted', style: {
       opacity: 0.95,
-      'border-width': 2,
-      'border-color': '#fbbf24',
-      // Outer halo to make matched nodes stand out even when many are
-      // packed in a tight cluster — underlay lives outside the node,
-      // so adjacent labels don't get visually collided into the halo.
-      'underlay-color': 'rgba(251, 191, 36, 0.30)',
-      'underlay-opacity': 0.85,
-      'underlay-padding': 10,
-      'underlay-shape': 'ellipse',
-      // Foreground ring for the sharp focus cue.
-      'overlay-color': 'rgba(251, 191, 36, 0.55)',
-      'overlay-opacity': 0.65,
-      'overlay-padding': 6,
-      'overlay-shape': 'ellipse',
+      'border-width': 3,
+      'border-color': '#fbbf24', // amber-400
     }},
     { selector: '.highlighted-edge', style: {
       opacity: 1,
