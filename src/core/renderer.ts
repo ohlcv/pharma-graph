@@ -48,8 +48,9 @@ export const CLASSES = {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const STYLESHEET: any[] = (() => {
-  // Tier 填充色
+  // Tier 填充色 + 外圈 glow 色（radial-gradient 形成"内核+外晕"）
   const TIER_DEFAULT_FILL = '#f8fafc';
+  const TIER_DEFAULT_GLOW = 'rgba(248,250,252,0.20)';
 
   // Essence 规则 — 仅形状（填充色由 tier 统一管理）
   const nodeTypeRules = Object.entries(NODE_TYPE_SHAPE).map(([key, shape]) => {
@@ -96,22 +97,34 @@ const STYLESHEET: any[] = (() => {
         'text-background-color': 'rgba(15,17,23,0.82)',
         'text-background-shape': 'roundrectangle',
         'text-background-padding': '3px',
-        'border-width': 0,
+        // Inner core + outer halo via radial-gradient (0% center, 70% stop
+        // leaves a glowing halo at the rim). The actual tier colors come
+        // from per-tier rules below, which override these. This is the
+        // fallback for nodes without an explicit tier.
+        'border-width': 1.5,
         'border-color': '#475569',
+        'background-fill': 'radial-gradient',
+        'background-gradient-stop-positions': '0% 70%',
+        'background-gradient-stop-colors': `${TIER_DEFAULT_FILL} ${TIER_DEFAULT_GLOW}`,
         'background-color': TIER_DEFAULT_FILL,
         'background-blacken': 0,
         shape: 'ellipse',
         'text-events': 'yes',
       },
     },
-    // ② field 边框色
+    // ② field 边框色 (学科色, 1.5px ring 表达"属哪一科")
     ...fieldRules,
     // ③ essence 形状（节点本质决定形状）
     ...nodeTypeRules,
-    // ④ tier 填充色（层次色均匀覆盖整节点）
+    // ④ tier 填充色 + glow halo（层次色覆盖内核，外圈半透明辉光）
     ...Object.entries(NODE_TIER_STYLE).map(([key, style]) => ({
       selector: `node[tier = "${key}"]`,
-      style: { 'background-color': style.bgColor },
+      style: {
+        'background-color': style.bgColor,
+        'background-fill': 'radial-gradient',
+        'background-gradient-stop-positions': '0% 70%',
+        'background-gradient-stop-colors': `${style.bgColor} ${style.glow}`,
+      },
     })),
     // 虚拟层父节点
     {
