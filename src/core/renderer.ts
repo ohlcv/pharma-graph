@@ -173,10 +173,9 @@ const STYLESHEET: any[] = (() => {
     // 边类型样式
     ...edgeTypeRules,
     // ── 交互状态 ──────────────────────────────────────────────────────────────
-    {
-      selector: '.selected-node',
-      style: { opacity: 1, 'border-width': 4 },
-    },
+    // .selected-node, .hovered, .highlighted are defined above with
+    // overlay-* support (cytoscape 3.20+). Don't redefine them here —
+    // duplicate selectors work but bloat the stylesheet.
     { selector: '.dimmed', style: {
       opacity: 0.1,
       'border-color': 'rgba(255,255,255,0.06)',
@@ -188,14 +187,34 @@ const STYLESHEET: any[] = (() => {
       'color': 'rgba(226,232,240,0.25)',
     }},
     { selector: '.entering', style: { opacity: 0 } },
+    // Hover / select / highlight use cytoscape 3.20+ `overlay-*` to paint
+    // a soft ring *on top* of the node (rather than just bumping border-
+    // width which makes the icon look heavier). Underlay is the halo
+    // (Batch A); overlay is the *foreground* focus state.
     { selector: '.hovered', style: {
       opacity: 1,
+      'border-width': 2,
+      'overlay-color': 'rgba(129, 140, 248, 0.55)', // indigo-400 @ 55%
+      'overlay-opacity': 0.55,
+      'overlay-padding': 8,
+      'overlay-shape': 'ellipse',
+    }},
+    { selector: '.selected-node', style: {
+      opacity: 1,
       'border-width': 3,
+      'overlay-color': 'rgba(251, 191, 36, 0.85)', // amber-400 @ 85%
+      'overlay-opacity': 0.9,
+      'overlay-padding': 10,
+      'overlay-shape': 'ellipse',
     }},
     { selector: '.highlighted', style: {
-      opacity: 0.8,
-      'border-width': 2.5,
+      opacity: 0.95,
+      'border-width': 2,
       'border-color': '#fbbf24',
+      'overlay-color': 'rgba(251, 191, 36, 0.45)',
+      'overlay-opacity': 0.45,
+      'overlay-padding': 6,
+      'overlay-shape': 'ellipse',
     }},
     { selector: '.highlighted-edge', style: {
       opacity: 1,
