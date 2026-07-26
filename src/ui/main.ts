@@ -26,6 +26,7 @@ import { Search } from './search.js';
 import { LAYOUTS } from '../core/config.js';
 import { brandCarousel } from './carousel.js';
 import { uiState } from './state.js';
+import { logInfo } from './logger.js';
 import { loadContent } from '../core/content-loader.js';
 import {
   installDispatcher,
@@ -70,10 +71,13 @@ async function boot(): Promise<void> {
   const { files: mdFiles } = await loadContent();
   const graphManager = new GraphManager(mdFiles as Record<string, string>);
   const data = graphManager.build();
-  // Diagnostic — surfaces data shape so we can confirm parser→renderer pipeline
-  // is producing edges in the browser. Remove once the missing-edges bug is
-  // confirmed resolved.
-  console.info('[pharma-graph] graph build:', {
+  // Issue #31: pipeline diagnostic. Gated by `import.meta.env.DEV`
+  // via `logInfo` so production users don't see graph-build state
+  // dumped to their console. The original inline comments said
+  // "Remove once the missing-edges bug is confirmed resolved"; the
+  // bug is long resolved, but we kept the diagnostic for future
+  // debugging and gate it instead of deleting it.
+  logInfo('graph build:', {
     mdFiles: Object.keys(mdFiles).length,
     nodes: data.nodes.length,
     edges: data.edges.length,
@@ -109,8 +113,8 @@ async function boot(): Promise<void> {
       layoutConfigs: LAYOUTS,
     });
     uiState.highlight = new HighlightEngine(uiState.renderer.getCy());
-    // Diagnostic — confirm cytoscape loaded the same number of edges as buildGraph produced.
-    console.info('[pharma-graph] cy after render:', {
+    // Issue #31: same DEV-gated diagnostic as the graph-build log.
+    logInfo('cy after render:', {
       nodes: uiState.renderer.getCy().nodes().length,
       edges: uiState.renderer.getCy().edges().length,
     });
