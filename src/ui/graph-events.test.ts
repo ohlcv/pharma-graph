@@ -54,6 +54,16 @@ function makeStubHighlight() {
 function makeStubDetailPanel() {
   return { close: () => {}, show: () => {} } as unknown as DetailPanel;
 }
+/**
+ * Build a minimal cytoscape `tap` event payload for `.emit()` test
+ * helpers. cytoscape types `.emit()`'s second argument as
+ * `unknown[]` (line 1694 of node_modules/cytoscape/index.d.ts), so we
+ * shape the payload here to match exactly — no `any` cast needed at
+ * the call site.
+ */
+function tapOn(target: cytoscape.NodeSingular | cytoscape.Core): unknown[] {
+  return [{ target }];
+}
 
 describe('initGraphEvents — canvas tap + tour (issue #11 fix)', () => {
   let cy: cytoscape.Core;
@@ -86,7 +96,7 @@ describe('initGraphEvents — canvas tap + tour (issue #11 fix)', () => {
     });
 
     // Tap the empty canvas (target = cy itself).
-    cy.emit('tap', { target: cy } as any);
+    cy.emit('tap', tapOn(cy));
     expect(tour.isRunning).toHaveBeenCalled();
     expect(tour.stop).not.toHaveBeenCalled();
   });
@@ -113,7 +123,7 @@ describe('initGraphEvents — canvas tap + tour (issue #11 fix)', () => {
       // now happens inside graph-events.ts via a file-local helper.
     });
 
-    cy.emit('tap', { target: cy } as any);
+    cy.emit('tap', tapOn(cy));
     expect(tour.stop).toHaveBeenCalledTimes(1);
   });
 
@@ -140,7 +150,7 @@ describe('initGraphEvents — canvas tap + tour (issue #11 fix)', () => {
       // now happens inside graph-events.ts via a file-local helper.
     });
 
-    cy.emit('tap', { target: cy } as any);
+    cy.emit('tap', tapOn(cy));
     expect(tour.stop).toHaveBeenCalledTimes(1);
   });
 
@@ -167,7 +177,7 @@ describe('initGraphEvents — canvas tap + tour (issue #11 fix)', () => {
     });
 
     // Fire a tap right away — the controller is provided, not deferred.
-    expect(() => cy.emit('tap', { target: cy } as any)).not.toThrow();
+    expect(() => cy.emit('tap', tapOn(cy))).not.toThrow();
     // isRunning was called (handler ran), stop was not (tour not running).
     expect(tour.isRunning).toHaveBeenCalled();
     expect(tour.stop).not.toHaveBeenCalled();
@@ -179,9 +189,9 @@ describe('initGraphEvents — canvas tap + tour (issue #11 fix)', () => {
     let canvasTapCalls = 0;
     initGraphEvents({
       cy,
-      renderer: {} as any,
-      highlight: { reset: () => {}, highlightNode: () => ({}) } as any,
-      detailPanel: { close: () => {}, show: () => {} } as any,
+      renderer: makeStubRenderer(),
+      highlight: makeStubHighlight(),
+      detailPanel: makeStubDetailPanel(),
       spawnNodeRipple: () => {},
       setPrevSelectedNode: () => {},
       showEdgeTooltip: () => {},
@@ -206,7 +216,7 @@ describe('initGraphEvents — canvas tap + tour (issue #11 fix)', () => {
     // Node taps go through the element-level event, not cy.emit. We dispatch
     // it via `node.emit('tap')` and let cytoscape propagate it to the matching
     // element-level listener. (cy.emit alone would simulate a canvas tap.)
-    node.emit('tap', { target: node } as any);
+    node.emit('tap', tapOn(node));
 
     // The canvas-tap handler must NOT have fired (target was a node).
     expect(canvasTapCalls).toBe(0);
