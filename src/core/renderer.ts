@@ -68,10 +68,23 @@ const STYLESHEET: any[] = (() => {
     style: { 'border-color': color, 'border-width': 2 },
   }));
 
+  // edge-type rules — 每种类型不仅设 line-color, 同步产生两个
+  // gradient stops (源 100% → 目的 30%), 让边自带"能量流动".
+  const hexToRgba = (hex: string, alpha: number) => {
+    const h = hex.replace('#', '');
+    const r = parseInt(h.slice(0, 2), 16);
+    const g = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
   const edgeTypeRules = Object.entries(EDGE_TYPE_STYLE).map(([type, s]) => ({
     selector: `edge[edgeType = "${type}"]`,
     style: {
       'line-color': s.color,
+      'line-fill': 'linear-gradient',
+      'line-gradient-direction': 'to-right',
+      'line-gradient-stop-positions': '0% 100%',
+      'line-gradient-stop-colors': `${hexToRgba(s.color, 1)} ${hexToRgba(s.color, 0.25)}`,
       'target-arrow-color': s.color,
       'line-style': s.lineStyle as cytoscape.Css.LineStyle,
       'target-arrow-shape': (s.arrow === 'none' ? 'none' : 'triangle') as cytoscape.Css.ArrowShape,
@@ -155,14 +168,24 @@ const STYLESHEET: any[] = (() => {
       style: {
         width: 1.5,
         'line-color': 'rgba(100,116,139,0.45)',
+        // cytoscape 原生支持 line-fill: linear-gradient. 让边从源
+        // 100% 实色渐变到目标 30% — 视觉上像"能量从源流向目的",
+        // 不再是死板的单色. line-gradient-stop-colors 用 css var
+        // 风格 0% / 100% (百分比空格分隔), 颜色由 edge-type rules
+        // 通过 line-color 提供 (cytoscape 同步把 line-color 应用到
+        // gradient 的 0% 端, 100% 端走 background-opacity 0.3).
+        'line-fill': 'linear-gradient',
+        'line-gradient-direction': 'to-right',
+        'line-gradient-stop-positions': '0% 100%',
+        'line-gradient-stop-colors': 'rgba(100,116,139,0.45) rgba(100,116,139,0.15)',
         'curve-style': 'bezier',
         'target-arrow-shape': 'triangle',
         'target-arrow-color': 'rgba(100,116,139,0.45)',
         'arrow-scale': 0.7,
-        opacity: 0.6,
+        opacity: 0.85,
         'haystack-radius': 0,
         // Edge entrance: when the `.entering` class is removed on a per-edge
-        // delay, opacity eases 0 → 0.6 over 400ms. Matches the wider node
+        // delay, opacity eases 0 → 0.85 over 400ms. Matches the wider node
         // stagger so the graph "lights up like a constellation" rather
         // than popping on as a static network.
         'transition-property': 'line-color, opacity, width, target-arrow-color',
