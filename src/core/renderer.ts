@@ -82,7 +82,6 @@ const STYLESHEET: any[] = (() => {
     style: {
       'line-color': s.color,
       'line-fill': 'linear-gradient',
-      'line-gradient-direction': 'to-right',
       'line-gradient-stop-positions': '0% 100%',
       'line-gradient-stop-colors': `${hexToRgba(s.color, 1)} ${hexToRgba(s.color, 0.25)}`,
       'target-arrow-color': s.color,
@@ -168,16 +167,12 @@ const STYLESHEET: any[] = (() => {
       style: {
         width: 1.5,
         'line-color': 'rgba(100,116,139,0.45)',
-        // cytoscape 原生支持 line-fill: linear-gradient. 让边从源
-        // 100% 实色渐变到目标 30% — 视觉上像"能量从源流向目的",
-        // 不再是死板的单色. line-gradient-stop-colors 用 css var
-        // 风格 0% / 100% (百分比空格分隔), 颜色由 edge-type rules
-        // 通过 line-color 提供 (cytoscape 同步把 line-color 应用到
-        // gradient 的 0% 端, 100% 端走 background-opacity 0.3).
+        // cytoscape 3.34 仅支持 node background gradient 的 direction;
+        // edge 的 line-fill gradient 方向永远沿 source→target 走, 所以
+        // 只设 stop-colors 与 stop-positions 即可, 不设 direction.
         'line-fill': 'linear-gradient',
-        'line-gradient-direction': 'to-right',
         'line-gradient-stop-positions': '0% 100%',
-        'line-gradient-stop-colors': 'rgba(100,116,139,0.45) rgba(100,116,139,0.15)',
+        'line-gradient-stop-colors': 'rgba(100,116,139,0.55) rgba(100,116,139,0.15)',
         'curve-style': 'bezier',
         'target-arrow-shape': 'triangle',
         'target-arrow-color': 'rgba(100,116,139,0.45)',
