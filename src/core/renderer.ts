@@ -68,14 +68,17 @@ const STYLESHEET: any[] = (() => {
     style: { 'border-color': color, 'border-width': 2 },
   }));
 
-  // edge-type rules — 每种类型不仅设 line-color, 同步产生两个
-  // gradient stops (源 100% → 目的 30%), 让边自带"能量流动".
-  const hexToRgba = (hex: string, alpha: number) => {
+  // edge-type rules — 让边自带"源亮 → 目的暗"的渐变, 但 cytoscape 的
+  // `line-gradient-stop-colors` 接受空格分隔的多颜色 token, 且
+  // color 解析走 util.color2tuple() — 它只支持 6 位 hex / rgb() /
+  // rgba().  *不允许 stop 各自 alpha*, 所以源亮目的暗必须用**两个
+  // 不同 hex** (lightColor 和 darkColor).
+  const darken = (hex: string, amount: number) => {
     const h = hex.replace('#', '');
-    const r = parseInt(h.slice(0, 2), 16);
-    const g = parseInt(h.slice(2, 4), 16);
-    const b = parseInt(h.slice(4, 6), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    const r = Math.max(0, parseInt(h.slice(0, 2), 16) - amount);
+    const g = Math.max(0, parseInt(h.slice(2, 4), 16) - amount);
+    const b = Math.max(0, parseInt(h.slice(4, 6), 16) - amount);
+    return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
   };
   const edgeTypeRules = Object.entries(EDGE_TYPE_STYLE).map(([type, s]) => ({
     selector: `edge[edgeType = "${type}"]`,
@@ -83,7 +86,7 @@ const STYLESHEET: any[] = (() => {
       'line-color': s.color,
       'line-fill': 'linear-gradient',
       'line-gradient-stop-positions': '0% 100%',
-      'line-gradient-stop-colors': `${hexToRgba(s.color, 1)} ${hexToRgba(s.color, 0.25)}`,
+      'line-gradient-stop-colors': `${s.color} ${darken(s.color, 80)}`,
       'target-arrow-color': s.color,
       'line-style': s.lineStyle as cytoscape.Css.LineStyle,
       'target-arrow-shape': (s.arrow === 'none' ? 'none' : 'triangle') as cytoscape.Css.ArrowShape,
