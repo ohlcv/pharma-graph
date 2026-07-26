@@ -95,7 +95,28 @@
   padding-bottom: 6px; margin-bottom: 8px;
 }
 .dbg-header__title { font-size: 11px; font-weight: 700; color: #a5b4fc; }
-.dbg-header__hint  { font-size: 9px; color: #475569; }
+.dbg-header__hint  { font-size: 9px; color: #475569; flex: 1; }
+.dbg-header__close {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 4px;
+  color: #94a3b8;
+  width: 20px; height: 20px;
+  font-size: 14px; line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.dbg-header__close:hover {
+  background: rgba(248,113,113,0.18);
+  border-color: rgba(248,113,113,0.45);
+  color: #fecaca;
+}
+.dbg-header__close:focus-visible {
+  outline: 2px solid #a5b4fc;
+  outline-offset: 1px;
+}
 
 .dbg-section { margin-bottom: 8px; }
 .dbg-section__label { font-size: 9px; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }

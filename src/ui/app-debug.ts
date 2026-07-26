@@ -52,6 +52,26 @@ export function toggleDebugOverlay(renderer: Renderer): boolean {
   return next;
 }
 
+/**
+ * Hide the panel without flipping `debugOverlayActive` or the
+ * toolbar button. Lets the user dismiss the panel with `×` while
+ * keeping the toggle state in sync — issue: previously the only
+ * path back was to click the sidebar toggle, which is awkward
+ * once the panel sits on top of the canvas.
+ *
+ * Idempotent: calling it when the panel is already hidden is a
+ * no-op so callers can fire-and-forget from `keydown` handlers.
+ */
+export function closeForensicPanel(): void {
+  const panel = document.getElementById('debug-panel');
+  if (!panel) return;
+  // Keep the canvas input behind the panel — display:none, not
+  // visibility:hidden, so the layout fully collapses (subsequent
+  // panel-opens won't leak the previous position into the next
+  // paint).
+  panel.style.display = 'none';
+}
+
 export function initDebugOverlay(renderer: Renderer): void {
   // ── Inject button into shortcuts sidebar ──────────────────────────────
   const btn = document.createElement('button');
@@ -68,9 +88,11 @@ export function initDebugOverlay(renderer: Renderer): void {
   // Positioned via CSS in index.css
   panel.style.display = 'none';
   panel.innerHTML = `
-    <div class="dbg-header">
+    <div class="dbg-header" id="dbg-header" role="banner">
       <span class="dbg-header__title">🔬 节点取证</span>
       <span class="dbg-header__hint">点击任意节点自动更新</span>
+      <button type="button" class="dbg-header__close" id="dbg-close-btn"
+              aria-label="关闭取证面板" title="关闭">×</button>
     </div>
 
     <!-- 当前选中节点 -->
@@ -172,6 +194,101 @@ export function initDebugOverlay(renderer: Renderer): void {
     </div>
   `;
   document.body.appendChild(panel);
+
+  // ── Close button — hides panel without flipping `debugOverlayActive` ──
+  panel
+    .querySelector<HTMLButtonElement>('#dbg-close-btn')
+    ?.addEventListener('click', (e) => {
+      // Stop the event from reaching the drag handler (which is a
+      // mousedown listener on the header). mousedown vs click differ
+      // here, but a click on the X mustn't accidentally start a drag
+      // if the user pressed-down on it.
+      e.stopPropagation();
+      closeForensicPanel();
+    });
+
+  // ── Drag handler — header is the drag handle ────────────────────────
+  // We listen on the header (which is wider than a 16px grip and
+  // visually conveys "this moves") but exclude the close button so
+  // users can still dismiss without dragging.
+  const headerEl = panel.querySelector<HTMLElement>('#dbg-header');
+  if (headerEl) attachDragHandlers(panel, headerEl);
+}
+
+/**
+ * Wire pointer-drag on `handleEl` (the title bar) to move `panelEl`
+ * around the viewport. Converts from CSS `bottom/right` positioning
+ * to `top/left` on first mousedown so the math stays sane: every
+ * mousemove is a delta from where the user first grabbed the panel.
+ *
+ * Why no 3rd-party drag lib: the panel has only one handle, we don't
+ * need inertia, edge-snapping, or touch gestures — and keeping it
+ * inline means tests can fire `mousedown`/`mousemove`/`mouseup`
+ * directly on the DOM nodes without spinning up a global event bus.
+ *
+ * The handler closes over panelEl's bounding rect on mousedown so a
+ * late-arriving mousemove doesn't drift if the user resizes the window
+ * mid-drag (we re-read rect on every move, which is cheap).
+ */
+function attachDragHandlers(panelEl: HTMLElement, handleEl: HTMLElement): void {
+  handleEl.style.cursor = 'move';
+  handleEl.style.userSelect = 'none';
+
+  handleEl.addEventListener('mousedown', (e: MouseEvent) => {
+    // Only primary button — middle-click or right-click shouldn't drag.
+    if (e.button !== 0) return;
+    if (e.target instanceof HTMLElement && e.target.closest('#dbg-close-btn')) {
+      return;
+    }
+    e.preventDefault();
+
+    // Convert from `bottom: 16px; right: 16px` to absolute `top/left`
+    // before the first mousemove so the drag origin matches the
+    // cursor exactly. Without this, the panel would jump on the
+    // first move because `bottom/right` and `top/left` resolve
+    // independently against the viewport.
+    const rect = panelEl.getBoundingClientRect();
+    panelEl.style.top = `${rect.top}px`;
+    panelEl.style.left = `${rect.left}px`;
+    panelEl.style.bottom = 'auto';
+    panelEl.style.right = 'auto';
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startTop = rect.top;
+    const startLeft = rect.left;
+
+    let moved = false;
+    const onMove = (ev: MouseEvent) => {
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      // 4px slop: a click that jitters a couple of pixels shouldn't
+      // be reported as "I dragged the panel". Without the threshold
+      // the user clicks the header to focus it and the panel jumps
+      // by 1-2px from the unavoidable mouse jitter.
+      if (!moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+      moved = true;
+
+      // Clamp to the viewport so the panel can't be flung off-screen.
+      // We keep the *top-left* corner at least 0px in, but allow the
+      // bulk of the panel to leave (so the user can drag it to dock
+      // against the edge).
+      const w = panelEl.offsetWidth;
+      const h = panelEl.offsetHeight;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const newLeft = Math.max(-(w - 60), Math.min(vw - 60, startLeft + dx));
+      const newTop = Math.max(0, Math.min(vh - 40, startTop + dy));
+      panelEl.style.left = `${newLeft}px`;
+      panelEl.style.top = `${newTop}px`;
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
 }
 
 function styleChip(label: string, value: string, ok: boolean): string {

@@ -15,6 +15,8 @@ import {
   toggleDebugOverlay,
   isDebugActive,
   setDebugActive,
+  closeForensicPanel,
+  initDebugOverlay,
 } from './app-debug.js';
 import type { Renderer } from '../core/renderer.js';
 
@@ -156,5 +158,176 @@ describe('toggleDebugOverlay synchronising button click ↔ console API (issue #
     expect(isDebugActive()).toBe(true);
     expect(btn.classList.contains('active')).toBe(true);
     expect(panel.style.display).toBe('');
+  });
+});
+
+// ── Close button + drag handle (separate workstream) ──────────────────
+//
+// `closeForensicPanel()` and the drag handlers were added so the panel
+// can sit anywhere on screen, can be dismissed without going back to the
+// sidebar toggle, and the title bar acts as a drag handle. These tests
+// exercise `closeForensicPanel()` directly and the drag wiring through
+// `initDebugOverlay()` because we want real DOM events end-to-end.
+
+describe('closeForensicPanel', () => {
+  function setupOpenPanel() {
+    const btn = document.createElement('button');
+    btn.id = 'debug-toggle';
+    document.body.appendChild(btn);
+    const panel = document.createElement('div');
+    panel.id = 'debug-panel';
+    panel.style.display = '';
+    document.body.appendChild(panel);
+    return { btn, panel };
+  }
+
+  it('hides the panel without flipping the module flag', () => {
+    const { btn, panel } = setupOpenPanel();
+    setDebugActive(true);
+    btn.classList.add('active');
+
+    closeForensicPanel();
+
+    expect(panel.style.display).toBe('none');
+    // The flag deliberately stays so the next click on the sidebar
+    // toggle still toggles correctly (off → on) and so the toolbar
+    // button's `active` class doesn't visually flip underneath the
+    // user. The panel is hidden by `display:none`, not by removing
+    // the toggle state.
+    expect(isDebugActive()).toBe(true);
+    expect(btn.classList.contains('active')).toBe(true);
+  });
+
+  it('is a no-op when the panel is absent', () => {
+    expect(() => closeForensicPanel()).not.toThrow();
+  });
+
+  it('is idempotent — calling it twice leaves the panel hidden', () => {
+    const { panel } = setupOpenPanel();
+    closeForensicPanel();
+    closeForensicPanel();
+    expect(panel.style.display).toBe('none');
+  });
+});
+
+describe('initDebugOverlay — close button & drag handle', () => {
+  function fire(el: EventTarget, type: string, init: Partial<MouseEvent> = {}) {
+    const ev = new MouseEvent(type, { bubbles: true, button: 0, ...init });
+    el.dispatchEvent(ev);
+    return ev;
+  }
+
+  it('renders a close button in the header and wires it to closeForensicPanel', () => {
+    document.body.innerHTML = `
+      <ul class="shortcuts-list"></ul>
+    `;
+    const renderer = makeStubRenderer();
+    initDebugOverlay(renderer);
+
+    const closeBtn = document.getElementById('dbg-close-btn');
+    expect(closeBtn).not.toBeNull();
+    expect(closeBtn?.getAttribute('aria-label')).toBe('关闭取证面板');
+
+    // Open the panel, then click × and verify panel hides.
+    toggleDebugOverlay(renderer);
+    const panel = document.getElementById('debug-panel')!;
+    expect(panel.style.display).toBe('');
+    closeBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(panel.style.display).toBe('none');
+  });
+
+  it('marks the header as a drag handle (cursor: move + userSelect: none)', () => {
+    document.body.innerHTML = `<ul class="shortcuts-list"></ul>`;
+    initDebugOverlay(makeStubRenderer());
+    const header = document.getElementById('dbg-header')!;
+    // jsdom normalizes the cursor declaration to its shorthand;
+    // we only need to assert the canonical move cursor.
+    expect(header.style.cursor).toBe('move');
+    expect(header.style.userSelect).toBe('none');
+  });
+
+  it('moves the panel on mousedown → mousemove → mouseup', () => {
+    document.body.innerHTML = `<ul class="shortcuts-list"></ul>`;
+    const renderer = makeStubRenderer();
+    initDebugOverlay(renderer);
+    toggleDebugOverlay(renderer);
+
+    const panel = document.getElementById('debug-panel')!;
+    const header = document.getElementById('dbg-header')!;
+
+    // jsdom's getBoundingClientRect returns 0,0/0,0 by default.
+    // We don't care about absolute coords — we care that the move
+    // event *changed* top/left and that bottom/right were unset
+    // (so CSS `top/left` can drive the layout).
+    fire(header, 'mousedown', { clientX: 100, clientY: 100 });
+    // The listeners are attached to `document`, not the header —
+    // mousemove / mouseup have to fire on document or window.
+    fire(document, 'mousemove', { clientX: 250, clientY: 180 });
+    fire(document, 'mouseup');
+
+    expect(panel.style.bottom).toBe('auto');
+    expect(panel.style.right).toBe('auto');
+    // Slop threshold = 4px in either axis; movement of 150/80
+    // clearly exceeds it.
+    expect(panel.style.left).not.toBe('');
+    expect(panel.style.top).not.toBe('');
+  });
+
+  it('ignores micro-drags below the 4px jitter threshold', () => {
+    document.body.innerHTML = `<ul class="shortcuts-list"></ul>`;
+    const renderer = makeStubRenderer();
+    initDebugOverlay(renderer);
+    toggleDebugOverlay(renderer);
+
+    const header = document.getElementById('dbg-header')!;
+    const panel = document.getElementById('debug-panel')!;
+
+    // Mock getBoundingClientRect so the drag handler has a
+    // meaningful starting rect — jsdom defaults to 0,0/0,0.
+    // We give it a real starting rect and assert the slop-threshold
+    // path leaves top/left at the *initial* mousedown-derived
+    // values (no delta applied from the under-threshold mousemove).
+    panel.getBoundingClientRect = () =>
+      ({ top: 100, left: 200, right: 600, bottom: 400, width: 400, height: 300, x: 200, y: 100, toJSON: () => '' }) as DOMRect;
+
+    fire(header, 'mousedown', { clientX: 200, clientY: 100 });
+    // Capture top/left immediately after mousedown — the handler
+    // commits the rect's top/left at this point to convert from
+    // `bottom/right` anchoring.
+    const startTop = panel.style.top;
+    const startLeft = panel.style.left;
+    expect(startTop).toBe('100px');
+    expect(startLeft).toBe('200px');
+
+    // 2px total (1 + 1) — below the 4px slop threshold. The handler
+    // should bail without rewriting top/left.
+    fire(document, 'mousemove', { clientX: 201, clientY: 101 });
+    fire(document, 'mouseup');
+
+    expect(panel.style.top).toBe(startTop);
+    expect(panel.style.left).toBe(startLeft);
+  });
+
+  it('does not start a drag when mousedown originates on the close button', () => {
+    document.body.innerHTML = `<ul class="shortcuts-list"></ul>`;
+    const renderer = makeStubRenderer();
+    initDebugOverlay(renderer);
+    toggleDebugOverlay(renderer);
+
+    const header = document.getElementById('dbg-header')!;
+    const closeBtn = document.getElementById('dbg-close-btn')!;
+    const panel = document.getElementById('debug-panel')!;
+
+    // Dispatch mousedown whose `target` is the close button (bubbled
+    // up via the header). The drag handler checks
+    // `e.target.closest('#dbg-close-btn')` and bails.
+    fire(closeBtn, 'mousedown', { clientX: 10, clientY: 10 });
+    expect(header.style.cursor).toBe('move'); // unrelated sanity
+
+    // Verify top/left stay unset because the drag should have refused.
+    fire(document, 'mousemove', { clientX: 200, clientY: 200 });
+    fire(document, 'mouseup');
+    expect(panel.style.top).toBe('');
+    expect(panel.style.left).toBe('');
   });
 });
