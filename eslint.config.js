@@ -117,6 +117,7 @@ export default [
     files: ['src/scripts/**/*.ts'],
     rules: {
       'no-console': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
 ];

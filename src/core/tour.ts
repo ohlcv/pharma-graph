@@ -424,8 +424,12 @@ export class TourEngine {
   }
 
   clearAllNodeInlineStyles(): void {
+    // Clear inline overrides so the stylesheet's per-field border-color
+    // and per-tier background-color take over again. Setting to a
+    // "dimmed" border here would leave every node looking dimmed until
+    // the user clicks a field/tier legend to reset.
     this.cy.nodes().forEach((n: cytoscape.NodeSingular) => {
-      n.style({ 'border-width': 1.5, 'border-color': 'rgba(255,255,255,0.06)' });
+      n.style({ 'border-width': null, 'border-color': null });
     });
   }
 

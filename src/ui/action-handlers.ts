@@ -14,6 +14,7 @@ import { registerAction } from './action-dispatcher.js';
 import {
   runLayout,
   applyLayoutParams,
+  resetLayoutParams,
   fitGraph,
   randomize,
   animatePulse,
@@ -74,6 +75,10 @@ export function registerAppActions(
 
   registerAction('apply-layout-params', () => {
     applyLayoutParams(renderer);
+  });
+
+  registerAction('reset-layout-params', () => {
+    resetLayoutParams(renderer);
   });
 
   // ── Bottom sheet (mobile) ───────────────────────────────────────────────────

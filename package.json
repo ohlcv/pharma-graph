@@ -6,6 +6,7 @@
   "scripts": {
     "validate": "tsx src/scripts/validate.ts",
     "audit": "tsx src/scripts/audit-frontmatter.ts",
+    "measure-overlap": "tsx src/scripts/measure-overlap.ts",
     "dev": "vite",
     "preview": "vite preview",
     "start": "npm run dev",

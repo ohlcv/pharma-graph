@@ -530,6 +530,12 @@
 .param-select:focus { border-color: var(--accent); background: rgba(255,255,255,0.06); }
 .no-params { font-size: 0.72rem; font-style: italic; color: var(--muted); }
 .btn--apply { margin-top: 6px; width: 100%; justify-content: center; border-color: var(--border-hi); font-weight: 600; }
+.param-actions { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
+.param-actions .btn--apply { margin-top: 0; flex: 1 1 auto; width: auto; }
+.btn--ghost { background: transparent; color: var(--muted); border-color: var(--border); }
+.btn--ghost:hover { color: var(--text); border-color: var(--border-hi); background: rgba(255,255,255,0.04); }
+.btn--sm { padding: 5px 10px; font-size: 0.7rem; }
+.btn--sm svg { width: 12px; height: 12px; }
 
 .shortcuts-list { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
 .shortcut-item  { display: flex; align-items: center; gap: 6px; font-size: 0.68rem; color: var(--muted); padding: 4px 0; }
@@ -806,6 +812,19 @@
 }
 .bs-apply-btn:active { background: rgba(99,102,241,0.28); transform: scale(0.98); }
 .bs-apply-btn svg { width: 13px; height: 13px; }
+.bs-params-actions { display: flex; gap: 8px; align-items: center; margin: 0 14px 12px; }
+.bs-params-actions .bs-apply-btn { margin: 0; flex: 1 1 auto; width: auto; }
+.bs-reset-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; flex-shrink: 0;
+  border-radius: 8px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted);
+  font-size: 1.1rem; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.14s, border-color 0.14s, background 0.14s;
+}
+.bs-reset-btn:hover { color: var(--text); border-color: var(--border-hi); background: rgba(255,255,255,0.04); }
+.bs-reset-btn:active { transform: scale(0.94); }
 
 #fab { display: none; width: 52px; height: 52px; border-radius: 16px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; cursor: pointer; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(99,102,241,0.4), 0 8px 24px rgba(0,0,0,0.4); transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.15s; -webkit-tap-highlight-color: transparent; }
 #fab:hover  { transform: scale(1.08); box-shadow: 0 6px 20px rgba(99,102,241,0.5), 0 10px 30px rgba(0,0,0,0.5); }

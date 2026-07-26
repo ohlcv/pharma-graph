@@ -363,10 +363,16 @@
         <div class="sidebar-section__body" id="body-params">
           <div id="layout-params">
             <div id="layout-params-rows"></div>
-            <button id="apply-params-btn" class="btn btn--apply" data-action="apply-layout-params" style="display:none">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              <span>应用参数</span>
-            </button>
+            <div class="param-actions">
+              <button id="reset-params-btn" class="btn btn--ghost btn--sm" data-action="reset-layout-params" title="恢复库默认参数">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                <span>恢复默认</span>
+              </button>
+              <button id="apply-params-btn" class="btn btn--apply" data-action="apply-layout-params" style="display:none">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>应用参数</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -538,7 +544,10 @@
         <svg class="bs-params-toggle__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
       <div class="bs-params-body" id="bs-layout-params" style="display:none"></div>
-      <button id="bs-apply-btn" class="bs-apply-btn" data-action="apply-bs-params" style="display:none">应用参数</button>
+      <div class="bs-params-actions">
+        <button id="bs-reset-btn" class="bs-reset-btn" data-action="reset-layout-params" style="display:none" title="恢复默认">↻</button>
+        <button id="bs-apply-btn" class="bs-apply-btn" data-action="apply-bs-params" style="display:none">应用参数</button>
+      </div>
     </div>
 
     </div><!-- /bs-scroll -->
