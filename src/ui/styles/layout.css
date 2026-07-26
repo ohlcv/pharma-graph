@@ -6,15 +6,12 @@
 
 /* ── Ambient background ─────────────────────────────────────────────────── */
 #app { z-index: 1; }
-#app::before {
-  content: ''; position: fixed; inset: 0;
-  /* Subtle dot-grid texture — fixed, does not move with the camera */
-  background-image: radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px);
-  background-size: 28px 28px;
-  /* Two-layer radial glow: indigo top-left, cyan bottom-right */
-  background-blend-mode: overlay;
-  pointer-events: none; z-index: 0;
-}
+/* Ambient background layer — only radial-glow halos, no dot-grid.
+   Keep this layer empty if we want a perfectly clean backdrop:
+   point is that the page isn't dead-flat; the gradient halos in
+   `::after` provide the visual rhythm. (Dot-grid was 0.045-opacity
+   texture — looked "IDE-ish" and competed with the canvas content.) */
+
 #app::after {
   content: ''; position: fixed; inset: 0;
   background:

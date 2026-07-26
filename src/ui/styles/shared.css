@@ -38,6 +38,21 @@
   100% { opacity: 0;   transform: translate(-50%, -50%) scale(3); }
 }
 
+/* Topbar logo: slow benzene-ring rotation. Stays between 0 and 360
+   only — a full turn — so the loop seam is invisible. 16s is slow
+   enough that it reads as "alive" rather than "loading spinner". */
+@keyframes logo-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.topbar__logo-mark svg {
+  transform-origin: 50% 50%;
+  animation: logo-spin 16s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .topbar__logo-mark svg { animation: none; }
+}
+
 /* ── Keyboard key badge ─────────────────────────────────────────────────── */
 .key {
   display: inline-flex; align-items: center; justify-content: center;

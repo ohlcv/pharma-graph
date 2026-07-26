@@ -31,11 +31,35 @@
   background: linear-gradient(135deg, var(--accent), var(--accent2));
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 0 18px var(--accent-glow), 0 4px 12px rgba(0,0,0,0.4); flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
 }
-.topbar__logo-mark svg { width: 17px; height: 17px; color: #fff; }
-.topbar__brand { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
-.topbar__brand-name { font-size: 0.88rem; font-weight: 700; color: var(--text); letter-spacing: -0.02em; line-height: 1.2; }
-.topbar__brand-sub  { font-size: 0.58rem; color: var(--muted); letter-spacing: 0.04em; line-height: 1; }
+.topbar__logo-mark svg { width: 22px; height: 22px; color: rgba(255,255,255,0.95); }
+/* Subtle inner sheen so the mark reads as a glossy capsule rather
+   than a flat square. Kept off the ring shapes — only the wrapper. */
+.topbar__logo-mark::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.18) 0%, transparent 50%);
+  pointer-events: none;
+  border-radius: inherit;
+}
+.topbar__brand { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.topbar__brand-name {
+  font-size: 0.92rem; font-weight: 800;
+  /* gradient text — picks up the logo's accent↔accent2 sweep so the
+     brand reads as part of the mark, not a separate label */
+  background: linear-gradient(135deg, #f1f5f9 0%, #c7d2fe 100%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.015em; line-height: 1.2;
+}
+.topbar__brand-sub  {
+  font-size: 0.62rem; color: var(--muted);
+  letter-spacing: 0.18em; line-height: 1;
+  font-weight: 500; text-transform: uppercase;
+  font-family: 'Fira Code', 'SF Mono', monospace;
+}
 
 .topbar__search-center { flex: 1; display: flex; align-items: center; justify-content: center; }
 .topbar__search-wrap   { position: relative; display: flex; align-items: center; flex: 1; min-width: 160px; }
