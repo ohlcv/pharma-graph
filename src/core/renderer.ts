@@ -97,25 +97,29 @@ const STYLESHEET: any[] = (() => {
         'text-background-color': 'rgba(15,17,23,0.82)',
         'text-background-shape': 'roundrectangle',
         'text-background-padding': '3px',
-        // Inner core + outer halo via radial-gradient (0% center, 70% stop
-        // leaves a glowing halo at the rim). The actual tier colors come
-        // from per-tier rules below, which override these. This is the
-        // fallback for nodes without an explicit tier.
+        // Halo: cytoscape 3.20+ supports `underlay-*` properties — a second
+        // shape rendered *behind* the node with `underlay-padding` leaving
+        // a visible gap between node body and halo. Cleaner than a fake
+        // "radial-gradient inside the node" trick: halo lives OUTSIDE the
+        // node and doesn't distort the body fill.
+        // Fallback defaults for nodes without an explicit tier.
         'border-width': 1.5,
         'border-color': '#475569',
-        'background-fill': 'radial-gradient',
-        'background-gradient-stop-positions': '0% 70%',
-        'background-gradient-stop-colors': `${TIER_DEFAULT_FILL} ${TIER_DEFAULT_GLOW}`,
         'background-color': TIER_DEFAULT_FILL,
+        'background-fill': 'solid',
         'background-blacken': 0,
         shape: 'ellipse',
         'text-events': 'yes',
+        'underlay-color': TIER_DEFAULT_GLOW,
+        'underlay-opacity': 0.55,
+        'underlay-padding': 6,
+        'underlay-shape': 'ellipse',
         // Stagger entrance: when the `.entering` class is removed, opacity
         // fades back in over ~280ms with ease-out. Width/height are NOT
         // transitioned (cy's transition machinery doesn't scale up node
         // radii smoothly without layout races — see anim-pulse.ts for
         // the dedicated width/height pipeline).
-        'transition-property': 'opacity, border-color, border-width, background-color',
+        'transition-property': 'opacity, border-color, border-width, background-color, underlay-color, underlay-opacity',
         'transition-duration': '280ms',
         'transition-timing-function': 'ease-out',
       },
@@ -124,14 +128,14 @@ const STYLESHEET: any[] = (() => {
     ...fieldRules,
     // ③ essence 形状（节点本质决定形状）
     ...nodeTypeRules,
-    // ④ tier 填充色 + glow halo（层次色覆盖内核，外圈半透明辉光）
+    // ④ tier 填充色 + halo (内核 + 同色外晕 — 用 underlay 替代之前的 radial-gradient)
     ...Object.entries(NODE_TIER_STYLE).map(([key, style]) => ({
       selector: `node[tier = "${key}"]`,
       style: {
         'background-color': style.bgColor,
-        'background-fill': 'radial-gradient',
-        'background-gradient-stop-positions': '0% 70%',
-        'background-gradient-stop-colors': `${style.bgColor} ${style.glow}`,
+        'underlay-color': style.halo,
+        'underlay-opacity': 0.7,
+        'underlay-padding': 6,
       },
     })),
     // 虚拟层父节点
