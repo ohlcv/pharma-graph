@@ -20,17 +20,22 @@
   --panel-alt:   #0f172a;
   --border:      #1e2d45;
   --border-hi:   #2d3f5a;
-  --accent:      #6366f1;
-  --accent-glow: rgba(99, 102, 241, 0.25);
+  --accent:      #818cf8;             /* raised from #6366f1 — brighter on dark panels */
+  --accent-soft: rgba(129, 140, 248, 0.16);  /* pre-baked 16% for hover halos */
+  --accent-glow: rgba(129, 140, 248, 0.28);
   --accent2:     #06b6d4;
+  --accent2-soft: rgba(6, 182, 212, 0.16);
   --text:        #f1f5f9;
   --text-2:      #94a3b8;
+  --text-3:      #cbd5e1;             /* NEW — placeholder / weak labels */
   --muted:       #64748b;  /* slate-500 — was slate-600 (~4.1:1, below AA on bg); raised to clear 4.5:1 */
   --green:       #34d399;
   --yellow:      #fbbf24;
+  --amber:       #f59e0b;             /* NEW — warning / pending state */
   --red:         #f87171;
   --blue:        #60a5fa;
   --purple:      #a78bfa;
+  --pink:        #f472b6;             /* NEW — edge category accent */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-out:    cubic-bezier(0.4, 0, 0.2, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
