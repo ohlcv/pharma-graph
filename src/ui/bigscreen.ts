@@ -74,10 +74,20 @@ let _preBigscreenViewport: ViewportSnapshot | null = null;
  *  the window after exiting bigscreen — those should not trigger a restore). */
 let _bigscreenRestorePending = false;
 
-/** Caches the current viewport (center in scene coords + zoom) into _preBigscreenViewport. */
+/** Caches the current viewport (center in scene coords + zoom) into _preBigscreenViewport.
+ *  When a tour is running, stops any in-flight cy.animate() first so we capture a
+ *  stable position rather than a mid-animation frame. */
 function captureViewport(): void {
   const cy = _getCy();
   if (!cy) return;
+
+  // Stop any running tour animation so the node lands at a stable position.
+  // Without this, exitBigscreen triggers capture while cy.animate() is still
+  // running, causing the viewport to be captured mid-flight.
+  if (_isTourActive()) {
+    cy.stop();
+  }
+
   const ext = cy.extent(); // { x1, y1, x2, y2 } in scene coords
   _preBigscreenViewport = {
     centerScene: {
