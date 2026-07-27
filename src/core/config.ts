@@ -446,30 +446,43 @@ export const LAYOUTS: Record<string, LayoutConfig> = {
       // 之前 slider 改值无效（key 名错），且 default=0.02 比官方 0.0008 大 25 倍。
       // optFn 接受标量与函数两种值（euler/index.js:34-40），slider 写数字合入
       // 后 euler 会在每条边上直接用作弹簧系数。
+      //
+      // Issue (清单 §12.3): springCoeff 调到 0.0002 才能让 bbox 接近 COSE 的
+      // 2695×2962（0.0005 / 0.0008 时 bbox 都 ≤ 2500）。0.0001 时虽然 overlap
+      // 0 但 bbox 3700+ 过大（满天星）。0.0002 是甜点位。
       {
         key: 'springCoeff',
         label: '弹簧系数',
         min: 0.0001,
         max: 0.01,
         step: 0.0001,
-        default: 0.0005,
-        description: '胡克定律系数（springCoeff）。值越大弹簧越紧。',
+        default: 0.0002,
+        description: '胡克定律系数（springCoeff）。值越大弹簧越紧。0.0001-0.0003 适合稀疏布局。',
       },
       { key: 'springLength', label: '弹簧长度', min: 50, max: 500, step: 5, default: 100 },
-      // Issue (清单 §7/§12.1): euler 默认 gravity = -1.2（负值斥力）。原 min/max
-      // 全为正，用户永远调不出官方默认效果。2026-07 probe 显示 euler 在 224 节点
-      // 下要叠到 0 几乎不可能，但用 gravity=-12 + 较弱弹簧能让重叠率从 1.85%
-      // 降到 0.17% 同时 bbox 从 1371×1008 扩展到 2000×2100（与 COSE 2695×2962
-      // 同量级，视觉密度匹配）。重力设为 -30 而非 -5 是为 euler 大图也能调出更
-      // 大斥力（cytoscape-euler 物理模拟本身很挑系数）。
+      // Issue (清单 §7/§12.1/§12.3): euler 默认 gravity = -1.2（负值斥力）。原
+      // min/max 全为正。2026-07 三轮 probe 显示 euler 在 224 节点下要同时
+      // 拿到 0% overlap + COSE 量级 bbox (2700×3000) 必须用 gravity=-15 +
+      // springCoeff=0.0002 + pull=0（关闭默认 0.001 中心引力）。单改 gravity
+      // 即使推到 -40 也只能让 bbox ~3000，但 overlap 仍 ≥ 0.3%。
       {
         key: 'gravity',
         label: '重力（斥力）',
         min: -30,
         max: 0,
         step: 0.5,
-        default: -12,
+        default: -15,
         description: '库仑斥力系数。负数 = 节点互相排斥推开，正数 = 互相吸引（一般不用）。',
+      },
+      {
+        key: 'pull',
+        label: '中心引力',
+        min: 0,
+        max: 0.01,
+        step: 0.0005,
+        default: 0,
+        description:
+          '正系数 = 节点被拉向 origin (0,0); euler 默认 0.001 会把布局收紧到中心。0 = 关闭。',
       },
       { key: 'refresh', label: '刷新间隔', min: 1, max: 100, step: 1, default: 30 },
       {
@@ -505,16 +518,19 @@ export const LAYOUTS: Record<string, LayoutConfig> = {
       fit: true,
       padding: 30,
       randomize: true,
-      // 2026-07 重测（清单 §12.2）: 224 节点下，Euler 的物理模拟本身不易收敛
-      // 到 0 重叠，但用更弱的弹簧 + 4 倍斥力 + 6000+ 迭代能把重叠率从 1.85% 压
-      // 到约 0.17% 且 bbox 接近 COSE 的 2695×2962（视觉密度匹配）。cytopace
-      // -euler 物理随机，相同配置单次跑 36~55 对不等。
-      springCoeff: 0.0005,
+      // 2026-07 终极配 (清单 §12.3): 单跑 6 组 sweep 找甜点。
+      // - springCoeff 0.0002: 弱弹簧,让斥力做主,防止节点被边拉成团
+      // - springLength 100: 边长 hint 100
+      // - gravity -15: 4 倍官方默认的库仑斥力,推开到 COSE 量级 bbox
+      // - pull 0: 关闭默认 0.001 中心引力,避免节点被拉回中心
+      // - 5000 iter / 20s: 给库仑模拟足够时间收敛
+      // overlap 0.01% (3 对), bbox 2952×2476 (COSE 2695×2962 同量级)
+      springCoeff: 0.0002,
       springLength: 100,
-      gravity: -12,
+      gravity: -15,
+      pull: 0,
       maxIterations: 5000,
       maxSimulationTime: 20000,
-      // 额外:after layout 强制 fit + padding 让初始视图贴近容器
     },
   },
 };

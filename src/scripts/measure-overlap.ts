@@ -170,7 +170,7 @@ const BASE_OPTIONS = {
   nodeDimensionsIncludeLabels: true,
 };
 
-function runLayout(name: string, options: Record<string, unknown>): void {
+function runLayout(name: string, options: Record<string, unknown>, label?: string): void {
   const cy = cytoscape({
     headless: true,
     styleEnabled: false,
@@ -182,6 +182,9 @@ function runLayout(name: string, options: Record<string, unknown>): void {
   // override via the spread, so we apply animate:false AFTER the spread.
   const layout = cy.layout({ name, ...options, animate: false });
   layout.run();
+  if (label) {
+    console.log(`=== ${label} ===`);
+  }
   measureOverlap(cy);
   cy.destroy();
 }
@@ -426,6 +429,168 @@ runLayout('euler', {
   maxIterations: 10000,
   maxSimulationTime: 30000,
 });
+
+console.log('\n=== euler: kill pull=0.001 default (test 1) ===');
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0005,
+  springLength: 100,
+  gravity: -12,
+  pull: 0,
+  maxIterations: 5000,
+  maxSimulationTime: 20000,
+});
+
+console.log('\n=== euler: pull=0 + softer drag ===');
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0005,
+  springLength: 100,
+  gravity: -12,
+  pull: 0,
+  dragCoeff: 0.01,
+  maxIterations: 5000,
+  maxSimulationTime: 20000,
+});
+
+console.log('\n=== euler: pull=0 + tweak theta ===');
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0005,
+  springLength: 100,
+  gravity: -12,
+  pull: 0,
+  theta: 0.8,
+  maxIterations: 5000,
+  maxSimulationTime: 20000,
+});
+
+console.log('\n=== euler: negative pull = anti-center repulsion (test 1) ===');
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0005,
+  springLength: 100,
+  gravity: -12,
+  pull: -0.001,
+  maxIterations: 5000,
+  maxSimulationTime: 20000,
+});
+
+console.log('\n=== euler: pull -0.005 ===');
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0005,
+  springLength: 100,
+  gravity: -12,
+  pull: -0.005,
+  maxIterations: 5000,
+  maxSimulationTime: 20000,
+});
+
+console.log('\n=== euler: pull -0.005 + drop drag to spread ===');
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0005,
+  springLength: 100,
+  gravity: -12,
+  pull: -0.005,
+  dragCoeff: 0.005,
+  maxIterations: 5000,
+  maxSimulationTime: 20000,
+});
+
+console.log('\n=== euler: pull -0.01 + tiny drag ===');
+runLayout('euler', {
+  ...BASE_OPTIONS,
+  springCoeff: 0.0005,
+  springLength: 100,
+  gravity: -12,
+  pull: -0.01,
+  dragCoeff: 0.005,
+  maxIterations: 5000,
+  maxSimulationTime: 20000,
+});
+
+console.log('\n=== euler: COOSE-style sweet-spot sweep (low-overlap + good bbox) ===');
+// COSE baseline: 0.09% / 2695×2962. Try to hit both.
+runLayout(
+  'euler',
+  {
+    ...BASE_OPTIONS,
+    springCoeff: 0.0001,
+    springLength: 100,
+    gravity: -15,
+    pull: 0,
+    maxIterations: 5000,
+    maxSimulationTime: 20000,
+  },
+  'sweep A: coeff 0.0001 / len 100 / gravity -15',
+);
+runLayout(
+  'euler',
+  {
+    ...BASE_OPTIONS,
+    springCoeff: 0.0001,
+    springLength: 100,
+    gravity: -12,
+    pull: 0,
+    maxIterations: 5000,
+    maxSimulationTime: 20000,
+  },
+  'sweep B: coeff 0.0001 / len 100 / gravity -12',
+);
+runLayout(
+  'euler',
+  {
+    ...BASE_OPTIONS,
+    springCoeff: 0.0001,
+    springLength: 100,
+    gravity: -10,
+    pull: 0,
+    maxIterations: 5000,
+    maxSimulationTime: 20000,
+  },
+  'sweep C: coeff 0.0001 / len 100 / gravity -10',
+);
+runLayout(
+  'euler',
+  {
+    ...BASE_OPTIONS,
+    springCoeff: 0.0002,
+    springLength: 100,
+    gravity: -15,
+    pull: 0,
+    maxIterations: 5000,
+    maxSimulationTime: 20000,
+  },
+  'sweep D: coeff 0.0002 / len 100 / gravity -15',
+);
+runLayout(
+  'euler',
+  {
+    ...BASE_OPTIONS,
+    springCoeff: 0.0003,
+    springLength: 100,
+    gravity: -15,
+    pull: 0,
+    maxIterations: 5000,
+    maxSimulationTime: 20000,
+  },
+  'sweep E: coeff 0.0003 / len 100 / gravity -15',
+);
+runLayout(
+  'euler',
+  {
+    ...BASE_OPTIONS,
+    springCoeff: 0.0001,
+    springLength: 150,
+    gravity: -15,
+    pull: 0,
+    maxIterations: 5000,
+    maxSimulationTime: 20000,
+  },
+  'sweep F: coeff 0.0001 / len 150 / gravity -15',
+);
 
 console.log('\n=== euler: production 1b — gentle + slight more repulsion ===');
 runLayout('euler', {
