@@ -163,6 +163,81 @@ function measureOverlap(cy: ReturnType<typeof cytoscape>): void {
   );
 }
 
+interface Metrics {
+  overlap: number;
+  bboxW: number;
+  bboxH: number;
+  score: number;
+}
+
+function collectMetrics(cy: ReturnType<typeof cytoscape>): Metrics {
+  const positions: { x: number; y: number; w: number; h: number }[] = [];
+  cy.nodes().forEach((n) => {
+    const pos = n.position();
+    positions.push({ x: pos.x, y: pos.y, w: DEFAULT_W, h: DEFAULT_H });
+  });
+  let overlapPairs = 0;
+  for (let i = 0; i < positions.length; i++) {
+    for (let j = i + 1; j < positions.length; j++) {
+      const a = positions[i];
+      const b = positions[j];
+      const dx = Math.abs(a.x - b.x);
+      const dy = Math.abs(a.y - b.y);
+      const minX = (a.w + b.w) / 2;
+      const minY = (a.h + b.h) / 2;
+      if (dx < minX && dy < minY) overlapPairs++;
+    }
+  }
+  const total = (positions.length * (positions.length - 1)) / 2;
+  let minX = +Infinity,
+    minY = +Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
+  positions.forEach((p) => {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  });
+  const bboxW = Math.round(maxX - minX);
+  const bboxH = Math.round(maxY - minY);
+  // Composite score: 0 = best (no overlap AND bbox close to COSE reference 2700×2962).
+  // We use L1 distance between (overlap%, bboxW, bboxH) and COSE reference
+  // (0.09%, 2695, 2962) — favours layouts that simultaneously beat COSE on
+  // overlap and match it on bbox, rather than collapsing to 0/0 with a giant bbox.
+  const refOverlap = 0.09;
+  const refW = 2695;
+  const refH = 2962;
+  const score =
+    Math.abs((overlapPairs / total) * 100 - refOverlap) +
+    Math.abs(bboxW - refW) / refW +
+    Math.abs(bboxH - refH) / refH;
+  return { overlap: overlapPairs, bboxW, bboxH, score };
+}
+
+function avgMetrics(arr: Metrics[]): Metrics {
+  const n = arr.length;
+  return {
+    overlap: arr.reduce((s, m) => s + m.overlap, 0) / n,
+    bboxW: arr.reduce((s, m) => s + m.bboxW, 0) / n,
+    bboxH: arr.reduce((s, m) => s + m.bboxH, 0) / n,
+    score: arr.reduce((s, m) => s + m.score, 0) / n,
+  };
+}
+
+function runLayoutMeasure(options: Record<string, unknown>): Metrics {
+  const cy = cytoscape({
+    headless: true,
+    styleEnabled: false,
+    elements: [...nodes, ...edges],
+  });
+  const layout = cy.layout({ name: 'euler', ...options, animate: false });
+  layout.run();
+  const m = collectMetrics(cy);
+  cy.destroy();
+  return m;
+}
+
 const BASE_OPTIONS = {
   randomize: true,
   fit: true,
@@ -698,3 +773,138 @@ runLayout('euler', {
   maxIterations: 5000,
   maxSimulationTime: 20000,
 });
+
+// ============================================================================
+// §12.4 (2026-07): Dense neighborhood sweep around §12.3 sweet-spot D.
+// Euler is a physics simulator — single runs have noticeable variance. Average
+// over N=5 to find parameters that are reliably good, not lucky.
+// COSE baseline for reference: overlap 0.09%, bbox 2695×2962.
+// Score = |overlap% - 0.09| + |bboxW - 2695|/2695 + |bboxH - 2962|/2962.
+// Lower = closer to COSE on all axes simultaneously.
+// ============================================================================
+console.log('\n=== §12.4 dense sweep around sweet-spot D (avg N=5) ===');
+const SWEEP_BASE = {
+  ...BASE_OPTIONS,
+  springLength: 100,
+  gravity: -15,
+  pull: 0,
+  maxIterations: 5000,
+  maxSimulationTime: 20000,
+};
+const SWEEP_AXES: Array<{ axis: string; values: number[]; update: Record<string, number> }> = [
+  { axis: 'springCoeff', values: [0.00015, 0.0002, 0.00025, 0.0003], update: {} },
+  { axis: 'gravity', values: [-12, -13, -14, -15, -16, -17, -18], update: {} },
+  { axis: 'springLength', values: [80, 100, 120, 140], update: {} },
+];
+const N = 5;
+type Row = { label: string; avg: Metrics };
+const sweepRows: Row[] = [];
+function avgRun(label: string, optOverrides: Record<string, number>): void {
+  const opts = { ...SWEEP_BASE, ...optOverrides };
+  const samples: Metrics[] = [];
+  for (let i = 0; i < N; i++) {
+    samples.push(runLayoutMeasure(opts));
+  }
+  const avg = avgMetrics(samples);
+  sweepRows.push({ label, avg });
+  console.log(
+    `  [${label.padEnd(50)}] avg-of-${N}: overlap=${avg.overlap.toFixed(1)}, bbox=${Math.round(avg.bboxW)}×${Math.round(avg.bboxH)}, score=${avg.score.toFixed(3)}`,
+  );
+}
+console.log('  --- coeff sweep (gravity -15, len 100) ---');
+for (const coeff of SWEEP_AXES[0].values) {
+  avgRun(`coeff=${coeff}`, { springCoeff: coeff });
+}
+console.log('  --- gravity sweep (coeff 0.0002, len 100) ---');
+for (const g of SWEEP_AXES[1].values) {
+  avgRun(`gravity=${g}`, { springCoeff: 0.0002, gravity: g });
+}
+console.log('  --- springLength sweep (coeff 0.0002, gravity -15) ---');
+for (const len of SWEEP_AXES[2].values) {
+  avgRun(`len=${len}`, { springCoeff: 0.0002, springLength: len });
+}
+
+// COSE reference for the final table.
+const coseSamples: Metrics[] = [];
+for (let i = 0; i < N; i++) {
+  const cy = cytoscape({ headless: true, styleEnabled: false, elements: [...nodes, ...edges] });
+  const layout = cy.layout({
+    name: 'cose-bilkent',
+    ...BASE_OPTIONS,
+    ...LAYOUTS.cose.cytoscape,
+    animate: false,
+  });
+  layout.run();
+  coseSamples.push(collectMetrics(cy));
+  cy.destroy();
+}
+const coseAvg = avgMetrics(coseSamples);
+console.log(
+  `\n  [COSE reference (avg ${N})]                                overlap=${coseAvg.overlap.toFixed(1)}, bbox=${Math.round(coseAvg.bboxW)}×${Math.round(coseAvg.bboxH)}, score=${coseAvg.score.toFixed(3)}`,
+);
+
+// Sort by score and print top-5 winners.
+console.log('\n  --- top 5 by score (lower=better, resembles COSE on all 3 axes) ---');
+const winners = [...sweepRows].sort((a, b) => a.avg.score - b.avg.score).slice(0, 5);
+winners.forEach((row, i) => {
+  console.log(
+    `  ${(i + 1).toString().padStart(1)}) ${row.label.padEnd(50)} score=${row.avg.score.toFixed(3)}`,
+  );
+});
+
+// Final validation: N=10 on the top contenders to capture variance and worst-case.
+console.log('\n=== §12.4 final validation: N=10 on top 3 contenders + COSE ===');
+const N10 = 10;
+const candidates = [
+  {
+    label: 'A: gravity=-17 (overlap-favoured)',
+    opt: { springCoeff: 0.0002, springLength: 100, gravity: -17, pull: 0 },
+  },
+  {
+    label: 'B: len=140 (bbox-favoured)',
+    opt: { springCoeff: 0.0002, springLength: 140, gravity: -15, pull: 0 },
+  },
+  {
+    label: 'C: current default (coeff 0.0002, len 100, g -15)',
+    opt: { springCoeff: 0.0002, springLength: 100, gravity: -15, pull: 0 },
+  },
+];
+console.log(
+  `  ${'candidate'.padEnd(50)} ${'mean overlap'.padStart(13)} ${'worst'.padStart(7)} ${'bboxW×H'.padStart(11)} ${'score'.padStart(8)}`,
+);
+for (const cand of candidates) {
+  const samples: Metrics[] = [];
+  for (let i = 0; i < N10; i++) {
+    samples.push(runLayoutMeasure({ ...SWEEP_BASE, ...cand.opt }));
+  }
+  const overlapArr = samples.map((s) => s.overlap);
+  const worstOverlap = Math.max(...overlapArr);
+  const avg = avgMetrics(samples);
+  console.log(
+    `  ${cand.label.padEnd(50)} ${avg.overlap.toFixed(2).padStart(13)} ${worstOverlap.toFixed(0).padStart(7)} ${`${Math.round(avg.bboxW)}×${Math.round(avg.bboxH)}`.padStart(11)} ${avg.score.toFixed(3).padStart(8)}`,
+  );
+}
+// COSE for head-to-head
+const coseSamples2: Metrics[] = [];
+for (let i = 0; i < N10; i++) {
+  const cy = cytoscape({ headless: true, styleEnabled: false, elements: [...nodes, ...edges] });
+  const layout = cy.layout({
+    name: 'cose-bilkent',
+    ...BASE_OPTIONS,
+    ...LAYOUTS.cose.cytoscape,
+    animate: false,
+  });
+  layout.run();
+  coseSamples2.push(collectMetrics(cy));
+  cy.destroy();
+}
+const coseAvg2 = avgMetrics(coseSamples2);
+console.log(
+  `  ${'COSE reference'.padEnd(50)} ${coseAvg2.overlap.toFixed(2).padStart(13)} ${Math.max(
+    ...coseSamples2.map((s) => s.overlap),
+  )
+    .toFixed(0)
+    .padStart(
+      7,
+    )} ${`${Math.round(coseAvg2.bboxW)}×${Math.round(coseAvg2.bboxH)}`.padStart(11)} ${coseAvg2.score.toFixed(3).padStart(8)}`,
+);

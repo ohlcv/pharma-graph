@@ -317,7 +317,7 @@ frontmatter 解析器
 {src/core/graph.ts} — { nodes[], edges[] }
     │
     ├──→ stylesheet 配置（节点形状 / 边颜色线型）
-    ├──→ layout 配置（默认 COSE-Bilkent）
+    ├──→ layout 配置（默认 Euler，2026-07 §12.4 由 COSE 切来）
     └──→ events 配置（点击 / 悬停 / 快捷键）
 
         ▼
@@ -336,7 +336,8 @@ Cytoscape.js 实例
 
 | 布局 | 适用数据结构 | 特点 |
 |------|-------------|------|
-| COSE-Bilkent | 任意 | 力学弹簧，自动聚类，默认布局 |
+| **Euler** | 任意 | 图论力学，优化边交叉。**默认布局（2026-07 §12.4）**。N=10 mean overlap 1.6 / worst 3，是当前最稳定的引擎 |
+| COSE-Bilkent | 任意 | 力学弹簧，自动聚类。原默认；现在作为"次选"保留 |
 | Dagre | 有向无环图（DAG） | 按方向分层，层次清晰 |
 | Euler | 任意 | 图论力学，优化边交叉 |
 | 同心圆 | 任意，按权重分层 | 重要性越大的越居中 |
@@ -345,7 +346,7 @@ Cytoscape.js 实例
 
 ### 9.2 默认布局
 
-默认使用 **COSE-Bilkent**，适合药学知识的非线性网状关联结构。
+默认使用 **Euler**（2026-07 §12.4 由 COSE 切换）。Euler 在 224 节点图上 N=10 mean overlap 1.6 / worst 3，对比 COSE mean 21.3 / worst 34。物理模拟比 COSE-Bilkent 稳定——首屏几乎看不到重叠。详见 [`docs/布局参数清单.md` §12.4](../布局参数清单.md#124-euler-密扫--默认布局切换2026-07)。
 
 ---
 

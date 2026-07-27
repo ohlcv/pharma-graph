@@ -16,6 +16,7 @@ import {
   NODE_TIER_STYLE,
   LAYOUTS,
   LayoutConfig,
+  DEFAULT_LAYOUT,
 } from './config.js';
 
 cytoscape.use(coseBilkent);
@@ -79,7 +80,7 @@ const STYLESHEET: any[] = (() => {
     const r = Math.max(0, parseInt(h.slice(0, 2), 16) - amount);
     const g = Math.max(0, parseInt(h.slice(2, 4), 16) - amount);
     const b = Math.max(0, parseInt(h.slice(4, 6), 16) - amount);
-    return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+    return '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
   };
   const edgeTypeRules = Object.entries(EDGE_TYPE_STYLE).map(([type, s]) => ({
     selector: `edge[edgeType = "${type}"]`,
@@ -100,7 +101,7 @@ const STYLESHEET: any[] = (() => {
       selector: 'node',
       style: {
         label: 'data(label)',
-        width:  'mapData(weight, 1, 10, 36, 76)',
+        width: 'mapData(weight, 1, 10, 36, 76)',
         height: 'mapData(weight, 1, 10, 36, 76)',
         'font-size': 'mapData(weight, 1, 10, 10, 15)',
         'font-weight': 600,
@@ -153,7 +154,9 @@ const STYLESHEET: any[] = (() => {
         'background-color': 'rgba(0,0,0,0)',
         'border-width': 0,
         label: '',
-        width: 1, height: 1, padding: 0,
+        width: 1,
+        height: 1,
+        padding: 0,
         shape: 'rectangle' as cytoscape.Css.NodeShape,
       },
     },
@@ -190,50 +193,65 @@ const STYLESHEET: any[] = (() => {
     // .selected-node, .hovered, .highlighted are defined above with
     // overlay-* support (cytoscape 3.20+). Don't redefine them here —
     // duplicate selectors work but bloat the stylesheet.
-    { selector: '.dimmed', style: {
-      opacity: 0.1,
-      'border-color': 'rgba(255,255,255,0.06)',
-      'text-background-color': 'rgba(15,17,23,0.5)',
-      'line-color': 'transparent',
-      'line-opacity': 0.1,
-      'source-arrow-color': 'transparent',
-      'target-arrow-color': 'transparent',
-      'color': 'rgba(226,232,240,0.25)',
-    }},
+    {
+      selector: '.dimmed',
+      style: {
+        opacity: 0.1,
+        'border-color': 'rgba(255,255,255,0.06)',
+        'text-background-color': 'rgba(15,17,23,0.5)',
+        'line-color': 'transparent',
+        'line-opacity': 0.1,
+        'source-arrow-color': 'transparent',
+        'target-arrow-color': 'transparent',
+        color: 'rgba(226,232,240,0.25)',
+      },
+    },
     { selector: '.entering', style: { opacity: 0 } },
     // Hover / select / highlight all use border-color + border-width
     // (Batch G). overlay-* and underlay-* were both removed because
     // cytoscape's overlay/underlay-shape only supports round-rectangle
     // and ellipse, which look inconsistent on the 8 essence shapes
     // (hexagon, star, tag, etc.). Border tracks the node shape exactly.
-    { selector: '.hovered', style: {
-      opacity: 1,
-      'border-width': 3,
-      'border-color': '#818cf8', // indigo-400
-    }},
-    { selector: '.selected-node', style: {
-      opacity: 1,
-      'border-width': 4,
-      'border-color': '#fbbf24', // amber-400
-    }},
-    { selector: '.highlighted', style: {
-      opacity: 0.95,
-      'border-width': 3,
-      'border-color': '#fbbf24', // amber-400
-    }},
-    { selector: '.highlighted-edge', style: {
-      opacity: 1,
-      width: 2.5,
-      'line-color': '#fbbf24',
-      'target-arrow-color': '#fbbf24',
-      'text-background-color': 'rgba(15,17,23,0.85)',
-      'text-background-shape': 'roundrectangle',
-      'text-background-padding': '2px 4px',
-      label: 'data(reason)',
-      'font-size': 10,
-      color: '#f1f5f9',
-      'text-margin-y': 8,
-    }},
+    {
+      selector: '.hovered',
+      style: {
+        opacity: 1,
+        'border-width': 3,
+        'border-color': '#818cf8', // indigo-400
+      },
+    },
+    {
+      selector: '.selected-node',
+      style: {
+        opacity: 1,
+        'border-width': 4,
+        'border-color': '#fbbf24', // amber-400
+      },
+    },
+    {
+      selector: '.highlighted',
+      style: {
+        opacity: 0.95,
+        'border-width': 3,
+        'border-color': '#fbbf24', // amber-400
+      },
+    },
+    {
+      selector: '.highlighted-edge',
+      style: {
+        opacity: 1,
+        width: 2.5,
+        'line-color': '#fbbf24',
+        'target-arrow-color': '#fbbf24',
+        'text-background-color': 'rgba(15,17,23,0.85)',
+        'text-background-shape': 'roundrectangle',
+        'text-background-padding': '2px 4px',
+        label: 'data(reason)',
+        'font-size': 10,
+        color: '#f1f5f9',
+        'text-margin-y': 8,
+      },
+    },
     {
       selector: '.pulse',
       style: {
@@ -260,7 +278,7 @@ const STYLESHEET: any[] = (() => {
         'border-width': 1,
         'text-background-color': 'rgba(15,17,23,0.5)',
         'line-opacity': 0.08,
-        'color': 'rgba(226,232,240,0.25)',
+        color: 'rgba(226,232,240,0.25)',
       },
     },
     {
@@ -285,8 +303,6 @@ export interface RendererOptions {
   minZoom?: number;
   maxZoom?: number;
 }
-
-const DEFAULT_LAYOUT = 'cose';
 
 // ── Renderer ──────────────────────────────────────────────────────────────────
 
@@ -379,9 +395,12 @@ export class Renderer {
 
     const edgeDelay = 80 + nodes.length * 16 + 150;
     this.cy.edges().forEach((edge: cytoscape.EdgeSingular, i: number) => {
-      setTimeout(() => {
-        edge.removeClass(CLASSES.ENTERING);
-      }, edgeDelay + i * 10 + 200);
+      setTimeout(
+        () => {
+          edge.removeClass(CLASSES.ENTERING);
+        },
+        edgeDelay + i * 10 + 200,
+      );
     });
 
     this.currentLayoutInstance?.stop();
@@ -443,8 +462,12 @@ export class Renderer {
           tags: n.tags ?? [],
           body: n.body,
           weight: n.weight ?? 60,
-          color: n.essence ? (NODE_TYPE_COLOR[n.essence] ?? NODE_TYPE_COLOR.default) : NODE_TYPE_COLOR.default,
-          colorDark: n.essence ? (NODE_TYPE_COLOR_DARK[n.essence] ?? NODE_TYPE_COLOR_DARK.default) : NODE_TYPE_COLOR_DARK.default,
+          color: n.essence
+            ? (NODE_TYPE_COLOR[n.essence] ?? NODE_TYPE_COLOR.default)
+            : NODE_TYPE_COLOR.default,
+          colorDark: n.essence
+            ? (NODE_TYPE_COLOR_DARK[n.essence] ?? NODE_TYPE_COLOR_DARK.default)
+            : NODE_TYPE_COLOR_DARK.default,
         },
       })),
       ...data.edges

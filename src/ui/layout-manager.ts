@@ -6,13 +6,13 @@
 import cytoscape from 'cytoscape';
 import { Renderer } from '../core/renderer.js';
 import { HighlightEngine } from './highlight-engine.js';
-import { LAYOUTS } from '../core/config.js';
+import { LAYOUTS, DEFAULT_LAYOUT } from '../core/config.js';
 import { pulseSelection } from './anim-pulse.js';
 import { forEachStatic } from './dom-cache.js';
 
 // ── Current layout state ────────────────────────────────────────────────────────
 
-let _currentLayout = 'cose';
+let _currentLayout = DEFAULT_LAYOUT;
 
 // Display labels for the toolbar segmented switcher. Source of truth stays in
 // LAYOUTS (key + cytoscape config); this map only carries the user-facing

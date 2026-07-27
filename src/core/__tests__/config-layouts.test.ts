@@ -15,7 +15,7 @@
  *   7. no duplicate param keys inside a single layout
  */
 import { describe, it, expect } from 'vitest';
-import { LAYOUTS, type LayoutParam, type LayoutConfig } from '../config';
+import { LAYOUTS, DEFAULT_LAYOUT, type LayoutParam, type LayoutConfig } from '../config';
 
 // Dead fields per layout extension (verified against node_modules/cytoscape-*/src/).
 // If a new extension version starts reading these keys, update this set and the docs.
@@ -150,5 +150,13 @@ describe('LAYOUTS - config integrity', () => {
         seen.add(p.key);
       }
     }
+  });
+
+  it('DEFAULT_LAYOUT points to a known LAYOUTS entry', () => {
+    // Guard against typo or rename that would silently break bootstrap.
+    expect(
+      Object.prototype.hasOwnProperty.call(LAYOUTS, DEFAULT_LAYOUT),
+      `DEFAULT_LAYOUT="${DEFAULT_LAYOUT}" is not a key in LAYOUTS=${Object.keys(LAYOUTS).join(',')}`,
+    ).toBe(true);
   });
 });

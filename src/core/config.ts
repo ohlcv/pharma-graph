@@ -459,7 +459,7 @@ export const LAYOUTS: Record<string, LayoutConfig> = {
         default: 0.0002,
         description: '胡克定律系数（springCoeff）。值越大弹簧越紧。0.0001-0.0003 适合稀疏布局。',
       },
-      { key: 'springLength', label: '弹簧长度', min: 50, max: 500, step: 5, default: 100 },
+      { key: 'springLength', label: '弹簧长度', min: 50, max: 500, step: 5, default: 140 },
       // Issue (清单 §7/§12.1/§12.3): euler 默认 gravity = -1.2（负值斥力）。原
       // min/max 全为正。2026-07 三轮 probe 显示 euler 在 224 节点下要同时
       // 拿到 0% overlap + COSE 量级 bbox (2700×3000) 必须用 gravity=-15 +
@@ -518,15 +518,16 @@ export const LAYOUTS: Record<string, LayoutConfig> = {
       fit: true,
       padding: 30,
       randomize: true,
-      // 2026-07 终极配 (清单 §12.3): 单跑 6 组 sweep 找甜点。
-      // - springCoeff 0.0002: 弱弹簧,让斥力做主,防止节点被边拉成团
-      // - springLength 100: 边长 hint 100
-      // - gravity -15: 4 倍官方默认的库仑斥力,推开到 COSE 量级 bbox
-      // - pull 0: 关闭默认 0.001 中心引力,避免节点被拉回中心
-      // - 5000 iter / 20s: 给库仑模拟足够时间收敛
-      // overlap 0.01% (3 对), bbox 2952×2476 (COSE 2695×2962 同量级)
+      // 2026-07 §12.4 终极配:N=10 三选手 + COSE head-to-head
+      // - springCoeff 0.0002: 弱弹簧保持(无变化,前轮已收)
+      // - springLength 140: N=10 均值 overlap=1.6, worst=3, bbox=3122×2869
+      //   (vs current default overlap=1.7, worst=4, bbox=2809×3008)
+      //   len 140 比 len 100：bbox +11% 接近 COSE 2845×2714,
+      //   最差情况从 4 降到 3 (用户首屏重叠体验更可靠)
+      // - gravity -15 / pull 0: 沿用 §12.3 配
+      // - COSE N=10: overlap=21.3, worst=34  → Euler 比 COSE overlap 低 13×
       springCoeff: 0.0002,
-      springLength: 100,
+      springLength: 140,
       gravity: -15,
       pull: 0,
       maxIterations: 5000,
@@ -535,4 +536,8 @@ export const LAYOUTS: Record<string, LayoutConfig> = {
   },
 };
 
-export const DEFAULT_LAYOUT = 'cose';
+// 2026-07: change default COSE -> Euler (清单 §12.4). Euler head-to-head:
+// COSE    N=10  overlap mean=21.3, worst=34, bbox 2845×2714
+// Euler   N=10  overlap mean=1.6,  worst=3,  bbox 3122×2869 (with springLength=140)
+// Euler 比 COSE overlap 低 13×，worst 低 11×，首屏加载视觉更稳定。
+export const DEFAULT_LAYOUT = 'euler';
