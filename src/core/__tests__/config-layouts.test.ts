@@ -200,4 +200,42 @@ describe('LAYOUTS - config integrity', () => {
     // (dropdownActive captured for future debugging if needed)
     void dropdownActive;
   });
+
+  it('index.html #layout-switcher-current initial label matches DEFAULT_LAYOUT', () => {
+    // §12.6: Bypass risk — even after §12.5 fixed the .active class on the
+    // dropdown button, the toolbar's "current layout" label (`布局 · COSE`)
+    // was still a hardcoded literal. Renderer constructor runs cytoscape.layout
+    // but does not invoke syncLayoutDisplay, so first paint shows whatever
+    // was typed in HTML. Bootstrap (main.ts) calls syncLayoutDisplay once
+    // — but only the *runtime* DOM matches DEFAULT_LAYOUT; the static HTML
+    // literal is what users see in the milliseconds before bootstrap runs
+    // and is what tests can verify without spinning up a renderer.
+    //
+    // Acceptable labels: the canonical `LAYOUT_LABELS[DEFAULT_LAYOUT]` casing,
+    // or the raw layout key. Anything else is a hardcoded stale literal.
+    const htmlPath = resolve(__dirname, '../../../index.html');
+    const html = readFileSync(htmlPath, 'utf-8');
+    const labelMatch = html.match(/<span[^>]*id="layout-switcher-current"[^>]*>([^<]*)<\/span>/);
+    expect(labelMatch, 'could not find #layout-switcher-current in index.html').toBeTruthy();
+    const initialLabel = labelMatch![1].trim();
+
+    // Mirror LAYOUT_LABELS in src/ui/layout-manager.ts (kept in sync by hand
+    // because e2e tests can't reach into a UI module's internals from a
+    // core config test — that's a refactor opportunity if we ever add a
+    // shared "display label" registry).
+    const LAYOUT_LABELS: Record<string, string> = {
+      cose: 'COSE',
+      concentric: '同心圆',
+      circle: '环形',
+      grid: '网格',
+      dagre: 'Dagre',
+      breadthfirst: '广度',
+      euler: 'Euler',
+    };
+    const expected = LAYOUT_LABELS[DEFAULT_LAYOUT] ?? DEFAULT_LAYOUT;
+    expect(
+      initialLabel,
+      `#layout-switcher-current initial text="${initialLabel}" but DEFAULT_LAYOUT="${DEFAULT_LAYOUT}" expects "${expected}". main.ts calls syncLayoutDisplay(DEFAULT_LAYOUT) at boot, but the static HTML literal is what tests see — keep them in sync.`,
+    ).toBe(expected);
+  });
 });

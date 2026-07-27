@@ -35,29 +35,52 @@ export function setCurrentLayout(name: string): void {
   _currentLayout = name;
 }
 
-// ── Layout ──────────────────────────────────────────────────────────────────────
-
-export function runLayout(name: string, renderer: Renderer): void {
-  _currentLayout = name;
+/**
+ * Sync all DOM surfaces that display the currently-active layout name to the
+ * given `name`, without running cytoscape. Called by `runLayout` after a
+ * user-initiated switch, by `applyLayoutParams`/`resetLayoutParams`, and by
+ * bootstrap (main.ts) so first paint shows the DEFAULT_LAYOUT, not whatever
+ * literal was hardcoded in index.html.
+ *
+ * Surfaces updated:
+ *   - `.layout-btn` active class (desktop dropdown items)
+ *   - `#bs-btn-{name}` active class (mobile sheet)
+ *   - `#layout-desc` description text (from LAYOUTS[name].description)
+ *   - `#layout-switcher-current` label text (from LAYOUT_LABELS, fallback to name)
+ *   - `aria-selected` on each `layout-switcher__item`
+ *
+ * Idle when `LAYOUTS[name]` is unknown (e.g. cytoscape built-ins used
+ * downstream but not in our config) — we still update the label from
+ * LAYOUT_LABELS but skip the description fetch.
+ */
+export function syncLayoutDisplay(name: string): void {
   forEachStatic((b) => b.classList.remove('active'), '.layout-btn');
   const btn = document.getElementById('btn-' + name);
   if (btn) btn.classList.add('active');
   const bsBtn = document.getElementById('bs-btn-' + name);
   if (bsBtn) bsBtn.classList.add('active');
-  const desc = document.getElementById('layout-desc');
-  const layout = LAYOUTS[name];
-  if (desc) desc.textContent = layout?.description ?? '';
-  // Keep the toolbar segmented switcher in sync (label + active item).
+
   const layoutObj = LAYOUTS[name];
   if (layoutObj) {
-    const current = document.getElementById('layout-switcher-current');
-    if (current) current.textContent = LAYOUT_LABELS[name] ?? name;
-    document.querySelectorAll<HTMLElement>('.layout-switcher__item').forEach((it) => {
-      const active = it.dataset.name === name;
-      it.classList.toggle('active', active);
-      it.setAttribute('aria-selected', String(active));
-    });
+    const desc = document.getElementById('layout-desc');
+    if (desc) desc.textContent = layoutObj.description ?? '';
   }
+
+  const current = document.getElementById('layout-switcher-current');
+  if (current) current.textContent = LAYOUT_LABELS[name] ?? name;
+
+  document.querySelectorAll<HTMLElement>('.layout-switcher__item').forEach((it) => {
+    const active = it.dataset.name === name;
+    it.classList.toggle('active', active);
+    it.setAttribute('aria-selected', String(active));
+  });
+}
+
+// ── Layout ──────────────────────────────────────────────────────────────────────
+
+export function runLayout(name: string, renderer: Renderer): void {
+  _currentLayout = name;
+  syncLayoutDisplay(name);
   renderLayoutParams(name);
   // Keep bottom-sheet params in sync if the panel is open
   const paramsBlock = document.getElementById('bs-params-block');

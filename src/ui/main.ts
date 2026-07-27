@@ -30,7 +30,7 @@ import { logInfo } from './logger.js';
 import { loadContent } from '../core/content-loader.js';
 import { installDispatcher, dispatchAction } from './action-dispatcher.js';
 import { updateStats, syncBottomSheetStats } from './graph-stats.js';
-import { fitGraph, randomize } from './layout-manager.js';
+import { fitGraph, randomize, syncLayoutDisplay, setCurrentLayout } from './layout-manager.js';
 import { initGraphEvents } from './graph-events.js';
 import { initSheetDrag, initPanelDrag, syncTourBarPosition } from './drag-manager.js';
 import {
@@ -109,6 +109,13 @@ async function boot(): Promise<void> {
       nodes: uiState.renderer.getCy().nodes().length,
       edges: uiState.renderer.getCy().edges().length,
     });
+
+    // §12.6: Renderer constructor calls cytoscape.layout() directly without
+    // going through layout-manager, so the DOM surfaces that show the current
+    // layout name still display whatever was hardcoded in index.html.
+    // Sync once at bootstrap so first paint shows the DEFAULT_LAYOUT, not 'COSE'.
+    syncLayoutDisplay(DEFAULT_LAYOUT);
+    setCurrentLayout(DEFAULT_LAYOUT);
 
     uiState.detailPanel = new DetailPanel(uiState.renderer.getCy(), uiState.highlight, {
       onNodeClick: (nodeId) => {

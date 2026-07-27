@@ -78,7 +78,8 @@
                 data-action="toggle-layout-menu">
           <span class="layout-switcher__label">布局</span>
           <span class="layout-switcher__sep">·</span>
-          <span class="layout-switcher__current" id="layout-switcher-current">COSE</span>
+          <!-- §12.6: 文案必须与 DEFAULT_LAYOUT='euler' 同步 (config-layouts.test.ts 守护) -->
+          <span class="layout-switcher__current" id="layout-switcher-current">Euler</span>
           <svg class="layout-switcher__chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="6 9 12 15 18 9"/>
           </svg>
@@ -348,9 +349,10 @@
           <div class="layout-info">
             <div class="layout-info__header">
               <span class="layout-info__label">布局</span>
-              <span class="layout-info__badge" id="stat-layout">COSE</span>
+              <span class="layout-info__badge" id="stat-layout">EULER</span>
             </div>
-            <span id="layout-desc" class="layout-info__desc">COSE — 力学弹簧布局，模拟物理排斥与吸引，自动产生紧凑聚类结构。</span>
+            <!-- §12.6: 文案必须与 DEFAULT_LAYOUT='euler' 同步 -->
+            <span id="layout-desc" class="layout-info__desc">Euler — 基于图论力学的布局，优化边交叉和长度。</span>
           </div>
         </div>
       </div>
