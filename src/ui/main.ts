@@ -31,6 +31,7 @@ import { loadContent } from '../core/content-loader.js';
 import { installDispatcher, dispatchAction } from './action-dispatcher.js';
 import { updateStats, syncBottomSheetStats } from './graph-stats.js';
 import { fitGraph, randomize, syncLayoutDisplay, setCurrentLayout } from './layout-manager.js';
+import { initBigscreen, registerFitFn, registerTourController, registerCyAccessor, isBigscreen } from './bigscreen.js';
 import { initGraphEvents } from './graph-events.js';
 import { initSheetDrag, initPanelDrag, syncTourBarPosition } from './drag-manager.js';
 import {
@@ -104,6 +105,8 @@ async function boot(): Promise<void> {
       layoutConfigs: LAYOUTS,
     });
     uiState.highlight = new HighlightEngine(uiState.renderer.getCy());
+    registerFitFn(() => fitGraph(uiState.renderer!));
+    registerCyAccessor(() => uiState.renderer!.getCy());
     // Issue #31: same DEV-gated diagnostic as the graph-build log.
     logInfo('cy after render:', {
       nodes: uiState.renderer.getCy().nodes().length,
@@ -146,6 +149,7 @@ async function boot(): Promise<void> {
     // assignment used to dereference `undefined`.
     tourController = new TourController(cy, uiState.renderer, uiState.detailPanel!);
     tourController.mount();
+    registerTourController(() => tourController.isRunning() || tourController.isPaused());
 
     initGraphEvents({
       cy,
@@ -200,6 +204,9 @@ async function boot(): Promise<void> {
   initResizeHandler();
   initMusicPlayer();
 
+  // Install bigscreen mode keyboard + fullscreen listeners.
+  initBigscreen();
+
   // Install the document-level click dispatcher once (idempotent).
   installDispatcher();
   // Wire every data-action="..." button to its handler.
@@ -239,7 +246,7 @@ function initResizeHandler(): void {
   window.addEventListener('resize', () => {
     if (uiState.resizeTimer) clearTimeout(uiState.resizeTimer);
     uiState.resizeTimer = setTimeout(() => {
-      fitGraph(uiState.renderer!);
+      if (!isBigscreen()) { fitGraph(uiState.renderer!); }
       syncTourBarPosition();
     }, 150);
   });

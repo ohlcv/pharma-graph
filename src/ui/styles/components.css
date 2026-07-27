@@ -862,5 +862,58 @@
   .bs-mobile-search { display: flex; }
 }
 
+/* Close @layer bottom-sheet (opened at line 674) */
+}
+
+/* ── Bigscreen / Cinema Mode ─────────────────────────────────────────────── */
+/* The single root class lives on <html> (not #app) to avoid any chance of
+   polluting cytoscape overlay or extension DOM nodes. */
+@layer bigscreen {
+
+html.bigscreen,
+html.bigscreen body { background: #000; }
+
+/* Deeper ambient halo for the "pure graph theatre" feel. */
+html.bigscreen #app::after {
+  background:
+    radial-gradient(ellipse 120% 80% at 12% -5%, rgba(129,140,248,0.35) 0%, transparent 65%),
+    radial-gradient(ellipse 100% 70% at 88% 95%, rgba(6,182,212,0.28) 0%, transparent 60%);
+  opacity: 1;
+}
+
+/* Hide all desktop chrome. Node-panel is kept — it is part of the graph
+   exploration, not a browser chrome element. */
+html.bigscreen .topbar,
+html.bigscreen .toolbar,
+html.bigscreen #sidebar,
+html.bigscreen #sidebar-strip,
+html.bigscreen #tour-dt,
+html.bigscreen #zoom-indicator { display: none !important; }
+
+/* Prominent z-index so node-panel (if opened) floats above canvas. */
+html.bigscreen .node-panel { z-index: 40; }
+
+/* Hint toast — fades in 0.2s, holds 1.5s, fades out. */
+.bigscreen-hint {
+  position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%);
+  padding: 8px 18px; border-radius: 999px;
+  background: rgba(15,17,23,0.88); backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.75); font-size: 0.74rem;
+  pointer-events: none; opacity: 0; z-index: 200;
+  animation: bigscreen-hint-in 1.5s ease-out 0.2s 1 forwards;
+  white-space: nowrap;
+}
+@keyframes bigscreen-hint-in {
+  0%   { opacity: 0; transform: translate(-50%, 8px); }
+  15%  { opacity: 1; transform: translate(-50%, 0); }
+  75%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -4px); }
+}
+
+/* Icon state: make the expand icon visible when not in bigscreen. */
+html:not(.bigscreen) #btn-bigscreen { }
+
 }
 

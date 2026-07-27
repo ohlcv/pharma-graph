@@ -1,4 +1,4 @@
-@layer base, shared, layout, topbar, toolbar, sidebar, node-panel, bottom-sheet, tour, tour-mobile;
+@layer base, shared, layout, topbar, toolbar, sidebar, node-panel, bottom-sheet, tour, tour-mobile, bigscreen;
 
 @import "./base.css";
 @import "./shared.css";

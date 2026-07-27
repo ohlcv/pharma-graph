@@ -10,6 +10,7 @@ import { DetailPanel } from './detail-panel.js';
 import { TourController } from './tour-controller.js';
 import { updateStats, syncBottomSheetStats } from './graph-stats.js';
 import { clearShapeFilter } from './legend-manager.js';
+import { isBigscreen, exitBigscreen } from './bigscreen.js';
 
 export interface GraphEventDeps {
   cy: cytoscape.Core;
@@ -106,6 +107,13 @@ export function initGraphEvents(deps: GraphEventDeps): void {
       if (deps.tourController.isRunning() || deps.tourController.isPaused()) {
         deps.tourController.stop();
       }
+    }
+  });
+
+  // Double-tap the canvas background → exit bigscreen mode.
+  cy.on('dbltap', (evt) => {
+    if (evt.target === cy && isBigscreen()) {
+      void exitBigscreen();
     }
   });
 

@@ -35,6 +35,7 @@ import {
   toggleLayoutMenu,
   installLayoutMenuDismissHandlers,
 } from './layout-menu.js';
+import { toggleBigscreen } from './bigscreen.js';
 
 export function registerAppActions(
   renderer: Renderer,
@@ -138,6 +139,10 @@ export function registerAppActions(
 
   registerAction('highlight-shape', (_el, args) => {
     highlightShape(args[0] ?? '', highlight);
+  });
+
+  registerAction('toggle-bigscreen', () => {
+    void toggleBigscreen();
   });
 
   // Close layout menu on outside click + Esc — installed once globally.
