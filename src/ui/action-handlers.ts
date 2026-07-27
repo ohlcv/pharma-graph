@@ -11,6 +11,7 @@ import { Renderer } from '../core/renderer.js';
 import { HighlightEngine } from './highlight-engine.js';
 import { DetailPanel } from './detail-panel.js';
 import { registerAction } from './action-dispatcher.js';
+import { DEFAULT_LAYOUT } from '../core/config.js';
 import {
   runLayout,
   applyLayoutParams,
@@ -56,7 +57,7 @@ export function registerAppActions(
     clearShapeFilter();
     highlight.reset();
     detailPanel.close();
-    renderer.runLayout('cose');
+    renderer.runLayout(DEFAULT_LAYOUT);
     updateStats(renderer.getCy());
     syncBottomSheetStats(renderer.getCy());
   });

@@ -450,54 +450,69 @@ export const LAYOUTS: Record<string, LayoutConfig> = {
       // Issue (清单 §12.3): springCoeff 调到 0.0002 才能让 bbox 接近 COSE 的
       // 2695×2962（0.0005 / 0.0008 时 bbox 都 ≤ 2500）。0.0001 时虽然 overlap
       // 0 但 bbox 3700+ 过大（满天星）。0.0002 是甜点位。
+      // §12.5 (2026-07): 滑块范围 0.0001~0.01 → 0.00005~0.05 让用户探索极端
+      // 值（小到接近 0 即"无弹簧"、大到 0.05 让图高度黏着）。
       {
         key: 'springCoeff',
         label: '弹簧系数',
-        min: 0.0001,
-        max: 0.01,
+        min: 0.00005,
+        max: 0.05,
         step: 0.0001,
         default: 0.0002,
         description: '胡克定律系数（springCoeff）。值越大弹簧越紧。0.0001-0.0003 适合稀疏布局。',
       },
-      { key: 'springLength', label: '弹簧长度', min: 50, max: 500, step: 5, default: 140 },
+      // §12.5 (2026-07): springLength 50~500 → 20~1000,N=10 winner=140
+      // 仍在合法区。允许拉到 20 模拟"边长极小"全图聚集,或拉到 1000 模拟
+      // "边长极大"大散点稀疏网。
+      { key: 'springLength', label: '弹簧长度', min: 20, max: 1000, step: 5, default: 140 },
       // Issue (清单 §7/§12.1/§12.3): euler 默认 gravity = -1.2（负值斥力）。原
       // min/max 全为正。2026-07 三轮 probe 显示 euler 在 224 节点下要同时
       // 拿到 0% overlap + COSE 量级 bbox (2700×3000) 必须用 gravity=-15 +
       // springCoeff=0.0002 + pull=0（关闭默认 0.001 中心引力）。单改 gravity
       // 即使推到 -40 也只能让 bbox ~3000，但 overlap 仍 ≥ 0.3%。
+      //
+      // §12.5: gravity -30~0 → -100~5,允许探索极限斥力(>30)或反向"吸力
+      // 主导"(>0)用 max=5 反向吸。
       {
         key: 'gravity',
         label: '重力（斥力）',
-        min: -30,
-        max: 0,
+        min: -100,
+        max: 5,
         step: 0.5,
         default: -15,
         description: '库仑斥力系数。负数 = 节点互相排斥推开，正数 = 互相吸引（一般不用）。',
       },
+      // §12.5: pull 0~0.01 → -0.005~0.05。允许负 pull（centrifugal-like 中心
+      // 排斥）和较大正 pull（高强度中心收束）。
       {
         key: 'pull',
         label: '中心引力',
-        min: 0,
-        max: 0.01,
+        min: -0.005,
+        max: 0.05,
         step: 0.0005,
         default: 0,
         description:
           '正系数 = 节点被拉向 origin (0,0); euler 默认 0.001 会把布局收紧到中心。0 = 关闭。',
       },
-      { key: 'refresh', label: '刷新间隔', min: 1, max: 100, step: 1, default: 30 },
+      // §12.5: refresh 1~100 → 1~200,允许更慢的视觉迭代（适合动画长链）。
+      { key: 'refresh', label: '刷新间隔', min: 1, max: 200, step: 1, default: 30 },
+      // §12.5: maxIterations 100~10000 → 100~30000,允许超长迭代（10000+
+      // 在调试极端参数时收敛更稳）。
       {
         key: 'maxIterations',
         label: '最大迭代',
         min: 100,
-        max: 10000,
+        max: 30000,
         step: 100,
         default: 5000,
       },
+      // §12.5: maxSimulationTime 500~40000 → 500~120000,从 40s 扩到 2min,
+      // 让超过 10000 迭代的场景能跑完。
       {
         key: 'maxSimulationTime',
         label: '模拟时长',
         min: 500,
-        max: 40000,
+        max: 120000,
         step: 500,
         default: 20000,
       },
@@ -505,8 +520,8 @@ export const LAYOUTS: Record<string, LayoutConfig> = {
         key: 'animationDuration',
         label: '动画时长',
         min: 0,
-        max: 3000,
-        step: 50,
+        max: 10000,
+        step: 100,
         default: 0,
         description: '仅 animate="end" 时生效；当前默认连续动画忽略此值。',
       },

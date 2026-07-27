@@ -15,7 +15,14 @@
  *   7. no duplicate param keys inside a single layout
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { LAYOUTS, DEFAULT_LAYOUT, type LayoutParam, type LayoutConfig } from '../config';
+
+// Vitest's ESM environment has no `__dirname`. Resolve via `import.meta.url`.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Dead fields per layout extension (verified against node_modules/cytoscape-*/src/).
 // If a new extension version starts reading these keys, update this set and the docs.
@@ -158,5 +165,39 @@ describe('LAYOUTS - config integrity', () => {
       Object.prototype.hasOwnProperty.call(LAYOUTS, DEFAULT_LAYOUT),
       `DEFAULT_LAYOUT="${DEFAULT_LAYOUT}" is not a key in LAYOUTS=${Object.keys(LAYOUTS).join(',')}`,
     ).toBe(true);
+  });
+
+  it('index.html default-active layout button matches DEFAULT_LAYOUT', () => {
+    // §12.5: Bypass risk — DEFAULT_LAYOUT switched to euler, but index.html
+    // still had `class="active"` on a different button. Renderer constructor
+    // calls cytoscape.layout() directly without going through layout-manager
+    // sync, so the static HTML active class is the user's visual cue. Mismatch
+    // = "I clicked what I thought was default but got a different layout".
+    //
+    // We scan both layout-switcher dropdown (.layout-switcher__item)
+    // and bottom sheet (.bs-layout-btn) for buttons with `active` class.
+    const htmlPath = resolve(__dirname, '../../../index.html');
+    const html = readFileSync(htmlPath, 'utf-8');
+    const dropdownActive = html.match(
+      /<button[^>]*class="[^"]*\bactive\b[^"]*layout-switcher__item[^"]*"[^>]*data-name="([^"]+)"|<button[^>]*layout-switcher__item[^"]*\bactive\b[^"]*"[^>]*data-name="([^"]+)"|<button[^>]*data-name="([^"]+)"[^>]*class="[^"]*\bactive\b[^"]*layout-switcher__item/i,
+    );
+    // Easier: just iterate every <button> with class containing `active`
+    // and `data-arg`. The first one matching a known layout wins.
+    const btnRe = /<button\b[^>]*class="([^"]+)"[^>]*data-(?:name|arg)="([^"]+)"[^>]*>/gi;
+    const activeLayouts = new Set<string>();
+    let m: RegExpExecArray | null;
+    while ((m = btnRe.exec(html)) !== null) {
+      const cls = m[1];
+      const arg = m[2];
+      if (/\bactive\b/.test(cls) && Object.prototype.hasOwnProperty.call(LAYOUTS, arg)) {
+        activeLayouts.add(arg);
+      }
+    }
+    expect(
+      activeLayouts.has(DEFAULT_LAYOUT),
+      `DEFAULT_LAYOUT="${DEFAULT_LAYOUT}" but index.html .active class is on: ${[...activeLayouts].join(',') || '(none)'}`,
+    ).toBe(true);
+    // (dropdownActive captured for future debugging if needed)
+    void dropdownActive;
   });
 });

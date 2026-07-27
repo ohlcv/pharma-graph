@@ -23,26 +23,16 @@ import { TourController } from './tour-controller.js';
 import { HighlightEngine } from './highlight-engine.js';
 import { DetailPanel } from './detail-panel.js';
 import { Search } from './search.js';
-import { LAYOUTS } from '../core/config.js';
+import { LAYOUTS, DEFAULT_LAYOUT } from '../core/config.js';
 import { brandCarousel } from './carousel.js';
 import { uiState } from './state.js';
 import { logInfo } from './logger.js';
 import { loadContent } from '../core/content-loader.js';
-import {
-  installDispatcher,
-  dispatchAction,
-} from './action-dispatcher.js';
-import {
-  updateStats,
-  syncBottomSheetStats,
-} from './graph-stats.js';
+import { installDispatcher, dispatchAction } from './action-dispatcher.js';
+import { updateStats, syncBottomSheetStats } from './graph-stats.js';
 import { fitGraph, randomize } from './layout-manager.js';
 import { initGraphEvents } from './graph-events.js';
-import {
-  initSheetDrag,
-  initPanelDrag,
-  syncTourBarPosition,
-} from './drag-manager.js';
+import { initSheetDrag, initPanelDrag, syncTourBarPosition } from './drag-manager.js';
 import {
   initEdgeTooltip,
   showEdgeTooltip,
@@ -89,10 +79,10 @@ async function boot(): Promise<void> {
   // see consistent feedback regardless of which surface they used.
   if (graphManager.warnings.length > 0) {
     const errors = graphManager.warnings.filter((w) => w.severity === 'error');
-    const warns  = graphManager.warnings.filter((w) => w.severity === 'warning');
+    const warns = graphManager.warnings.filter((w) => w.severity === 'warning');
     console.warn(
       `[pharma-graph] frontmatter warnings: ${errors.length} error(s), ${warns.length} warning(s)` +
-      ` — details follow. See docs/问题清单.md #14.`,
+        ` — details follow. See docs/问题清单.md #14.`,
     );
     for (const w of graphManager.warnings) {
       const tag = w.severity === 'error' ? '[error]' : '[warn]';
@@ -109,7 +99,8 @@ async function boot(): Promise<void> {
     uiState.renderer = new Renderer({
       container,
       data,
-      layoutName: 'cose',
+      // §12.4: 走 config.ts 的 DEFAULT_LAYOUT = 'euler' 单点真相
+      layoutName: DEFAULT_LAYOUT,
       layoutConfigs: LAYOUTS,
     });
     uiState.highlight = new HighlightEngine(uiState.renderer.getCy());
@@ -198,12 +189,7 @@ async function boot(): Promise<void> {
 
   // These init functions need cy — only proceed if renderer was created successfully.
   initKeyboardShortcuts();
-  initSearchUI(
-    uiState.renderer.getCy(),
-    uiState.highlight!,
-    uiState.search!,
-    uiState.detailPanel!,
-  );
+  initSearchUI(uiState.renderer.getCy(), uiState.highlight!, uiState.search!, uiState.detailPanel!);
   initResizeHandler();
   initMusicPlayer();
 

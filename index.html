@@ -144,13 +144,14 @@
 
   <!-- Layout switcher popover (outside toolbar to avoid overflow clipping) -->
   <div id="layout-switcher-menu" class="layout-switcher__menu" role="listbox" aria-label="选择布局">
-    <button class="layout-switcher__item active" role="option" aria-selected="true"  data-name="cose"         data-action="pick-layout" data-arg="cose">COSE</button>
+    <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="cose"         data-action="pick-layout" data-arg="cose">COSE</button>
     <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="concentric"   data-action="pick-layout" data-arg="concentric">同心圆</button>
     <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="circle"      data-action="pick-layout" data-arg="circle">环形</button>
     <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="grid"        data-action="pick-layout" data-arg="grid">网格</button>
     <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="dagre"       data-action="pick-layout" data-arg="dagre">Dagre</button>
     <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="breadthfirst" data-action="pick-layout" data-arg="breadthfirst">广度</button>
-    <button class="layout-switcher__item"        role="option" aria-selected="false" data-name="euler"       data-action="pick-layout" data-arg="euler">Euler</button>
+    <!-- §12.4: 默认布局 Euler (清单 §12.4) — HTML 默认 active 与 DEFAULT_LAYOUT 同步 -->
+    <button class="layout-switcher__item active" role="option" aria-selected="true" data-name="euler" data-action="pick-layout" data-arg="euler">Euler</button>
   </div>
 
   <!-- ── Main ───────────────────────────────────────────────────────── -->
@@ -527,13 +528,14 @@
     <div class="bs-section">
       <div class="bs-section__label">图谱布局</div>
       <div class="bs-layout-grid">
-        <button class="bs-layout-btn layout-btn active" id="bs-btn-cose" data-action="run-layout" data-arg="cose">COSE</button>
+        <button class="bs-layout-btn layout-btn" id="bs-btn-cose" data-action="run-layout" data-arg="cose">COSE</button>
         <button class="bs-layout-btn layout-btn" id="bs-btn-concentric" data-action="run-layout" data-arg="concentric">同心圆</button>
         <button class="bs-layout-btn layout-btn" id="bs-btn-circle" data-action="run-layout" data-arg="circle">环形</button>
         <button class="bs-layout-btn layout-btn" id="bs-btn-grid" data-action="run-layout" data-arg="grid">网格</button>
         <button class="bs-layout-btn layout-btn" id="bs-btn-dagre" data-action="run-layout" data-arg="dagre">Dagre</button>
         <button class="bs-layout-btn layout-btn" id="bs-btn-breadthfirst" data-action="run-layout" data-arg="breadthfirst">广度</button>
-        <button class="bs-layout-btn layout-btn" id="bs-btn-euler" data-action="run-layout" data-arg="euler">Euler</button>
+        <!-- §12.4: 默认布局 Euler -->
+        <button class="bs-layout-btn layout-btn active" id="bs-btn-euler" data-action="run-layout" data-arg="euler">Euler</button>
       </div>
     </div>
 
