@@ -3,16 +3,28 @@
 // Search + HighlightEngine + DetailPanel pipeline.
 //
 // The pipeline:
-//   onInput → run search → update stats + schedule debounced camera center
-//   ArrowUp/Down → navigate results + open DetailPanel
-//   Enter → confirm highlighted result + show DetailPanel
-//   Escape → clear search and cancel pending center
+//   onInput  → run search → update stats; auto-center the *first* result
+//             after a short debounce so rapid typing doesn't thrash the camera.
+//   ArrowUp  → move cursor to prev result + center camera on it (first press
+//             lands on result 0, not result 1)
+//   ArrowDown → same, other direction
+//   Enter    → commit: pick the current/pending result and *navigate* the
+//             camera to it (same path as a graph tap / detail neighbour click)
+//   Escape   → clear search and cancel any pending auto-center
+//
+// The desktop and mobile inputs are kept in sync so the user doesn't see two
+// divergent result lists.
+//
+// Input-method composition (`compositionstart` / `compositionend`) is tracked
+// so the Enter key pressed while confirming a CJK candidate doesn't trigger
+// navigation until the candidate is finalised.
 
 import cytoscape from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
 import { DetailPanel } from './detail-panel.js';
 import { Search } from './search.js';
 import { updateStats } from './graph-stats.js';
+import { focusOnNode } from './focus-node.js';
 
 /** Debounce window for "input" handlers — keeps the graph from re-centering
  *  on every keystroke while still updating the result count and highlight live. */
@@ -24,18 +36,16 @@ export function initSearchUI(
   search: Search,
   detailPanel: DetailPanel,
 ): void {
-  attachSearchHandlers(document.getElementById('bs-search-input') as HTMLInputElement, {
-    cy,
-    highlight,
-    search,
-    detailPanel,
-  });
-  attachSearchHandlers(document.getElementById('bs-mobile-search-input') as HTMLInputElement, {
-    cy,
-    highlight,
-    search,
-    detailPanel,
-  });
+  const desktopInput = document.getElementById('bs-search-input') as HTMLInputElement | null;
+  const mobileInput = document.getElementById('bs-mobile-search-input') as HTMLInputElement | null;
+
+  if (desktopInput && mobileInput) {
+    wireMirror(desktopInput, mobileInput);
+    wireMirror(mobileInput, desktopInput);
+  }
+
+  attachSearchHandlers(desktopInput, { cy, highlight, search, detailPanel });
+  attachSearchHandlers(mobileInput, { cy, highlight, search, detailPanel });
 }
 
 interface HandlersCtx {
@@ -45,51 +55,79 @@ interface HandlersCtx {
   detailPanel: DetailPanel;
 }
 
+/**
+ * Mirror `value` from `src` to `dst` on every input event so the two search
+ * inputs show the same query. Mirror is suppressed while the *destination*
+ * is focused, otherwise typing in one input while the other has focus would
+ * feel like the cursor is being yanked away from underneath the user.
+ */
+function wireMirror(src: HTMLInputElement, dst: HTMLInputElement): void {
+  src.addEventListener('input', () => {
+    if (document.activeElement === dst) return;
+    if (dst.value === src.value) return;
+    dst.value = src.value;
+  });
+}
+
 function attachSearchHandlers(input: HTMLInputElement | null, ctx: HandlersCtx): void {
   if (!input) return;
-  const { cy, highlight, search, detailPanel } = ctx;
+  const { cy, search, detailPanel } = ctx;
   let pendingCenterTimer: ReturnType<typeof setTimeout> | null = null;
+  let isComposing = false;
+
+  function cancelPendingCenter(): void {
+    if (pendingCenterTimer !== null) {
+      clearTimeout(pendingCenterTimer);
+      pendingCenterTimer = null;
+    }
+  }
+
+  input.addEventListener('compositionstart', () => {
+    isComposing = true;
+    cancelPendingCenter();
+  });
+  input.addEventListener('compositionend', () => {
+    isComposing = false;
+    // Browser fires `input` after `compositionend`; nothing else to do here.
+  });
 
   input.addEventListener('input', () => {
     // Run search synchronously so highlight + stats update on every keystroke.
-    // The expensive part — centering the camera — is deferred so rapid typing
-    // doesn't queue overlapping cy.animate() calls.
     const results = search.search(input.value);
     updateStats(cy);
 
-    if (pendingCenterTimer !== null) clearTimeout(pendingCenterTimer);
+    cancelPendingCenter();
+    if (results.length === 0) return;
     pendingCenterTimer = setTimeout(() => {
       pendingCenterTimer = null;
-      if (results.length === 0) return;
-      // Skip auto-centering if the input has lost focus or the user has
-      // already navigated to a result (which centers the camera itself).
       if (document.activeElement !== input) return;
-      if (search.getCurrentIndex() >= 0) return;
-      const firstId = results[0];
-      const node = cy.getElementById(firstId);
-      if (node.empty()) return;
-      cy.animate({
-        center: { eles: node },
-        zoom: 1.5,
-        duration: 400,
-        easing: 'ease-out-cubic',
-      });
+      if (search.getCurrentId() !== null) return;
+      // Preview the first match: move the camera but keep the batch of
+      // search-highlighted results visible. `skipHighlight: true` ensures
+      // we don't collapse the whole batch down to "the target's neighbours".
+      focusOnNode(cy, results[0], { skipHighlight: true });
     }, SEARCH_INPUT_DEBOUNCE_MS);
   });
 
   input.addEventListener('keydown', (e) => {
+    // Escape always works, even mid-composition.
     if (e.key === 'Escape') {
-      if (pendingCenterTimer !== null) {
-        clearTimeout(pendingCenterTimer);
-        pendingCenterTimer = null;
-      }
+      cancelPendingCenter();
       input.value = '';
       search.clear();
       updateStats(cy);
       e.preventDefault();
       return;
     }
-    if (search.getResults().length === 0) return;
+
+    // Skip arrow/enter handling while CJK composition is active — the browser
+    // is still finishing the candidate and Enter is going to confirm it.
+    if (isComposing) return;
+    if ((e as unknown as { isComposing?: boolean }).isComposing) return;
+
+    const results = search.getResults();
+    if (results.length === 0) return;
+
     if (e.key === 'ArrowDown') {
       const id = search.navigateNext();
       if (id) detailPanel.show(id);
@@ -99,17 +137,14 @@ function attachSearchHandlers(input: HTMLInputElement | null, ctx: HandlersCtx):
       if (id) detailPanel.show(id);
       e.preventDefault();
     } else if (e.key === 'Enter') {
-      if (pendingCenterTimer !== null) {
-        clearTimeout(pendingCenterTimer);
-        pendingCenterTimer = null;
-      }
-      const results = search.getResults();
-      const idx = search.getCurrentIndex();
-      if (results[idx]) {
-        detailPanel.show(results[idx]);
-        highlight.highlightNode(results[idx]);
-      }
+      cancelPendingCenter();
+      const id = search.commit();
+      if (id) detailPanel.show(id);
       e.preventDefault();
     }
   });
+
+  // If the user clicks a search result somewhere else (or the input loses
+  // focus to the canvas), still cancel any pending auto-center.
+  input.addEventListener('blur', () => cancelPendingCenter());
 }

@@ -5,8 +5,11 @@
 // announcer (`#search-announcer`, aria-live polite). The tests
 // verify that:
 //   1. `search()` announces the result count (incl. zero-result case)
-//   2. `navigateNext/Prev` announces "第 N / 共 M 个结果：<label>"
+//   2. `navigateNext/Prev` announces "第 N / 共 M 个结果：<label>".
+//      The first press on a fresh query lands on index 0 (not 1).
 //   3. `clear()` announces "搜索已清除"
+//   4. `commit()` (the Enter-key path) selects the current cursor or, when
+//      the user has not navigated yet, the first result.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import cytoscape from 'cytoscape';
@@ -61,20 +64,53 @@ describe('Search — issue #29 announcer', () => {
     expect(readAnnouncer()).toBe('没有匹配的结果');
   });
 
-  it('announces position + label on navigateNext()', () => {
+  it('first navigateNext lands on result 0, not 1', () => {
+    // Behaviour change: previously the index started at 0 inside
+    // `search()`, so the first ArrowDown jumped to 1 (skipping the
+    // first result). Now index starts at -1 and the first press goes
+    // to 0; the second press goes to 1.
     const { search } = makeSearch();
     search.search('阿');
+    expect(search.getCurrentId()).toBeNull();
     search.navigateNext();
-    // results = [a, b]; index starts at 0; next wraps to 1 → "阿莫西林"
+    expect(search.getCurrentId()).toBe('a');
+    expect(readAnnouncer()).toBe('第 1 / 共 2 个结果：阿司匹林');
+    search.navigateNext();
+    expect(search.getCurrentId()).toBe('b');
     expect(readAnnouncer()).toBe('第 2 / 共 2 个结果：阿莫西林');
   });
 
-  it('announces position + label on navigatePrev()', () => {
+  it('first navigatePrev lands on result 0', () => {
     const { search } = makeSearch();
     search.search('阿');
     search.navigatePrev();
-    // index 0 → wrap to 1
-    expect(readAnnouncer()).toBe('第 2 / 共 2 个结果：阿莫西林');
+    expect(search.getCurrentId()).toBe('a');
+    expect(readAnnouncer()).toBe('第 1 / 共 2 个结果：阿司匹林');
+    search.navigatePrev();
+    expect(search.getCurrentId()).toBe('b');
+  });
+
+  it('commit() with no prior navigation falls back to first result', () => {
+    const { search } = makeSearch();
+    search.search('阿');
+    const id = search.commit();
+    expect(id).toBe('a');
+    expect(search.getCurrentId()).toBe('a');
+    expect(readAnnouncer()).toBe('第 1 / 共 2 个结果：阿司匹林');
+  });
+
+  it('commit() honours the cursor after manual navigation', () => {
+    const { search } = makeSearch();
+    search.search('阿');
+    search.navigateNext(); // → a
+    search.navigateNext(); // → b
+    const id = search.commit();
+    expect(id).toBe('b');
+  });
+
+  it('commit() with no results returns null', () => {
+    const { search } = makeSearch();
+    expect(search.commit()).toBeNull();
   });
 
   it('announces "搜索已清除" on clear()', () => {
@@ -82,16 +118,10 @@ describe('Search — issue #29 announcer', () => {
     search.search('阿');
     search.clear();
     expect(readAnnouncer()).toBe('搜索已清除');
+    expect(search.getCurrentId()).toBeNull();
   });
 
   it('dedupes consecutive identical messages by clearing first', () => {
-    // The Search writes textContent = '' then textContent = msg so
-    // screen readers fire the change event even for identical back-to-back
-    // messages. We can only assert the final state, not the AT behavior,
-    // but we can verify the clear-then-set ordering by spying on
-    // getElementById — too invasive. Instead: verify two consecutive
-    // searches with the same result produce the same final text and
-    // that search() doesn't throw.
     const { search } = makeSearch();
     search.search('阿');
     const first = readAnnouncer();
