@@ -293,7 +293,8 @@ export const LAYOUTS: Record<string, LayoutConfig> = {
       // Issue (清单 §12.1): 在 224 节点密度下 quality='default' 的自适应冷却
       // 经常过早收敛（节点仍有重叠就停）。proof 模式使用固定 numIter 迭代
       // （无自适应冷却），5000 次配合弱弹簧 0.45 + 高斥力 80000 + 中心重力
-      // 0.05 让重叠率从 1.07% 降到 0.08%（probe: src/scripts/_probe-overlap.ts）。
+      // 0.05 让重叠率从 1.07% 降到 0.08%（probe: scripts/measure-overlap.ts
+      // 的旧草稿版本）。
       numIter: 5000,
       quality: 'proof',
       tile: true,

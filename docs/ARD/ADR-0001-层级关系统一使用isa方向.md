@@ -5,8 +5,8 @@
 | **状态** | Accepted · Implemented |
 | **日期** | 2026-07-14 |
 | **决策者** | 项目所有者 |
-| **影响范围** | `public/content/**` 所有 frontmatter、`src/parser/frontmatter.ts`、`src/scripts/validate.ts`、`docs/frontmatter.md` |
-| **实施** | 迁移脚本 `src/scripts/migrate-isa.ts` 已执行，has 边从 384 清零、isa 边新增 356 条（167 由 has 改写 + 189 子节点补），详见 `docs/migration-report.md` |
+| **影响范围** | `public/content/**` 所有 frontmatter、`src/parser/frontmatter.ts`、`scripts/validate.ts`、`docs/frontmatter.md` |
+| **实施** | 迁移脚本 `archive/scripts/migrate-isa.ts` 已执行，has 边从 384 清零、isa 边新增 356 条（167 由 has 改写 + 189 子节点补），详见 `docs/migration-report.md` |
 
 ## 一、背景（Context）
 
@@ -183,7 +183,7 @@ class Dog extends Mammal {}  // 子类声明父类
 
 ### Step 1: 编写一次性迁移脚本
 
-新建 `src/scripts/fix-isas.ts`：
+新建 `archive/scripts/fix-isas.ts`（已归档）：
 
 ```typescript
 // 伪代码
@@ -209,7 +209,7 @@ for each public/content/**/*.md file:
 
 ### Step 3: 增强校验
 
-修改 `src/scripts/validate.ts`：
+修改 `scripts/validate.ts`：
 
 1. 警告"父→子方向的 `has` 边"（建议改用 `isa`）。
 2. 警告"双向 `isa`/`has` 配对"（应只留一边）。
@@ -225,7 +225,7 @@ for each public/content/**/*.md file:
 
 ```bash
 # 1. 跑迁移脚本
-npx tsx src/scripts/fix-isas.ts
+npx tsx archive/scripts/fix-isas.ts
 
 # 2. 校验
 npm run validate

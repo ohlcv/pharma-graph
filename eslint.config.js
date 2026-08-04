@@ -24,7 +24,7 @@ export default [
   prettierConfig,
 
   {
-    files: ['src/**/*.ts'],
+    files: ['src/**/*.ts', 'scripts/**/*.ts', 'archive/**/*.ts'],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
@@ -114,7 +114,7 @@ export default [
 
   // Scripts are standalone Node CLIs
   {
-    files: ['src/scripts/**/*.ts'],
+    files: ['scripts/**/*.ts', 'archive/**/*.ts'],
     rules: {
       'no-console': 'off',
       '@typescript-eslint/no-explicit-any': 'off',

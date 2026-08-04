@@ -161,11 +161,6 @@ pharma-graph/
 │   │   └── tour.ts             ← 章节导览逻辑
 │   │
 │   ├── ui/                       ← 浏览器层 UI 代码（详见 DEVELOP.md 下半部分）
-│   │
-│   └── scripts/                  ← 工具脚本（详见下文"scripts/"小节）
-│       ├── validate.ts          ← 严格 schema 校验（`npm run validate`）
-│       ├── audit-frontmatter.ts ← ADR-0001 评分 + 关系方向审查（`npm run audit`）
-│       └── serve.ts             ← 静态服务器（`npm run view`）
 │
 ├── content/                      ← 知识内容（Markdown + frontmatter）
 │   │   ├── config.ts            ← 全局配置（默认布局、颜色映射、边类型映射）
@@ -235,7 +230,7 @@ pharma-graph/
   - `styles/` 统一管理样式变量和组件样式，CSS 变量集中定义颜色和间距，方便换主题
   - `cytoscape-overrides.css` 覆盖 Cytoscape.js 的默认背景色、滚动条等 UI 元素
 
-**`scripts/`** — 独立工具脚本，可单独运行或集成到 CI。代码位于 `src/scripts/`，通过 `npm run <name>` 调用：
+**`scripts/`** — 独立工具脚本，可单独运行或集成到 CI。代码位于 `scripts/`（不再在 `src/` 下），通过 `npm run <name>` 调用：
 
 | 命令 | 脚本 | 用途 | 退出码 |
 |---|---|---|---|
