@@ -36,7 +36,11 @@ export async function loadContent(): Promise<LoadedContent> {
 
   const responses = await Promise.all(
     manifest.files.map((rel) =>
-      fetch('/content/' + rel).then((r) => {
+      // encodeURI leaves `+`, `(`, `)`, etc. literal — but servers (nginx default)
+      // decode `+` as space, breaking paths like 强抗氧化+金属离子螯合.md.
+      // encodeURIComponent on each segment is too aggressive (breaks `/`),
+      // so split on `/`, encode each piece, then re-join.
+      fetch('/content/' + rel.split('/').map(encodeURIComponent).join('/')).then((r) => {
         if (!r.ok) throw new Error(`[content-loader] ${rel}: ${r.status}`);
         return r.text().then((text) => [rel, text] as const);
       }),
