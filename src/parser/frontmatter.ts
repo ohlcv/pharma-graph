@@ -115,12 +115,25 @@ const REQUIRED_FIELDS = ['id'];
  * `data:`, so when that block exists we use it; otherwise we read from
  * the root map. Only the new schema (essence/field/tier) is accepted;
  * legacy type/category/layer is not supported here.
+ *
+ * Legacy files keep `edges_out` at the YAML root while the rest of their
+ * metadata sits under `data:`. To keep those files readable without a
+ * migration pass, fold the root-level `edges_out` into the nested block
+ * before returning. If the nested block already has its own `edges_out`,
+ * the root-level copy is dropped (nested wins).
  */
 function pickSource(yamlRoot: Record<string, unknown>): Record<string, unknown> {
   const nested = yamlRoot['data'];
-  return nested && typeof nested === 'object' && !Array.isArray(nested)
-    ? (nested as Record<string, unknown>)
-    : yamlRoot;
+  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+    const block = nested as Record<string, unknown>;
+    const rootEdges = yamlRoot['edges_out'];
+    const blockHasEdges = 'edges_out' in block && block['edges_out'] != null;
+    if (!blockHasEdges && Array.isArray(rootEdges)) {
+      block['edges_out'] = rootEdges;
+    }
+    return block;
+  }
+  return yamlRoot;
 }
 
 /**
@@ -165,13 +178,12 @@ export function parseFrontmatterWithWarnings(
         ? rawSummary.trim()
         : undefined;
 
-  // edges_out typically lives at the YAML root — the migration script puts
-  // most fields under `data:` but leaves `edges_out` at the top level. Fall
-  // back to the nested map only if the root didn't have it.
-  const edgesRaw =
-    (data['edges_out'] as unknown[] | undefined) ??
-    (fm['edges_out'] as unknown[] | undefined) ??
-    [];
+  // edges_out lives under `data:` in the new schema; legacy files keep it at
+  // the YAML root. `pickSource` already folded the root-level copy into the
+  // nested block when needed, so a single `fm['edges_out']` lookup covers
+  // both layouts. (Reading `data['edges_out']` directly would be equivalent
+  // since `fm === data` when the `data:` block exists.)
+  const edgesRaw = (fm['edges_out'] as unknown[] | undefined) ?? [];
   if (!Array.isArray(edgesRaw)) {
     warnings.push({
       file: filePath,
