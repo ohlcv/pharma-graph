@@ -8,6 +8,7 @@ import { DEFAULT_EDGE_TYPE, isEdgeType } from '../core/edge-types.js';
 import { uiState, registerPinToggle } from './state.js';
 import { forEachStatic } from './dom-cache.js';
 import { UiToggle } from './ui-toggle.js';
+import { restorePanelBounds, hasSavedBounds } from './drag-manager.js';
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -111,12 +112,15 @@ export class DetailPanel {
 
     this.applySectionState();
 
+    const wasVisible = this.panel.classList.contains('visible');
     this.panel.classList.add('visible');
 
     if (!uiState.isPanelPinned) {
-      const W = this.panel.offsetWidth;
-      const H = this.panel.offsetHeight;
-      this.reposition(nodeId, W, H);
+      // First show: pull saved bounds (if any) so the panel reopens where the
+      // user left it. Subsequent shows (e.g. jumping from neighbor to neighbor)
+      // keep the panel where it is — reposition would only re-clamp edges.
+      if (!wasVisible) restorePanelBounds(this.panel);
+      this.reposition(nodeId);
     }
   }
 
@@ -132,18 +136,23 @@ export class DetailPanel {
     this.callbacks?.onClose?.();
   }
 
-  reposition(nodeId: string, W?: number, H?: number): void {
+  reposition(nodeId: string, _W?: number, _H?: number): void {
     if (!this.panel.classList.contains('visible') || uiState.isPanelPinned) return;
 
-    const pW = W ?? this.panel.offsetWidth;
-    const pH = H ?? this.panel.offsetHeight;
+    const pW = this.panel.offsetWidth;
+    const pH = this.panel.offsetHeight;
     const vpW = window.innerWidth;
+    const vpH = window.innerHeight;
     const TOPBAR_H = 56;
-    const PAD = 12;
+    const PAD = 8;
 
-    // Position in top-right corner
+    // Once the user has dragged or resized the panel, leave it where they
+    // put it. We only reposition when no saved bounds exist — i.e. the
+    // very first open of the session.
+    if (hasSavedBounds()) return;
+
     const left = vpW - pW - PAD;
-    const top = TOPBAR_H + PAD;
+    const top = Math.max(TOPBAR_H + PAD, Math.round((vpH - pH) / 2));
 
     this.panel.style.left = left + 'px';
     this.panel.style.top = top + 'px';

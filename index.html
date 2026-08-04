@@ -182,7 +182,7 @@
 
     <!-- ── Left floating node detail ─────────────────────────────────── -->
     <div id="node-panel" class="node-panel" role="dialog" aria-label="节点详情">
-      <div class="node-panel__header" id="node-panel-header" onpointerdown="startPanelDrag(event)">
+      <div class="node-panel__header" id="node-panel-header">
         <span class="node-panel__title">节点详情</span>
         <div class="node-panel__tabs" role="tablist" aria-label="详情面板标签">
           <button class="node-panel__tab active" id="lp-tab-overview"
@@ -205,6 +205,7 @@
           </svg>
         </button>
       </div>
+      <div class="node-panel__resize" id="node-panel-resize" aria-hidden="true"></div>
       <div class="node-panel__body">
         <div id="lp-overview-page" class="np-page" role="tabpanel" aria-labelledby="lp-tab-overview"></div>
         <div id="lp-body-page"    class="np-page" role="tabpanel" aria-labelledby="lp-tab-body"     style="display:none"></div>

@@ -33,7 +33,7 @@ import { updateStats, syncBottomSheetStats } from './graph-stats.js';
 import { fitGraph, randomize, syncLayoutDisplay, setCurrentLayout } from './layout-manager.js';
 import { initBigscreen, registerFitFn, registerTourController, registerCyAccessor, isBigscreen } from './bigscreen.js';
 import { initGraphEvents } from './graph-events.js';
-import { initSheetDrag, initPanelDrag, syncTourBarPosition } from './drag-manager.js';
+import { initSheetDrag, initPanelDrag, initPanelResize, syncTourBarPosition } from './drag-manager.js';
 import {
   initEdgeTooltip,
   showEdgeTooltip,
@@ -189,6 +189,7 @@ async function boot(): Promise<void> {
 
     initSheetDrag();
     initPanelDrag();
+    initPanelResize();
   } catch (err) {
     const n = document.getElementById('stat-nodes');
     const e = document.getElementById('stat-edges');

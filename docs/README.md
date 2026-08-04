@@ -2,6 +2,14 @@
 
 > **当前状态**：本项目已于 **2026-07-14** 完成 ISA 边迁移。所有 has 边已清零（384→0），isa 边由 0 增至 356。详见 [ADR-0001](./ADR-0001-层级关系统一使用isa方向.md) 与 [migration-report](./migration-report.md)。
 
+## 0. 规则手册
+
+| 规则 | 适用范围 | 文档 |
+|---|---|---|
+| **节点拆分** | 把每张手绘思维导图转写为新增节点 | [SPLIT-RULES.md](./SPLIT-RULES.md) |
+| **节点合并 / 重构** | 在已有图谱上清理零入度节点、补骨架边、修 schema | [REFACTOR-RULES.md](./REFACTOR-RULES.md) |
+| **层级关系方向** | isa / prerequisite / mechanism 等边的方向约定 | [ADR-0001](./ADR-0001-层级关系统一使用isa方向.md) |
+
 ## 1. 产品概述
 
 **药学知识图谱**（pharma-graph）是一个基于知识图谱可视化技术，帮助药学学习者整理、关联和记忆药学专业知识的工具。

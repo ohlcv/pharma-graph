@@ -188,19 +188,86 @@ export function initSheetDrag(): void {
 // Tour bar collapse/expand was moved to TourController.bindMobileCollapse();
 // this module now only owns the bottom-sheet drag and the desktop panel drag.
 
-// ── Desktop panel drag ─────────────────────────────────────────────────────────
+// ── Desktop panel drag + resize ───────────────────────────────────────────────
+
+const PANEL_BOUNDS_KEY = 'detailPanel.bounds';
+const PANEL_DEFAULT_W = 360;
+const PANEL_DEFAULT_H = 360;
+const PANEL_MIN_W = 280;
+const PANEL_MIN_H = 240;
+/** Gap from viewport edges / top bar — also the gap inside which the panel
+ *  is snapped back if dragged outside. */
+const PANEL_PAD = 8;
+const TOPBAR_H = 56;
+
+interface PanelBounds { left: number; top: number; width: number; height: number; }
 
 let dragState: { startX: number; startY: number; startLeft: number; startTop: number; el: HTMLElement } | null = null;
+let resizeState: { startX: number; startY: number; startW: number; startH: number; el: HTMLElement } | null = null;
+
+function clampBounds(b: PanelBounds): PanelBounds {
+  const vpW = window.innerWidth;
+  const vpH = window.innerHeight;
+  // Constrain size first so the left/top clamp below accounts for the actual
+  // rendered width/height (panel may have been resized below its CSS default).
+  const w = Math.max(PANEL_MIN_W, Math.min(b.width, vpW - PANEL_PAD * 2));
+  const h = Math.max(PANEL_MIN_H, Math.min(b.height, vpH - TOPBAR_H - PANEL_PAD * 2));
+  const left = Math.max(PANEL_PAD, Math.min(b.left, vpW - w - PANEL_PAD));
+  const top = Math.max(TOPBAR_H + PANEL_PAD, Math.min(b.top, vpH - h - PANEL_PAD));
+  return { left, top, width: w, height: h };
+}
+
+function loadPanelBounds(): PanelBounds | null {
+  try {
+    const raw = localStorage.getItem(PANEL_BOUNDS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PanelBounds>;
+    if (typeof parsed.left !== 'number' || typeof parsed.top !== 'number'
+        || typeof parsed.width !== 'number' || typeof parsed.height !== 'number') return null;
+    return clampBounds({ left: parsed.left, top: parsed.top, width: parsed.width, height: parsed.height });
+  } catch { return null; }
+}
+
+function savePanelBounds(b: PanelBounds): void {
+  try { localStorage.setItem(PANEL_BOUNDS_KEY, JSON.stringify(b)); } catch { /* ignore */ }
+}
+
+/**
+ * Apply saved bounds (if any) so the panel pops open at the user's last
+ * position. No-op when the panel is already visible at a non-default spot
+ * (subsequent `show()` calls on the same node shouldn't jump the user).
+ */
+export function restorePanelBounds(panel: HTMLElement): void {
+  const saved = loadPanelBounds();
+  if (!saved) return;
+  panel.style.left = saved.left + 'px';
+  panel.style.top = saved.top + 'px';
+  panel.style.width = saved.width + 'px';
+  panel.style.minHeight = saved.height + 'px';
+}
+
+/** True iff the user has dragged or resized the panel at least once. */
+export function hasSavedBounds(): boolean {
+  return loadPanelBounds() !== null;
+}
 
 export function initPanelDrag(): void {
   const panel = document.getElementById('node-panel');
-  if (!panel) return;
+  const header = document.getElementById('node-panel-header');
+  if (!panel || !header) return;
 
-  panel.addEventListener('pointerdown', (e: PointerEvent) => {
+  // Drag must start on the header only — clicking the body, tabs, close,
+  // or pin would otherwise double-trigger drag + click. Touch-action: none
+  // on the header (CSS) keeps pointer events flowing on mobile.
+  header.addEventListener('pointerdown', (e: PointerEvent) => {
     if (!panel.classList.contains('visible')) return;
-    const closeBtn = panel.querySelector('.node-panel__close');
-    if (closeBtn?.contains(e.target as Node)) return;
-    dragState = { startX: e.clientX, startY: e.clientY, startLeft: panel.offsetLeft, startTop: panel.offsetTop, el: panel };
+    dragState = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startLeft: panel.offsetLeft,
+      startTop: panel.offsetTop,
+      el: panel,
+    };
     panel.classList.add('dragging');
     document.addEventListener('pointermove', onPanelDrag);
     document.addEventListener('pointerup', stopPanelDrag);
@@ -210,19 +277,86 @@ export function initPanelDrag(): void {
 function onPanelDrag(e: PointerEvent): void {
   if (!dragState || uiState.isPanelPinned) return;
   const { el, startLeft, startTop } = dragState;
-  const W = el.offsetWidth, H = el.offsetHeight;
-  const vpW = window.innerWidth, vpH = window.innerHeight;
-  const TOPBAR_H = 56, PAD = 8;
-  let left = Math.max(PAD, Math.min(startLeft + (e.clientX - dragState.startX), vpW - W - PAD));
-  let top = Math.max(TOPBAR_H + PAD, Math.min(startTop + (e.clientY - dragState.startY), vpH - H - PAD));
-  el.style.left = left + 'px'; el.style.top = top + 'px';
+  const next = clampBounds({
+    left: startLeft + (e.clientX - dragState.startX),
+    top: startTop + (e.clientY - dragState.startY),
+    width: el.offsetWidth,
+    height: el.offsetHeight,
+  });
+  el.style.left = next.left + 'px';
+  el.style.top = next.top + 'px';
 }
 
 function stopPanelDrag(): void {
-  if (dragState) { dragState.el.classList.remove('dragging'); dragState = null; }
   document.removeEventListener('pointermove', onPanelDrag);
   document.removeEventListener('pointerup', stopPanelDrag);
+  if (dragState) {
+    dragState.el.classList.remove('dragging');
+    savePanelBounds({
+      left: dragState.el.offsetLeft,
+      top: dragState.el.offsetTop,
+      width: dragState.el.offsetWidth,
+      height: dragState.el.offsetHeight,
+    });
+    dragState = null;
+  }
 }
+
+export function initPanelResize(): void {
+  const panel = document.getElementById('node-panel');
+  const handle = document.getElementById('node-panel-resize');
+  if (!panel || !handle) return;
+
+  handle.addEventListener('pointerdown', (e: PointerEvent) => {
+    if (!panel.classList.contains('visible')) return;
+    e.preventDefault();
+    e.stopPropagation(); // don't bubble to header → no drag kickoff
+    resizeState = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startW: panel.offsetWidth,
+      startH: panel.offsetHeight,
+      el: panel,
+    };
+    panel.classList.add('resizing');
+    document.addEventListener('pointermove', onPanelResize);
+    document.addEventListener('pointerup', stopPanelResize);
+  });
+}
+
+function onPanelResize(e: PointerEvent): void {
+  if (!resizeState || uiState.isPanelPinned) return;
+  const { el, startW, startH } = resizeState;
+  const next = clampBounds({
+    left: el.offsetLeft,
+    top: el.offsetTop,
+    width: startW + (e.clientX - resizeState.startX),
+    height: startH + (e.clientY - resizeState.startY),
+  });
+  el.style.width = next.width + 'px';
+  el.style.minHeight = next.height + 'px';
+}
+
+function stopPanelResize(): void {
+  document.removeEventListener('pointermove', onPanelResize);
+  document.removeEventListener('pointerup', stopPanelResize);
+  if (resizeState) {
+    resizeState.el.classList.remove('resizing');
+    savePanelBounds({
+      left: resizeState.el.offsetLeft,
+      top: resizeState.el.offsetTop,
+      width: resizeState.el.offsetWidth,
+      height: resizeState.el.offsetHeight,
+    });
+    resizeState = null;
+  }
+}
+
+/** Reset persisted bounds — used when the user wants to start fresh. */
+export function clearPanelBounds(): void {
+  try { localStorage.removeItem(PANEL_BOUNDS_KEY); } catch { /* ignore */ }
+}
+
 
 // ── Sidebar toggle ────────────────────────────────────────────────────────────
 
