@@ -1,7 +1,9 @@
-// src/scripts/extract-all-frontmatter.ts
+// archive/scripts/extract-all-frontmatter.ts — ONCE-OFF dump, already produced
+// docs/all-frontmatter-extracted.md. Rerunning will simply rewrite that file.
+// Kept for archaeology only.
 // 提取 content/ 下全部 .md 文件的 frontmatter，写入一个 markdown 文档
 // 用途：把仓库当前所有 frontmatter 状态聚合成一份单一文档，方便人工审查/讨论
-// 用法：node --import tsx src/scripts/extract-all-frontmatter.ts
+// 用法：node --import tsx archive/scripts/extract-all-frontmatter.ts
 
 import fs from 'node:fs';
 import path from 'node:path';

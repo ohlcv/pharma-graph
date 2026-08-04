@@ -1,9 +1,11 @@
 /**
+ * archive/scripts/batch-fix.ts — ONCE-OFF cleanup, completed before 2026-07
+ * Kept for archaeology only; rerunning on current data is a no-op.
  * 批量修正全库 frontmatter 和正文格式问题：
  * 1. 正文标题：所有非标准五问格式 → 标准五问格式
  * 2. layer 值：section/chapter → system/clinical
  *
- * 用法：npx tsx src/scripts/batch-fix.ts
+ * 用法：npx tsx archive/scripts/batch-fix.ts
  */
 
 import { readFileSync, writeFileSync, readdirSync, statSync } from "fs";

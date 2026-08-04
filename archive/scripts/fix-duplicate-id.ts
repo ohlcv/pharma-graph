@@ -1,4 +1,6 @@
 /**
+ * archive/scripts/fix-duplicate-id.ts — ONCE-OFF cleanup, completed before 2026-07
+ * Kept for archaeology only; rerunning on current data is a no-op.
  * 批量修复 frontmatter 中重复 id 字段的问题
  * 问题：某些文件的 data.id 字段被写成了 data.id 和 data.id: <hash> 两行
  * 解决：只保留第一行的 id，删除第二行的 hash id

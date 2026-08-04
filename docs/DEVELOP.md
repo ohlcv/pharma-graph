@@ -165,11 +165,6 @@ pharma-graph/
 │   └── scripts/                  ← 工具脚本（详见下文"scripts/"小节）
 │       ├── validate.ts          ← 严格 schema 校验（`npm run validate`）
 │       ├── audit-frontmatter.ts ← ADR-0001 评分 + 关系方向审查（`npm run audit`）
-│       ├── extract-all-frontmatter.ts
-│       ├── migrate-frontmatter.ts
-│       ├── migrate-isa.ts
-│       ├── fix-duplicate-id.ts
-│       ├── batch-fix.ts
 │       └── serve.ts             ← 静态服务器（`npm run view`）
 │
 ├── content/                      ← 知识内容（Markdown + frontmatter）
@@ -260,16 +255,16 @@ pharma-graph/
 - 集中批量修一批 markdown → 中途用 `npm run audit` 看整体进度和 ADR-0001 合规率
 - 修完提交前 → 再 `npm run validate`（兜底）
 
-### 一次性脚本（不在 npm scripts 里）
+### 已归档的一次性脚本（不在 npm scripts 里）
 
-`src/scripts/` 下还有几个一次性改造工具，**只在大型重构时使用**，日常开发不需要：
+大型重构时跑过、已经完成历史使命的工具，**归档在 [`archive/scripts/`](../archive/scripts)**，不在日常开发中使用：
 
-- `migrate-frontmatter.ts` — 把 frontmatter 统一迁到新 schema（位置/字段顺序）；`--dry-run` 默认
-- `migrate-isa.ts` — 按 ADR-0001 把 has 边统一为 isa；默认 dry-run，`--apply` 才落盘
-- `extract-all-frontmatter.ts` — 把全库 frontmatter 聚合成一份 markdown（人工审查用）
-- `fix-duplicate-id.ts` / `batch-fix.ts` — 历史遗留修复工具，仅在已知问题复发时跑
+- `migrate-frontmatter.ts` — 把 frontmatter 统一迁到新 schema（位置/字段顺序）；`--dry-run` 默认。归档前最后一次运行已完成全库迁移。
+- `migrate-isa.ts` — 按 ADR-0001 把 has 边统一为 isa；默认 dry-run，`--apply` 才落盘。已与 ADR-0001 一并落地（详见 `docs/migration-report.md`）。
+- `extract-all-frontmatter.ts` — 把全库 frontmatter 聚合成一份 markdown（人工审查用），输出 `docs/all-frontmatter-extracted.md`。
+- `fix-duplicate-id.ts` / `batch-fix.ts` — 历史遗留修复工具，仅在已知问题复发时跑。
 
-跑法统一为 `npx tsx src/scripts/<name>.ts [--flags]`。
+跑法统一为 `npx tsx archive/scripts/<name>.ts [--flags]`。各文件头部已标注"ONCE-OFF / completed YYYY-MM"，请勿在当前数据上重跑。
 
 **`tests/`** — 测试代码，保证 parser 和 graph 构建逻辑的正确性，防止解析错误导致图谱数据损坏
 

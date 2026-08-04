@@ -1,13 +1,17 @@
-// src/scripts/migrate-frontmatter.ts
+// archive/scripts/migrate-frontmatter.ts — ONCE-OFF migration, completed 2026-06
+// Kept for archaeology only; rerunning on current data is a no-op.
 // 将所有 .md 文件的 frontmatter 统一为新格式：location/tags/summary 移入 data: 块内
 // 新顺序: id → label → type → category → layer → location → tags → summary
 // edges_out 保持在根级
-// 用法: npx tsx src/scripts/migrate-frontmatter.ts [--dry-run]
+// 用法: npx tsx archive/scripts/migrate-frontmatter.ts [--dry-run]
 
 import { readFileSync, writeFileSync, readdirSync } from 'fs';
 import { join, basename } from 'path';
 import { parse as yamlParse, stringify as yamlStringify } from 'yaml';
 
+// NOTE: this script predates the move from root-level `content/` to
+// `public/content/`. If you actually want to rerun the migration, point
+// CONTENT_DIR at `public/content` first.
 const CONTENT_DIR = join(process.cwd(), 'content');
 
 function stripChapterPrefix(s: string): string {

@@ -1,7 +1,9 @@
-// src/scripts/migrate-isa.ts
+// archive/scripts/migrate-isa.ts — ONCE-OFF migration, completed 2026-07-14
+// Kept for archaeology only; rerunning on current data is a no-op (ISA migration
+// is already complete, see ADR-0001 and docs/migration-report.md).
 // 按 ADR-0001 把层级边统一为子→父 isa，删父→子 has，把同级/横切 has 改为 relates
 // 默认 dry-run：只打报告，不改文件。加 --apply 才落盘。
-// 用法：node --import tsx src/scripts/migrate-isa.ts [--apply]
+// 用法：node --import tsx archive/scripts/migrate-isa.ts [--apply]
 
 import fs from 'node:fs';
 import path from 'node:path';
