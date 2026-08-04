@@ -3,7 +3,12 @@
 import fs from 'fs/promises';
 import { scanContentDir } from "../parser/content-manager.js";
 import { parseFrontmatterWithWarnings } from "../parser/frontmatter.js";
-import { EDGE_TYPES } from "../core/edge-types.js";
+import {
+  isValidEssence,
+  isValidField,
+  isValidTier,
+  isValidEdgeType,
+} from "../parser/schema.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
@@ -12,32 +17,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const ROOT = path.resolve(__dirname, "../..");
 
-// 新 schema 有效值
-const VALID_ESSENCE = [
-  'notion', 'medication', 'illness', 'route', 'substance', 'process', 'module', 'section',
-  'concept', 'drug', 'disease', 'ingredient', 'mechanism', 'bridge', 'service',
-  'pathogen', 'pathway', 'indicator', 'book', 'chapter',
-];
-const VALID_FIELD = [
-  'pharmaceutics', 'pharmacokinetics', 'medicinal_chemistry', 'pharmacology',
-  'toxicology', 'biopharmaceutics', 'clinical_pharmacy', 'pharmacy_service',
-  'cardiovascular', 'respiratory', 'digestive', 'endocrine', 'musculoskeletal',
-  'anti_infective', 'anti_tumor', 'blood', 'immunology', 'dermatology',
-  'antipyretic', 'anti_rheumatic', 'anti_gout', 'nutrition', 'diagnostic',
-  'life_sciences', 'biopharmaceutical', '药学专业知识二',
-  'pharmacy_practice',
-];
-const VALID_TIER = [
-  'basic', 'drug', 'disease', 'management', 'service', 'legal',
-  'foundation', 'system', 'clinical',
-];
-
-// Issue #9: previously this list was hand-maintained alongside the
-// EDGE_TYPE_STYLE / EDGE_TYPE_LABEL keys in config.ts; the three lists
-// silently agreed until somebody added a new type to one and forgot
-// the others. Now it's a re-export of the canonical tuple, kept as a
-// named binding so the existing .includes() call sites read naturally.
-const VALID_EDGE_TYPES: readonly string[] = EDGE_TYPES;
+// VALID_* whitelists live in src/parser/schema.ts. Both validate and
+// audit-frontmatter import the same readonly tuples, so the two scripts
+// can no longer silently disagree on what counts as a canonical value.
 
 interface ValidationError {
   file: string;
@@ -93,7 +75,7 @@ export async function validate(): Promise<void> {
     allIds.add(fm.id);
 
     // Validate essence field
-    if (fm.essence && !VALID_ESSENCE.includes(fm.essence)) {
+    if (fm.essence && !isValidEssence(fm.essence)) {
       errors.push({
         file: relPath,
         field: 'essence',
@@ -103,7 +85,7 @@ export async function validate(): Promise<void> {
     }
 
     // Validate field field
-    if (fm.field && !VALID_FIELD.includes(fm.field)) {
+    if (fm.field && !isValidField(fm.field)) {
       errors.push({
         file: relPath,
         field: 'field',
@@ -113,7 +95,7 @@ export async function validate(): Promise<void> {
     }
 
     // Validate tier field
-    if (fm.tier && !VALID_TIER.includes(fm.tier)) {
+    if (fm.tier && !isValidTier(fm.tier)) {
       errors.push({
         file: relPath,
         field: 'tier',
@@ -128,7 +110,7 @@ export async function validate(): Promise<void> {
       for (let i = 0; i < fm.edges_out.length; i++) {
         const edge = fm.edges_out[i];
 
-        if (edge.type && !VALID_EDGE_TYPES.includes(edge.type)) {
+        if (edge.type && !isValidEdgeType(edge.type)) {
           errors.push({
             file: relPath,
             field: `edges_out[${i}].type`,

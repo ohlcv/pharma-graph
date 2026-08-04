@@ -28,23 +28,15 @@ const CONTENT_DIR = path.resolve('content');
 const OUTPUT_FILE = path.resolve('docs/frontmatter-audit.md');
 
 // ── Schema 值 ──────────────────────────────────────────────────────
-const VALID_ESSENCE = [
-  'notion', 'medication', 'illness', 'route', 'substance', 'process', 'module', 'section',
-  'drug', 'disease', 'pathogen', 'mechanism', 'ingredient', 'concept', 'service', 'pathway', 'indicator',
-  'book', 'chapter', 'part',
-];
-const VALID_FIELD = [
-  'pharmaceutics', 'pharmacokinetics', 'medicinal_chemistry', 'pharmacology',
-  'toxicology', 'biopharmaceutics', 'clinical_pharmacy', 'pharmacy_service',
-  'cardiovascular', 'respiratory', 'digestive', 'endocrine',
-  'musculoskeletal', 'anti_infective', 'anti_tumor', 'blood',
-  'immunology', 'dermatology', 'antipyretic', 'anti_rheumatic',
-  'anti_gout', 'nutrition', 'diagnostic', 'pharmacy_practice',
-];
-const VALID_TIER = [
-  'basic', 'drug', 'disease', 'management', 'service', 'legal',
-  'foundation', 'system', 'clinical',
-];
+// Whitelists live in src/parser/schema.ts. Both audit and validate import
+// from the same module so the two scripts can no longer drift on what
+// counts as a canonical value. Locally re-bind the readonly tuples under
+// their old names so the scoring branches read naturally.
+import {
+  VALID_ESSENCE,
+  VALID_FIELD,
+  VALID_TIER,
+} from "../parser/schema.js";
 
 const LOC_KEYS = ['book', 'part', 'chapter', 'section', 'point', 'item', 'subsection'] as const;
 type LocKey = typeof LOC_KEYS[number];
