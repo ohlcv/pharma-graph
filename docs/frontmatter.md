@@ -54,7 +54,7 @@ edges_out:
 | `concave-hexagon` | 凹六边形 | 六边形右侧内凹，方向感 | — |
 | `heptagon` | 七边形 | 正七边形 | — |
 | `round-heptagon` | 圆角七边形 | 七角圆润的七边形 | — |
-| ✅ `octagon` | 八边形 | 正八边形，分类聚集感 | `notion` — 概念、理论、术语 |
+| ✅ `octagon` | 八边形 | 正八边形，分类聚集感 | `concept` — 概念、理论、术语 |
 | `round-octagon` | 圆角八边形 | 八角圆润的八边形 | — |
 | `star` | 星形 | 五角星 | `process` — 过程、机制、体内行为 |
 | ✅ `tag` | 标签形 | 矩形左侧带三角形尖角 | `section` — 标签型知识点 |
@@ -383,7 +383,7 @@ D. 学习路径
 data:
   id: shouguo-xiaoying
   label: 首过效应
-  essence: notion
+  essence: concept
   field: biopharmaceutics
   tier: basic
   location:

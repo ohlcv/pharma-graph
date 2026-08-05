@@ -21,10 +21,10 @@ data:
     - target: dopaminergic-drugs
       type: isa
       reason: COMT 抑制剂是拟多巴胺类药亚类
-    - target: notion-comt-inhibitor-adr
+    - target: concept-comt-inhibitor-adr
       type: prerequisite
       reason: COMT 抑制剂不良反应与相互作用独立节点
-    - target: notion-pd-scenario-comt
+    - target: concept-pd-scenario-comt
       type: prerequisite
       reason: 左旋多巴疗效减退/开关现象首选 COMT 抑制剂
 ---

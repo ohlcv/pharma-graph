@@ -1,8 +1,8 @@
 ---
 data:
-  id: notion-serotonin-syndrome
+  id: concept-serotonin-syndrome
   label: 5-HT综合征
-  essence: notion
+  essence: concept
   field: pharmacology
   tier: management
   location:
@@ -24,7 +24,7 @@ data:
     - target: antidepressant-drugs
       type: isa
       reason: 5-HT综合征是抗抑郁药的核心用药监护要点
-    - target: notion-washout-period
+    - target: concept-washout-period
       type: prerequisite
       reason: 5-HT综合征的预防依赖换药时严格遵守洗脱期
 ---

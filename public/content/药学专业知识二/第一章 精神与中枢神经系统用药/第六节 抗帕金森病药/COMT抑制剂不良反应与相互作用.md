@@ -1,8 +1,8 @@
 ---
 data:
-  id: notion-comt-inhibitor-adr
+  id: concept-comt-inhibitor-adr
   label: COMT 抑制剂不良反应与相互作用
-  essence: notion
+  essence: concept
   field: pharmacology
   tier: management
   location:

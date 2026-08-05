@@ -866,7 +866,7 @@ edges_out:
 |---|---|
 | id | `first-pass-effect` |
 | label | 首过效应 |
-| essence / type | `notion` |
+| essence / type | `concept` |
 | field / category | `biopharmaceutics` |
 | tier / layer | `basic` |
 | location | `{"book":"药学专业知识一","part":"第一篇 药剂学","chapter":"第七章 口服制剂与临床应用","section":"第一节 口服固体制剂","item":"首过效应"}` |
@@ -887,7 +887,7 @@ edges_out:
 data:
   id: first-pass-effect
   label: 首过效应
-  essence: notion
+  essence: concept
   field: biopharmaceutics
   tier: basic
   location:

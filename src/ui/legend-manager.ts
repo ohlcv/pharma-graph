@@ -51,7 +51,7 @@ function clearAllFilters(): void {
 // ── Axis populators ────────────────────────────────────────────────────────────
 
 const NODE_TYPE_SHAPE_MAP: Record<string, string> = {
-  notion: 'octagon',
+  concept: 'octagon',
   medication: 'ellipse',
   illness: 'diamond',
   route: 'triangle',

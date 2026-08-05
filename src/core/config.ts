@@ -19,7 +19,7 @@ import { EDGE_TYPES, type EdgeType } from './edge-types.js';
 // 8 种本质，与 frontmatter.md 的 essence 枚举一一对应
 
 export const NODE_TYPE_SHAPE: Record<string, string> = {
-  notion: 'octagon', // 概念 — 八边形，分类聚集
+  concept: 'octagon', // 概念 — 八边形，分类聚集
   medication: 'ellipse', // 具体药物或制剂 — 圆形，规整具体
   illness: 'diamond', // 疾病或病理状态 — 菱形，警示感强
   route: 'triangle', // 信号通路、受体家族 — 三角形，方向汇聚
@@ -30,7 +30,7 @@ export const NODE_TYPE_SHAPE: Record<string, string> = {
 };
 
 export const NODE_TYPE_COLOR: Record<string, string> = {
-  notion: '#818cf8', // 靛蓝 — 概念
+  concept: '#818cf8', // 靛蓝 — 概念
   medication: '#67e8f9', // 青色 — 具体药物或制剂
   illness: '#fca5a5', // 浅红 — 疾病或病理状态
   route: '#22d3ee', // 青色 — 信号通路、受体家族
@@ -42,7 +42,7 @@ export const NODE_TYPE_COLOR: Record<string, string> = {
 };
 
 export const NODE_TYPE_COLOR_DARK: Record<string, string> = {
-  notion: '#4f46e5',
+  concept: '#4f46e5',
   medication: '#0891b2',
   illness: '#dc2626',
   route: '#0891b2',
@@ -56,7 +56,7 @@ export const NODE_TYPE_COLOR_DARK: Record<string, string> = {
 // ── Essence → 中文标签 ───────────────────────────────────────────────────────
 
 export const ESSENCE_LABEL: Record<string, string> = {
-  notion: '概念',
+  concept: '概念',
   medication: '药物',
   illness: '疾病',
   route: '通路',

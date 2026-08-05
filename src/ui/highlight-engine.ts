@@ -98,7 +98,7 @@ export class HighlightEngine {
     // filtered by their essence attribute — which is what the legend counts use.
     const essenceMap: Record<string, string> = {
       ellipse:           'medication',
-      octagon:          'notion',
+      octagon:          'concept',
       diamond:          'illness',
       triangle:         'route',
       pentagon:         'substance',

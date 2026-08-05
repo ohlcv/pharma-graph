@@ -52,7 +52,7 @@
 | 9 | `药学专业知识一/第一篇 药剂学/第七章 口服制剂与临床应用/第一节 口服固体制剂/缓释剂型.md` | ✅ `sustained-release-dosage-forms-y1` | ✅ section | ✅ pharmaceutics | ✅ drug | ✅ | ✅ | -无 | 100% |
 | 10 | `药学专业知识一/第一篇 药剂学/第七章 口服制剂与临床应用/第一节 口服固体制剂/美托洛尔.md` | ✅ `metoprolol` | ✅ medication | ✅ pharmacology | ✅ drug | ✅ | ✅ | -无 | 100% |
 | 11 | `药学专业知识一/第一篇 药剂学/第七章 口服制剂与临床应用/第一节 口服固体制剂/药物吸收.md` | ✅ `drug-absorption-y1` | ✅ section | ✅ pharmaceutics | ✅ drug | ✅ | ✅ | -无 | 100% |
-| 12 | `药学专业知识一/第一篇 药剂学/第七章 口服制剂与临床应用/第一节 口服固体制剂/首过效应.md` | ✅ `first-pass-effect` | ✅ notion | ✅ biopharmaceutics | ✅ basic | ✅ | ✅ | 🔁×1 | 100% |
+| 12 | `药学专业知识一/第一篇 药剂学/第七章 口服制剂与临床应用/第一节 口服固体制剂/首过效应.md` | ✅ `first-pass-effect` | ✅ concept | ✅ biopharmaceutics | ✅ basic | ✅ | ✅ | 🔁×1 | 100% |
 | 13 | `药学专业知识一/第一篇 药剂学/第七章 口服制剂与临床应用/第二节 口服液体制剂.md` | ✅ `oral-liquid-dosage-forms-y1` | ✅ module | ✅ pharmaceutics | ✅ basic | ✅ | ✅ | -无 | 100% |
 | 14 | `药学专业知识一/第一篇 药剂学/第九章 皮肤和黏膜给药途径制剂与临床应用.md` | ✅ `topical-mucosal-drugs-y1` | ✅ module | ✅ pharmaceutics | ✅ drug | ✅ | ✅ | 🔁×2 | 100% |
 | 15 | `药学专业知识一/第一篇 药剂学/第九章 皮肤和黏膜给药途径制剂与临床应用/第一节 皮肤给药制剂.md` | ✅ `topical-drug-delivery-y1` | ✅ module | ✅ pharmaceutics | ✅ drug | ✅ | ✅ | -无 | 100% |
