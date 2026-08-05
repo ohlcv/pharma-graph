@@ -1,6 +1,6 @@
 ---
 data:
-  id: concept-mao-b-inhibitor-adr
+  id: notion-mao-b-inhibitor-adr
   label: MAO-B 抑制剂不良反应与相互作用
   essence: notion
   field: pharmacology

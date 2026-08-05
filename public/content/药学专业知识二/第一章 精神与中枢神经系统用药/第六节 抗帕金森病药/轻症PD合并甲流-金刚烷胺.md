@@ -1,6 +1,6 @@
 ---
 data:
-  id: concept-pd-scenario-amantadine
+  id: notion-pd-scenario-amantadine
   label: 轻症PD合并甲型流感——金刚烷胺
   essence: notion
   field: pharmacology

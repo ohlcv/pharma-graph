@@ -93,7 +93,16 @@ edges_out:
 
 ### 1.2 notion 与 concept 的关系
 
-旧版本曾短暂引入 `concept` essence 与 `notion` 并列，但两者的判定边界模糊（一个临床评价、一个口诀、一个理论术语都会被叫作"概念"），导致全仓出现 47 个 `concept-*` 前缀的语义混杂节点。**最新规范：删除 `concept`，统一使用 `notion`**。任何"概念、术语、理论、口诀、临床评价、用药监护场景"均归 `notion`（形状 octagon），不再单独占一种 essence。
+`concept` 与 `notion` 并存，**判定边界如下**：
+
+| 维度 | `concept` | `notion` |
+|---|---|---|
+| 语义 | 教科书定义、有边界、有内涵外延的认知单元 | 临床评价、记忆口诀、经验提示 |
+| 例子 | 急性缺血性脑卒中、5-HT 综合征、三阶梯镇痛、心源性哮喘、体位性低血压 | 吗啡大坏蛋口诀、轻症PD合并甲型流感场景、起效延迟 4~6 周 |
+| id 前缀 | `concept-*` | `notion-*` |
+| 形状 | octagon | octagon |
+
+Round 5 之前曾把两者合并为 `notion`，导致 10 个概念节点丢了语义。**当前规范**：`concept` 节点保留 `concept-` 前缀与 `concept` essence；口诀/经验类改 `notion-` 前缀与 `notion` essence。
 
 ### field — 学科领域（决定节点边框色）
 | 值 | 含义 | 对应教材
@@ -478,7 +487,7 @@ edges_out:
 | 节属于章 | `isa` | 节节点的 frontmatter | `section-id → chapter-id` |
 | 章属于篇 | `isa` | 章节点的 frontmatter | `chapter-id → part-id` |
 | 篇属于 book | `isa` | 篇节点的 frontmatter | `part-id → book-id` |
-| 概念属于分类 | `isa` | 概念节点的 frontmatter | `concept-id → category-id` |
+| 概念属于分类 | `isa` | 概念节点的 frontmatter | `concept-id → category-id` / `notion-id → category-id` |
 
 **禁止**用 `has` 表达"属于"。例如 "第一节 镇静催眠药" 写 `has → 第一章 精神与中枢神经系统用药` 是错的，应写 `isa → cns-drugs-y2`。
 

@@ -28,6 +28,7 @@ import { EDGE_TYPES } from '../core/edge-types.js';
 /** Canonical essence values (decide node shape). */
 export const VALID_ESSENCE: readonly string[] = [
   'concept',
+  'notion',
   'medication',
   'illness',
   'route',

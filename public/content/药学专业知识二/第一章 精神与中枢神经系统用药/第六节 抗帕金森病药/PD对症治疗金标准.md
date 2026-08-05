@@ -1,6 +1,6 @@
 ---
 data:
-  id: concept-pd-scenario-gold-standard
+  id: notion-pd-scenario-gold-standard
   label: PD对症治疗金标准（运动迟缓/肌强直）
   essence: notion
   field: pharmacology

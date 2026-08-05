@@ -1,6 +1,6 @@
 ---
 data:
-  id: concept-pd-scenario-tremor-young
+  id: notion-pd-scenario-tremor-young
   label: 年轻患者、震颤为主的轻症PD
   essence: notion
   field: pharmacology

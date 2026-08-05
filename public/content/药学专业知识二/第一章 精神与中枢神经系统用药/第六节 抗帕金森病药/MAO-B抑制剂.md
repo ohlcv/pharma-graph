@@ -22,10 +22,10 @@ data:
     - target: dopaminergic-drugs
       type: isa
       reason: MAO-B 抑制剂是拟多巴胺类药亚类
-    - target: concept-mao-b-inhibitor-adr
+    - target: notion-mao-b-inhibitor-adr
       type: prerequisite
       reason: MAO-B 抑制剂不良反应与相互作用独立节点
-    - target: concept-mao-b-couplet
+    - target: notion-mao-b-couplet
       type: prerequisite
       reason: 单相思兰口诀指向司来吉兰/雷沙吉兰
 ---
