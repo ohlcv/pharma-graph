@@ -19,17 +19,51 @@
 
 ## 二、节点类型映射（essence）
 
-思维导图中的内容按其本质映射到现有 8 种 essence：
+思维导图中的内容按其本质映射到现有 9 种 essence：
 
 | 思维导图内容 | essence | 形状 | tier |
 |---|---|---|---|
 | 药物类别（巴比妥类、苯二氮䓬类…） | `module` | round-rectangle | management |
 | 具体药物（苯妥英钠、卡马西平…） | `medication` | ellipse | drug |
 | 作用机制（钠通道阻滞、GABA 增强…） | `process` | star | mechanism |
-| 监护主题（用药监护、用药相关问题…） | `concept` | octagon | management |
+| 监护主题、临床评价、口诀、理论术语（用药监护、起效延迟…） | `notion` | octagon | management |
+| **具体疾病、症状综合征、病理状态**（高血压、青光眼、阿尔茨海默病…） | **`illness`** | **diamond** | **disease** |
 | 章节入口（节级节点，已经存在） | `section` | tag | management |
 
-> 字段 / tier 选择参考 [frontmatter.md 中字段约定](./frontmatter.md)。
+> 字段 / tier 选择参考 [frontmatter.md 中字段约定](./frontmatter.md)。**旧版本中的 `concept` essence 已废弃**（参见 frontmatter.md § 1.2），全仓 47 个 `concept-*` 前缀节点将在后续重构中批量改为 `notion`，过渡期间不阻断构建。
+
+### § 二.5 疾病节点拆分原则（illness 节点必建，不是 tag）
+
+**核心原则**：具体的疾病、症状综合征、病理状态在图谱中是一等公民，**必须**拥有独立 `.md` 节点（`essence: illness`、`tier: disease`、形状 `diamond`）。这与"具体药物必须独立成 medication 节点"是同等重要的设计。
+
+**为什么不能只作 tag：**
+1. `medication` 节点的 `treats` / `contraindicates` 边需要指向**独立疾病节点**（`target` 必须是真实节点 id，不能指向不存在的 tag）
+2. `diamond` 形状是图谱中视觉识别"这是一个独立疾病"的关键信号；如果只是 tag，读者看不到菱形节点
+3. `tier: disease` 与 `essence: illness` 是 1:1 对应关系，避免再出现"既有 tier:disease 又有 section 节点"的混乱
+
+**判定该建独立 disease 节点的阈值：**
+
+满足以下任一条件，应建立独立 `.md` 节点：
+- 全仓 `tag` 引用 ≥ 2 次（即该疾病名作为适应证 tag 出现在 ≥ 2 个 medication / module 节点中）
+- 是 `medication` 节点的 `treats` 边的目标（不管数量）
+- 是 `medication` 节点的 `contraindicates` 边的目标（不管数量）
+
+**判定为不应建独立节点（仍可作 tag 出现）：**
+- 一次性出现的临床症状（发热、疼痛、便秘）—— 这些是症状 `tag`，不是疾病
+- 教材无独立章节、药师不会单独检索的极小概念
+- 仅为章节命名服务、且正文不带具体诊疗内容的章节标题
+
+**疾病节点 id 命名约定：**
+- `<disease-name>-management` 或 `<disease-name>-disease` 二选一
+- 与现有节节点命名保持一致：疾病治疗/管理类用 `-management`（如 `hypertension-management`），单纯病理/疾病实体用 `-disease`
+
+**illness 节点位置**：
+- 默认与所治疗的药物放在同一目录（如"抗高血压药"目录下的 `hypertension-management`）
+- 若疾病跨多个节，建立在最常用药物目录；正文 `## 它在知识体系里的位置` 段交代跨节位置
+
+**illness 节点的最低边要求**（参见 frontmatter.md § 一 各类节点最低边数）：
+- 1 条 `isa` 边指向疾病分类父节点（如"高血压 → 心血管系统疾病"）
+- ≥1 条上游治疗药 `treats` 边指向本节点（即由 medication 节点写 `treats → hypertension-management`）
 
 ---
 
@@ -119,7 +153,7 @@
 - 单个不良反应名称（眩晕、嗜睡、共济失调…）
 - 单个禁忌项（房室传导阻滞、皮肤损伤…）
 - 特殊人群（妊娠期、哺乳期、儿童、老年人、驾驶员）
-- 适应证类型（抗惊厥、抗癫痫）
+- **泛指的"适应证类型"词**（抗惊厥、抗癫痫、抗炎、抗菌）——这些是功能描述，不是具体疾病，按"临床应用"或"代表药核心考点"段写入对应伞形正文，**不**独立成节点。注意与"具体疾病名（如高血压、阿尔茨海默病）"区分（见下文 § 二.5 疾病节点拆分原则）
 - 给药方法、剂量数字、给药细节
 - 注意事项、用药交代的具体要点
 - **概念性 concept 节点**（如"首过效应""足量足疗程原则""止泻"等）—— 此类概念在思维导图中作为独立分支出现时，**应按其语义归属并入伞形 module 或节节点正文的对应段**（`## 机制` / `## 用药注意` / `## 临床应用` 等），不独立建节点。理由：这些概念本质是"主题的解释"而非"独立可学的知识实体"，单独成节点会导致 `in_deg = 0` 零散积累，详见 [REFACTOR-RULES.md § 二](./REFACTOR-RULES.md)。
@@ -202,7 +236,8 @@
 | 作用机制 → 4 个机制 | `process` | 钠通道阻滞、T型钙通道阻滞… |
 | 监护 → 整体用药监护 | `concept` | 抗癫痫药用药监护 |
 | 监护 → 典型不良反应 / 禁忌 / 特殊人群 / 用药相关问题 / 用药交代 | 合并写入 | 抗癫痫药用药监护.md 的正文 |
-| 适应证 → 抗惊厥 / 抗癫痫 | 写入节节点正文 | 第二节 抗癫痫发作药物.md（已有） |
+| 适应证 → 具体疾病名（高血压、阿尔茨海默病…） | 建独立 `illness` 节点 | `hypertension-management` 等 |
+| 适应证 → 泛指功能词（抗惊厥 / 抗癫痫 / 抗炎） | 写入节节点正文 | 第二节 抗癫痫发作药物.md |
 
 ---
 
