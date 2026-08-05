@@ -2,7 +2,7 @@
 data:
   id: concept-pd-scenario-pramipexole
   label: 早期PD或伴抑郁——普拉克索
-  essence: concept
+  essence: notion
   field: pharmacology
   tier: management
   location:

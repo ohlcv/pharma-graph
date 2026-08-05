@@ -2,7 +2,7 @@
 data:
   id: concept-serotonin-syndrome
   label: 5-HT综合征
-  essence: concept
+  essence: notion
   field: pharmacology
   tier: management
   location:
