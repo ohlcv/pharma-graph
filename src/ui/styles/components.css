@@ -683,6 +683,114 @@
 .node-overlay-close { position: absolute; top: 12px; right: 12px; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; background: var(--border); color: var(--text-2); border: none; line-height: 1; transition: background 0.14s, color 0.14s; }
 .node-overlay-close:hover { background: var(--accent); color: #fff; }
 
+/* ── Markdown content (.np-markdown) ────────────────────────────────────────
+ * Rendered markdown injected via renderMarkdown() — see src/ui/markdown.ts.
+ * Sized for the 360px panel body, so line-height and font-size are tighter
+ * than the main UI text. Tables, lists, code, blockquote, images, links —
+ * all get their own line so it's easy to tune one element without touching
+ * the rest.
+ *
+ * Inheritance: the wrapper sits inside `.np-summary` or
+ * `.np-question__answer`, so its base font-size and color come from those.
+ * We only override for elements that need to deviate (e.g. table cell
+ * padding, code background).
+ */
+.np-markdown { color: var(--text-2); }
+.np-markdown > *:first-child { margin-top: 0; }
+.np-markdown > *:last-child  { margin-bottom: 0; }
+.np-markdown p { margin: 0 0 0.55em; }
+.np-markdown h1,
+.np-markdown h2,
+.np-markdown h3,
+.np-markdown h4 {
+  margin: 0.85em 0 0.4em; font-weight: 600; color: var(--text);
+  line-height: 1.35;
+}
+.np-markdown h1 { font-size: 1rem;    border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 4px; }
+.np-markdown h2 { font-size: 0.92rem; border-left: 3px solid var(--accent); padding-left: 8px; }
+.np-markdown h3 { font-size: 0.82rem; color: var(--text-2); }
+.np-markdown h4 { font-size: 0.76rem; color: var(--muted);   }
+.np-markdown strong { color: var(--text); font-weight: 700; }
+.np-markdown em { color: var(--text); font-style: italic; }
+.np-markdown ul,
+.np-markdown ol { margin: 0.4em 0 0.6em; padding-left: 1.4em; }
+.np-markdown li { margin: 0.18em 0; }
+.np-markdown li > p { margin: 0.2em 0; }
+.np-markdown code {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 1px 5px; border-radius: 3px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.85em; color: #f5d491;
+}
+.np-markdown pre {
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.06);
+  padding: 9px 11px; border-radius: 6px;
+  overflow-x: auto; margin: 0.55em 0;
+  font-size: 0.72rem; line-height: 1.55;
+}
+.np-markdown pre code {
+  background: transparent; border: none; padding: 0;
+  color: var(--text); font-size: inherit;
+}
+.np-markdown blockquote {
+  border-left: 3px solid rgba(99,102,241,0.45);
+  margin: 0.55em 0; padding: 4px 10px;
+  color: var(--muted); background: rgba(99,102,241,0.05);
+  border-radius: 0 5px 5px 0;
+}
+.np-markdown blockquote > *:first-child { margin-top: 0; }
+.np-markdown blockquote > *:last-child  { margin-bottom: 0; }
+.np-markdown hr {
+  border: none; border-top: 1px solid rgba(255,255,255,0.08);
+  margin: 0.85em 0;
+}
+.np-markdown table {
+  border-collapse: collapse; width: 100%; margin: 0.55em 0;
+  font-size: 0.72rem; display: block; overflow-x: auto; max-width: 100%;
+}
+.np-markdown th,
+.np-markdown td {
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 5px 8px; text-align: left; vertical-align: top;
+}
+.np-markdown th {
+  background: rgba(99,102,241,0.14);
+  color: var(--text); font-weight: 600;
+}
+.np-markdown tr:nth-child(even) td { background: rgba(255,255,255,0.025); }
+.np-markdown img {
+  max-width: 100%; height: auto; display: block;
+  border-radius: 5px; margin: 0.45em 0;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.np-markdown a {
+  color: var(--accent); text-decoration: none;
+  border-bottom: 1px dashed rgba(99,102,241,0.5);
+  transition: border-bottom-style 0.12s, color 0.12s;
+}
+.np-markdown a:hover { color: #c7d2fe; border-bottom-style: solid; }
+/* GFM task list checkbox: the markdown engine emits an <input disabled>
+ * followed by text. Keep the box inline with the text. */
+.np-markdown input[type='checkbox'] {
+  appearance: none; -webkit-appearance: none;
+  width: 12px; height: 12px; border-radius: 3px;
+  border: 1px solid var(--accent);
+  background: rgba(99,102,241,0.08);
+  margin-right: 6px; vertical-align: -1px; cursor: default;
+  position: relative; top: 1px;
+}
+.np-markdown input[type='checkbox']:checked {
+  background: var(--accent);
+}
+.np-markdown input[type='checkbox']:checked::after {
+  content: ''; position: absolute; left: 3px; top: 0px;
+  width: 4px; height: 7px;
+  border: solid #fff; border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
 }
 
 /* ── Bottom sheet (mobile) ──────────────────────────────────────────────── */

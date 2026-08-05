@@ -24,6 +24,10 @@ export interface NodeData {
   location?: NodeLocation;
   tags?: string[];
   body?: string;      // 正文内容（md 文件中 frontmatter 后的部分）
+  /** Manifest-style path to the source file (e.g. `药学专业知识二/第一章 .../COMT抑制剂.md`).
+   *  Used by the detail panel to resolve relative image references against
+   *  `/content/<dir>/`. Empty string when the source is unknown (CLI tools). */
+  sourcePath?: string;
 }
 
 export interface EdgeData {

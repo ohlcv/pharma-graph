@@ -83,7 +83,7 @@ export function buildGraph(
   // Second pass — build nodes with degree-derived weight.
   const nodes: NodeData[] = [];
   const seenNode = new Set<string>();
-  for (const [, fm] of frontmatters) {
+  for (const [fp, fm] of frontmatters) {
     if (!fm.id || seenNode.has(fm.id)) continue;
     seenNode.add(fm.id);
     nodes.push({
@@ -99,6 +99,11 @@ export function buildGraph(
       location: fm.location,
       tags: fm.tags,
       body: fm.body,
+      // The browser path keys these `../../content/<rel>...`; the CLI uses
+      // absolute or repo-relative paths. Strip the well-known prefix when
+      // present, otherwise fall back to whatever the caller supplied so we
+      // never silently lose the file context.
+      sourcePath: fp.startsWith('../../content/') ? fp.slice('../../content/'.length) : fp,
       weight: degree[fm.id] ?? 1,
     });
   }

@@ -3,12 +3,21 @@
 
 import cytoscape from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
-import { NODE_TYPE_COLOR, ESSENCE_LABEL, FIELD_COLOR, FIELD_LABEL, TIER_LABEL, NODE_TIER_STYLE, EDGE_TYPE_LABEL } from '../core/config.js';
+import {
+  NODE_TYPE_COLOR,
+  ESSENCE_LABEL,
+  FIELD_COLOR,
+  FIELD_LABEL,
+  TIER_LABEL,
+  NODE_TIER_STYLE,
+  EDGE_TYPE_LABEL,
+} from '../core/config.js';
 import { DEFAULT_EDGE_TYPE, isEdgeType } from '../core/edge-types.js';
 import { uiState, registerPinToggle } from './state.js';
 import { forEachStatic } from './dom-cache.js';
 import { UiToggle } from './ui-toggle.js';
 import { restorePanelBounds, hasSavedBounds } from './drag-manager.js';
+import { renderMarkdown } from './markdown.js';
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -29,7 +38,7 @@ export class DetailPanel {
     private callbacks?: {
       onNodeClick?: (nodeId: string) => void;
       onClose?: () => void;
-    }
+    },
   ) {
     const panel = document.getElementById('node-panel');
     const overviewPage = document.getElementById('lp-overview-page');
@@ -88,8 +97,9 @@ export class DetailPanel {
       // Read the section key from a data-attribute rather than the visible
       // label text — keeps the toggle in sync with i18n and prevents a label
       // rename from silently breaking the collapse/expand state.
-      const key = (toggle.dataset['sectionKey']
-        ?? toggle.closest<HTMLElement>('.np-section')?.dataset['sectionKey']) as 'summary' | 'tags' | 'edges' | null;
+      const key = (toggle.dataset['sectionKey'] ??
+        toggle.closest<HTMLElement>('.np-section')?.dataset['sectionKey']) as
+        'summary' | 'tags' | 'edges' | null;
       if (!key) return;
       uiState.sectionState[key] = !uiState.sectionState[key];
       const arrow = toggle.querySelector<HTMLElement>('.np-section__toggle-arrow');
@@ -105,10 +115,11 @@ export class DetailPanel {
 
     this._currentNodeId = nodeId;
     const d = node.data();
+    const sourcePath = typeof d.sourcePath === 'string' ? d.sourcePath : '';
 
     this.overviewPage.innerHTML =
       buildHeroHtml(d) + buildSummaryHtml(d) + buildTagsHtml(d) + buildEdgesHtml(node, this.cy);
-    this.bodyPage.innerHTML = buildBodyHtml(d);
+    this.bodyPage.innerHTML = buildBodyHtml(d, sourcePath);
 
     this.applySectionState();
 
@@ -164,11 +175,16 @@ export class DetailPanel {
 
   private applySectionState(): void {
     this.overviewPage.querySelectorAll<HTMLElement>('.np-section__toggle').forEach((toggle) => {
-      const key = (toggle.dataset['sectionKey']
-        ?? toggle.closest<HTMLElement>('.np-section')?.dataset['sectionKey']) as 'summary' | 'tags' | 'edges' | null;
+      const key = (toggle.dataset['sectionKey'] ??
+        toggle.closest<HTMLElement>('.np-section')?.dataset['sectionKey']) as
+        'summary' | 'tags' | 'edges' | null;
       if (!key) return;
-      const arrow = toggle.closest('.np-section')?.querySelector<HTMLElement>('.np-section__toggle-arrow');
-      const content = toggle.closest('.np-section')?.querySelector<HTMLElement>('.np-section__content');
+      const arrow = toggle
+        .closest('.np-section')
+        ?.querySelector<HTMLElement>('.np-section__toggle-arrow');
+      const content = toggle
+        .closest('.np-section')
+        ?.querySelector<HTMLElement>('.np-section__content');
       if (arrow) arrow.classList.toggle('rotated', uiState.sectionState[key]);
       if (content) content.style.display = uiState.sectionState[key] ? '' : 'none';
     });
@@ -216,15 +232,17 @@ function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
   let location = '';
   if (d.location) {
     const loc = d.location as Record<string, string>;
-    const parts = [loc.book, loc.part, loc.chapter, loc.section, loc.subsection, loc.item].filter(Boolean);
+    const parts = [loc.book, loc.part, loc.chapter, loc.section, loc.subsection, loc.item].filter(
+      Boolean,
+    );
     if (parts.length > 0) location = `<div class="np-hero__location">${parts.join(' / ')}</div>`;
   }
 
   return `<div class="np-hero">
   <div class="np-hero__badges">
-    <span class="np-badge np-badge--type" style="color:${color};border-color:${rgba(color,0.4)};background:${rgba(color,0.12)}">${escHtml(essenceText)}</span>
-    ${fieldText ? `<span class="np-badge np-badge--field" style="color:${fieldColor};border-color:${rgba(fieldColor,0.4)};background:${rgba(fieldColor,0.1)}">${escHtml(fieldText)}</span>` : ''}
-    ${tierText && tierColor ? `<span class="np-badge np-badge--tier" style="color:${tierColor};border-color:${rgba(tierColor,0.4)};background:${rgba(tierColor,0.12)}">${escHtml(tierText)}</span>` : ''}
+    <span class="np-badge np-badge--type" style="color:${color};border-color:${rgba(color, 0.4)};background:${rgba(color, 0.12)}">${escHtml(essenceText)}</span>
+    ${fieldText ? `<span class="np-badge np-badge--field" style="color:${fieldColor};border-color:${rgba(fieldColor, 0.4)};background:${rgba(fieldColor, 0.1)}">${escHtml(fieldText)}</span>` : ''}
+    ${tierText && tierColor ? `<span class="np-badge np-badge--tier" style="color:${tierColor};border-color:${rgba(tierColor, 0.4)};background:${rgba(tierColor, 0.12)}">${escHtml(tierText)}</span>` : ''}
   </div>
   <div class="np-hero__name">${escHtml(nodeName)}</div>
   ${location}
@@ -239,7 +257,7 @@ function buildSummaryHtml(d: cytoscape.NodeDataDefinition): string {
     <span class="np-section__label">摘要</span>
   </div>
   <div class="np-section__content">
-    <div class="np-summary">${escHtml(d.summary as string)}</div>
+    <div class="np-summary np-markdown">${renderMarkdown(d.summary as string)}</div>
   </div>
 </div>`;
 }
@@ -262,40 +280,46 @@ function buildEdgesHtml(node: cytoscape.NodeSingular, cy: cytoscape.Core): strin
   const inEdges = cy.edges(`[target = "${node.id()}"]`);
   if (outEdges.length === 0 && inEdges.length === 0) return '';
 
-  const outHtml = outEdges.map((edge: cytoscape.EdgeSingular) => {
-    const targetId = edge.data('target') as string;
-    const targetNode = cy.getElementById(targetId);
-    const targetLabel = targetNode.empty() ? targetId : (targetNode.data('label') || targetId);
-    const edgeType = (edge.data('edgeType') as string) ?? DEFAULT_EDGE_TYPE;
-    const reason = edge.data('reason') as string | undefined;
-    const edgeTypeLabel = isEdgeType(edgeType) ? EDGE_TYPE_LABEL[edgeType] : edgeType;
-    return `<div class="np-edge-item" data-target="${escAttr(targetId)}">
+  const outHtml = outEdges
+    .map((edge: cytoscape.EdgeSingular) => {
+      const targetId = edge.data('target') as string;
+      const targetNode = cy.getElementById(targetId);
+      const targetLabel = targetNode.empty() ? targetId : targetNode.data('label') || targetId;
+      const edgeType = (edge.data('edgeType') as string) ?? DEFAULT_EDGE_TYPE;
+      const reason = edge.data('reason') as string | undefined;
+      const edgeTypeLabel = isEdgeType(edgeType) ? EDGE_TYPE_LABEL[edgeType] : edgeType;
+      return `<div class="np-edge-item" data-target="${escAttr(targetId)}">
   <span class="np-edge-item__type">${edgeTypeLabel}</span>
   <div class="np-edge-item__body">
     <div class="np-edge-item__target">${escHtml(targetLabel)}</div>
     ${reason ? `<div class="np-edge-item__reason">${escHtml(reason)}</div>` : ''}
   </div>
 </div>`;
-  }).join('');
+    })
+    .join('');
 
-  const inHtml = inEdges.map((edge: cytoscape.EdgeSingular) => {
-    const srcId = edge.data('source') as string;
-    const srcNode = cy.getElementById(srcId);
-    const srcLabel = srcNode.empty() ? srcId : (srcNode.data('label') || srcId);
-    const edgeType = (edge.data('edgeType') as string) ?? DEFAULT_EDGE_TYPE;
-    const reason = edge.data('reason') as string | undefined;
-    const edgeTypeLabel = isEdgeType(edgeType) ? EDGE_TYPE_LABEL[edgeType] : edgeType;
-    return `<div class="np-edge-item np-edge-item--incoming" data-target="${escAttr(srcId)}">
+  const inHtml = inEdges
+    .map((edge: cytoscape.EdgeSingular) => {
+      const srcId = edge.data('source') as string;
+      const srcNode = cy.getElementById(srcId);
+      const srcLabel = srcNode.empty() ? srcId : srcNode.data('label') || srcId;
+      const edgeType = (edge.data('edgeType') as string) ?? DEFAULT_EDGE_TYPE;
+      const reason = edge.data('reason') as string | undefined;
+      const edgeTypeLabel = isEdgeType(edgeType) ? EDGE_TYPE_LABEL[edgeType] : edgeType;
+      return `<div class="np-edge-item np-edge-item--incoming" data-target="${escAttr(srcId)}">
   <span class="np-edge-item__type">${edgeTypeLabel}</span>
   <div class="np-edge-item__body">
     <div class="np-edge-item__target">${escHtml(srcLabel)}</div>
     ${reason ? `<div class="np-edge-item__reason">${escHtml(reason)}</div>` : ''}
   </div>
 </div>`;
-  }).join('');
+    })
+    .join('');
 
-  const outLabel = outEdges.length > 0 ? `关联 <span class="np-count">${outEdges.length}</span>` : '';
-  const inLabel = inEdges.length > 0 ? `被关联 <span class="np-count">${inEdges.length}</span>` : '';
+  const outLabel =
+    outEdges.length > 0 ? `关联 <span class="np-count">${outEdges.length}</span>` : '';
+  const inLabel =
+    inEdges.length > 0 ? `被关联 <span class="np-count">${inEdges.length}</span>` : '';
 
   return `<div class="np-section" data-section-key="edges">
   <div class="np-section__toggle" data-section-key="edges">
@@ -309,22 +333,29 @@ function buildEdgesHtml(node: cytoscape.NodeSingular, cy: cytoscape.Core): strin
 </div>`;
 }
 
-function buildBodyHtml(d: cytoscape.NodeDataDefinition): string {
+function buildBodyHtml(d: cytoscape.NodeDataDefinition, sourcePath: string): string {
   if (!d.body) return '';
   const questions = parseBodyQuestions(d.body as string);
   if (questions.length === 0) return '';
-  return questions.map((q) =>
-    `<div class="np-question">
+  return questions
+    .map(
+      (q) =>
+        `<div class="np-question">
   <div class="np-question__label">${escHtml(q.label)}</div>
-  <div class="np-question__answer">${escHtml(q.answer)}</div>
-</div>`
-  ).join('');
+  <div class="np-question__answer np-markdown">${renderMarkdown(q.answer, sourcePath)}</div>
+</div>`,
+    )
+    .join('');
 }
 
 // ── Shared utils ──────────────────────────────────────────────────────────────
 
 function escHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function escAttr(s: string): string {
