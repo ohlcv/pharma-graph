@@ -4,7 +4,7 @@ data:
   label: COX同工酶生理功能与抑制效应
   essence: process
   field: biopharmaceutics
-  tier: mechanism
+  tier: basic
   location:
     book: 药学专业知识二
     chapter: 第二章 解热、镇痛、抗炎、抗风湿及抗痛风药

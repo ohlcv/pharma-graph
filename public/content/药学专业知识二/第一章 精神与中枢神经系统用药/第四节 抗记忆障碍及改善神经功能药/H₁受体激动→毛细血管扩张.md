@@ -4,7 +4,7 @@ data:
   label: H₁受体激动 → 毛细血管扩张
   essence: process
   field: pharmacology
-  tier: mechanism
+  tier: basic
   location:
     book: 药学专业知识二
     chapter: 第一章 精神与中枢神经系统用药

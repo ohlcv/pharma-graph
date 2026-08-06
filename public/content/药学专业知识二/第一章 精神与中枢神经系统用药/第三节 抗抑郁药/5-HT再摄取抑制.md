@@ -4,7 +4,7 @@ data:
   label: 5-HT再摄取抑制
   essence: process
   field: pharmacology
-  tier: mechanism
+  tier: basic
   location:
     book: 药学专业知识二
     chapter: 第一章 精神与中枢神经系统用药
