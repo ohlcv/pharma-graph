@@ -23,18 +23,10 @@ data:
     - target: anti-inflammatory-antirheumatic-drugs
       type: part_of
       reason: bDMARDs/tsDMARDs 是抗风湿药两大分类之一
-    - target: tnf-alpha-inhibitors
-      type: contains
-      reason: TNF-α 抑制剂是 bDMARDs 最常用类别
     - target: il-17-inhibitors
       type: contains
       reason: IL-17 抑制剂用于强直性脊柱炎、银屑病关节炎
-    - target: jakinibs
-      type: contains
-      reason: JAK 抑制剂是 tsDMARDs 代表
-    - target: il-1-antagonist
-      type: contains
-      reason: IL-1 受体拮抗剂用于自身炎症性疾病
 ---
 
 # 生物/靶向合成改善病情抗风湿药（bDMARDs/tsDMARDs）
+

@@ -19,24 +19,23 @@ data:
   summary:
     short: 铂类药物是化疗的基石，烷化剂和拓扑酶抑制剂各有绝活。
     full: 这类药直接破坏肿瘤细胞的DNA。铂类（顺铂、卡铂、奥沙利铂）是化疗的"老大哥"，几乎所有实体瘤都可能用到，但有肾毒性和耳毒性。烷化剂（环磷酰胺）用得也很多，但可能导致出血性膀胱炎。拓扑异构酶抑制剂（伊立替康、依托泊苷）是后起之秀。
-edges_out:
-  - target: antitumor-drugs-y2
-    type: isa
-    reason: 本节属于抗肿瘤药章
-  - target: antimetabolite-antitumor
-    type: prerequisite
-    reason: 理解DNA损伤是细胞毒化疗的基础
-  - target: hematologic-drugs-y2
-    type: prerequisite
-    reason: 骨髓抑制是这类药的主要毒性
-  - target: tumor-chemotherapy-management
-    type: treats
-    reason: DNA损伤药用于肿瘤化疗
-  - target: antitumor-drugs-y2
-    type: isa
+  edges_out:
+    - target: antitumor-drugs-y2
+      type: isa
+      reason: 本节属于抗肿瘤药章
+    - target: antimetabolite-antitumor
+      type: prerequisite
+      reason: 理解DNA损伤是细胞毒化疗的基础
+    - target: hematologic-drugs-y2
+      type: prerequisite
+      reason: 骨髓抑制是这类药的主要毒性
+    - target: tumor-chemotherapy-management
+      type: relates
+      reason: DNA损伤药用于肿瘤化疗
 ---
 
 # 直接影响DNA结构和功能的药物
+
 
 ## 这是什么药？
 

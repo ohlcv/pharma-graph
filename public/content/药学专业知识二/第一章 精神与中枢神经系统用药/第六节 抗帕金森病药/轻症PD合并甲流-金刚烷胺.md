@@ -22,15 +22,13 @@ data:
     - target: antiparkinson-drugs
       type: isa
       reason: 轻症 PD 合并甲型流感是抗帕金森病药节的关键临床场景
-    - target: amantadine
-      type: prerequisite
-      reason: 首选金刚烷胺
     - target: dopamine-releasers
       type: prerequisite
       reason: 金刚烷胺是促多巴胺释放药（其他类）代表
 ---
 
 # 轻症PD合并甲型流感——金刚烷胺
+
 
 ## 它在讲什么？
 

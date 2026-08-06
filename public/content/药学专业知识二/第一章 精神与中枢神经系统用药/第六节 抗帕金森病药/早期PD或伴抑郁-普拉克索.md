@@ -23,12 +23,10 @@ data:
     - target: antiparkinson-drugs
       type: isa
       reason: 早期 PD 或伴抑郁是抗帕金森病药节的关键临床场景
-    - target: pramipexole
-      type: prerequisite
-      reason: 普拉克索是首选药物
 ---
 
 # 早期PD或伴抑郁——普拉克索
+
 
 ## 它在讲什么？
 

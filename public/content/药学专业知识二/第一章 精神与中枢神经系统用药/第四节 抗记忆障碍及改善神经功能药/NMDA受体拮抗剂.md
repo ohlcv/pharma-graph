@@ -26,12 +26,10 @@ data:
     - target: mechanism-nmda-antagonism
       type: mechanism
       reason: NMDA受体拮抗剂通过拮抗NMDA受体减弱谷氨酸兴奋毒性
-    - target: notion-ad-moderate-severe
-      type: prerequisite
-      reason: NMDA受体拮抗剂用于中重度AD
 ---
 
 # NMDA受体拮抗剂
+
 
 ## 它是什么分类？
 
