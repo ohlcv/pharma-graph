@@ -143,6 +143,12 @@ export const EDGE_TYPE_STYLE: Record<string, { color: string; lineStyle: string;
     prerequisite: { color: '#9b59b6', lineStyle: 'dotted', arrow: 'triangle' },
     relates: { color: '#7f8c8d', lineStyle: 'dashed', arrow: 'none' },
     sibling: { color: '#16a085', lineStyle: 'dotted', arrow: 'none' },
+    // 结构语义（知识组织）
+    contains: { color: '#95a3b8', lineStyle: 'solid', arrow: 'triangle' },
+    part_of: { color: '#4a90e2', lineStyle: 'solid', arrow: 'triangle' },
+    has_couplet: { color: '#f39c12', lineStyle: 'dashed', arrow: 'none' },
+    describes: { color: '#f39c12', lineStyle: 'dashed', arrow: 'none' },
+    specializes: { color: '#27ae60', lineStyle: 'dotted', arrow: 'triangle' },
     default: { color: '#bdc3c7', lineStyle: 'solid', arrow: 'none' },
   };
 
@@ -165,6 +171,12 @@ export const EDGE_TYPE_LABEL: Record<EdgeType, string> = {
   prerequisite: '前置',
   relates: '相关',
   sibling: '兄弟',
+  // 结构语义（知识组织）
+  contains: '包含',
+  part_of: '属于',
+  has_couplet: '含口诀',
+  describes: '描述',
+  specializes: '专治',
 };
 
 // ── Shape → 中文标签 ─────────────────────────────────────────────────────────
