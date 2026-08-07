@@ -385,6 +385,19 @@ export function toggleSidebar(renderer: Renderer): void {
         renderer.getCy().resize();
       },
     });
+  } else {
+    // Resync the toggle's in-memory state to whatever the DOM says
+    // right now. Reason: bigscreen.ts restores the sidebar DOM directly
+    // (captureSidebar / restoreSidebar round-trip) so the DOM and the
+    // UiToggle's `this.on` can drift apart. Without this resync, the
+    // first toggle after bigscreen exit computes `set(!this.on)` based
+    // on the stale memory state — which can flip the DOM in the
+    // opposite direction the user expects, making it look like the
+    // button "doesn't work".
+    //
+    // We resync by reaching into the private field via a thin helper
+    // (UiToggle.resyncFromDom). See ui-toggle.ts.
+    sidebarToggle.resyncFromDom();
   }
   sidebarToggle.toggle();
 }

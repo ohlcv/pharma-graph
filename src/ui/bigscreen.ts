@@ -246,7 +246,16 @@ export async function enterBigscreen(): Promise<void> {
 export async function exitBigscreen(): Promise<void> {
   if (!isBigscreen()) return;
 
-  captureSidebar();
+  // We do NOT call captureSidebar() here. The snapshot was taken at
+  // enterBigscreen() time, which is the correct "before bigscreen"
+  // baseline. Calling captureSidebar() here would re-read the DOM
+  // mid-bigscreen, but the user can't interact with the sidebar during
+  // bigscreen (toolbar / sidebar-strip are display:none), so the DOM
+  // is unchanged anyway — but if any future code path ever does touch
+  // the sidebar mid-bigscreen, we'd accidentally bake that change into
+  // the post-exit state. The whole point of the snapshot is that
+  // "exit bigscreen looks identical to before entering bigscreen".
+  // Trust the snapshot.
 
   if (_isTourActive()) {
     captureViewport();
@@ -388,7 +397,9 @@ export function initBigscreen(): void {
   // restoration is handled by the ResizeObserver installed above.
   document.addEventListener('fullscreenchange', () => {
     if (!document.fullscreenElement && isBigscreen()) {
-      captureSidebar();
+      // We do NOT captureSidebar() here either — see exitBigscreen()
+      // for the same rationale: the snapshot was taken at
+      // enterBigscreen() time and must be the source of truth.
       document.documentElement.classList.remove('bigscreen');
       dismissHint();
       // Force a reflow + restore sidebar synchronously so the resize

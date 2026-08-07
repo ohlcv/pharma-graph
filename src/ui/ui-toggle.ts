@@ -107,6 +107,36 @@ export class UiToggle {
     return this.on;
   }
 
+  /**
+   * Force the toggle's in-memory state (and persisted state) to match
+   * whatever the DOM currently says. Does NOT fire onChange — the
+   * expectation is that the DOM already reflects the intended state
+   * (e.g. it was rewritten directly by another module), and we just
+   * need to bring `this.on` into agreement so the next toggle() does
+   * the right thing.
+   *
+   * The case where this was needed in practice:
+   *  - bigscreen.ts captures/restores sidebar DOM directly via
+   *    `sidebar.classList.toggle('hidden', snap.hidden)`.
+   *  - That bypasses the UiToggle's `set()`, so `this.on` stays at
+   *    whatever it was before bigscreen.
+   *  - After exit, the DOM and memory can disagree.
+   *  - First click computes `set(!this.on)` based on stale memory —
+   *    possibly toggling in the OPPOSITE direction the user expects.
+   *
+   * Calling this on every toggleSidebar click closes that loop.
+   */
+  resyncFromDom(): void {
+    const el = this.options.applyTo;
+    if (!el) return;
+    const target = Array.isArray(el) ? el[0] : el;
+    if (!target) return;
+    const current = target.classList.contains(this.options.cssClass);
+    if (current === this.on) return;
+    this.on = current;
+    writePersisted(this.options.persist, current);
+  }
+
   /** Subscribe to state changes. Returns an unsubscribe function. */
   listen(cb: (on: boolean) => void): () => void {
     this.listeners.add(cb);
