@@ -96,7 +96,7 @@ function captureSidebar(): void {
   console.log('[bigscreen] captureSidebar', JSON.parse(JSON.stringify(_preBigscreenSidebar)));
 }
 
-function restoreSidebar(): void {
+export function restoreSidebar(): void {
   const snap = _preBigscreenSidebar;
   if (!snap) return;
   _preBigscreenSidebar = null;
@@ -106,7 +106,20 @@ function restoreSidebar(): void {
   const sidebar = document.getElementById('sidebar');
   const btn     = document.getElementById('btn-sidebar-toggle');
   const strip   = document.getElementById('sidebar-strip');
-  if (sidebar) sidebar.classList.toggle('hidden', snap.hidden);
+
+  // Force-clear any in-flight transform/opacity transition on the
+  // sidebar before writing the new state. Without this, a pending
+  // transition from a previous toggle (or from the bigscreen hide)
+  // can leave the sidebar in a stale intermediate state — it looks
+  // hidden even though the DOM `.hidden` class is gone. We disable
+  // the transition, sync the DOM, force a reflow, then re-enable.
+  if (sidebar) {
+    sidebar.style.transition = 'none';
+    sidebar.classList.toggle('hidden', snap.hidden);
+    // Force a reflow so the browser commits the new transform.
+    void sidebar.offsetWidth;
+    sidebar.style.transition = '';
+  }
   if (btn)     btn.classList.toggle('active', snap.btnActive);
   if (strip) {
     strip.classList.toggle('visible', snap.stripVisible);
@@ -121,6 +134,19 @@ function restoreSidebar(): void {
     const chev = el.querySelector<HTMLElement>('.sidebar-section__chevron');
     if (chev) chev.classList.toggle('open', s.chevronOpen);
   });
+
+  // Sanity-check after restore — log the actual computed state so
+  // any "sidebar disappeared" report has hard data to debug.
+  if (sidebar) {
+    const cs = window.getComputedStyle(sidebar);
+    console.log('[bigscreen] restoreSidebar DONE', {
+      domHidden: sidebar.classList.contains('hidden'),
+      transform: cs.transform,
+      opacity: cs.opacity,
+      width: cs.width,
+      pointerEvents: cs.pointerEvents,
+    });
+  }
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
