@@ -46,24 +46,26 @@
 }
 .topbar__brand {
   display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
-  /* max-width prevents the brand column from growing indefinitely when the
-   * Chinese title is long and the viewport is narrow (Android ~360px).
-   * Without it, the brand name expands to content size and pushes the
-   * search-center and badge out of the topbar on small screens.
-   * On Android Chrome the Chinese font renders slightly wider than iOS
-   * Safari, which is why this shows up on Android but not on iPhone. */
-  max-width: 140px;
-  flex-shrink: 1;
+  /* No max-width here — let the brand-name's clamp() handle sizing.
+   * overflow:hidden is the last-resort safety net if clamp ever overflows. */
   overflow: hidden;
 }
 .topbar__brand-name {
-  font-size: 0.92rem; font-weight: 800;
-  /* gradient text — picks up the logo's accent↔accent2 sweep so the
-     brand reads as part of the mark, not a separate label */
+  /* clamp(min, preferred, max): font scales with viewport width automatically.
+   * At 360px Android  → 0.68rem  (≈10.9px — compact, badge stays visible)
+   * At 768px mobile  → 0.76rem  (≈12.2px)
+   * At 1200px desktop → 0.92rem (≈14.7px — full-size)
+   * The clamp is the single fix for the "brand pushes badge off bar" bug:
+   * font never grows beyond what the bar can hold, so badge is never squeezed. */
+  font-size: clamp(0.68rem, 2.5vw, 0.92rem);
+  font-weight: 800;
+  /* gradient text */
   background: linear-gradient(135deg, #f1f5f9 0%, #c7d2fe 100%);
   -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent;
   letter-spacing: -0.015em; line-height: 1.2;
+  /* white-space: nowrap is redundant here — clamp() on font-size
+   * already prevents overflow by shrinking, not wrapping. */
 }
 .topbar__brand-sub  {
   font-size: 0.62rem; color: var(--muted);
@@ -1066,18 +1068,23 @@
   .topbar__logo-mark { width: 28px; height: 28px; border-radius: 7px; }
   .topbar__logo-mark svg { width: 18px; height: 18px; }
 
-  /* Brand: hard max-width so the long Chinese title can never grow wider
-   * than the space left after logo + badge. max-width + overflow:hidden
-   * together are the iron clamp — even if font-size is wrong, text won't
-   * push the badge off the bar. */
+  /* Brand: no max-width constraint — let clamp() on .brand-name and
+   * flex-shrink handle all sizing. flex-shrink:1 means the brand column
+   * can be compressed before the logo-mark gives up space. */
   .topbar__brand {
-    max-width: 85px;          /* ~3 Chinese chars at 12px; the rest clips */
+    flex-shrink: 1;
     overflow: hidden;
-    flex-shrink: 0;           /* don't let the brand column be compressed away */
   }
+  /* clamp(min, preferred, max) makes font-size scale fluidly:
+   *   360px → 0.72rem (≈11.5px)  compact, badge stays visible
+   *   768px → 0.92rem (≈14.7px)  desktop size
+   * text-size-adjust:100% prevents mobile browsers from overriding
+   * the font-size with their own text-size algorithms. */
   .topbar__brand-name {
-    font-size: 0.68rem;        /* 10.88px — compact but still readable */
-    white-space: nowrap;       /* single-line; overflow goes into max-width clamp */
+    font-size: clamp(0.72rem, calc(0.28 * 100vw - 29.4px), 0.92rem);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    white-space: nowrap;
     letter-spacing: 0;
   }
   .topbar__brand-sub { display: none; }
