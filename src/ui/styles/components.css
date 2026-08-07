@@ -1051,7 +1051,7 @@
  * down automatically, so it benefits too. */
 @media (max-width: 768px) {
   #sidebar { display: none; }
-  #main    { grid-template-columns: 1fr; }
+  #main    { grid-template-columns: minmax(0, 1fr); }
   .topbar  { z-index: 60; }
   #app.sheet-open { z-index: 60; }
   .toolbar { display: none; }
@@ -1147,8 +1147,19 @@ html.bigscreen #main {
      the sidebar entirely. We do NOT touch #sidebar's DOM state (no
      display:none, no transform override, no class manipulation) — the
      sidebar's own `.hidden` toggle stays exactly as the user left it,
-     and the grid-template-columns transition handles it on exit. */
-  grid-template-columns: 1fr 0;
+     and the grid-template-columns transition handles it on exit.
+     `minmax(0, 1fr)` is critical — a plain `1fr` would default to
+     `minmax(auto, 1fr)`, and `auto` is the column's max-content. If
+     cytoscape or any descendant sizes itself to the *pre-bigscreen*
+     canvas width (862px in our 836px viewport), that auto-min would
+     push the canvas track to 862px, the total grid to 1122px, and the
+     sidebar — which lives in track #2 — would be parked at x=862,
+     *outside* #main's overflow:hidden box. After exiting bigscreen the
+     sidebar would still be in the DOM (transform/opacity/width all
+     correct) but visually pushed off-screen to the right. Forcing the
+     canvas track's min size to 0 with minmax(0, 1fr) pins the grid
+     total to #main's own width and keeps the sidebar inside the box. */
+  grid-template-columns: minmax(0, 1fr) 0;
 }
 
 /* Deeper ambient halo for the "pure graph theatre" feel. */

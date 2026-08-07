@@ -29,11 +29,11 @@
 
 /* ── Main grid ──────────────────────────────────────────────────────────── */
 #main {
-  display: grid; grid-template-columns: 1fr 260px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 260px;
   overflow: hidden; height: calc(100vh - 56px - 44px);
-  position: relative; z-index: 1;
+  position: relative; z-index: 1; min-width: 0;
 }
-#main.sidebar-hidden { grid-template-columns: 1fr; }
+#main.sidebar-hidden { grid-template-columns: minmax(0, 1fr) 0; }
 
 /* ── Canvas ─────────────────────────────────────────────────────────────── */
 #cy {

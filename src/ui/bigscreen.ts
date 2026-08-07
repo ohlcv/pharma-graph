@@ -126,40 +126,8 @@ export function restoreSidebar(): void {
     strip.style.right = snap.stripRight;
   }
 
-  // DEBUG: also probe the parent grid (#main) so we can see whether
-  // the column width is actually 260px after the bigscreen exit, or
-  // stuck at 0px because the `html.bigscreen` selector didn't unapply.
-  const main = document.getElementById('main');
-  const app = document.getElementById('app');
-  const body = document.body;
-  const html = document.documentElement;
-  const mainGridCols = main ? getComputedStyle(main).gridTemplateColumns : '?';
-  const sidebarRect = sidebar?.getBoundingClientRect();
-  // Flat, prefix-tagged single-line output so Chrome DevTools does not
-  // collapse it to "..." when the object is wide.
-  console.log(
-    `[bigscreen] RESTORE-PROBE ` +
-    `viewportW=${window.innerWidth} ` +
-    `html.scrollW=${html.scrollWidth} ` +
-    `body.scrollW=${body.scrollWidth} ` +
-    `body.clientW=${body.clientWidth} ` +
-    `appRectW=${app?.getBoundingClientRect().width} ` +
-    `appOverflowX=${app ? getComputedStyle(app).overflowX : '?'} ` +
-    `mainRectW=${main?.getBoundingClientRect().width} ` +
-    `mainRectLeft=${main?.getBoundingClientRect().left} ` +
-    `mainOverflowX=${main ? getComputedStyle(main).overflowX : '?'} ` +
-    `mainGridCols="${mainGridCols}" ` +
-    `sidebarRectW=${sidebarRect?.width} ` +
-    `sidebarRectLeft=${sidebarRect?.left} ` +
-    `sidebarRectRight=${sidebarRect?.right}`,
-  );
-  console.log('[bigscreen] restoreSidebar DONE', {
-    domHidden: sidebar?.classList.contains('hidden'),
-    transform: sidebar ? getComputedStyle(sidebar).transform : '?',
-    opacity:   sidebar ? getComputedStyle(sidebar).opacity : '?',
-    width:     sidebar ? getComputedStyle(sidebar).width : '?',
-    pointerEvents: sidebar ? getComputedStyle(sidebar).pointerEvents : '?',
-  });
+  // (DEBUG probe removed — the root cause was located: see the
+  //  minmax(0, 1fr) fix in layout.css / bigscreen #main rule.)
   const sectionEls = document.querySelectorAll<HTMLElement>('.sidebar-section, .legend-block');
   sectionEls.forEach((el, i) => {
     const s = snap.sections[i];
@@ -169,9 +137,8 @@ export function restoreSidebar(): void {
     if (chev) chev.classList.toggle('open', s.chevronOpen);
   });
 
-  // Sanity-check after restore — log the actual computed state so
-  // any "sidebar disappeared" report has hard data to debug.
-  // (Console log already emitted above with mainGridCols + sidebarRect.)
+  // (DEBUG sanity-check console.log removed — see the minmax(0, 1fr)
+  //  fix in layout.css / bigscreen #main rule that solved it.)
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
