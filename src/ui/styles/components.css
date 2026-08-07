@@ -1069,14 +1069,11 @@
   .topbar__logo-mark svg { width: 18px; height: 18px; }
 
   /* Brand: max-width is the hard constraint that lets .topbar__badge's
-   * margin-left:auto work. If brand has no max-width, flexbox distributes
-   * all free space proportionally (brand + badge share the space), so
-   * auto-margin on badge has no effect. max-width:105px = "take up to 105px,
-   * no more", which forces flexbox to put the remaining space to the RIGHT
-   * of the brand — and that's exactly where margin-left:auto pushes badge. */
+   * margin-left:auto work. 8 Chinese chars at 0.72rem ≈ 92px; 105px clips
+   * the last char. 130px fits all 8 with room to spare. */
   .topbar__brand {
     flex-shrink: 0;
-    max-width: 105px;
+    max-width: 130px;
     overflow: hidden;
   }
   /* clamp(min, preferred, max) makes font-size scale fluidly:
