@@ -1144,10 +1144,20 @@ html.bigscreen #app::after {
    exploration, not a browser chrome element. */
 html.bigscreen .topbar,
 html.bigscreen .toolbar,
-html.bigscreen #sidebar,
 html.bigscreen #sidebar-strip,
 html.bigscreen #tour-dt,
 html.bigscreen #zoom-indicator { display: none !important; }
+
+/* Sidebar is hidden with the same transform that #sidebar.hidden uses,
+   so the toggle state remains consistent across bigscreen enter/exit.
+   visibility:hidden keeps it out of the accessibility tree while the
+   transform slides it off-canvas. */
+html.bigscreen #sidebar {
+  transform: translateX(100%) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
 
 /* Prominent z-index so node-panel (if opened) floats above canvas. */
 html.bigscreen .node-panel { z-index: 40; }

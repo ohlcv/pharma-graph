@@ -151,6 +151,15 @@ export async function enterBigscreen(): Promise<void> {
   showHint();
   await tryFullscreen(document.documentElement);
 
+  // Wait for the browser to actually lay out at the fullscreen dimensions
+  // before calling cy.resize().  requestFullscreen() is async — by the time
+  // it resolves, the layout may not have flushed yet.  Two rAFs ensure the
+  // first paint with the new viewport size has happened, so the canvas
+  // internal pixel buffer matches what the user sees.
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+
   // Resize cytoscape canvas to match the new fullscreen dimensions.
   // Without this, the canvas internal pixel buffer stays at the old size,
   // so nodes bleed off the right/bottom edge of the (now-larger) viewport.
@@ -179,6 +188,16 @@ export async function exitBigscreen(): Promise<void> {
   document.documentElement.classList.remove('bigscreen');
   await tryExitFullscreen();
   dismissHint();
+
+  // Wait for the browser to actually lay out at the normal dimensions
+  // before resizing the canvas.  Without this, cy.resize() can fire while
+  // #main still has the bigscreen grid layout (topbar=0) baked into its
+  // computed style, leaving the canvas buffer one size larger than the
+  // actual viewport — nodes drift below the bottom of the visible area.
+  // Two rAFs guarantee the post-fullscreen layout has been painted.
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
 
   // Resize cytoscape canvas back to the normal layout dimensions
   // (topbar + toolbar are visible again, so #main shrinks).
@@ -250,16 +269,21 @@ export function initBigscreen(): void {
       document.documentElement.classList.remove('bigscreen');
       dismissHint();
 
-      // Resize canvas back to normal layout now that topbar+toolbar are visible.
-      _getCy()?.resize();
-      try { localStorage.removeItem(STORAGE_KEY); } catch { /* private mode */ }
-      if (_isTourActive()) {
-        // Restore the viewport captured at the start of the bigscreen session.
-        // Do NOT capture again — _preBigscreenViewport holds the correct snapshot.
-        setTimeout(restoreViewport, 0);
-      } else {
-        runFitIfAvailable();
-      }
+      // Wait for post-fullscreen layout to paint before resizing canvas.
+      // See exitBigscreen() for the same rationale.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          _getCy()?.resize();
+          try { localStorage.removeItem(STORAGE_KEY); } catch { /* private mode */ }
+          if (_isTourActive()) {
+            // Restore the viewport captured at the start of the bigscreen session.
+            // Do NOT capture again — _preBigscreenViewport holds the correct snapshot.
+            setTimeout(restoreViewport, 0);
+          } else {
+            runFitIfAvailable();
+          }
+        });
+      });
     }
   });
 }
