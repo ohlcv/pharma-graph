@@ -130,17 +130,28 @@ export function restoreSidebar(): void {
   // the column width is actually 260px after the bigscreen exit, or
   // stuck at 0px because the `html.bigscreen` selector didn't unapply.
   const main = document.getElementById('main');
+  const app = document.getElementById('app');
+  const body = document.body;
+  const html = document.documentElement;
   const mainGridCols = main ? getComputedStyle(main).gridTemplateColumns : '?';
   const sidebarRect = sidebar?.getBoundingClientRect();
   // Flat, prefix-tagged single-line output so Chrome DevTools does not
   // collapse it to "..." when the object is wide.
   console.log(
-    `[bigscreen] RESTORE-PROBE mainGridCols="${mainGridCols}" ` +
-    `sidebarRectWidth=${sidebarRect?.width} ` +
-    `sidebarRectRight=${sidebarRect?.right} ` +
+    `[bigscreen] RESTORE-PROBE ` +
     `viewportW=${window.innerWidth} ` +
-    `mainClassList="${main?.className}" ` +
-    `htmlClassList="${document.documentElement.className}"`,
+    `html.scrollW=${html.scrollWidth} ` +
+    `body.scrollW=${body.scrollWidth} ` +
+    `body.clientW=${body.clientWidth} ` +
+    `appRectW=${app?.getBoundingClientRect().width} ` +
+    `appOverflowX=${app ? getComputedStyle(app).overflowX : '?'} ` +
+    `mainRectW=${main?.getBoundingClientRect().width} ` +
+    `mainRectLeft=${main?.getBoundingClientRect().left} ` +
+    `mainOverflowX=${main ? getComputedStyle(main).overflowX : '?'} ` +
+    `mainGridCols="${mainGridCols}" ` +
+    `sidebarRectW=${sidebarRect?.width} ` +
+    `sidebarRectLeft=${sidebarRect?.left} ` +
+    `sidebarRectRight=${sidebarRect?.right}`,
   );
   console.log('[bigscreen] restoreSidebar DONE', {
     domHidden: sidebar?.classList.contains('hidden'),
