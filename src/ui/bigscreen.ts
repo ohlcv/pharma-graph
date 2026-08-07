@@ -50,6 +50,76 @@ async function tryExitFullscreen(): Promise<void> {
   }
 }
 
+// ── Sidebar state snapshot ────────────────────────────────────────────────────
+// We snapshot every visual toggle on sidebar / sections BEFORE entering
+// bigscreen, then restore them on exit. This guarantees "exit bigscreen"
+// looks identical to "before entering bigscreen" — no more "legend
+// disappeared" surprises.
+//
+// Snapshot fields (per-section): data-section-state, chevron .open class.
+// Snapshot fields (sidebar): .hidden class, button .active class, strip
+// .visible class & inline right style. Anything else that might affect
+// the sidebar's visible state is preserved by simply not touching it.
+
+interface SidebarSectionSnapshot {
+  state: string | null;
+  chevronOpen: boolean;
+}
+
+interface SidebarSnapshot {
+  hidden: boolean;
+  btnActive: boolean;
+  stripVisible: boolean;
+  stripRight: string;
+  sections: SidebarSectionSnapshot[];
+}
+
+let _preBigscreenSidebar: SidebarSnapshot | null = null;
+
+function captureSidebar(): void {
+  const sidebar = document.getElementById('sidebar');
+  const btn     = document.getElementById('btn-sidebar-toggle');
+  const strip   = document.getElementById('sidebar-strip');
+  if (!sidebar) return;
+  _preBigscreenSidebar = {
+    hidden: sidebar.classList.contains('hidden'),
+    btnActive: btn?.classList.contains('active') ?? false,
+    stripVisible: strip?.classList.contains('visible') ?? false,
+    stripRight: strip?.style.right ?? '',
+    sections: Array.from(
+      document.querySelectorAll<HTMLElement>('.sidebar-section, .legend-block'),
+    ).map((el) => ({
+      state: el.getAttribute('data-section-state'),
+      chevronOpen: el.querySelector<HTMLElement>('.sidebar-section__chevron')?.classList.contains('open') ?? false,
+    })),
+  };
+}
+
+function restoreSidebar(): void {
+  const snap = _preBigscreenSidebar;
+  if (!snap) return;
+  _preBigscreenSidebar = null;
+
+  const sidebar = document.getElementById('sidebar');
+  const btn     = document.getElementById('btn-sidebar-toggle');
+  const strip   = document.getElementById('sidebar-strip');
+  if (sidebar) sidebar.classList.toggle('hidden', snap.hidden);
+  if (btn)     btn.classList.toggle('active', snap.btnActive);
+  if (strip) {
+    strip.classList.toggle('visible', snap.stripVisible);
+    strip.style.right = snap.stripRight;
+  }
+
+  const sectionEls = document.querySelectorAll<HTMLElement>('.sidebar-section, .legend-block');
+  sectionEls.forEach((el, i) => {
+    const s = snap.sections[i];
+    if (!s) return;
+    el.setAttribute('data-section-state', s.state ?? 'closed');
+    const chev = el.querySelector<HTMLElement>('.sidebar-section__chevron');
+    if (chev) chev.classList.toggle('open', s.chevronOpen);
+  });
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /** True when bigscreen mode is active (class on <html>). */
@@ -143,6 +213,13 @@ export function registerCyAccessor(fn: () => cytoscape.Core | null): void {
 export async function enterBigscreen(): Promise<void> {
   if (isBigscreen()) return;
 
+  // Snapshot sidebar state BEFORE we hide anything so we can restore it
+  // verbatim on exit. We do this here (and again in exitBigscreen) so that
+  // pressing the sidebar toggle while bigscreen is active doesn't leak
+  // into the post-exit state — but if the user doesn't touch anything
+  // inside bigscreen, the sidebar still reappears exactly as it was.
+  captureSidebar();
+
   if (_isTourActive()) {
     captureViewport();
   }
@@ -181,34 +258,31 @@ export async function enterBigscreen(): Promise<void> {
 export async function exitBigscreen(): Promise<void> {
   if (!isBigscreen()) return;
 
+  // Re-snapshot: if the user toggled sidebar / sections inside bigscreen
+  // (their click events still fire because the toggle button uses
+  // display:none during bigscreen... actually wait, no — the toolbar
+  // button IS display:none during bigscreen, but #sidebar-strip is also
+  // display:none and so is #sidebar's parent context, so there should
+  // be NO way to toggle sidebar state inside bigscreen. We still
+  // re-capture as a safety net so any future change can't leak.).
+  captureSidebar();
+
   if (_isTourActive()) {
     captureViewport();
   }
 
+  // The grid collapse in components.css keeps #sidebar's own state
+  // (transform / .hidden) untouched during bigscreen — but we still
+  // restore the snapshot to defend against any DOM mutation that
+  // might have happened during the fullscreen transition itself.
   document.documentElement.classList.remove('bigscreen');
 
-  // Defensive: while in bigscreen, the sidebar was display:none'd, which
-  // means its grid track collapsed and any transform/opacity/visibility
-  // overrides from the bigscreen CSS got cleanly removed. But the
-  // sidebar's .hidden class (user toggled off before bigscreen) survives
-  // and would slide it back off-canvas. Reset its hidden state so the
-  // user always sees the legend again. The user's toggle preference is
-  // not preserved across bigscreen, but they can re-toggle if needed.
-  const sidebar = document.getElementById('sidebar');
-  if (sidebar && sidebar.classList.contains('hidden')) {
-    sidebar.classList.remove('hidden');
-    const btn = document.getElementById('btn-sidebar-toggle');
-    if (btn) btn.classList.toggle('active', true);
-  }
+  // Force a synchronous reflow so the grid template change is committed
+  // before we touch section DOM.
+  void document.documentElement.offsetWidth;
 
-  // Also re-open any sidebar section the user collapsed before bigscreen.
-  // max-height:0 on .sidebar-section__body would otherwise hide the
-  // legend/stats content even though the sidebar container is visible.
-  document.querySelectorAll('.sidebar-section, .legend-block').forEach((el) => {
-    el.setAttribute('data-section-state', 'open');
-    const chev = el.querySelector<HTMLElement>('.sidebar-section__chevron');
-    if (chev) chev.classList.add('open');
-  });
+  // Restore sidebar state to exactly what it was before bigscreen.
+  restoreSidebar();
 
   await tryExitFullscreen();
   dismissHint();
@@ -290,21 +364,14 @@ export function initBigscreen(): void {
     if (!document.fullscreenElement && isBigscreen()) {
       // Browser forced an exit (e.g. user pressed browser chrome Esc).
       // Remove bigscreen class before restoring viewport so canvas dims are correct.
+      // We restore sidebar state to its pre-bigscreen snapshot — see enterBigscreen().
+      captureSidebar();
       document.documentElement.classList.remove('bigscreen');
       dismissHint();
-
-      // Defensive sidebar reset — same rationale as exitBigscreen().
-      const sidebar = document.getElementById('sidebar');
-      if (sidebar && sidebar.classList.contains('hidden')) {
-        sidebar.classList.remove('hidden');
-        const btn = document.getElementById('btn-sidebar-toggle');
-        if (btn) btn.classList.toggle('active', true);
-      }
-      document.querySelectorAll('.sidebar-section, .legend-block').forEach((el) => {
-        el.setAttribute('data-section-state', 'open');
-        const chev = el.querySelector<HTMLElement>('.sidebar-section__chevron');
-        if (chev) chev.classList.add('open');
-      });
+      // Force a reflow + restore sidebar synchronously so the next rAF
+      // sees the post-restore layout.
+      void document.documentElement.offsetWidth;
+      restoreSidebar();
 
       // Wait for post-fullscreen layout to paint before resizing canvas.
       // See exitBigscreen() for the same rationale.

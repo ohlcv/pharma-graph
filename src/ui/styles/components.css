@@ -1121,7 +1121,7 @@
 html.bigscreen,
 html.bigscreen body { background: #000; }
 
-/* #main normally has height: calc(100vh - 56px - 44px) — it hard-codes the
+/* Node #main normally has height: calc(100vh - 56px - 44px) — it hard-codes the
    topbar (56px) + toolbar (44px) heights as fixed offsets.
    In bigscreen those bars are hidden so that 100px deduction leaves a
    black bar at the bottom.  Override it here so the canvas truly fills
@@ -1129,7 +1129,12 @@ html.bigscreen body { background: #000; }
    Node-panel is kept — it is part of the graph exploration. */
 html.bigscreen #main {
   height: 100vh;
-  grid-template-columns: 1fr;
+  /* Sidebar column collapses to 0px; #main's overflow:hidden then crops
+     the sidebar entirely. We do NOT touch #sidebar's DOM state (no
+     display:none, no transform override, no class manipulation) — the
+     sidebar's own `.hidden` toggle stays exactly as the user left it,
+     and the grid-template-columns transition handles it on exit. */
+  grid-template-columns: 1fr 0;
 }
 
 /* Deeper ambient halo for the "pure graph theatre" feel. */
@@ -1142,23 +1147,19 @@ html.bigscreen #app::after {
 
 /* Hide all desktop chrome. Node-panel is kept — it is part of the graph
    exploration, not a browser chrome element.
-   We use display:none + transform:translateX(100%) together so that
-   the .hidden class's transform state survives bigscreen enter/exit
-   intact, and the sidebar visibly "stays" in whatever hidden/visible
-   state the user set before. */
+
+   IMPORTANT: #sidebar is intentionally NOT in this list. The grid column
+   collapse above (1fr 0) is what makes the sidebar invisible during
+   bigscreen. Adding `display:none` here would tear down the sidebar's
+   rendering context mid-transition, and on exit the sidebar's own
+   `transform`/`opacity` transitions can fail to re-apply cleanly.
+   Keeping the sidebar in normal flow under overflow:hidden is the
+   least-invasive way to hide it without touching its DOM state. */
 html.bigscreen .topbar,
 html.bigscreen .toolbar,
 html.bigscreen #sidebar-strip,
 html.bigscreen #tour-dt,
 html.bigscreen #zoom-indicator { display: none !important; }
-
-/* Force sidebar fully off-canvas regardless of .hidden class state, so
-   the canvas gets all the room. Without this, a sidebar that the user
-   had collapsed before entering bigscreen would keep its .hidden class,
-   but a sidebar that was visible would also need to be moved away. */
-html.bigscreen #sidebar {
-  display: none !important;
-}
 
 /* Prominent z-index so node-panel (if opened) floats above canvas. */
 html.bigscreen .node-panel { z-index: 40; }
