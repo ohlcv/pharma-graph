@@ -1068,11 +1068,15 @@
   .topbar__logo-mark { width: 28px; height: 28px; border-radius: 7px; }
   .topbar__logo-mark svg { width: 18px; height: 18px; }
 
-  /* Brand: no max-width constraint — let clamp() on .brand-name and
-   * flex-shrink handle all sizing. flex-shrink:1 means the brand column
-   * can be compressed before the logo-mark gives up space. */
+  /* Brand: max-width is the hard constraint that lets .topbar__badge's
+   * margin-left:auto work. If brand has no max-width, flexbox distributes
+   * all free space proportionally (brand + badge share the space), so
+   * auto-margin on badge has no effect. max-width:105px = "take up to 105px,
+   * no more", which forces flexbox to put the remaining space to the RIGHT
+   * of the brand — and that's exactly where margin-left:auto pushes badge. */
   .topbar__brand {
-    flex-shrink: 1;
+    flex-shrink: 0;
+    max-width: 105px;
     overflow: hidden;
   }
   /* clamp(min, preferred, max) makes font-size scale fluidly:
@@ -1093,12 +1097,12 @@
    * replaces it inside the bottom-sheet. No overflow risk here. */
   .topbar__search-center { display: none; }
 
-  /* badge: allow it to shrink so it fits. flex-shrink:1 on the badge
-   * lets it give up space before the logo-mark. margin-right: 4px
-   * cuts the gap from 16px to keep things tight. */
+  /* badge: flex-shrink:0 keeps the capsule at full size. margin-left:auto
+   * is what actually pushes it to the far right of the topbar — this only
+   * works because .topbar__brand has max-width (not flex-shrink:1). */
   .topbar__badge {
-    flex-shrink: 1;
-    margin-left: 4px;
+    flex-shrink: 0;
+    margin-left: auto;
     margin-right: 4px;
     padding: 4px 8px 4px 6px;
     gap: 4px;
