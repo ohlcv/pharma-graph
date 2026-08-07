@@ -126,6 +126,23 @@ export function restoreSidebar(): void {
     strip.style.right = snap.stripRight;
   }
 
+  // DEBUG: also probe the parent grid (#main) so we can see whether
+  // the column width is actually 260px after the bigscreen exit, or
+  // stuck at 0px because the `html.bigscreen` selector didn't unapply.
+  const main = document.getElementById('main');
+  const mainGridCols = main ? getComputedStyle(main).gridTemplateColumns : '?';
+  const sidebarRect = sidebar?.getBoundingClientRect();
+  console.log('[bigscreen] restoreSidebar DONE', {
+    domHidden: sidebar?.classList.contains('hidden'),
+    transform: sidebar ? getComputedStyle(sidebar).transform : '?',
+    opacity:   sidebar ? getComputedStyle(sidebar).opacity : '?',
+    width:     sidebar ? getComputedStyle(sidebar).width : '?',
+    pointerEvents: sidebar ? getComputedStyle(sidebar).pointerEvents : '?',
+    mainGridCols,
+    sidebarRectWidth: sidebarRect?.width,
+    sidebarRectRight: sidebarRect?.right,
+    viewportWidth: window.innerWidth,
+  });
   const sectionEls = document.querySelectorAll<HTMLElement>('.sidebar-section, .legend-block');
   sectionEls.forEach((el, i) => {
     const s = snap.sections[i];
@@ -137,16 +154,7 @@ export function restoreSidebar(): void {
 
   // Sanity-check after restore — log the actual computed state so
   // any "sidebar disappeared" report has hard data to debug.
-  if (sidebar) {
-    const cs = window.getComputedStyle(sidebar);
-    console.log('[bigscreen] restoreSidebar DONE', {
-      domHidden: sidebar.classList.contains('hidden'),
-      transform: cs.transform,
-      opacity: cs.opacity,
-      width: cs.width,
-      pointerEvents: cs.pointerEvents,
-    });
-  }
+  // (Console log already emitted above with mainGridCols + sidebarRect.)
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
