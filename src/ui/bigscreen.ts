@@ -127,40 +127,45 @@ export function isBigscreen(): boolean {
   return document.documentElement.classList.contains('bigscreen');
 }
 
-/** Snapshot of the viewport as saved before entering bigscreen mode.
- *  pan/zoom are scene coordinates — independent of canvas size — so they survive
- *  canvas resize without the camera drifting to a different graph region. */
+/** Snapshot of the viewport captured before entering bigscreen mode.
+ *
+ * We deliberately store the model-coordinate center of the *visible*
+ * viewport (cy.extent()) rather than the cytoscape pan/x/y values.
+ * Reason: `cy.pan()` is a container-local rendered-pixel offset that
+ * depends on the container's current width/height. When the container
+ * resizes (entering or exiting bigscreen), the same pan value produces
+ * a completely different visual framing. Saving/loading the raw pan
+ * would therefore drift the view every time the layout changes.
+ *
+ * Model coordinates are independent of canvas size, so they survive
+ * any resize. To restore, we translate back to a pan value using the
+ * post-resize container size — see restoreViewport(). */
 interface ViewportSnapshot {
-  centerScene: { x: number; y: number };
+  centerModel: { x: number; y: number };
   zoom: number;
 }
 
-/** Stores the viewport snapshot captured before entering bigscreen mode.
- *  Valid only while bigscreen is active. */
 let _preBigscreenViewport: ViewportSnapshot | null = null;
 
-/** Tracks whether the post-exit viewport restoration has already been applied.
- *  Used to avoid re-applying on subsequent resize events (e.g. user manually resizes
- *  the window after exiting bigscreen — those should not trigger a restore). */
-let _bigscreenRestorePending = false;
-
-/** Caches the current viewport (center in scene coords + zoom) into _preBigscreenViewport.
- *  When a tour is running, stops any in-flight cy.animate() first so we capture a
- *  stable position rather than a mid-animation frame. */
+/** Captures the current viewport (center in model coords + zoom).
+ *
+ * If a tour is active, stops any in-flight cy.animate() first so we
+ * capture a stable position rather than a mid-animation frame. The
+ * center is read from `cy.extent()`, which returns the model-space
+ * bounding box of all *visible* elements — i.e. the current viewport
+ * center, not the bounding box of the whole graph. This matches what
+ * the user was looking at before bigscreen. */
 function captureViewport(): void {
   const cy = _getCy();
   if (!cy) return;
 
-  // Stop any running tour animation so the node lands at a stable position.
-  // Without this, exitBigscreen triggers capture while cy.animate() is still
-  // running, causing the viewport to be captured mid-flight.
   if (_isTourActive()) {
     cy.stop();
   }
 
-  const ext = cy.extent(); // { x1, y1, x2, y2 } in scene coords
+  const ext = cy.extent(); // model-space { x1, y1, x2, y2 } of visible elements
   _preBigscreenViewport = {
-    centerScene: {
+    centerModel: {
       x: (ext.x1 + ext.x2) / 2,
       y: (ext.y1 + ext.y2) / 2,
     },
@@ -169,36 +174,42 @@ function captureViewport(): void {
 }
 
 /** Applies the cached viewport snapshot to the live cy instance.
- *  Uses cy.center() semantics: adjust pan so the scene center lands at canvas center.
- *  Robust against canvas repositioning caused by toolbar/show-hide transitions.
- *  The double-setTimeout defers the restore past the cy.resize() that fires when
- *  the toolbar reappears after exiting fullscreen, so we restore from the correct
- *  post-resize viewport rather than fighting with cy.resize()'s internal reset. */
+ *
+ * Uses the **container-local** pan formula:
+ *   pan.x = containerW/2 - centerModel.x * zoom
+ *   pan.y = containerH/2 - centerModel.y * zoom
+ *
+ * This places `centerModel` at the center of the cy container,
+ * regardless of where the container sits on the page (topbar /
+ * toolbar / sidebar don't factor in — they're outside the container).
+ *
+ * The previous version used screen-absolute coordinates
+ * (`bounds.left + bounds.width/2` and `bounds.top + bounds.height/2`)
+ * which were wrong for two reasons:
+ *  1. cy.pan uses container-local pixels, not screen pixels.
+ *  2. In normal layout, bounds.top = topbar+toolbar ≈ 100px, which
+ *     added 100px of vertical offset to every restore — making the
+ *     "saved view" appear noticeably lower than where it was.
+ *
+ * Called by the ResizeObserver in installResizeBridge AFTER cy.resize
+ * has been issued — so clientWidth/clientHeight here reflect the
+ * post-bigscreen dimensions, and the pan we compute lands at the
+ * container's true center. */
 function restoreViewport(): void {
-  if (!_preBigscreenViewport) return;
   const vp = _preBigscreenViewport;
-  _bigscreenRestorePending = true;
+  if (!vp) return;
+  const cy = _getCy();
+  const container = cy?.container();
+  if (!cy || !container) return;
+  _preBigscreenViewport = null;
 
-  const doRestore = () => {
-    const cy2 = _getCy();
-    if (!_bigscreenRestorePending || !cy2 || !vp) return;
-    _bigscreenRestorePending = false;
-    _preBigscreenViewport = null;
-
-    // Set zoom first, then pan so the center lands at the same scene coordinate.
-    // canvasBounds reflects the post-resize / post-repositioned canvas position.
-    cy2.zoom(vp.zoom);
-    const bounds = cy2.container()!.getBoundingClientRect();
-    cy2.pan({
-      x: (bounds.left + bounds.width / 2) - vp.centerScene.x * vp.zoom,
-      y: (bounds.top + bounds.height / 2) - vp.centerScene.y * vp.zoom,
-    });
-  };
-
-  // Double macrotask: fullscreenchange fires → outer callback → inner callback.
-  // By then the browser has laid out the toolbar, resized/repositioned the canvas,
-  // fired cy.resize(), and painted.  Restore after all that settles.
-  setTimeout(() => setTimeout(doRestore, 0), 0);
+  cy.zoom(vp.zoom);
+  const w = container.clientWidth;
+  const h = container.clientHeight;
+  cy.pan({
+    x: w / 2 - vp.centerModel.x * vp.zoom,
+    y: h / 2 - vp.centerModel.y * vp.zoom,
+  });
 }
 
 /** Returns the current cytoscape Core instance. */
@@ -213,11 +224,6 @@ export function registerCyAccessor(fn: () => cytoscape.Core | null): void {
 export async function enterBigscreen(): Promise<void> {
   if (isBigscreen()) return;
 
-  // Snapshot sidebar state BEFORE we hide anything so we can restore it
-  // verbatim on exit. We do this here (and again in exitBigscreen) so that
-  // pressing the sidebar toggle while bigscreen is active doesn't leak
-  // into the post-exit state — but if the user doesn't touch anything
-  // inside bigscreen, the sidebar still reappears exactly as it was.
   captureSidebar();
 
   if (_isTourActive()) {
@@ -228,53 +234,24 @@ export async function enterBigscreen(): Promise<void> {
   showHint();
   await tryFullscreen(document.documentElement);
 
-  // Wait for the browser to actually lay out at the fullscreen dimensions
-  // before calling cy.resize().  requestFullscreen() is async — by the time
-  // it resolves, the layout may not have flushed yet.  Two rAFs ensure the
-  // first paint with the new viewport size has happened, so the canvas
-  // internal pixel buffer matches what the user sees.
-  await new Promise<void>((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-  });
-
-  // Resize cytoscape canvas to match the new fullscreen dimensions.
-  // Without this, the canvas internal pixel buffer stays at the old size,
-  // so nodes bleed off the right/bottom edge of the (now-larger) viewport.
-  _getCy()?.resize();
-
+  // ResizeObserver (registered in installResizeBridge) fires once the
+  // browser has laid out the new fullscreen dimensions; it will call
+  // cy.resize() for us. We deliberately do NOT call cy.resize() here —
+  // the observer knows the true container size at the moment it fires,
+  // whereas we would have to guess via rAF/setTimeout gymnastics.
   try { localStorage.setItem(STORAGE_KEY, '1'); } catch { /* private mode */ }
-
-  if (_isTourActive()) {
-    // Canvas has resized; restore the exact pan/zoom we captured above so the
-    // tour camera is not disturbed.  The restore is async (cy.resize() may
-    // fire on the next tick) so we defer it slightly.
-    setTimeout(restoreViewport, 0);
-  } else {
-    runFitIfAvailable();
-  }
 }
 
 /** Exit bigscreen: remove class, exit fullscreen, remove preference. */
 export async function exitBigscreen(): Promise<void> {
   if (!isBigscreen()) return;
 
-  // Re-snapshot: if the user toggled sidebar / sections inside bigscreen
-  // (their click events still fire because the toggle button uses
-  // display:none during bigscreen... actually wait, no — the toolbar
-  // button IS display:none during bigscreen, but #sidebar-strip is also
-  // display:none and so is #sidebar's parent context, so there should
-  // be NO way to toggle sidebar state inside bigscreen. We still
-  // re-capture as a safety net so any future change can't leak.).
   captureSidebar();
 
   if (_isTourActive()) {
     captureViewport();
   }
 
-  // The grid collapse in components.css keeps #sidebar's own state
-  // (transform / .hidden) untouched during bigscreen — but we still
-  // restore the snapshot to defend against any DOM mutation that
-  // might have happened during the fullscreen transition itself.
   document.documentElement.classList.remove('bigscreen');
 
   // Force a synchronous reflow so the grid template change is committed
@@ -287,26 +264,18 @@ export async function exitBigscreen(): Promise<void> {
   await tryExitFullscreen();
   dismissHint();
 
-  // Wait for the browser to actually lay out at the normal dimensions
-  // before resizing the canvas.  Without this, cy.resize() can fire while
-  // #main still has the bigscreen grid layout (topbar=0) baked into its
-  // computed style, leaving the canvas buffer one size larger than the
-  // actual viewport — nodes drift below the bottom of the visible area.
-  // Two rAFs guarantee the post-fullscreen layout has been painted.
-  await new Promise<void>((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-  });
-
-  // Resize cytoscape canvas back to the normal layout dimensions
-  // (topbar + toolbar are visible again, so #main shrinks).
-  _getCy()?.resize();
-
-  try { localStorage.removeItem(STORAGE_KEY); } catch { /* private mode */ }
-
-  if (_isTourActive()) {
-    setTimeout(restoreViewport, 0);
-  } else {
-    runFitIfAvailable();
+  // ResizeObserver (registered in installResizeBridge) fires once the
+  // browser has laid out the post-bigscreen dimensions; it calls
+  // cy.resize() AND, if a tour is active, applies the cached viewport
+  // snapshot. We deliberately do NOT call cy.resize() here — calling
+  // it on a still-big-screen container would measure the wrong width.
+  //
+  // For the non-tour path we want a fit-to-viewport after the resize.
+  // We can't fit now (container hasn't resized yet — calling fit here
+  // would compute pan against the bigscreen dimensions). Schedule the
+  // fit to run *after* the ResizeObserver has had its turn.
+  if (!_isTourActive()) {
+    requestAnimationFrame(() => requestAnimationFrame(() => runFitIfAvailable()));
   }
 }
 
@@ -344,10 +313,66 @@ export function registerFitFn(fn: () => void): void {
 
 let _installed = false;
 
+/** ResizeObserver watching the cy container. Fires after every layout
+ * change that affects the container's width/height. We use it as the
+ * single source of truth for "cy needs to resize + pan restore".
+ *
+ * Why this is more reliable than the old setTimeout/rAF dance:
+ *  - ResizeObserver fires AFTER layout and BEFORE paint, so clientWidth
+ *    and clientHeight are accurate at the moment the callback runs.
+ *  - We never have to guess "how many rAFs is enough" — the spec says
+ *    the callback runs at the natural resize point.
+ *  - The observer handles ALL container resizes (bigscreen enter,
+ *    bigscreen exit, sidebar collapse, window resize, devtools open)
+ *    uniformly — no special-casing per path. */
+let _cyResizeObserver: ResizeObserver | null = null;
+let _lastObservedW = 0;
+let _lastObservedH = 0;
+
+function installResizeBridge(): void {
+  const cy = _getCy();
+  const container = cy?.container();
+  if (!container) return;
+  if (_cyResizeObserver) _cyResizeObserver.disconnect();
+  _lastObservedW = container.clientWidth;
+  _lastObservedH = container.clientHeight;
+
+  _cyResizeObserver = new ResizeObserver((entries) => {
+    const cy2 = _getCy();
+    if (!cy2) return;
+    for (const entry of entries) {
+      const { width, height } = entry.contentRect;
+      // ResizeObserver fires once on install with the current size and
+      // then on every actual change. We only react to real changes to
+      // avoid spurious cy.resize() loops during boot.
+      if (width === _lastObservedW && height === _lastObservedH) continue;
+      _lastObservedW = width;
+      _lastObservedH = height;
+
+      cy2.resize();
+      // If we have a pending viewport snapshot (we just exited
+      // bigscreen and need to restore the saved center), apply it now
+      // — the container has the new size, so the pan formula reads
+      // the right numbers.
+      if (_preBigscreenViewport) {
+        restoreViewport();
+      }
+    }
+  });
+  _cyResizeObserver.observe(container);
+}
+
 /** Register keydown + fullscreenchange listeners. Idempotent — safe to call twice. */
 export function initBigscreen(): void {
   if (_installed) return;
   _installed = true;
+
+  // Install the resize bridge as soon as we know where cy is mounted.
+  // This must run *after* registerCyAccessor has been called by main.ts.
+  // We retry on the next rAF if cy isn't ready yet (boot ordering).
+  requestAnimationFrame(() => {
+    installResizeBridge();
+  });
 
   // ESC: in CSS-only mode (fullscreen denied) the browser doesn't intercept ESC,
   // so we need to handle it ourselves.
@@ -359,35 +384,23 @@ export function initBigscreen(): void {
   });
 
   // If the browser forces an exit (user pressed browser chrome Esc, or OS shortcut),
-  // sync the JS state back to match.
+  // sync the JS state back to match. The actual canvas resize + viewport
+  // restoration is handled by the ResizeObserver installed above.
   document.addEventListener('fullscreenchange', () => {
     if (!document.fullscreenElement && isBigscreen()) {
-      // Browser forced an exit (e.g. user pressed browser chrome Esc).
-      // Remove bigscreen class before restoring viewport so canvas dims are correct.
-      // We restore sidebar state to its pre-bigscreen snapshot — see enterBigscreen().
       captureSidebar();
       document.documentElement.classList.remove('bigscreen');
       dismissHint();
-      // Force a reflow + restore sidebar synchronously so the next rAF
-      // sees the post-restore layout.
+      // Force a reflow + restore sidebar synchronously so the resize
+      // observer fires against the post-restore layout.
       void document.documentElement.offsetWidth;
       restoreSidebar();
-
-      // Wait for post-fullscreen layout to paint before resizing canvas.
-      // See exitBigscreen() for the same rationale.
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          _getCy()?.resize();
-          try { localStorage.removeItem(STORAGE_KEY); } catch { /* private mode */ }
-          if (_isTourActive()) {
-            // Restore the viewport captured at the start of the bigscreen session.
-            // Do NOT capture again — _preBigscreenViewport holds the correct snapshot.
-            setTimeout(restoreViewport, 0);
-          } else {
-            runFitIfAvailable();
-          }
-        });
-      });
+      try { localStorage.removeItem(STORAGE_KEY); } catch { /* private mode */ }
+      if (!_isTourActive()) {
+        // Same deferred-fit as exitBigscreen — fit only after the
+        // ResizeObserver has resized cy to the new container size.
+        requestAnimationFrame(() => requestAnimationFrame(() => runFitIfAvailable()));
+      }
     }
   });
 }

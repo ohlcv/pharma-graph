@@ -740,23 +740,40 @@ export class TourEngine {
       strategyName: this.strategyName,
     };
 
-    // Use pan instead of center to correctly position the node at the
-    // viewport center even when the canvas is offset by the topbar (56px)
-    // in normal layout mode.  cy.center() / cy.animate({ center: ... })
-    // target the canvas buffer center, which is 56px lower than the
-    // actual viewport center — causing the node to appear too low in
-    // normal mode (and correctly centered in bigscreen where topbar=0).
+    // Pan the camera so this node lands at the center of the cy container.
     //
-    // Guard for test environments where cy.container() is null (no DOM mount).
+    // cytoscape's `pan` value is in container-LOCAL rendered pixels: it's
+    // the offset from the container's top-left corner to the model origin
+    // (0, 0). To put a model point `(mx, my)` at the container's center:
+    //
+    //     pan.x = (containerW / 2) - mx * zoom
+    //     pan.y = (containerH / 2) - my * zoom
+    //
+    // Earlier versions of this code mixed screen-absolute coordinates
+    // (bounds.top, bounds.left) with the pan formula, which is a category
+    // error: it caused nodes to land below the canvas center by exactly
+    // topbar+toolbar height (100px) in normal layout mode, while appearing
+    // correct in bigscreen mode (where bounds.top === 0). Bug reports
+    // describing "selected node is too low in non-bigscreen mode" traced
+    // directly back to this.
+    //
+    // We use clientWidth / clientHeight (container-local CSS pixel size,
+    // excluding topbar/toolbar) — the same numbers cytoscape's own
+    // internal center code reads via this.width() / this.height().
     const container = this.cy.container();
+    const targetZoom = depth === 0 ? 1.5 : 1.3;
     if (container) {
-      const bounds = container.getBoundingClientRect();
-      const topbarH = bounds.top; // 0 in bigscreen, ~56 in normal mode
+      // Pan formula uses the TARGET zoom, not the current one — cy.animate
+      // applies pan and zoom together, so the formula must reflect the
+      // post-animation state. (Earlier versions read this.cy.zoom() here
+      // which gave a transient pan that then got shifted when zoom
+      // changed mid-animation.)
+      const w = container.clientWidth;
+      const h = container.clientHeight;
       const targetPan = {
-        x: bounds.left + bounds.width  / 2 - node.position('x') * this.cy.zoom(),
-        y: topbarH    + bounds.height / 2 - node.position('y') * this.cy.zoom(),
+        x: w / 2 - node.position('x') * targetZoom,
+        y: h / 2 - node.position('y') * targetZoom,
       };
-      const targetZoom = depth === 0 ? 1.5 : 1.3;
       this.cy.animate(
         { pan: targetPan, zoom: targetZoom, duration: 600, easing: 'ease-out-cubic' },
         {
@@ -767,9 +784,9 @@ export class TourEngine {
         },
       );
     } else {
-      // Test / headless: fall back to center (no topbar offset)
+      // Headless / test path — defer to cytoscape's own center math.
       this.cy.animate(
-        { center: { eles: node }, zoom: depth === 0 ? 1.5 : 1.3, duration: 600, easing: 'ease-out-cubic' },
+        { center: { eles: node }, zoom: targetZoom, duration: 600, easing: 'ease-out-cubic' },
         {
           complete: () => {
             this.onStepAfterCenter?.(stepInfo);
