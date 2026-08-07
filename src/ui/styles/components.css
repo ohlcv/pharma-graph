@@ -44,7 +44,18 @@
   pointer-events: none;
   border-radius: inherit;
 }
-.topbar__brand { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.topbar__brand {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  /* max-width prevents the brand column from growing indefinitely when the
+   * Chinese title is long and the viewport is narrow (Android ~360px).
+   * Without it, the brand name expands to content size and pushes the
+   * search-center and badge out of the topbar on small screens.
+   * On Android Chrome the Chinese font renders slightly wider than iOS
+   * Safari, which is why this shows up on Android but not on iPhone. */
+  max-width: 140px;
+  flex-shrink: 1;
+  overflow: hidden;
+}
 .topbar__brand-name {
   font-size: 0.92rem; font-weight: 800;
   /* gradient text — picks up the logo's accent↔accent2 sweep so the
@@ -102,12 +113,20 @@
   background-size: 400% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
   animation: badge-shimmer 3s ease-in-out -1.5s infinite;
   filter: drop-shadow(0 0 10px rgba(168,85,247,0.7)) drop-shadow(0 0 22px rgba(236,72,153,0.4));
+  /* hint GPU to composite the animated background-position in a separate
+   * layer — prevents the shimmer from flickering on Android Chrome where
+   * the browser doesn't infer this automatically. */
+  will-change: background-position;
+  -webkit-will-change: background-position;
 }
 .topbar__badge-carousel { display: inline-block; min-width: 3ch; text-align: left; }
 #carousel-text {
   display: inline-block; background-size: 400% 100%;
   animation: carousel-shimmer 3s ease-in-out infinite; transition: opacity 0.45s ease;
   filter: drop-shadow(0 0 8px rgba(167,139,250,0.5)) drop-shadow(0 0 18px rgba(103,232,249,0.25));
+  /* same GPU hint for carousel text shimmer on Android. */
+  will-change: background-position;
+  -webkit-will-change: background-position;
 }
 #carousel-text.is-hidden { opacity: 0; }
 
@@ -861,7 +880,24 @@
 #sheet-close-bar svg { width: 16px; height: 16px; color: var(--muted); transition: color 0.15s; }
 #sheet-close-bar:active svg { color: var(--accent); }
 
-#bottom-sheet { position: fixed; bottom: 0; top: auto; left: 0; right: 0; transform: translateY(100%); pointer-events: none; background: rgba(12,18,34,0.30); backdrop-filter: blur(32px) saturate(180%); -webkit-backdrop-filter: blur(32px) saturate(180%); border-radius: 22px 22px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.04) inset; z-index: 50; max-height: calc(85dvh - env(safe-area-inset-bottom, 0px)); overflow-y: auto; touch-action: none; flex-direction: column; padding: 0 16px max(16px, env(safe-area-inset-bottom)); transition: transform 0.32s cubic-bezier(0.34,1.4,0.64,1), opacity 0.32s; }
+#bottom-sheet {
+  position: fixed; bottom: 0; top: auto; left: 0; right: 0;
+  transform: translateY(100%); pointer-events: none;
+  /* Fallback background-color: used when backdrop-filter is unsupported
+   * or falls back (Android Chrome on low-end hardware). A solid
+   * rgba(12,18,34,0.90) makes the sheet opaque rather than transparent.
+   * backdrop-filter: blur sits on top of this, so iOS Safari (good support)
+   * gets the blur, Android gets the solid color instead. */
+  background-color: rgba(12,18,34,0.90);
+  backdrop-filter: blur(32px) saturate(180%); -webkit-backdrop-filter: blur(32px) saturate(180%);
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.04) inset;
+  z-index: 50;
+  max-height: calc(85dvh - env(safe-area-inset-bottom, 0px));
+  overflow-y: auto; touch-action: none; flex-direction: column;
+  padding: 0 16px max(16px, env(safe-area-inset-bottom));
+  transition: transform 0.32s cubic-bezier(0.34,1.4,0.64,1), opacity 0.32s;
+}
 #bottom-sheet.open { transform: translateY(0); pointer-events: auto; }
 
 .bs-quick-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
@@ -1007,6 +1043,11 @@
   .bottom-sheet     { border-radius: 22px 22px 0 0; max-height: calc(85dvh - env(safe-area-inset-bottom, 0px)); }
   .topbar__search-center { display: none; }
   .topbar__badge         { margin-right: 8px; }
+  /* Brand name too wide for narrow Android screens — iOS Safari renders Chinese
+   * ~5% narrower, so it fits; Android Chrome needs a smaller font to avoid
+   * pushing the badge off the topbar. */
+  .topbar__brand-name    { font-size: 0.72rem; }
+  .topbar__brand-sub     { display: none; }
   .bs-mobile-search { display: flex; }
 }
 
