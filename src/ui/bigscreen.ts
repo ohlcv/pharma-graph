@@ -186,6 +186,30 @@ export async function exitBigscreen(): Promise<void> {
   }
 
   document.documentElement.classList.remove('bigscreen');
+
+  // Defensive: while in bigscreen, the sidebar was display:none'd, which
+  // means its grid track collapsed and any transform/opacity/visibility
+  // overrides from the bigscreen CSS got cleanly removed. But the
+  // sidebar's .hidden class (user toggled off before bigscreen) survives
+  // and would slide it back off-canvas. Reset its hidden state so the
+  // user always sees the legend again. The user's toggle preference is
+  // not preserved across bigscreen, but they can re-toggle if needed.
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar && sidebar.classList.contains('hidden')) {
+    sidebar.classList.remove('hidden');
+    const btn = document.getElementById('btn-sidebar-toggle');
+    if (btn) btn.classList.toggle('active', true);
+  }
+
+  // Also re-open any sidebar section the user collapsed before bigscreen.
+  // max-height:0 on .sidebar-section__body would otherwise hide the
+  // legend/stats content even though the sidebar container is visible.
+  document.querySelectorAll('.sidebar-section, .legend-block').forEach((el) => {
+    el.setAttribute('data-section-state', 'open');
+    const chev = el.querySelector<HTMLElement>('.sidebar-section__chevron');
+    if (chev) chev.classList.add('open');
+  });
+
   await tryExitFullscreen();
   dismissHint();
 
@@ -268,6 +292,19 @@ export function initBigscreen(): void {
       // Remove bigscreen class before restoring viewport so canvas dims are correct.
       document.documentElement.classList.remove('bigscreen');
       dismissHint();
+
+      // Defensive sidebar reset — same rationale as exitBigscreen().
+      const sidebar = document.getElementById('sidebar');
+      if (sidebar && sidebar.classList.contains('hidden')) {
+        sidebar.classList.remove('hidden');
+        const btn = document.getElementById('btn-sidebar-toggle');
+        if (btn) btn.classList.toggle('active', true);
+      }
+      document.querySelectorAll('.sidebar-section, .legend-block').forEach((el) => {
+        el.setAttribute('data-section-state', 'open');
+        const chev = el.querySelector<HTMLElement>('.sidebar-section__chevron');
+        if (chev) chev.classList.add('open');
+      });
 
       // Wait for post-fullscreen layout to paint before resizing canvas.
       // See exitBigscreen() for the same rationale.
