@@ -150,6 +150,12 @@ export async function enterBigscreen(): Promise<void> {
   document.documentElement.classList.add('bigscreen');
   showHint();
   await tryFullscreen(document.documentElement);
+
+  // Resize cytoscape canvas to match the new fullscreen dimensions.
+  // Without this, the canvas internal pixel buffer stays at the old size,
+  // so nodes bleed off the right/bottom edge of the (now-larger) viewport.
+  _getCy()?.resize();
+
   try { localStorage.setItem(STORAGE_KEY, '1'); } catch { /* private mode */ }
 
   if (_isTourActive()) {
@@ -173,6 +179,11 @@ export async function exitBigscreen(): Promise<void> {
   document.documentElement.classList.remove('bigscreen');
   await tryExitFullscreen();
   dismissHint();
+
+  // Resize cytoscape canvas back to the normal layout dimensions
+  // (topbar + toolbar are visible again, so #main shrinks).
+  _getCy()?.resize();
+
   try { localStorage.removeItem(STORAGE_KEY); } catch { /* private mode */ }
 
   if (_isTourActive()) {
@@ -238,6 +249,9 @@ export function initBigscreen(): void {
       // Remove bigscreen class before restoring viewport so canvas dims are correct.
       document.documentElement.classList.remove('bigscreen');
       dismissHint();
+
+      // Resize canvas back to normal layout now that topbar+toolbar are visible.
+      _getCy()?.resize();
       try { localStorage.removeItem(STORAGE_KEY); } catch { /* private mode */ }
       if (_isTourActive()) {
         // Restore the viewport captured at the start of the bigscreen session.

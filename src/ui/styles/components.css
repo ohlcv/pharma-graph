@@ -1121,6 +1121,17 @@
 html.bigscreen,
 html.bigscreen body { background: #000; }
 
+/* #main normally has height: calc(100vh - 56px - 44px) — it hard-codes the
+   topbar (56px) + toolbar (44px) heights as fixed offsets.
+   In bigscreen those bars are hidden so that 100px deduction leaves a
+   black bar at the bottom.  Override it here so the canvas truly fills
+   the full viewport.
+   Node-panel is kept — it is part of the graph exploration. */
+html.bigscreen #main {
+  height: 100vh;
+  grid-template-columns: 1fr;
+}
+
 /* Deeper ambient halo for the "pure graph theatre" feel. */
 html.bigscreen #app::after {
   background:
