@@ -9,37 +9,42 @@ data:
     book: 药学专业知识二
     chapter: 第二章 解热、镇痛、抗炎、抗风湿及抗痛风药
     section: 第二节 抗风湿药
-    tags:
-      - csDMARDs
-      - 改善病情
-      - 慢作用
-      - 甲氨蝶呤
-      - 一线用药
   summary:
-    short: 传统合成 DMARDs 起效慢（数周~数月），可延缓关节骨破坏，是类风湿关节炎等风湿免疫病的一线基础用药。
-    full: csDMARDs 包括甲氨蝶呤（锚定药/首选）、来氟米特、柳氮磺吡啶、羟氯喹、金诺芬等。作用机制以免疫抑制为主，特点为起效慢、疗效持久、可改变病情进展。NSAIDs 与糖皮质激素仅作对症桥接，csDMARDs 才是核心治疗药物。
+    short: csDMARDs 起效慢（数周~数月），可延缓关节骨破坏，是风湿免疫病的一线基础用药。
+    full: 传统合成改善病情抗风湿药（csDMARDs）起效慢，需3~6个月达最大疗效，可延缓关节骨破坏，是类风湿关节炎等风湿免疫病的一线基础用药。代表药：甲氨蝶呤（锚定药）、来氟米特、柳氮磺吡啶、羟氯喹、金诺芬、双醋瑞因。
   edges_out:
-    - target: anti-inflammatory-antirheumatic-drugs
-      type: part_of
-      reason: csDMARDs 是抗风湿药两大分类之一
     - target: methotrexate
       type: contains
-      reason: 甲氨蝶呤是 csDMARDs 锚定首选药
+      reason: 甲氨蝶呤是 csDMARDs 锚定药
     - target: leflunomide
       type: contains
-      reason: 来氟米特是 csDMARDs 重要成员
-    - target: sulfasalazine
-      type: contains
-      reason: 柳氮磺吡啶是 csDMARDs 联合方案常用药
-    - target: hydroxychloroquine
-      type: contains
-      reason: 羟氯喹是 csDMARDs 用于 SLE 的代表
-    - target: auranofin
-      type: contains
-      reason: 金诺芬是 csDMARDs 口服金制剂
-    - target: diacerein
-      type: contains
-      reason: 双醋瑞因是 csDMARDs 用于骨关节炎的代表
+      reason: 来氟米特是 csDMARDs 代表药
 ---
 
 # 传统合成改善病情抗风湿药（csDMARDs）
+
+## 它是什么药？
+
+起效慢（数周~数月），但可**延缓关节骨破坏**，保护关节功能。是风湿免疫病的**一线基础用药**，对症缓解药（NSAIDs/糖皮质激素）仅缓解症状，不治本。
+
+## 代表药有哪些？
+
+| 药物 | 临床定位 | 特征性不良反应 |
+|---|---|---|
+| **甲氨蝶呤** | 类风湿关节炎**锚定药、首选药** | 骨髓抑制、肝损伤、致畸 |
+| **来氟米特** | 类风湿、狼疮性肾炎 | 强致畸性、肝损伤 |
+| **柳氮磺吡啶** | 强直性脊柱炎、类风湿、溃疡性结肠炎 | 磺胺过敏、男性可逆不育 |
+| **羟氯喹** | 系统性红斑狼疮基础用药 | 视网膜病变 |
+| **金诺芬** | 活动性类风湿关节炎 | 黏膜损害、血液系统损害 |
+| **双醋瑞因** | 退行性骨关节炎 | 腹泻、尿液变黄 |
+
+## 核心特点是什么？
+
+- **起效慢**：通常3~6个月达最大疗效，不能急用
+- **改变病程**：延缓骨破坏，保护关节功能
+- **需长期使用**：不可症状缓解就停药
+- **定期监测**：血常规、肝肾功能
+
+## 它和章的关系？
+
+它是抗风湿药的核心治疗药物，定位"改善病情抗风湿药，延缓骨破坏，一线基础用药，起效慢需长期用"。
