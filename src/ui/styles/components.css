@@ -1070,10 +1070,10 @@
 
   /* Brand: max-width is the hard constraint that lets .topbar__badge's
    * margin-left:auto work. 8 Chinese chars at 0.72rem ≈ 92px; 105px clips
-   * the last char. 130px fits all 8 with room to spare. */
+   * the last char. 135px fits all 8 with room to spare. */
   .topbar__brand {
     flex-shrink: 0;
-    max-width: 130px;
+    max-width: 135px;
     overflow: hidden;
   }
   /* clamp(min, preferred, max) makes font-size scale fluidly:
