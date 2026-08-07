@@ -722,6 +722,8 @@ export class TourEngine {
 
     this.startTourPulse(node);
 
+    this.cy.stop(); // Stop any in-progress pan/zoom animation before starting a new one
+
     const stepInfo: TourStepInfo = {
       nodeId,
       label: node.data('label') || nodeId,
@@ -738,17 +740,44 @@ export class TourEngine {
       strategyName: this.strategyName,
     };
 
-    this.cy.stop();
-    this.cy.animate({
-      center: { eles: node },
-      zoom: depth === 0 ? 1.5 : 1.3,
-      duration: 600,
-      easing: 'ease-out-cubic',
-      complete: () => {
-        this.onStepAfterCenter?.(stepInfo);
-        if (!this.stopped && !this.paused) this.scheduleNext();
-      },
-    } as cytoscape.AnimationOptions);
+    // Use pan instead of center to correctly position the node at the
+    // viewport center even when the canvas is offset by the topbar (56px)
+    // in normal layout mode.  cy.center() / cy.animate({ center: ... })
+    // target the canvas buffer center, which is 56px lower than the
+    // actual viewport center — causing the node to appear too low in
+    // normal mode (and correctly centered in bigscreen where topbar=0).
+    //
+    // Guard for test environments where cy.container() is null (no DOM mount).
+    const container = this.cy.container();
+    if (container) {
+      const bounds = container.getBoundingClientRect();
+      const topbarH = bounds.top; // 0 in bigscreen, ~56 in normal mode
+      const targetPan = {
+        x: bounds.left + bounds.width  / 2 - node.position('x') * this.cy.zoom(),
+        y: topbarH    + bounds.height / 2 - node.position('y') * this.cy.zoom(),
+      };
+      const targetZoom = depth === 0 ? 1.5 : 1.3;
+      this.cy.animate(
+        { pan: targetPan, zoom: targetZoom, duration: 600, easing: 'ease-out-cubic' },
+        {
+          complete: () => {
+            this.onStepAfterCenter?.(stepInfo);
+            if (!this.stopped && !this.paused) this.scheduleNext();
+          },
+        },
+      );
+    } else {
+      // Test / headless: fall back to center (no topbar offset)
+      this.cy.animate(
+        { center: { eles: node }, zoom: depth === 0 ? 1.5 : 1.3, duration: 600, easing: 'ease-out-cubic' },
+        {
+          complete: () => {
+            this.onStepAfterCenter?.(stepInfo);
+            if (!this.stopped && !this.paused) this.scheduleNext();
+          },
+        },
+      );
+    }
 
     if (!silent) {
       this.onStep?.(stepInfo);
