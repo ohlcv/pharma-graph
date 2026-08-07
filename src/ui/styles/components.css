@@ -883,17 +883,19 @@
 #bottom-sheet {
   position: fixed; bottom: 0; top: auto; left: 0; right: 0;
   transform: translateY(100%); pointer-events: none;
-  /* Fallback background-color: used when backdrop-filter is unsupported
-   * or falls back (Android Chrome on low-end hardware). A solid
-   * rgba(12,18,34,0.90) makes the sheet opaque rather than transparent.
-   * backdrop-filter: blur sits on top of this, so iOS Safari (good support)
-   * gets the blur, Android gets the solid color instead. */
-  background-color: rgba(12,18,34,0.90);
-  backdrop-filter: blur(32px) saturate(180%); -webkit-backdrop-filter: blur(32px) saturate(180%);
+  /* No backdrop-filter here — Android Chrome (Chromium 103+) supports it, but
+   * `backdrop-filter: blur` shows and blurs the content behind the element,
+   * making the graph canvas bleed through. The intended visual is "solid
+   * blurred-ish dark panel", not "see-through blurred glass". A solid
+   * rgba(12,18,34,0.97) gives us opaque-on-both-platforms consistent look.
+   * iOS Safari would blur with backdrop-filter but gets a slightly different
+   * (opaque) treatment — acceptable; the Android result is much better than
+   * the previous transparent rgba(12,18,34,0.30). */
+  background-color: rgba(12, 18, 34, 0.97);
   border-radius: 22px 22px 0 0;
-  box-shadow: 0 -10px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.04) inset;
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06) inset;
   z-index: 50;
-  max-height: calc(85dvh - env(safe-area-inset-bottom, 0px));
+  max-height: calc(88dvh - env(safe-area-inset-bottom, 0px));
   overflow-y: auto; touch-action: none; flex-direction: column;
   padding: 0 16px max(16px, env(safe-area-inset-bottom));
   transition: transform 0.32s cubic-bezier(0.34,1.4,0.64,1), opacity 0.32s;
@@ -1026,6 +1028,11 @@
 .bs-mobile-search__input::placeholder { color: var(--muted); }
 
 /* ── Mobile responsive ──────────────────────────────────────────────────── */
+/* iOS Safari on narrow screens uses a 980px Compatibility View viewport
+ * (content is scaled down), which hides the real space crunch. Android
+ * Chrome reports the true ~360px innerWidth. All mobile rules below are
+ * tuned for the real Android constraint — iOS Safari scales everything
+ * down automatically, so it benefits too. */
 @media (max-width: 768px) {
   #sidebar { display: none; }
   #main    { grid-template-columns: 1fr; }
@@ -1040,15 +1047,59 @@
   #sheet-backdrop.visible { pointer-events: auto; }
   #sheet-peek-tab   { display: flex; }
   .bs-params-block  { display: flex; }
-  .bottom-sheet     { border-radius: 22px 22px 0 0; max-height: calc(85dvh - env(safe-area-inset-bottom, 0px)); }
-  .topbar__search-center { display: none; }
-  .topbar__badge         { margin-right: 8px; }
-  /* Brand name too wide for narrow Android screens — iOS Safari renders Chinese
-   * ~5% narrower, so it fits; Android Chrome needs a smaller font to avoid
-   * pushing the badge off the topbar. */
-  .topbar__brand-name    { font-size: 0.72rem; }
-  .topbar__brand-sub     { display: none; }
+  .bottom-sheet     { border-radius: 22px 22px 0 0; }
   .bs-mobile-search { display: flex; }
+
+  /* ── topbar on real narrow viewports ── */
+  .topbar {
+    /* height auto lets the content drive the bar — badge + dot are
+     * single-line; the bar doesn't need 56px if we don't force it. */
+    height: auto;
+    min-height: 48px;
+    padding: 0 12px;
+  }
+  .topbar__logo {
+    /* logo mark stays 28px; the text beside it gets tight constraints */
+    padding: 0 10px 0 0;
+    gap: 6px;
+  }
+  .topbar__logo-mark { width: 28px; height: 28px; border-radius: 7px; }
+  .topbar__logo-mark svg { width: 18px; height: 18px; }
+
+  /* Brand: hard max-width so the long Chinese title can never grow wider
+   * than the space left after logo + badge. max-width + overflow:hidden
+   * together are the iron clamp — even if font-size is wrong, text won't
+   * push the badge off the bar. */
+  .topbar__brand {
+    max-width: 85px;          /* ~3 Chinese chars at 12px; the rest clips */
+    overflow: hidden;
+    flex-shrink: 0;           /* don't let the brand column be compressed away */
+  }
+  .topbar__brand-name {
+    font-size: 0.68rem;        /* 10.88px — compact but still readable */
+    white-space: nowrap;       /* single-line; overflow goes into max-width clamp */
+    letter-spacing: 0;
+  }
+  .topbar__brand-sub { display: none; }
+
+  /* search-center is hidden on mobile; a separate bs-mobile-search
+   * replaces it inside the bottom-sheet. No overflow risk here. */
+  .topbar__search-center { display: none; }
+
+  /* badge: allow it to shrink so it fits. flex-shrink:1 on the badge
+   * lets it give up space before the logo-mark. margin-right: 4px
+   * cuts the gap from 16px to keep things tight. */
+  .topbar__badge {
+    flex-shrink: 1;
+    margin-left: 4px;
+    margin-right: 4px;
+    padding: 4px 8px 4px 6px;
+    gap: 4px;
+  }
+  .topbar__badge-dot { width: 6px; height: 6px; }
+  .badge-by   { font-size: 0.6rem; }
+  .badge-meow { font-size: 0.64rem; }
+  #carousel-text { font-size: 0.64rem; }
 }
 
 /* Close @layer bottom-sheet (opened at line 674) */
