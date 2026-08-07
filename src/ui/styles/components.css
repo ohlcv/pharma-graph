@@ -266,22 +266,10 @@
   backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
   border-left: 1px solid var(--border); overflow-y: auto;
   display: flex; flex-direction: column; transform: translateX(0);
-  /* DEBUG-STRIP-DOWN: removed `transition: transform/opacity/width` and
-     `will-change: transform` to isolate a suspected GPU-compositor
-     transition residual where, after a bigscreen round-trip, the
-     sidebar visually disappears even though the DOM `.hidden` state
-     and computed transform/opacity are correct.
-
-     Live debug toggle: this file is paired with a one-line JS log
-     in `restoreSidebar` (`[bigscreen] restoreSidebar DONE`); together
-     they let us determine whether the missing sidebar is a CSS-layer
-     (this file) or DOM-layer (elsewhere) bug.
-
-     Restore these properties once the bug is identified. */
-  /* will-change: transform; (REMOVED) */
-  /* transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.28s ease,
-              width    0.28s cubic-bezier(0.4, 0, 0.2, 1); (REMOVED) */
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity   0.28s ease,
+              width     0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
 }
 #sidebar.hidden { transform: translateX(100%); opacity: 0; pointer-events: none; }
 

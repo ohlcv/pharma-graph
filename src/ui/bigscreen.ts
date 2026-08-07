@@ -93,15 +93,12 @@ function captureSidebar(): void {
       chevronOpen: el.querySelector<HTMLElement>('.sidebar-section__chevron')?.classList.contains('open') ?? false,
     })),
   };
-  console.log('[bigscreen] captureSidebar', JSON.parse(JSON.stringify(_preBigscreenSidebar)));
 }
 
 export function restoreSidebar(): void {
   const snap = _preBigscreenSidebar;
   if (!snap) return;
   _preBigscreenSidebar = null;
-
-  console.log('[bigscreen] restoreSidebar applying', JSON.parse(JSON.stringify(snap)));
 
   const sidebar = document.getElementById('sidebar');
   const btn     = document.getElementById('btn-sidebar-toggle');
@@ -126,8 +123,6 @@ export function restoreSidebar(): void {
     strip.style.right = snap.stripRight;
   }
 
-  // (DEBUG probe removed — the root cause was located: see the
-  //  minmax(0, 1fr) fix in layout.css / bigscreen #main rule.)
   const sectionEls = document.querySelectorAll<HTMLElement>('.sidebar-section, .legend-block');
   sectionEls.forEach((el, i) => {
     const s = snap.sections[i];
@@ -136,9 +131,6 @@ export function restoreSidebar(): void {
     const chev = el.querySelector<HTMLElement>('.sidebar-section__chevron');
     if (chev) chev.classList.toggle('open', s.chevronOpen);
   });
-
-  // (DEBUG sanity-check console.log removed — see the minmax(0, 1fr)
-  //  fix in layout.css / bigscreen #main rule that solved it.)
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
