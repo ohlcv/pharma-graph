@@ -357,7 +357,8 @@
 }
 .legend-section[data-section-state="open"] .legend-section__body {
   max-height: none;
-  overflow: visible;
+  overflow-x: auto; /* safety net: long labels overflow → horizontal scroll, not silent clip */
+  overflow-y: visible;
   padding: 0 4px 6px;
 }
 
@@ -425,7 +426,20 @@
 .legend-shape-svg svg { width: 16px; height: 16px; }
 .legend-node--cat   { width: 8px; height: 8px; border-radius: 50%; display: inline-block; border: 1px solid rgba(255,255,255,0.15); }
 .legend-swatch      { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-.legend-row__label { font-size: 0.7rem; color: var(--text-2); font-weight: 500; flex: 1; }
+.legend-row__label {
+  font-size: 0.7rem; color: var(--text-2); font-weight: 500; flex: 1;
+  /* flex item inside a multi-column grid cell: min-width:0 lets the label
+   * shrink below its content width, then ellipsis clips the overflow.
+   * Without min-width:0 a long Chinese label pushes its cell past the
+   * column track, the whole grid blows out, and on iOS WebView the
+   * legend block appears shifted right (clipped by overflow:hidden on
+   * the sheet). Visible as the legend block looking "偏右" on iPhone
+   * while Android renders fine. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .legend-row__count { font-size: 0.6rem; color: var(--muted); font-weight: 400; margin-left: auto; }
 .legend-row.active {
   background: rgba(99,102,241,0.18);
@@ -483,7 +497,18 @@
 }
 .legend-tier-row.active .legend-row__label { color: var(--accent); }
 .legend-edge-row svg { flex-shrink: 0; }
-.legend-edge-row__label { flex: 1; }
+.legend-edge-row__label {
+  flex: 1;
+  /* Same fix as .legend-row__label — see comment there. The edge type
+   * label sits inside a single-column legend-edge list, but the count
+   * tag to its right uses margin-left:auto, so without min-width:0 the
+   * label still wins the squeeze and pushes the count off-screen on
+   * narrow viewports. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .legend-edge-row__count { font-size: 0.6rem; color: var(--muted); font-weight: 400; margin-left: auto; }
 
 /* category dot in sidebar (dynamic) */
