@@ -132,16 +132,22 @@ export function restoreSidebar(): void {
   const main = document.getElementById('main');
   const mainGridCols = main ? getComputedStyle(main).gridTemplateColumns : '?';
   const sidebarRect = sidebar?.getBoundingClientRect();
+  // Flat, prefix-tagged single-line output so Chrome DevTools does not
+  // collapse it to "..." when the object is wide.
+  console.log(
+    `[bigscreen] RESTORE-PROBE mainGridCols="${mainGridCols}" ` +
+    `sidebarRectWidth=${sidebarRect?.width} ` +
+    `sidebarRectRight=${sidebarRect?.right} ` +
+    `viewportW=${window.innerWidth} ` +
+    `mainClassList="${main?.className}" ` +
+    `htmlClassList="${document.documentElement.className}"`,
+  );
   console.log('[bigscreen] restoreSidebar DONE', {
     domHidden: sidebar?.classList.contains('hidden'),
     transform: sidebar ? getComputedStyle(sidebar).transform : '?',
     opacity:   sidebar ? getComputedStyle(sidebar).opacity : '?',
     width:     sidebar ? getComputedStyle(sidebar).width : '?',
     pointerEvents: sidebar ? getComputedStyle(sidebar).pointerEvents : '?',
-    mainGridCols,
-    sidebarRectWidth: sidebarRect?.width,
-    sidebarRectRight: sidebarRect?.right,
-    viewportWidth: window.innerWidth,
   });
   const sectionEls = document.querySelectorAll<HTMLElement>('.sidebar-section, .legend-block');
   sectionEls.forEach((el, i) => {
