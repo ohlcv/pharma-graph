@@ -93,12 +93,15 @@ function captureSidebar(): void {
       chevronOpen: el.querySelector<HTMLElement>('.sidebar-section__chevron')?.classList.contains('open') ?? false,
     })),
   };
+  console.log('[bigscreen] captureSidebar', JSON.parse(JSON.stringify(_preBigscreenSidebar)));
 }
 
 function restoreSidebar(): void {
   const snap = _preBigscreenSidebar;
   if (!snap) return;
   _preBigscreenSidebar = null;
+
+  console.log('[bigscreen] restoreSidebar applying', JSON.parse(JSON.stringify(snap)));
 
   const sidebar = document.getElementById('sidebar');
   const btn     = document.getElementById('btn-sidebar-toggle');
