@@ -31,9 +31,6 @@ data:
     - target: ketotifen
       type: contains
       reason: 酮替芬是 H₁拮抗剂兼具肥大细胞稳定
-    - target: notion-h1-couplet
-      type: has_couplet
-      reason: H₁拮抗剂有记忆口诀
 ---
 
 # H₁受体拮抗剂（哮喘辅助）

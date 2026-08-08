@@ -24,9 +24,6 @@ data:
     - target: omalizumab
       type: contains
       reason: 奥马珠单抗是抗IgE单抗代表
-    - target: notion-anti-ige-couplet
-      type: has_couplet
-      reason: 抗IgE有记忆口诀
 ---
 
 # 抗IgE单克隆抗体

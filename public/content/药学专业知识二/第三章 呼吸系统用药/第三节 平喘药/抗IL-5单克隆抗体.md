@@ -24,9 +24,6 @@ data:
     - target: mepolizumab
       type: contains
       reason: 美泊利珠单抗是抗IL-5代表
-    - target: notion-anti-il5-couplet
-      type: has_couplet
-      reason: 抗IL-5有记忆口诀
 ---
 
 # 抗IL-5单克隆抗体

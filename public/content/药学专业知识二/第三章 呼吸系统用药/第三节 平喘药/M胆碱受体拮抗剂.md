@@ -37,9 +37,6 @@ data:
     - target: aclidinium
       type: contains
       reason: 阿地溴铵是 LAMA 新型
-    - target: notion-muscarinic-couplet
-      type: has_couplet
-      reason: M胆碱拮抗剂有记忆口诀
 ---
 
 # M胆碱受体拮抗剂（呼吸系统）
