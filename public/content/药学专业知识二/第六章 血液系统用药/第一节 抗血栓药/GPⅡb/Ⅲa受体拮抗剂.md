@@ -1,0 +1,61 @@
+---
+data:
+  id: gpiib-iiia-antagonists
+  label: GPⅡb/Ⅲa受体拮抗剂
+  essence: module
+  field: pharmacology
+  tier: drug
+  location:
+    book: 药学专业知识二
+    chapter: 第六章 血液系统用药
+    section: 第一节 抗血栓药
+  tags:
+    - GPⅡb/Ⅲa受体拮抗剂
+    - 阿昔单抗
+    - 依替巴肽
+    - 替罗非班
+    - PCI
+    - 急性冠脉综合征
+  summary:
+    short: GPⅡb/Ⅲa受体拮抗剂是强效抗血小板药，阿昔单抗不可逆存在免疫原性，依替巴肽、替罗非班可逆。
+    full: GPⅡb/Ⅲa受体拮抗剂是抗血小板的强效药物，作用于血小板聚集的最终共同通路。代表药：阿昔单抗（不可逆，**存在免疫原性**）、依替巴肽（可逆）、替罗非班（可逆）。
+  edges_out:
+    - target: antiplatelet-drugs-thrombus
+      type: part_of
+      reason: GPⅡb/Ⅲa拮抗剂是抗血小板药一类
+    - target: abciximab
+      type: contains
+      reason: 阿昔单抗是不可逆代表
+    - target: tirofiban
+      type: contains
+      reason: 替罗非班是常用可逆代表
+---
+
+# GPⅡb/Ⅲa受体拮抗剂
+
+## 它是什么药？
+
+作用于**血小板聚集的最终共同通路**——GPⅡb/Ⅲa受体（纤维蛋白原受体）的强效抗血小板药。
+
+## 代表药
+
+| 药物 | 抑制方式 | 特点 |
+|---|---|---|
+| **阿昔单抗** | **不可逆** | 存在免疫原性 |
+| **依替巴肽** | 可逆 | — |
+| **替罗非班** | 可逆 | PCI围手术期常用 |
+
+## 记忆口诀是什么？
+
+**"2b3a依次单飞"**
+
+| 口诀 | 含义 |
+|---|---|
+| **2b3a** | GPⅡb/Ⅲa受体 |
+| **依次单飞** | 阿昔单抗"单"独"飞"（不可逆） |
+
+**为什么要记？** GPⅡb/Ⅲa受体名易混，口诀帮助记忆。
+
+## 它和节的关系？
+
+GPⅡb/Ⅲa受体拮抗剂是抗血小板药的最强效类别，定位"作用于血小板聚集最终通路，PCI围手术期使用，阿昔单抗不可逆有免疫原性"。
