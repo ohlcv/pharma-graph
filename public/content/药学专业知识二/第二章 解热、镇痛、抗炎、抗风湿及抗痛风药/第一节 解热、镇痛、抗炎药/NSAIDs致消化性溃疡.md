@@ -5,6 +5,11 @@ data:
   essence: concept
   field: pharmacology
   tier: management
+
+  tags:
+    - NSAIDs
+    - 不良反应
+    - 消化性溃疡
   location:
     book: 药学专业知识二
     chapter: 第二章 解热、镇痛、抗炎、抗风湿及抗痛风药

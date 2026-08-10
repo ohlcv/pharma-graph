@@ -5,6 +5,11 @@ data:
   essence: module
   field: pharmacology
   tier: drug
+
+  tags:
+    - DMARDs
+    - 抗风湿药
+    - 免疫抑制剂
   location:
     book: 药学专业知识二
     chapter: 第二章 解热、镇痛、抗炎、抗风湿及抗痛风药

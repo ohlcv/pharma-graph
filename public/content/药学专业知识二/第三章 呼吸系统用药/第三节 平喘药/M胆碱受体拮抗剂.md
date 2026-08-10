@@ -5,6 +5,11 @@ data:
   essence: module
   field: pharmacology
   tier: drug
+
+  tags:
+    - 抗胆碱能
+    - 平喘药
+    - M3拮抗剂
   location:
     book: 药学专业知识二
     chapter: 第三章 呼吸系统用药

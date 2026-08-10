@@ -5,6 +5,11 @@ data:
   essence: module
   field: pharmacology
   tier: drug
+
+  tags:
+    - H1拮抗剂
+    - 抗过敏
+    - 平喘药
   location:
     book: 药学专业知识二
     chapter: 第三章 呼吸系统用药

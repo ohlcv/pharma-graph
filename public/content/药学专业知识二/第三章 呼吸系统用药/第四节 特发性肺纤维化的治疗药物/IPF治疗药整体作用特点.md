@@ -5,6 +5,10 @@ data:
   essence: concept
   field: pharmacology
   tier: management
+
+  tags:
+    - IPF
+    - 抗纤维化
   location:
     book: 药学专业知识二
     chapter: 第三章 呼吸系统用药

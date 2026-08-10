@@ -4,6 +4,7 @@ data:
   label: NSAIDs 致消化性溃疡
   essence: notion
   field: pharmacology
+  tier: service
   location:
     book: 药学专业知识二
     chapter: 第二章 解热、镇痛、抗炎、抗风湿及抗痛风药

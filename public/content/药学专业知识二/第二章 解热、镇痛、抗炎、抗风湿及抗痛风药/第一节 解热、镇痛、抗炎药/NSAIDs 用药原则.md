@@ -4,6 +4,12 @@ data:
   label: NSAIDs 用药原则
   essence: notion
   field: pharmacology
+  tier: service
+
+  tags:
+    - NSAIDs
+    - 临床应用
+    - 用药原则
   location:
     book: 药学专业知识二
     chapter: 第二章 解热、镇痛、抗炎、抗风湿及抗痛风药
