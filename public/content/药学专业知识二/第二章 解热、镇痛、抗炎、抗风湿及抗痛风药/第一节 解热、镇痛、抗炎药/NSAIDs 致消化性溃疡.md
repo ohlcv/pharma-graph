@@ -1,6 +1,6 @@
 ---
 data:
-  id: nsaids-gi-ulcer
+  id: notion-nsaids-gi-ulcer
   label: NSAIDs 致消化性溃疡
   essence: notion
   field: pharmacology

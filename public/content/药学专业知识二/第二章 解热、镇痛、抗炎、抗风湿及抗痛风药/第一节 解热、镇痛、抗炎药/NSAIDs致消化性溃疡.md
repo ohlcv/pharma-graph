@@ -1,6 +1,6 @@
 ---
 data:
-  id: nsaid-gi-injury
+  id: concept-nsaid-gi-injury
   label: NSAIDs 致消化性溃疡
   essence: concept
   field: pharmacology

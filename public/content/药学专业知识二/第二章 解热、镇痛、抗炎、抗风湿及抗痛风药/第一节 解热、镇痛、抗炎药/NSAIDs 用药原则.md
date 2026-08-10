@@ -1,6 +1,6 @@
 ---
 data:
-  id: nsaids-principles
+  id: notion-nsaids-principles
   label: NSAIDs 用药原则
   essence: notion
   field: pharmacology

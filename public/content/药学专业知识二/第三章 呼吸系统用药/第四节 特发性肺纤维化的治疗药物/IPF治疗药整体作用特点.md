@@ -1,6 +1,6 @@
 ---
 data:
-  id: ipf-drugs-overview
+  id: concept-ipf-drugs-overview
   label: IPF 治疗药整体作用特点
   essence: concept
   field: pharmacology

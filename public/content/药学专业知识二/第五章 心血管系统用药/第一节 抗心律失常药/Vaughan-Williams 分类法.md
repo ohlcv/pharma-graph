@@ -1,6 +1,6 @@
 ---
 data:
-  id: vaughan-williams-classification
+  id: concept-vaughan-williams-classification
   label: Vaughan-Williams 分类法
   essence: concept
   field: pharmacology

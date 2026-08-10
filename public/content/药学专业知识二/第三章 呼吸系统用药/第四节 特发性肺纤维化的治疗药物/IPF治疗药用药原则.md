@@ -1,6 +1,6 @@
 ---
 data:
-  id: ipf-use-principles
+  id: concept-ipf-use-principles
   label: IPF 治疗药用药原则
   essence: concept
   field: pharmacology

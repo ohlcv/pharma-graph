@@ -1,6 +1,6 @@
 ---
 data:
-  id: ppi-clopidogrel-interaction
+  id: concept-ppi-clopidogrel-interaction
   label: PPI 与氯吡格雷相互作用
   essence: concept
   field: pharmacology

@@ -1,6 +1,6 @@
 ---
 data:
-  id: antacid-vs-antisecretory
+  id: concept-antacid-vs-antisecretory
   label: 抗酸药 vs 抑酸药
   essence: concept
   field: pharmacology

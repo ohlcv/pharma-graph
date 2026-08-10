@@ -4,7 +4,7 @@ data:
   label: PD 核心病理
   essence: module
   field: pharmacology
-  tier: foundation
+  tier: basic
   location:
     book: 药学专业知识二
     chapter: 第一章 精神与中枢神经系统用药

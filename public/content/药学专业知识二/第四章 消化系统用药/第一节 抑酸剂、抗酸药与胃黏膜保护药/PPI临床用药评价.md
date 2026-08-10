@@ -1,6 +1,6 @@
 ---
 data:
-  id: ppi-clinical
+  id: concept-ppi-clinical
   label: PPI 临床用药评价
   essence: concept
   field: pharmacology

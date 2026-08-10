@@ -1,6 +1,6 @@
 ---
 data:
-  id: nsaids-use-principles
+  id: concept-nsaids-use-principles
   label: NSAIDs 用药原则
   essence: concept
   field: pharmacology
