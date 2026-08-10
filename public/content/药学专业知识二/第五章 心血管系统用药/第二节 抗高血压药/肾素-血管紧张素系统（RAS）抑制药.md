@@ -39,7 +39,7 @@ data:
     - target: renin-inhibitor
       type: relates
       reason: 肾素抑制剂是RAS抑制药下属的第三亚类
-    - target: arni
+    - target: arni-module
       type: relates
       reason: ARNI是RAS抑制药下属的第四亚类
 ---

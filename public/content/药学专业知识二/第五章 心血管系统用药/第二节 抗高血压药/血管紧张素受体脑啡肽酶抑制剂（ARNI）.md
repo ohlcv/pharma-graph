@@ -1,6 +1,6 @@
 ---
 data:
-  id: arni
+  id: arni-module
   label: 血管紧张素受体脑啡肽酶抑制剂（ARNI）
   essence: module
   field: pharmacology
