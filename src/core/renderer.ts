@@ -434,6 +434,8 @@ export class Renderer {
     resolveOverlaps();
     this.currentLayoutInstance = layoutInstance;
     layoutInstance.run();
+    // Run again after layout settles — nodes may have shifted to overlapping positions
+    resolveOverlaps();
   }
 
   currentLayoutName(): string {
