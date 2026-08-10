@@ -21,7 +21,7 @@ edges_out:
   - target: ppis
     type: relates
     reason: PPI 通过 CYP2C19 影响氯吡格雷
-  - target: ppi-clinical
+  - target: concept-ppi-clinical
     type: describes
     reason: 此概念补充 PPI 临床评价中关键相互作用
 ---

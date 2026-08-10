@@ -22,10 +22,10 @@ edges_out:
   - target: ppis
     type: describes
     reason: 此概念专门评价 PPI 临床要点
-  - target: ppi-clopidogrel-interaction
+  - target: concept-ppi-clopidogrel-interaction
     type: relates
     reason: 氯吡格雷相互作用是 PPI 关键临床考点
-  - target: hp-eradication-quadruple
+  - target: concept-hp-eradication-quadruple
     type: relates
     reason: HP 四联疗法必含 PPI
   - target: zollinger-ellison

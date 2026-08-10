@@ -25,7 +25,7 @@ edges_out:
   - target: ppis
     type: describes
     reason: 抑酸药是对因治疗
-  - target: anti-secretory-use-principles
+  - target: concept-anti-secretory-use-principles
     type: relates
     reason: 抑酸药用药原则
   - target: peptic-ulcer-disease

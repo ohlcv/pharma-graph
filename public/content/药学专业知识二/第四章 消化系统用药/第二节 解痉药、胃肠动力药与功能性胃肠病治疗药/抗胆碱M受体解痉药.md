@@ -38,9 +38,9 @@ edges_out:
   - target: hyoscine-butylbromide
     type: contains
     reason: 丁溴东莨菪碱外周高选择性代表
-    - target: belladonna
-      type: contains
-      reason: 颠茄是天然植物来源
+  - target: belladonna
+    type: contains
+    reason: 颠茄是天然植物来源
 ---
 
 # 抗胆碱 M 受体解痉药
