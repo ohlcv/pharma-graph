@@ -21,7 +21,7 @@ data:
     - target: cox-isoform-function-y2
       type: mechanism
       reason: COX-1 抑制削弱胃黏膜屏障是致病核心
-    - target: selective-cox2-inhibitors-y2
+    - target: cox2-inhibitors
       type: relates
       reason: COX-2 选择性抑制可降低胃肠风险
     - target: aspirin

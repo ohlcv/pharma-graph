@@ -12,8 +12,8 @@ data:
     short: NSAIDs 选药原则以 COX 选择性为核心：非选择性药物胃肠道风险高，选择性药物心血管风险高。
     full: NSAIDs 用药原则：按 COX 选择性分为非选择性（胃肠道风险高）和选择性 COX-2 抑制剂（心血管风险高）。选药原则：轻度疼痛/发热首选对乙酰氨基酚；需抗炎时首选布洛芬等芳基丙酸类；胃溃疡高危人群选选择性 COX-2 抑制剂或联用 PPI；心血管高危人群避免选择性 COX-2 抑制剂；肾功能不全/老年人避免非选择性 NSAIDs；阿司匹林哮喘患者避免所有 NSAIDs。通用原则：不联用两种 NSAIDs，定期监测肝肾功能。
   edges_out:
-    - target: acetaminophen
-      type: related
+    - target: paracetamol
+      type: relates
       reason: 对乙酰氨基酚是轻度疼痛/发热的首选
 ---
 

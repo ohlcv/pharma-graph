@@ -15,10 +15,7 @@ data:
   summary:
     short: NSAIDs 抑制胃黏膜 COX-1 导致保护屏障削弱，表现为上腹不适、恶心，严重者可致消化性溃疡、出血甚至穿孔。
     full: NSAIDs 通过抑制胃黏膜 COX-1，削弱黏膜保护屏障（减少前列腺素介导的黏液和碳酸氢盐分泌、黏膜血流），引发从黏膜糜烂到消化性溃疡、出血、穿孔的系列损伤。非选择性 COX 抑制剂风险最高。预防措施：高危人群联用质子泵抑制剂（PPI）或米索前列醇；选用选择性 COX-2 抑制剂；餐后服用。
-  edges_out:
-    - target: nsaids-non-selective
-      type: related
-      reason: 非选择性 COX 抑制剂是消化性溃疡的主要风险来源
+  edges_out: []
 ---
 
 # NSAIDs 致消化性溃疡

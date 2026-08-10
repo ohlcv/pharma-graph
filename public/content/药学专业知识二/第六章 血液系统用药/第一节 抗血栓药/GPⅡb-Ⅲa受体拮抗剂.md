@@ -23,12 +23,6 @@ data:
     - target: antiplatelet-drugs-thrombus
       type: part_of
       reason: GPⅡb/Ⅲa拮抗剂是抗血小板药一类
-    - target: abciximab
-      type: contains
-      reason: 阿昔单抗是不可逆代表
-    - target: tirofiban
-      type: contains
-      reason: 替罗非班是常用可逆代表
 ---
 
 # GPⅡb/Ⅲa受体拮抗剂

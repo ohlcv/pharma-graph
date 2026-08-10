@@ -29,9 +29,6 @@ data:
     - target: ticagrelor
       type: contains
       reason: 替格瑞洛是可逆代表
-    - target: ticlopidine
-      type: contains
-      reason: 噻氯匹定是老一代代表
 ---
 
 # P2Y₁₂受体拮抗剂
