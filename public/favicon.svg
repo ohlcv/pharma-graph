@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+  <!-- 苯环外六角轮廓 -->
+  <polygon points="16,4 26,10 26,22 16,28 6,22 6,10"
+           fill="none" stroke="url(#g)" stroke-width="2"
+           stroke-linejoin="round" stroke-linecap="round"/>
+  <!-- 苯环三条内双键（Kekulé 式三条交叉线） -->
+  <g stroke="url(#g)" stroke-width="1.5" stroke-linecap="round" opacity="0.7">
+    <line x1="16" y1="4"  x2="16" y2="28"/>
+    <line x1="6"  y1="10" x2="26" y2="22"/>
+    <line x1="6"  y1="22" x2="26" y2="10"/>
+  </g>
+  <!-- 六个原子圆点（六角顶点） -->
+  <g fill="url(#g)">
+    <circle cx="16" cy="4"  r="1.9"/>
+    <circle cx="26" cy="10" r="1.9"/>
+    <circle cx="26" cy="22" r="1.9"/>
+    <circle cx="16" cy="28" r="1.9"/>
+    <circle cx="6"  cy="22" r="1.9"/>
+    <circle cx="6"  cy="10" r="1.9"/>
+  </g>
+</svg>
