@@ -23,9 +23,6 @@ edges_out:
   - target: antispasmodics
     type: part_of
     reason: 抗胆碱 M 受体药是解痉药第一亚类
-  - target: gi-neuromotor-regulation
-    type: mechanism
-    reason: M 受体阻断
   - target: atropine
     type: contains
     reason: 阿托品是经典代表

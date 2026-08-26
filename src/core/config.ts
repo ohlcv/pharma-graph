@@ -146,7 +146,6 @@ export const EDGE_TYPE_STYLE: Record<string, { color: string; lineStyle: string;
     // 结构语义（知识组织）
     contains: { color: '#95a3b8', lineStyle: 'solid', arrow: 'triangle' },
     part_of: { color: '#4a90e2', lineStyle: 'solid', arrow: 'triangle' },
-    describes: { color: '#f39c12', lineStyle: 'dashed', arrow: 'none' },
     specializes: { color: '#27ae60', lineStyle: 'dotted', arrow: 'triangle' },
     default: { color: '#bdc3c7', lineStyle: 'solid', arrow: 'none' },
   };
@@ -173,7 +172,6 @@ export const EDGE_TYPE_LABEL: Record<EdgeType, string> = {
   // 结构语义（知识组织）
   contains: '包含',
   part_of: '属于',
-  describes: '描述',
   specializes: '专治',
 };
 

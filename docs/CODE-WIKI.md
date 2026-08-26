@@ -266,7 +266,7 @@ graph-events/highlight-engine/detail-panel/search 等模块接管交互
 - **设计原则**：视觉维度与知识语义一一对应——essence→形状（"这是什么"）、field→边框色（"哪门学科"）、tier→填充色（"在哪一层"）。
 
 #### [edge-types.ts](../src/core/edge-types.ts)
-- **职责**：边类型词汇表的 SSoT（issue #9）。导出 `EDGE_TYPES` readonly tuple（has/isa/activates/inhibits/mechanism/metabolizes/treats/causes/interacts/contraindicates/prerequisite/relates/sibling/contains/part_of/describes/specializes）、`EdgeType` 类型、`DEFAULT_EDGE_TYPE`（`'relates'`）、`isEdgeType()` 类型守卫。
+- **职责**：边类型词汇表的 SSoT（issue #9）。导出 `EDGE_TYPES` readonly tuple（has/isa/activates/inhibits/mechanism/metabolizes/treats/causes/interacts/contraindicates/prerequisite/relates/sibling/contains/part_of/specializes）、`EdgeType` 类型、`DEFAULT_EDGE_TYPE`（`'relates'`）、`isEdgeType()` 类型守卫。
 - **设计要点**：新增边类型只需改这一个文件，validator/legend/renderer 全部派生自此。
 
 #### [renderer.ts](../src/core/renderer.ts)
