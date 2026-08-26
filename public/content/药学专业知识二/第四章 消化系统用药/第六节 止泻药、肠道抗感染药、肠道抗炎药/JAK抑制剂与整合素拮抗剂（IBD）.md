@@ -23,13 +23,13 @@ edges_out:
     type: isa
     reason: 属 4.6 节肠道抗炎药（第三亚类）第五大类（合并）
   - target: upadacitinib
-    type: contains
+    type: has
     reason: 乌帕替尼是 JAK1 抑制剂代表
   - target: tofacitinib-ibd
-    type: contains
+    type: has
     reason: 托法替尼是 JAK 抑制剂代表
   - target: vedolizumab-ibd
-    type: contains
+    type: has
     reason: 维得利珠单抗是整合素 α4β7 拮抗剂代表
 ---
 

@@ -17,10 +17,10 @@ data:
     full: EPO 模拟肽（EPO Mimetic Peptides）是模拟 EPO 受体的口服肽类红细胞生成刺激剂。代表药罗米司亭，每周口服 1 次。
   edges_out:
     - target: erythropoiesis-stimulating-agents
-      type: part_of
+      type: isa
       reason: EPO 模拟肽是 ESAs 第二亚类
     - target: romiplostim
-      type: contains
+      type: has
       reason: 罗米司亭是 EPO 模拟肽代表
 ---
 

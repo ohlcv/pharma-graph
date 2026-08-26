@@ -20,16 +20,16 @@ data:
     full: 维生素K类（Vitamin K）是肝脏γ-羧化酶的辅酶，参与凝血因子Ⅱ、Ⅶ、Ⅸ、Ⅹ及抗凝蛋白C、蛋白S的合成与活化，维持正常凝血功能。代表药：① 维生素K₁（植物甲萘醌，脂溶性，注射用于严重出血）；② 维生素K₄（甲萘氢醌，水溶性，口服）；③ 甲萘醌（维生素K₃，合成水溶性）。
   edges_out:
     - target: hemostatic-drugs-overview
-      type: part_of
+      type: isa
       reason: 维生素K类是促凝血药的一类
     - target: vitamin-k1
-      type: contains
+      type: has
       reason: 维生素K₁是注射用脂溶性维生素K
     - target: vitamin-k4
-      type: contains
+      type: has
       reason: 维生素K₄是口服水溶性维生素K
     - target: menadione
-      type: contains
+      type: has
       reason: 甲萘醌是合成维生素K₃
 ---
 

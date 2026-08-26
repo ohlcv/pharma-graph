@@ -127,7 +127,7 @@ export const TIER_LABEL: Record<string, string> = {
 export const EDGE_TYPE_STYLE: Record<string, { color: string; lineStyle: string; arrow: string }> =
   {
     // 结构与组成
-    has: { color: '#95a5a6', lineStyle: 'solid', arrow: 'none' },
+    has: { color: '#95a3b8', lineStyle: 'solid', arrow: 'triangle' },
     isa: { color: '#4a90e2', lineStyle: 'solid', arrow: 'triangle' },
     // 药理机制
     activates: { color: '#27ae60', lineStyle: 'solid', arrow: 'triangle' },
@@ -144,8 +144,6 @@ export const EDGE_TYPE_STYLE: Record<string, { color: string; lineStyle: string;
     relates: { color: '#7f8c8d', lineStyle: 'dashed', arrow: 'none' },
     sibling: { color: '#16a085', lineStyle: 'dotted', arrow: 'none' },
     // 结构语义（知识组织）
-    contains: { color: '#95a3b8', lineStyle: 'solid', arrow: 'triangle' },
-    part_of: { color: '#4a90e2', lineStyle: 'solid', arrow: 'triangle' },
     specializes: { color: '#27ae60', lineStyle: 'dotted', arrow: 'triangle' },
     default: { color: '#bdc3c7', lineStyle: 'solid', arrow: 'none' },
   };
@@ -170,8 +168,6 @@ export const EDGE_TYPE_LABEL: Record<EdgeType, string> = {
   relates: '相关',
   sibling: '兄弟',
   // 结构语义（知识组织）
-  contains: '包含',
-  part_of: '属于',
   specializes: '专治',
 };
 

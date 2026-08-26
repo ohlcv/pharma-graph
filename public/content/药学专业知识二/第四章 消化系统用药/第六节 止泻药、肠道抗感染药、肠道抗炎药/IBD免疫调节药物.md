@@ -23,16 +23,16 @@ edges_out:
     type: isa
     reason: 属 4.6 节肠道抗炎药（第三亚类）第三大类
   - target: azathioprine
-    type: contains
+    type: has
     reason: 硫唑嘌呤是 IBD 代表
   - target: mercaptopurine
-    type: contains
+    type: has
     reason: 巯嘌呤是 IBD 代表
   - target: methotrexate-ibd
-    type: contains
+    type: has
     reason: 甲氨蝶呤是 IBD 代表
   - target: cyclosporine
-    type: contains
+    type: has
     reason: 环孢素是重度 UC 抢救用药
 ---
 

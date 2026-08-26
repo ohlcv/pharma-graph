@@ -21,7 +21,7 @@ data:
     full: GPⅡb/Ⅲa受体拮抗剂是抗血小板的强效药物，作用于血小板聚集的最终共同通路。代表药：阿昔单抗（不可逆，**存在免疫原性**）、依替巴肽（可逆）、替罗非班（可逆）。
   edges_out:
     - target: antiplatelet-drugs-thrombus
-      type: part_of
+      type: isa
       reason: GPⅡb/Ⅲa拮抗剂是抗血小板药一类
 ---
 

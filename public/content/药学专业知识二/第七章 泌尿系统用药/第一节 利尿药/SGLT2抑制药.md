@@ -25,13 +25,13 @@ data:
       type: isa
       reason: SGLT2抑制药属于利尿药分类
     - target: empagliflozin
-      type: contains
+      type: has
       reason: 恩格列净是SGLT2抑制药代表
     - target: dapagliflozin
-      type: contains
+      type: has
       reason: 达格列净是SGLT2抑制药代表
     - target: canagliflozin
-      type: contains
+      type: has
       reason: 卡格列净是SGLT2抑制药代表
 ---
 

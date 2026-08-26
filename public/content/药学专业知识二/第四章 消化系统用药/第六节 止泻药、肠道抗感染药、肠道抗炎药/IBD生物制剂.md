@@ -23,19 +23,19 @@ edges_out:
     type: isa
     reason: 属 4.6 节肠道抗炎药（第三亚类）第四大类
   - target: infliximab-ibd
-    type: contains
+    type: has
     reason: 英夫利昔单抗是 IBD TNF-α 一线
   - target: adalimumab-ibd
-    type: contains
+    type: has
     reason: 阿达木单抗是 TNF-α 代表
   - target: golimumab
-    type: contains
+    type: has
     reason: 戈利木单抗是 TNF-α 代表
   - target: certolizumab
-    type: contains
+    type: has
     reason: 培塞利珠单抗是 TNF-α 代表
   - target: vedolizumab-ibd
-    type: contains
+    type: has
     reason: 维得利珠单抗是整合素 α4β7 代表
 ---
 

@@ -26,19 +26,19 @@ data:
       type: isa
       reason: PDE-5抑制剂是治疗ED的药物分类
     - target: sildenafil
-      type: contains
+      type: has
       reason: 西地那非是PDE-5抑制剂代表
     - target: vardenafil
-      type: contains
+      type: has
       reason: 伐地那非是PDE-5抑制剂代表
     - target: tadalafil
-      type: contains
+      type: has
       reason: 他达拉非是PDE-5抑制剂代表
     - target: avanafil
-      type: contains
+      type: has
       reason: 阿伐那非是PDE-5抑制剂代表
     - target: aidenafil
-      type: contains
+      type: has
       reason: 爱地那非是PDE-5抑制剂代表
     - target: erectile-dysfunction-disease
       type: treats

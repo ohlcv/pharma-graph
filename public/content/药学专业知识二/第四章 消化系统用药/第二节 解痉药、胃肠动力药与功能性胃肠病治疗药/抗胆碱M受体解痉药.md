@@ -21,22 +21,22 @@ data:
     full: M 胆碱阻断伴全身抗胆碱效应：口干、扩瞳、心率↑、尿潴留、便秘、中枢兴奋；口诀"口干舌燥心突突，憋屎憋尿眼模糊"。
 edges_out:
   - target: antispasmodics
-    type: part_of
+    type: isa
     reason: 抗胆碱 M 受体药是解痉药第一亚类
   - target: atropine
-    type: contains
+    type: has
     reason: 阿托品是经典代表
   - target: anisodamine
-    type: contains
+    type: has
     reason: 山莨菪碱外周解痉代表
   - target: scopolamine
-    type: contains
+    type: has
     reason: 东莨菪碱中枢抑制代表
   - target: hyoscine-butylbromide
-    type: contains
+    type: has
     reason: 丁溴东莨菪碱外周高选择性代表
   - target: belladonna
-    type: contains
+    type: has
     reason: 颠茄是天然植物来源
 ---
 

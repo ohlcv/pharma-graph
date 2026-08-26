@@ -21,13 +21,13 @@ data:
     full: P2Y₁₂受体拮抗剂阻断血小板ADP受体，抑制血小板聚集。三药对比：噻氯匹定（不可逆，前药）、氯吡格雷（不可逆，前药）、替格瑞洛（可逆，直接拮抗，起效更快）。
   edges_out:
     - target: antiplatelet-drugs-thrombus
-      type: part_of
+      type: isa
       reason: P2Y₁₂拮抗剂是抗血小板药核心类别
     - target: clopidogrel
-      type: contains
+      type: has
       reason: 氯吡格雷是前药代表
     - target: ticagrelor
-      type: contains
+      type: has
       reason: 替格瑞洛是可逆代表
 ---
 

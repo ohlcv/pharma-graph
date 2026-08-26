@@ -18,7 +18,7 @@ data:
     full: JAK 激酶抑制剂是口服小分子靶向合成 DMARDs（tsDMARDs），通过抑制 JAK 激酶阻断细胞因子信号通路而发挥抗炎作用。代表药：托法替布、巴瑞替尼。用于类风湿关节炎、银屑病关节炎等。不良反应：感染风险升高（用药前需筛查结核/乙肝）、血栓风险升高（需关注深静脉血栓和肺栓塞）、血脂升高、肝功能异常。活动性感染、血栓病史患者慎用。
   edges_out:
     - target: biodmards
-      type: part_of
+      type: isa
       reason: JAK 激酶抑制剂属于 tsDMARDs，是 bDMARDs/tsDMARDs 的重要组成
 ---
 

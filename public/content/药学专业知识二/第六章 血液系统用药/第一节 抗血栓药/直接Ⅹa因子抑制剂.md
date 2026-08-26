@@ -20,13 +20,13 @@ data:
     full: 直接Ⅹa因子抑制剂是DOAC的主体，包括利伐沙班、阿哌沙班、艾多沙班。共同特征：与CYP3A4和P-gp强效抑制剂合用血药浓度升高。
   edges_out:
     - target: doacs
-      type: part_of
+      type: isa
       reason: 直接Ⅹa因子抑制剂是DOAC主体
     - target: rivaroxaban
-      type: contains
+      type: has
       reason: 利伐沙班是Ⅹa抑制剂代表
     - target: apixaban
-      type: contains
+      type: has
       reason: 阿哌沙班是Ⅹa抑制剂代表
 ---
 

@@ -19,10 +19,10 @@ data:
     full: 传统合成改善病情抗风湿药（csDMARDs）起效慢，需3~6个月达最大疗效，可延缓关节骨破坏，是类风湿关节炎等风湿免疫病的一线基础用药。代表药：甲氨蝶呤（锚定药）、来氟米特、柳氮磺吡啶、羟氯喹、金诺芬、双醋瑞因。
   edges_out:
     - target: methotrexate
-      type: contains
+      type: has
       reason: 甲氨蝶呤是 csDMARDs 锚定药
     - target: leflunomide
-      type: contains
+      type: has
       reason: 来氟米特是 csDMARDs 代表药
 ---
 

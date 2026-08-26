@@ -24,10 +24,10 @@ data:
     full: 抗IL-5单克隆抗体靶向结合 IL-5，抑制嗜酸粒细胞的成熟、活化、招募，用于嗜酸粒细胞升高的重度哮喘（常规治疗控制不佳）。代表药：美泊利珠单抗（Mepolizumab）皮下注射，每 4 周一次。记忆口诀：我美丽，很嗜酸（美泊利珠单抗，"美丽"谐音，用于嗜酸粒细胞升高）。
   edges_out:
     - target: antiallergic-asthma-drugs
-      type: part_of
+      type: isa
       reason: 抗IL-5单抗是抗过敏药亚类
     - target: mepolizumab
-      type: contains
+      type: has
       reason: 美泊利珠单抗是抗IL-5代表
 ---
 

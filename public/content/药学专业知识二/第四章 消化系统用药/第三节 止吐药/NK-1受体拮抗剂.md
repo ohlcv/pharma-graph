@@ -22,13 +22,13 @@ edges_out:
     type: isa
     reason: NK-1 受体拮抗剂属于止吐药大类
   - target: aprepitant
-    type: contains
+    type: has
     reason: 阿瑞匹坦是 NK-1 口服代表
   - target: fosaprepitant
-    type: contains
+    type: has
     reason: 福沙匹坦是 NK-1 静脉前药
   - target: netupitant
-    type: contains
+    type: has
     reason: 奈妥匹坦是 NK-1 代表
   - target: 5ht3-receptor-antagonists
     type: sibling

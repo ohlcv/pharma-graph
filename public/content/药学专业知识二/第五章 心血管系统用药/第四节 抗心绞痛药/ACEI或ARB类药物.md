@@ -21,7 +21,7 @@ data:
     full: ACEI或ARB通过抑制血管紧张素转换酶（ACE）或阻断血管紧张素Ⅱ受体，改善心肌重构、降低血压、减轻心脏负荷、改善心功能，从而降低心血管事件风险和全因死亡率。
   edges_out:
     - target: antianginal-drugs
-      type: part_of
+      type: isa
       reason: ACEI或ARB用于改善预后
 ---
 

@@ -17,7 +17,8 @@
  */
 export const EDGE_TYPES = [
   // 结构与组成
-  'has', 'isa',
+  'has',        // 包含：物理组成（整体→部分）或分类成员（模块→药物）
+  'isa',        // 属于：层级归属（子→父）或分类归属（药物→分类）
   // 药理机制
   'activates', 'inhibits', 'mechanism', 'metabolizes',
   // 临床关联
@@ -25,8 +26,6 @@ export const EDGE_TYPES = [
   // 学习路径
   'prerequisite', 'relates', 'sibling',
   // 结构语义（知识组织）
-  'contains',   // 模块/分类节点包含成员药物
-  'part_of',    // 药物/概念属于某个分类
   'specializes', // 药物/概念专用于某临床场景
 ] as const;
 

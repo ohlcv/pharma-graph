@@ -21,7 +21,7 @@ data:
     full: SGLT-2抑制剂（达格列净、恩格列净）通过抑制肾小管葡萄糖重吸收，促进尿糖排泄，同时伴有排钠作用。降低血糖、血压、体重，改善心衰预后，降低心血管死亡与心衰住院风险。
   edges_out:
     - target: cardiac-protection
-      type: part_of
+      type: isa
       reason: SGLT-2抑制剂是心衰保护心脏药一类
 ---
 

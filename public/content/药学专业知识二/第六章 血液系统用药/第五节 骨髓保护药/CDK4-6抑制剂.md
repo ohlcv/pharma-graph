@@ -25,13 +25,13 @@ data:
       type: isa
       reason: CDK4/6抑制剂属于骨髓保护药
     - target: trilaciclib
-      type: contains
+      type: has
       reason: 曲拉西利是CDK4/6抑制剂的骨髓保护代表
     - target: palbociclib
-      type: contains
+      type: has
       reason: 哌柏西利是CDK4/6抑制剂的抗肿瘤代表
     - target: ribociclib
-      type: contains
+      type: has
       reason: 瑞波西利是CDK4/6抑制剂的抗肿瘤代表
 ---
 

@@ -20,7 +20,7 @@ data:
     full: 毒毛花苷K为速效强心苷，静脉给药10~15分钟起效，是所有强心苷中起效最快者。以原型经肾脏排泄，蓄积性低。用于急性心力衰竭的紧急处理。
   edges_out:
     - target: cardiac-glycosides
-      type: part_of
+      type: isa
       reason: 毒毛花苷K是强心苷类代表药
 ---
 

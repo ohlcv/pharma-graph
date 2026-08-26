@@ -21,13 +21,13 @@ data:
     full: 血栓素A₂合成酶抑制剂通过抑制TXA₂合成减少血小板聚集，代表药：阿司匹林（小剂量不可逆抑制COX-1）、吲哚布芬（可逆性抑制COX-1）、奥扎格雷钠。
   edges_out:
     - target: antiplatelet-drugs-thrombus
-      type: part_of
+      type: isa
       reason: TXA₂合成酶抑制剂是抗血小板药一类
     - target: aspirin-thrombus
-      type: contains
+      type: has
       reason: 阿司匹林是代表药
     - target: indobufen
-      type: contains
+      type: has
       reason: 吲哚布芬是可逆性代表
 ---
 

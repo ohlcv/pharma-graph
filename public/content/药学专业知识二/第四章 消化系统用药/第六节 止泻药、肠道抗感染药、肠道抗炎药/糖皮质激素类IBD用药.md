@@ -22,13 +22,13 @@ edges_out:
     type: isa
     reason: 属 4.6 节肠道抗炎药（第三亚类）第二大类
   - target: budesonide-ibd
-    type: contains
+    type: has
     reason: 布地奈德是 IBD 局部用药代表
   - target: prednisone-ibd
-    type: contains
+    type: has
     reason: 泼尼松 IBD 全身用药
   - target: hydrocortisone-ibd
-    type: contains
+    type: has
     reason: 氢化可的松 IBD 全身用药
 ---
 

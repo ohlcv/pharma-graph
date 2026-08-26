@@ -18,7 +18,7 @@ data:
     full: IL-1 受体拮抗剂通过阻断白细胞介素-1（IL-1）受体而发挥作用，代表药为阿那白滞素。用于类风湿关节炎、自身炎症性疾病（如 cryopyrin 相关周期性综合征）。需每日皮下注射给药。不良反应：注射部位反应、感染风险升高（用药前需筛查结核/乙肝）。
   edges_out:
     - target: biodmards
-      type: part_of
+      type: isa
       reason: IL-1 受体拮抗剂是 bDMARDs 的代表类别
 ---
 
