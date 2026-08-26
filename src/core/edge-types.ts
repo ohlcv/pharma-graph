@@ -27,8 +27,7 @@ export const EDGE_TYPES = [
   // 结构语义（知识组织）
   'contains',   // 模块/分类节点包含成员药物
   'part_of',    // 药物/概念属于某个分类
-  'has_couplet', // 药物关联其记忆口诀节点
-  'describes',  // 口诀/评价节点描述其关联药物
+  'describes',  // 用药原则/总论/评价节点描述其关联药物分类
   'specializes', // 药物/概念专用于某临床场景
 ] as const;
 
