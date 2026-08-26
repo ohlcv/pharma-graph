@@ -3,22 +3,86 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>药学家族关系星图 — 药学专业知识可视化</title>
-  <meta name="description" content="基于药学专业知识的交互式知识图谱，支持节点探索、关系推理与漫游学习。">
+
+  <!-- ── Primary SEO ───────────────────────────────────────────── -->
+  <title>药学知识图谱 | 执业药师考试 · 药学专业知识一·二·综 可视化学习平台</title>
+  <meta name="description" content="药学家族关系星图：基于执业药师考试大纲（药学专业知识一、药学专业知识二、药学综合知识与技能）构建的交互式知识图谱，覆盖药剂学、药理学、药物化学、药动学、临床用药等学科，支持节点搜索、关系推理、漫游学习与多种布局探索，助力系统记忆与备考。">
+  <meta name="keywords" content="药学知识图谱,执业药师,药学专业知识一,药学专业知识二,药学综合知识与技能,药剂学,药理学,药物化学,药动学,临床药学,药学可视化,执业药师考试,药学备考,药物关系图谱,知识星图,Pharma Knowledge Graph">
+  <meta name="author" content="meow">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
+  <link rel="canonical" href="https://www.pharma.ac.cn/">
 
   <!-- Open Graph -->
   <meta property="og:type"        content="website">
-  <meta property="og:title"       content="药学知识图谱">
-  <meta property="og:description"  content="基于药学专业知识的交互式知识图谱，支持节点探索、关系推理与漫游学习。">
-  <meta property="og:site_name"    content="药学知识图谱">
+  <meta property="og:url"         content="https://www.pharma.ac.cn/">
+  <meta property="og:title"       content="药学知识图谱 | 执业药师备考可视化学习平台">
+  <meta property="og:description"  content="交互式药学知识图谱：药剂学 / 药理学 / 药物化学 / 药动学 / 临床用药，支持漫游学习与关系推理。">
+  <meta property="og:site_name"    content="药学家族关系星图">
+  <meta property="og:locale"       content="zh_CN">
+  <meta property="og:image"        content="https://www.pharma.ac.cn/images/药学知识拓扑.png">
+  <meta property="og:image:type"   content="image/png">
+  <meta property="og:image:alt"    content="药学知识拓扑 — 药一 · 药二 · 药综三大模块关系图">
 
   <!-- Twitter Card -->
-  <meta name="twitter:card"        content="summary">
-  <meta name="twitter:title"       content="药学家族关系星图">
-  <meta name="twitter:description"  content="基于药学专业知识的交互式知识图谱，支持节点探索、关系推理与漫游学习。">
+  <meta name="twitter:card"        content="summary_large_image">
+  <meta name="twitter:title"       content="药学知识图谱 | 执业药师备考可视化学习">
+  <meta name="twitter:description" content="交互式药学知识图谱，支持漫游学习与关系推理">
+  <meta name="twitter:image"       content="https://www.pharma.ac.cn/images/药学知识拓扑.png">
+  <meta name="twitter:image:alt"   content="药学知识拓扑图">
 
   <!-- SVG Favicon: indigo→cyan 渐变三角形图腾 -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%236366f1'/><stop offset='100%25' stop-color='%2306b6d4'/></linearGradient></defs><polygon points='16,3 3,28 29,28' fill='url(%23g)'/></svg>">
+
+  <!-- ── JSON-LD Structured Data ────────────────────────────────── -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://www.pharma.ac.cn/#website",
+        "url": "https://www.pharma.ac.cn/",
+        "name": "药学家族关系星图",
+        "alternateName": "药学知识图谱 · Pharma Knowledge Graph",
+        "description": "基于执业药师考试大纲构建的交互式药学知识图谱，覆盖药剂学、药理学、药物化学、药动学、临床药学等学科。",
+        "inLanguage": "zh-CN",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://www.pharma.ac.cn/?q={search_term_string}",
+          "query-input": "required name=search_term_string"
+        }
+      },
+      {
+        "@type": "EducationalOrganization",
+        "@id": "https://www.pharma.ac.cn/#eduorg",
+        "name": "药学知识图谱",
+        "url": "https://www.pharma.ac.cn/",
+        "description": "面向执业药师考生与药学从业者的免费开放知识图谱学习平台",
+        "address": { "@type": "PostalAddress", "addressCountry": "CN" }
+      },
+      {
+        "@type": "LearningResource",
+        "@id": "https://www.pharma.ac.cn/#learningresource",
+        "name": "药学专业知识知识图谱",
+        "about": "Pharmaceutical Science",
+        "educationalLevel": "Professional certification",
+        "learningResourceType": "Knowledge Graph",
+        "inLanguage": "zh-CN",
+        "url": "https://www.pharma.ac.cn/",
+        "isPartOf": { "@id": "https://www.pharma.ac.cn/#website" },
+        "provider": { "@id": "https://www.pharma.ac.cn/#eduorg" },
+        "teaches": [
+          "药剂学", "药理学与毒理学", "药物化学", "药物动力学",
+          "临床药学", "药学综合知识与技能", "药物不良反应与安全用药"
+        ],
+        "audience": {
+          "@type": "Audience",
+          "audienceType": ["执业药师考生", "药学专业学生", "临床药师", "医药行业从业者"]
+        }
+      }
+    ]
+  }
+  </script>
 
 </head>
 <body>
@@ -225,6 +289,7 @@
           <svg class="sidebar-section__chevron open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
         <div class="sidebar-section__body" id="body-types">
+          <div class="sidebar-section__body-inner">
           <!-- 节点本质（形状 + 计数，动态） -->
           <div class="legend-block legend-section" data-section="legend-essence" data-section-state="open">
             <div class="legend-section__head" data-action="toggle-section" data-arg="legend-essence" aria-expanded="true" aria-controls="body-legend-essence">
@@ -232,8 +297,10 @@
               <svg class="sidebar-section__chevron open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </div>
             <div class="legend-section__body" id="body-legend-essence">
+              <div class="legend-section__body-inner">
               <div class="legend-grid legend-grid--2" id="legend-essence-grid">
                 <!-- 由 populateEssenceLegend() 动态填充 -->
+              </div>
               </div>
             </div>
           </div>
@@ -244,8 +311,10 @@
               <svg class="sidebar-section__chevron open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </div>
             <div class="legend-section__body" id="body-legend-field">
+              <div class="legend-section__body-inner">
               <div class="legend-grid" id="legend-field-grid">
                 <!-- 由 populateFieldLegend() 动态填充 -->
+              </div>
               </div>
             </div>
           </div>
@@ -256,8 +325,10 @@
               <svg class="sidebar-section__chevron open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </div>
             <div class="legend-section__body" id="body-legend-tier">
+              <div class="legend-section__body-inner">
               <div class="legend-grid legend-grid--2" id="legend-tier-grid">
                 <!-- 由 populateTierLegend() 动态填充 -->
+              </div>
               </div>
             </div>
           </div>
@@ -268,74 +339,13 @@
               <svg class="sidebar-section__chevron open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </div>
             <div class="legend-section__body" id="body-legend-edge">
+              <div class="legend-section__body-inner">
               <div class="legend-grid legend-grid--2" id="legend-edge-grid">
-                <div class="legend-edge-row" data-edge="has">
-                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#95a5a6" stroke-width="2"/></svg>
-                  <span class="legend-edge-row__label">包含</span>
-                  <span class="legend-edge-row__count" id="count-edge-has"></span>
-                </div>
-                <div class="legend-edge-row" data-edge="isa">
-                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#4a90e2" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#4a90e2"/></svg>
-                  <span class="legend-edge-row__label">属于</span>
-                  <span class="legend-edge-row__count" id="count-edge-isa"></span>
-                </div>
-                <div class="legend-edge-row" data-edge="activates">
-                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#27ae60" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#27ae60"/></svg>
-                  <span class="legend-edge-row__label">激动</span>
-                  <span class="legend-edge-row__count" id="count-edge-activates"></span>
-                </div>
-                <div class="legend-edge-row" data-edge="inhibits">
-                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#c0392b" stroke-width="2"/><line x1="24" y1="2" x2="26" y2="5" stroke="#c0392b" stroke-width="2"/><line x1="24" y1="8" x2="26" y2="5" stroke="#c0392b" stroke-width="2"/></svg>
-                  <span class="legend-edge-row__label">抑制</span>
-                  <span class="legend-edge-row__count" id="count-edge-inhibits"></span>
-                </div>
-                <div class="legend-edge-row" data-edge="mechanism">
-                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#e27c3e" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#e27c3e"/></svg>
-                  <span class="legend-edge-row__label">机制</span>
-                  <span class="legend-edge-row__count" id="count-edge-mechanism"></span>
-                </div>
-                <div class="legend-edge-row" data-edge="metabolizes">
-                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#8e44ad" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#8e44ad"/></svg>
-                  <span class="legend-edge-row__label">代谢</span>
-                  <span class="legend-edge-row__count" id="count-edge-metabolizes"></span>
-                </div>
-                <div class="legend-edge-row" data-edge="treats">
-                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#2ecc71" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#2ecc71"/></svg>
-                  <span class="legend-edge-row__label">治疗</span>
-                  <span class="legend-edge-row__count" id="count-edge-treats"></span>
-                </div>
-                <div class="legend-edge-row" data-edge="causes">
-                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#e74c3c" stroke-width="2"/><polygon points="26,5 21,2 21,8" fill="#e74c3c"/></svg>
-                  <span class="legend-edge-row__label">致因</span>
-                  <span class="legend-edge-row__count" id="count-edge-causes"></span>
-                </div>
-                <div class="legend-edge-row" data-edge="interacts">
-                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#f39c12" stroke-width="2" stroke-dasharray="4 3"/></svg>
-                  <span class="legend-edge-row__label">相互作用</span>
-                  <span class="legend-edge-row__count" id="count-edge-interacts"></span>
-                </div>
-                <div class="legend-edge-row" data-edge="contraindicates">
-                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#c0392b" stroke-width="2" stroke-dasharray="4 3"/></svg>
-                  <span class="legend-edge-row__label">禁忌</span>
-                  <span class="legend-edge-row__count" id="count-edge-contraindicates"></span>
-                </div>
-                <div class="legend-edge-row" data-edge="prerequisite">
-                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#9b59b6" stroke-width="2" stroke-dasharray="2 2"/><polygon points="26,5 21,2 21,8" fill="#9b59b6"/></svg>
-                  <span class="legend-edge-row__label">前置</span>
-                  <span class="legend-edge-row__count" id="count-edge-prerequisite"></span>
-                </div>
-                <div class="legend-edge-row" data-edge="relates">
-                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#7f8c8d" stroke-width="2" stroke-dasharray="4 3"/></svg>
-                  <span class="legend-edge-row__label">相关</span>
-                  <span class="legend-edge-row__count" id="count-edge-relates"></span>
-                </div>
-                <div class="legend-edge-row" data-edge="sibling">
-                  <svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="#16a085" stroke-width="2" stroke-dasharray="2 2"/></svg>
-                  <span class="legend-edge-row__label">兄弟</span>
-                  <span class="legend-edge-row__count" id="count-edge-sibling"></span>
-                </div>
+                <!-- 由 populateEdgeLegend() 动态填充 -->
+              </div>
               </div>
             </div>
+          </div>
           </div>
         </div>
       </div>
@@ -348,6 +358,7 @@
           <svg class="sidebar-section__chevron open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
         <div class="sidebar-section__body" id="body-stats">
+          <div class="sidebar-section__body-inner">
           <div class="stat-list">
             <div class="stat-card">
               <span class="stat-card__label">节点</span>
@@ -370,6 +381,7 @@
             <!-- §12.6: 文案必须与 DEFAULT_LAYOUT='euler' 同步 -->
             <span id="layout-desc" class="layout-info__desc">Euler — 基于图论力学的布局，优化边交叉和长度。</span>
           </div>
+          </div>
         </div>
       </div>
 
@@ -380,6 +392,7 @@
           <svg class="sidebar-section__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
         <div class="sidebar-section__body" id="body-params">
+          <div class="sidebar-section__body-inner">
           <div id="layout-params">
             <div id="layout-params-rows"></div>
             <div class="param-actions">
@@ -393,6 +406,7 @@
               </button>
             </div>
           </div>
+          </div>
         </div>
       </div>
 
@@ -403,6 +417,7 @@
           <svg class="sidebar-section__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
         <div class="sidebar-section__body" id="body-shortcuts">
+          <div class="sidebar-section__body-inner">
           <div class="shortcuts-list">
             <div class="shortcut-item"><span class="key">点击</span><span class="shortcut-item__label">选中节点</span></div>
             <div class="shortcut-item"><span class="key">右键</span><span class="shortcut-item__label">删除节点</span></div>
@@ -412,6 +427,7 @@
             <div class="shortcut-item"><span class="key">Del</span><span class="shortcut-item__label">删除选中</span></div>
             <div class="shortcut-item"><span class="key">Esc</span><span class="shortcut-item__label">重置视图</span></div>
             <div class="shortcut-item"><span class="key">Ctrl+A</span><span class="shortcut-item__label">全选</span></div>
+          </div>
           </div>
         </div>
       </div>
@@ -813,6 +829,101 @@
 
 <!-- BGM playlist -->
 <audio id="bgm" preload="none"></audio>
+
+<!-- ── <noscript>: 为搜索引擎爬虫 / 禁用 JS 用户提供可索引内容 ── -->
+<noscript>
+  <main style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:2rem;max-width:720px;margin:0 auto;color:#0f172a;line-height:1.7;">
+    <h1 style="font-size:2rem;margin-bottom:0.5rem;color:#4f46e5;">药学家族关系星图 · 药学知识图谱</h1>
+    <p style="color:#475569;font-size:1.05rem;">
+      基于<strong>执业药师考试大纲</strong>构建的交互式药学专业知识图谱，
+      覆盖<strong>药学专业知识一、药学专业知识二、药学综合知识与技能</strong>三大科目，
+      收录大量药学知识节点与关联关系，系统化呈现学科体系。
+    </p>
+
+    <section style="margin-top:2rem;">
+      <h2 style="color:#06b6d4;border-left:4px solid #06b6d4;padding-left:0.75rem;">📚 覆盖学科</h2>
+      <ul style="list-style:none;padding:0;">
+        <li style="padding:0.35rem 0;">• <strong>药学专业知识一</strong>：药剂学、药理学与毒理学、药物化学、药物动力学、生命药学</li>
+        <li style="padding:0.35rem 0;">• <strong>药学专业知识二</strong>：精神与中枢神经系统用药、解热镇痛抗炎药、呼吸系统、消化系统、心血管系统、内分泌系统、泌尿系统、抗肿瘤等临床常用药物</li>
+        <li style="padding:0.35rem 0;">• <strong>药学综合知识与技能</strong>：药学服务、处方审核、用药安全、常见疾病健康管理、慢性病管理、药物治疗管理</li>
+      </ul>
+    </section>
+
+    <section style="margin-top:2rem;">
+      <h2 style="color:#06b6d4;border-left:4px solid #06b6d4;padding-left:0.75rem;">💊 核心药名索引（部分）</h2>
+      <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.75rem;">
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">阿司匹林</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">对乙酰氨基酚</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">布洛芬</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">塞来昔布</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">吗啡</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">哌替啶</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">芬太尼</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">纳洛酮</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">卡马西平</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">丙戊酸钠</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">苯妥英钠</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">地西泮</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">氟西汀</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">帕罗西汀</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">舍曲林</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">文拉法辛</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">米氮平</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">氯丙嗪</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">氯氮平</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">奥氮平</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">利培酮</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">喹硫平</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">碳酸锂</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">左旋多巴</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">苄丝肼</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">普拉克索</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">司来吉兰</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">恩他卡朋</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">苯海索</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">金刚烷胺</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">呋塞米</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">氢氯噻嗪</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">螺内酯</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">氨苯蝶啶</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">甘露醇</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">达格列净</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">恩格列净</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">西地那非</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">他达拉非</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">别嘌醇</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">非布司他</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">秋水仙碱</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">苯溴马隆</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">甲氨蝶呤</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">柳氮磺吡啶</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">羟氯喹</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">阿达木单抗</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">托法替布</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">胰岛素</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">二甲双胍</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">左甲状腺素</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">甲巯咪唑</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">丙硫氧嘧啶</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">双膦酸盐</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">泼尼松</span>
+        <span style="padding:0.25rem 0.65rem;background:#eef2ff;color:#4f46e5;border-radius:999px;font-size:0.875rem;">地塞米松</span>
+      </div>
+      <p style="color:#64748b;font-size:0.875rem;margin-top:1rem;">… 以及更多药学知识节点。请启用 JavaScript 以体验完整交互式知识图谱，支持节点搜索、关系推理、漫游学习与多种布局算法探索。</p>
+    </section>
+
+    <section style="margin-top:2rem;">
+      <h2 style="color:#06b6d4;border-left:4px solid #06b6d4;padding-left:0.75rem;">🎯 平台特色</h2>
+      <ul style="list-style:none;padding:0;">
+        <li style="padding:0.35rem 0;">✅ <strong>交互式知识图谱</strong>：基于 Cytoscape.js，支持缩放、拖拽、点击探索节点关联</li>
+        <li style="padding:0.35rem 0;">✅ <strong>关系推理</strong>：通过 isa / 治疗 / 抑制 / 激活 等 13 种关系类型展现药物机制</li>
+        <li style="padding:0.35rem 0;">✅ <strong>漫游学习</strong>：按教材顺序或层级依赖自动遍历节点，间隔可调</li>
+        <li style="padding:0.35rem 0;">✅ <strong>7 种布局算法</strong>：Euler、COSE、同心圆、环形、网格、Dagre、广度优先</li>
+        <li style="padding:0.35rem 0;">✅ <strong>多端适配</strong>：桌面端侧栏 + 移动端底部面板，大屏影院模式</li>
+      </ul>
+    </section>
+  </main>
+</noscript>
 
 <script type="module" src="/src/ui/main.ts"></script>
 </body>

@@ -1,0 +1,25 @@
+# ============================================================
+# 药学家族关系星图 · Pharma Knowledge Graph
+# robots.txt — 搜索引擎爬虫抓取规则
+# ============================================================
+
+User-agent: *
+Allow: /
+Disallow: /audio/
+Disallow: /diagnose.js
+Disallow: /full-diagnose.js
+
+# 允许主要搜索引擎爬虫
+User-agent: Googlebot
+Allow: /
+
+User-agent: Baiduspider
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Yandex
+Allow: /
+
+Sitemap: https://www.pharma.ac.cn/sitemap.xml
