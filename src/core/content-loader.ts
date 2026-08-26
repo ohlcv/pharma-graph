@@ -41,14 +41,13 @@ export async function loadContent(): Promise<LoadedContent> {
       // `,` (e.g. %2C for `,`) and returns the SPA fallback instead.
       // `#` and `?` are additionally encoded — encodeURI leaves them literal,
       // which would break URL semantics (fragment / query parsing).
-      // `+` is additionally encoded as %2B — production nginx decodes literal
-      // `+` as space in URL paths, causing 404 for files with `+` in names.
-      // Vite dev server resolves %2B correctly (verified), so this is safe.
+      // Files with ASCII `+` in names have been renamed to full-width `＋`
+      // (U+FF0B) because: production nginx decodes literal `+` as space → 404,
+      // and Vite dev server doesn't decode %2B → SPA fallback. Full-width
+      // `＋` is encoded by encodeURI to %EF%BC%8B, which both servers decode
+      // correctly (same as all other CJK characters in filenames).
       fetch('/content/' + rel.split('/').map(
-        (s) => encodeURI(s)
-          .replace(/#/g, '%23')
-          .replace(/\?/g, '%3F')
-          .replace(/\+/g, '%2B'),
+        (s) => encodeURI(s).replace(/#/g, '%23').replace(/\?/g, '%3F'),
       ).join('/')).then((r) => {
         if (!r.ok) throw new Error(`[content-loader] ${rel}: ${r.status}`);
         return r.text().then((text) => [rel, text] as const);
