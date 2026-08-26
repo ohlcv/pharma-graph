@@ -12,7 +12,6 @@
 import type { Core } from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
 import { uiState } from './state.js';
-import { staticEls } from './dom-cache.js';
 
 export type ClickHandler = (key: string, highlight: HighlightEngine) => void;
 
@@ -43,8 +42,6 @@ export interface LegendAxisDescriptor {
   readonly onClick: ClickHandler;
   /** Optional HTML class name applied to the row. */
   readonly rowExtraClass?: string;
-  /** Optional list of additional id-prefixes for count badges (e.g. static HTML ids). */
-  readonly extraCountIds?: readonly string[];
 }
 
 /** Tracks whether a container has had its click handler attached. */
@@ -65,15 +62,6 @@ function decorateRowA11y(row: HTMLElement): void {
   // read per mutation on a container that holds at most a few dozen rows.
   const observer = new MutationObserver(syncAria);
   observer.observe(row, { attributes: true, attributeFilter: ['class'] });
-}
-
-/** Static-row variant: edges don't go through MutationObserver (they only
- * toggle once or twice). Inline aria-pressed sync is enough. */
-function decorateStaticRowA11y(row: HTMLElement): void {
-  if (row.getAttribute('role') === 'button') return;
-  row.setAttribute('role', 'button');
-  row.tabIndex = 0;
-  row.setAttribute('aria-pressed', row.classList.contains('active') ? 'true' : 'false');
 }
 
 function attachDelegated(
@@ -138,14 +126,6 @@ export function buildLegend(cy: Core, descriptor: LegendAxisDescriptor): void {
     Array.from(mobile.children).forEach((c) => decorateRowA11y(c as HTMLElement));
   }
 
-  // Static edge-legend rows are hard-coded in index.html (rather than generated
-  // via desktopRow()) so they bypass the innerHTML branch above. Decorate them
-  // once on first build so they pick up keyboard support too.
-  if (descriptor.dataKey === 'data-edge') {
-    staticEls('.legend-edge-row[data-edge]').forEach(decorateStaticRowA11y);
-    staticEls('.bs-chip[data-edge]').forEach(decorateStaticRowA11y);
-  }
-
   if (desktop) {
     attachDelegated(desktop, `.${descriptor.rowClass}[${descriptor.dataKey}]`, descriptor.dataKey.replace('data-', ''), descriptor.onClick);
   }
@@ -160,9 +140,5 @@ export function buildLegend(cy: Core, descriptor: LegendAxisDescriptor): void {
     const mEl = document.getElementById(`${descriptor.mobileCountPrefix}${key}`);
     if (dEl) dEl.textContent = text;
     if (mEl) mEl.textContent = text;
-    for (const extra of descriptor.extraCountIds ?? []) {
-      const el = document.getElementById(`${extra}${key}`);
-      if (el) el.textContent = text;
-    }
   }
 }

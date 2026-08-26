@@ -269,6 +269,9 @@
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
               opacity   0.28s ease;
   will-change: transform, opacity;
+  padding-bottom: 16px;
+  flex: 0 0 260px; width: 260px;
+  height: 100%;
 }
 #sidebar.hidden { transform: translateX(100%); opacity: 0; pointer-events: none; }
 
@@ -293,7 +296,7 @@
 .sidebar-strip:hover { background: rgba(99,102,241,0.2); color: var(--accent); }
 .sidebar-strip svg { width: 12px; height: 12px; }
 
-.sidebar-section { padding: 0; border-bottom: 1px solid var(--border); }
+.sidebar-section { padding: 0; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .sidebar-section__head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 14px; cursor: pointer; user-select: none;
@@ -323,11 +326,11 @@
 .sidebar-section__chevron.open { transform: rotate(90deg); transition: transform var(--dur-normal) var(--ease-out); }
 .sidebar-section__body {
   max-height: 0; overflow: hidden;
-  transition: max-height var(--dur-normal) var(--ease-out), padding var(--dur-normal) var(--ease-out);
+  transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1), padding 0.28s ease;
   padding-top: 0; padding-bottom: 0;
 }
 .sidebar-section[data-section-state="open"] .sidebar-section__body {
-  max-height: 600px;
+  max-height: none;
   padding: 0 14px 12px;
 }
 
@@ -351,7 +354,7 @@
  * is identical to `.sidebar-section`, so the four axes (节点本质 / 学科领域 /
  * 知识层级 / 关联关系) each become their own collapsible card without any
  * extra JS. The chevron icon is shared via `.sidebar-section__chevron`. */
-.legend-block { display: flex; flex-direction: column; gap: 0; }
+.legend-block { display: flex; flex-direction: column; gap: 0; flex-shrink: 0; }
 .legend-block + .legend-block { margin-top: 8px; }
 .legend-block__label { display: none; }   /* legacy label class kept off the DOM */
 
@@ -379,16 +382,13 @@
   background: var(--accent); margin-right: 7px; vertical-align: middle;
 }
 .legend-section__body {
-  display: block;
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height var(--dur-normal) var(--ease-out), padding var(--dur-normal) var(--ease-out);
+  max-height: 0; overflow: hidden;
+  transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1), padding 0.28s ease;
   padding: 0 4px;
 }
 .legend-section[data-section-state="open"] .legend-section__body {
   max-height: none;
   overflow-x: auto; /* safety net: long labels overflow → horizontal scroll, not silent clip */
-  overflow-y: visible;
   padding: 0 4px 6px;
 }
 
@@ -1046,7 +1046,8 @@
  * down automatically, so it benefits too. */
 @media (max-width: 768px) {
   #sidebar { display: none; }
-  #main    { grid-template-columns: minmax(0, 1fr); }
+  #main    { flex-direction: row; }
+  #cy      { flex: 1 1 auto; }
   .topbar  { z-index: 60; }
   #app.sheet-open { z-index: 60; }
   .toolbar { display: none; }
@@ -1138,23 +1139,10 @@ html.bigscreen body { background: #000; }
    Node-panel is kept — it is part of the graph exploration. */
 html.bigscreen #main {
   height: 100vh;
-  /* Sidebar column collapses to 0px; #main's overflow:hidden then crops
-     the sidebar entirely. We do NOT touch #sidebar's DOM state (no
-     display:none, no transform override, no class manipulation) — the
-     sidebar's own `.hidden` toggle stays exactly as the user left it,
-     and the grid-template-columns transition handles it on exit.
-     `minmax(0, 1fr)` is critical — a plain `1fr` would default to
-     `minmax(auto, 1fr)`, and `auto` is the column's max-content. If
-     cytoscape or any descendant sizes itself to the *pre-bigscreen*
-     canvas width (862px in our 836px viewport), that auto-min would
-     push the canvas track to 862px, the total grid to 1122px, and the
-     sidebar — which lives in track #2 — would be parked at x=862,
-     *outside* #main's overflow:hidden box. After exiting bigscreen the
-     sidebar would still be in the DOM (transform/opacity/width all
-     correct) but visually pushed off-screen to the right. Forcing the
-     canvas track's min size to 0 with minmax(0, 1fr) pins the grid
-     total to #main's own width and keeps the sidebar inside the box. */
-  grid-template-columns: minmax(0, 1fr) 0;
+}
+
+html.bigscreen #sidebar {
+  flex: 0 0 0; width: 0; overflow: hidden; border-left: none;
 }
 
 /* Deeper ambient halo for the "pure graph theatre" feel. */
@@ -1168,9 +1156,9 @@ html.bigscreen #app::after {
 /* Hide all desktop chrome. Node-panel is kept — it is part of the graph
    exploration, not a browser chrome element.
 
-   IMPORTANT: #sidebar is intentionally NOT in this list. The grid column
-   collapse above (1fr 0) is what makes the sidebar invisible during
-   bigscreen. Adding `display:none` here would tear down the sidebar's
+   IMPORTANT: #sidebar is intentionally NOT in this list. The flex-basis
+   collapse above (flex:0 0 0 + width:0) is what makes the sidebar invisible
+   during bigscreen. Adding `display:none` here would tear down the sidebar's
    rendering context mid-transition, and on exit the sidebar's own
    `transform`/`opacity` transitions can fail to re-apply cleanly.
    Keeping the sidebar in normal flow under overflow:hidden is the

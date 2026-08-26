@@ -450,13 +450,84 @@ export function toggleSidebar(renderer: Renderer): void {
 
 // ── Section collapse ───────────────────────────────────────────────────────────
 
+/** Duration in ms matching the CSS max-height transition. */
+const SECTION_ANIM_MS = 280;
+
 export function toggleSection(name: string): void {
   const section = document.querySelector(`[data-section="${name}"]`);
   const head = document.querySelector(`[data-section="${name}"] .sidebar-section__chevron`);
   if (!section) return;
   const wasOpen = section.getAttribute('data-section-state') === 'open';
   const nowOpen = !wasOpen;
-  section.setAttribute('data-section-state', nowOpen ? 'open' : 'closed');
+
+  // Find the body element (works for both .sidebar-section__body and
+  // .legend-section__body — they share the same class suffix).
+  const body = section.querySelector('.sidebar-section__body, .legend-section__body') as HTMLElement | null;
+
+  if (nowOpen) {
+    // Opening: animate max-height from 0 → measured → none
+    if (body) {
+      body.style.maxHeight = '0px';
+      // Force reflow so the transition picks up the start value
+      void body.offsetHeight;
+      section.setAttribute('data-section-state', 'open');
+      const h = body.scrollHeight;
+      body.style.maxHeight = h + 'px';
+      setTimeout(() => { body.style.maxHeight = 'none'; }, SECTION_ANIM_MS);
+    } else {
+      section.setAttribute('data-section-state', 'open');
+    }
+  } else {
+    // Closing: animate max-height from measured → 0
+    if (body) {
+      const h = body.scrollHeight;
+      body.style.maxHeight = h + 'px';
+      // Force reflow
+      void body.offsetHeight;
+      section.setAttribute('data-section-state', 'closed');
+      body.style.maxHeight = '0px';
+    } else {
+      section.setAttribute('data-section-state', 'closed');
+    }
+  }
+
   if (head) head.classList.toggle('open', nowOpen);
   if (nowOpen && name === 'params') renderLayoutParams(getCurrentLayout());
+}
+
+/** Restore a section to its saved open/closed state (used by bigscreen roundtrip). */
+export function restoreSectionState(name: string, isOpen: boolean): void {
+  const section = document.querySelector(`[data-section="${name}"]`);
+  if (!section) return;
+  const body = section.querySelector('.sidebar-section__body, .legend-section__body') as HTMLElement | null;
+  const head = section.querySelector('.sidebar-section__chevron');
+
+  if (isOpen) {
+    section.setAttribute('data-section-state', 'open');
+    if (body) {
+      body.style.maxHeight = 'none';
+    }
+  } else {
+    section.setAttribute('data-section-state', 'closed');
+    if (body) {
+      body.style.maxHeight = '0px';
+    }
+  }
+  if (head) head.classList.toggle('open', isOpen);
+}
+
+/** Initialize max-height on all sections based on their data-section-state.
+ *  Must be called once during boot, after the DOM is ready. */
+export function initSectionHeights(): void {
+  const sections = document.querySelectorAll<HTMLElement>('.sidebar-section, .legend-block');
+  sections.forEach((section) => {
+    const isOpen = section.getAttribute('data-section-state') === 'open';
+    const body = section.querySelector('.sidebar-section__body, .legend-section__body') as HTMLElement | null;
+    if (!body) return;
+    if (isOpen) {
+      body.style.maxHeight = 'none';
+    } else {
+      body.style.maxHeight = '0px';
+    }
+  });
 }

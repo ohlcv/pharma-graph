@@ -153,7 +153,6 @@ export function populateEdgeLegend(cy: Core): void {
     mobileCountPrefix: 'bs-edge-count-',
     rowClass: 'legend-edge-row',
     dataKey: 'data-edge',
-    extraCountIds: ['count-edge-'],  // Static HTML id for the sidebar copy
     desktopRow: (k, label) => {
       const style = EDGE_TYPE_STYLE_FALLBACK(k);
       return `<div class="legend-edge-row" data-edge="${k}"><svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="${style.color}" stroke-width="2" ${dashAttr(style.lineStyle)}/>${arrowSvg(style, 26)}</svg><span class="legend-edge-row__label">${label}</span><span class="legend-edge-row__count" id="legend-edge-count-${k}"></span></div>`;

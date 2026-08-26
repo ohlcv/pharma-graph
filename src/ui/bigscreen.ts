@@ -2,7 +2,7 @@
 // Cinema / bigscreen mode: hide all chrome UI + request fullscreen.
 // Single root class is on <html> (not #app) to avoid cytoscape overlay pollution.
 
-import { cancelSidebarAnim } from './drag-manager';
+import { cancelSidebarAnim, restoreSectionState } from './drag-manager';
 
 const STORAGE_KEY = 'pharma-graph:bigscreen';
 
@@ -136,9 +136,18 @@ export function restoreSidebar(): void {
   sectionEls.forEach((el, i) => {
     const s = snap.sections[i];
     if (!s) return;
-    el.setAttribute('data-section-state', s.state ?? 'closed');
-    const chev = el.querySelector<HTMLElement>('.sidebar-section__chevron');
-    if (chev) chev.classList.toggle('open', s.chevronOpen);
+    const isOpen = s.state === 'open';
+    // Use restoreSectionState so the inline max-height style stays in sync
+    // with the data-section-state attribute — needed because toggleSection
+    // now manages max-height via JS for smooth animations.
+    const name = el.getAttribute('data-section');
+    if (name) {
+      restoreSectionState(name, isOpen);
+    } else {
+      el.setAttribute('data-section-state', s.state ?? 'closed');
+      const chev = el.querySelector<HTMLElement>('.sidebar-section__chevron');
+      if (chev) chev.classList.toggle('open', s.chevronOpen);
+    }
   });
 }
 
