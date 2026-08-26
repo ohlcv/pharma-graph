@@ -2,11 +2,33 @@ import { defineConfig, type Plugin } from 'vite';
 import { readdir, readFile, writeFile, stat, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, relative, sep, posix } from 'node:path';
+import { parse as yamlParse } from 'yaml';
 
 const CONTENT_DIR = 'public/content';
 const PUBLIC_DIR = 'public';
 const MANIFEST_FILENAME = 'content-manifest.json';
 const SITEMAP_FILENAME = 'sitemap.xml';
+
+/**
+ * 构建时生成的精简图谱数据 JSON（节点 + 边），注入到 index.html 的
+ * <script type="application/json" id="static-graph-data"> 供搜索引擎爬虫
+ * 不执行 JS 也能读取全部节点名称和关系。空字符串表示尚未生成。
+ */
+let staticGraphDataJson = '';
+
+interface StaticNode {
+  id: string;
+  label: string;
+  essence: string;
+  field: string;
+  tier: string;
+}
+
+interface StaticEdge {
+  source: string;
+  target: string;
+  type: string;
+}
 
 /**
  * Escape XML special characters for sitemap <loc> / <lastmod> text nodes.
@@ -38,6 +60,71 @@ function isoDate(d: Date): string {
   const m = String(d.getUTCMonth() + 1).padStart(2, '0');
   const day = String(d.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+/**
+ * 简化版 frontmatter 解析（构建时用，不依赖 src/parser/frontmatter.ts 的完整警告系统）。
+ * 只提取 SEO 需要的字段：id / label / essence / field / tier / edges_out。
+ * 与 frontmatter.ts 的 pickSource 逻辑一致：优先读 `data:` 嵌套块，兼容 legacy 顶层 edges_out。
+ */
+function parseFrontmatterSimple(
+  raw: string,
+  filePath: string,
+): {
+  id: string;
+  label: string;
+  essence: string;
+  field: string;
+  tier: string;
+  edges: Array<{ target: string; type: string }>;
+} | null {
+  const trimmed = raw.replace(/^\uFEFF/, '');
+  const match = trimmed.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!match) return null;
+
+  let data: Record<string, unknown>;
+  try {
+    data = (yamlParse(match[1]) as Record<string, unknown>) ?? {};
+  } catch {
+    return null;
+  }
+
+  // 处理 data: 嵌套块（与 frontmatter.ts pickSource 一致）
+  const nested = data['data'];
+  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+    const block = nested as Record<string, unknown>;
+    const rootEdges = data['edges_out'];
+    if (!('edges_out' in block) && Array.isArray(rootEdges)) {
+      block['edges_out'] = rootEdges;
+    }
+    data = block;
+  }
+
+  const id = String(data['id'] ?? '').trim();
+  if (!id) return null;
+
+  const fileBasename = filePath.split(/[/\\]/).pop()?.replace(/\.md$/i, '') ?? id;
+  const label =
+    (typeof data['label'] === 'string' ? data['label'].trim() : '') || fileBasename;
+  const essence = typeof data['essence'] === 'string' ? data['essence'].trim() : '';
+  const field = typeof data['field'] === 'string' ? data['field'].trim() : '';
+  const tier = typeof data['tier'] === 'string' ? data['tier'].trim() : '';
+
+  const edgesRaw = data['edges_out'];
+  const edges: Array<{ target: string; type: string }> = [];
+  if (Array.isArray(edgesRaw)) {
+    for (const e of edgesRaw) {
+      if (e && typeof e === 'object' && !Array.isArray(e)) {
+        const obj = e as Record<string, unknown>;
+        const target = String(obj['target'] ?? '').trim();
+        if (target) {
+          edges.push({ target, type: String(obj['type'] ?? '').trim() || 'relates' });
+        }
+      }
+    }
+  }
+
+  return { id, label, essence, field, tier, edges };
 }
 
 /**
@@ -121,6 +208,22 @@ async function buildManifest(): Promise<void> {
   lines.push('</urlset>');
   lines.push('');
   await writeFile(join(publicRoot, SITEMAP_FILENAME), lines.join('\n'), 'utf8');
+
+  // 3) 静态图谱数据 JSON — 注入 index.html 供爬虫读取（无需执行 JS）
+  const nodes: StaticNode[] = [];
+  const edges: StaticEdge[] = [];
+  for (const e of entries) {
+    const raw = await readFile(e.abs, 'utf-8');
+    const fm = parseFrontmatterSimple(raw, e.rel);
+    if (!fm) continue;
+    nodes.push({ id: fm.id, label: fm.label, essence: fm.essence, field: fm.field, tier: fm.tier });
+    for (const edge of fm.edges) {
+      edges.push({ source: fm.id, target: edge.target, type: edge.type });
+    }
+  }
+  staticGraphDataJson = JSON.stringify({ nodes, edges });
+  // 转义 < 防止浏览器误关闭 <script> 标签
+  staticGraphDataJson = staticGraphDataJson.replace(/</g, '\\u003c');
 }
 
 function contentManifestPlugin(): Plugin {
@@ -136,6 +239,14 @@ function contentManifestPlugin(): Plugin {
       if (ctx.file.endsWith('.md')) {
         await buildManifest();
       }
+    },
+    transformIndexHtml(html: string): string {
+      if (!staticGraphDataJson) return html;
+      // 注入到 <div id="app"> 之前——爬虫不执行 JS 也能读取全部节点和关系
+      return html.replace(
+        '<div id="app">',
+        `<script type="application/json" id="static-graph-data">${staticGraphDataJson}</script>\n\n<div id="app">`,
+      );
     },
   };
 }
