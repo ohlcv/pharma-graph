@@ -81,7 +81,7 @@ async function buildManifest(): Promise<void> {
   // 1) content-manifest.json
   await writeFile(
     join(publicRoot, MANIFEST_FILENAME),
-    JSON.stringify({ files: entries.map(e => e.rel), generatedAt: Date.now() }, null, 2),
+    JSON.stringify({ files: entries.map(e => e.rel) }, null, 2),
     'utf8',
   );
 

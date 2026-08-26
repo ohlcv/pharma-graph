@@ -39,4 +39,4 @@ coverage/
 
 #临时文件
 *.tmp
-#content-manifest.json
+content-manifest.json

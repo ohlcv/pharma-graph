@@ -6,7 +6,7 @@
  * The manifest is written to public/content-manifest.json by the
  * `pharma-graph:content-manifest` Vite plugin (see vite.config.ts). It is a
  * simple array of relative paths:
- *   { files: ["药学专业知识二/第八章 内分泌系统用药.md", ...], generatedAt: 0 }
+ *   { files: ["药学专业知识二/第八章 内分泌系统用药.md", ...] }
  *
  * At boot we fetch the manifest, then fetch every file in parallel. Each
  * fetched text is keyed under its absolute-from-repo path (the original glob
