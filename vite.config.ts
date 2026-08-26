@@ -242,11 +242,31 @@ function contentManifestPlugin(): Plugin {
     },
     transformIndexHtml(html: string): string {
       if (!staticGraphDataJson) return html;
-      // 注入到 <div id="app"> 之前——爬虫不执行 JS 也能读取全部节点和关系
-      return html.replace(
+
+      // 解析节点/边数量，用于替换页面可见占位符
+      const data = JSON.parse(staticGraphDataJson) as { nodes: unknown[]; edges: unknown[] };
+      const nodeCount = String(data.nodes.length);
+      const edgeCount = String(data.edges.length);
+
+      let out = html;
+
+      // 1) 注入 JSON 到 <div id="app"> 之前——爬虫不执行 JS 也能读取全部节点和关系
+      out = out.replace(
         '<div id="app">',
         `<script type="application/json" id="static-graph-data">${staticGraphDataJson}</script>\n\n<div id="app">`,
       );
+
+      // 2) 替换可见占位符为真实数字（JS 运行后会覆盖，对用户无影响）
+      out = out.replace('id="stat-nodes">—<', `id="stat-nodes">${nodeCount}<`);
+      out = out.replace('id="stat-edges">—<', `id="stat-edges">${edgeCount}<`);
+      out = out.replace('id="bs-stat-nodes">—<', `id="bs-stat-nodes">${nodeCount}<`);
+      out = out.replace('id="bs-stat-edges">—<', `id="bs-stat-edges">${edgeCount}<`);
+
+      // 3) 替换"图谱为空"提示——爬虫看到的是真实状态而非空状态
+      out = out.replace('图谱为空', '图谱数据已就绪');
+      out = out.replace('请选择或添加节点以开始探索', `${nodeCount} 个药学知识节点，${edgeCount} 条关联关系`);
+
+      return out;
     },
   };
 }
