@@ -381,11 +381,6 @@ export function toggleSidebar(renderer: Renderer): void {
   const btn = document.getElementById('btn-sidebar-toggle');
   const strip = document.getElementById('sidebar-strip');
   if (!sidebar) return;
-  console.log('[toggleSidebar] called', {
-    domHidden: sidebar.classList.contains('hidden'),
-    btnActive: btn?.classList.contains('active'),
-    toggleOn: sidebarToggle?.value,
-  });
   if (!sidebarToggle) {
     sidebarToggle = new UiToggle({
       initial: sidebar.classList.contains('hidden'),

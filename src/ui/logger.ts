@@ -32,13 +32,10 @@ function isDev(): boolean {
 }
 
 /**
- * `console.info(...)` gated on `import.meta.env.DEV`. Use this for
- *   pipeline / boot diagnostics — anything that helps a developer
- *   confirm the wiring but isn't useful to end users. Production
- *   builds tree-shake the call site to a no-op.
+ * Dev-gated log function. Currently a no-op — all console output has been
+ *   removed per user request. The function is kept as a stable API so
+ *   call sites don't need to change if logging is re-enabled later.
  */
-export function logInfo(msg: string, payload?: unknown): void {
-  if (!isDev()) return;
-  if (payload === undefined) console.info(TAG, msg);
-  else console.info(TAG, msg, payload);
+export function logInfo(_msg: string, _payload?: unknown): void {
+  // No-op — intentionally silent.
 }

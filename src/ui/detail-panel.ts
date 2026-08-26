@@ -48,7 +48,6 @@ export class DetailPanel {
     const pinBtn = document.getElementById('lp-btn-pin');
 
     if (!panel || !overviewPage || !bodyPage || !overviewTab || !bodyTab || !pinBtn) {
-      console.warn('DetailPanel: required DOM elements not found');
       return;
     }
 

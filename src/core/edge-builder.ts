@@ -19,13 +19,9 @@ export async function buildEdges(
   const frontmatters = await loadAllFrontmatter(filePaths);
   const { edges, danglingEdges } = buildGraph(frontmatters, {
     knownNodeIds,
-    onDanglingEdges: (entries: DanglingEdge[]) => {
-      console.error(`\n[edge-builder] 发现 ${entries.length} 条悬空边（target 节点不存在）:`);
-      for (const { source, target, file } of entries) {
-        const rel = file.replace(/\\/g, '/').replace('content/', '');
-        console.error(`  - [${rel}] ${source} → ${target}`);
-      }
-      console.error('');
+    onDanglingEdges: (_entries: DanglingEdge[]) => {
+      // Dangling edges are silently ignored in production.
+      // The validation script (scripts/audit-content.ts) reports them separately.
     },
   });
   return edges;

@@ -262,8 +262,9 @@ export function parseFrontmatterWithWarnings(
   if (options.softFail) {
     for (const w of warnings) {
       const tag = w.severity === 'error' ? '[error]' : '[warn]';
-      // eslint-disable-next-line no-console
-      console.warn(`${tag} ${w.file} ${w.field ? `[${w.field}]` : ''} — ${w.message}`);
+      // Warnings are returned to the caller (not logged to console).
+      // The caller decides how to surface them (UI toast, etc.).
+      void tag;
     }
   }
 

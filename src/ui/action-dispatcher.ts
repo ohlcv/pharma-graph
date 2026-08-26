@@ -60,10 +60,6 @@ export function installDispatcher(): void {
     const handler = registry.get(name);
     if (!handler) {
       // Unregistered action — silent no-op so unknown attributes don't crash.
-      // Surface in dev console for easier debugging.
-      if (import.meta.env?.DEV) {
-        console.warn(`[action-dispatcher] no handler for action="${name}"`);
-      }
       return;
     }
 
@@ -76,9 +72,6 @@ export function installDispatcher(): void {
 export function dispatchAction(name: string, args: string[] = []): void {
   const handler = registry.get(name);
   if (!handler) {
-    if (import.meta.env?.DEV) {
-      console.warn(`[action-dispatcher] dispatch: no handler for action="${name}"`);
-    }
     return;
   }
   // Synthesize a throwaway element so the handler signature stays uniform.

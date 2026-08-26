@@ -617,7 +617,6 @@ export class TourEngine {
         return `  ${String(i + 1).padStart(3)}. ${label}${loc ? `  [${loc}]` : ''}`;
       });
 
-      console.log(`\n▶ ${s.label}  (${seq.length} 个节点)\n${lines.join('\n')}`);
     });
   }
 

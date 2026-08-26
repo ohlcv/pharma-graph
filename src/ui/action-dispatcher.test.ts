@@ -31,7 +31,6 @@ beforeEach(() => {
   // requires an `any` cast because Vite intentionally types the field
   // as `ImportMetaEnv` (no writable shape).
   (import.meta as any).env = { DEV: true };
-  vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
 describe('action-dispatcher: click delegation', () => {
@@ -114,16 +113,13 @@ describe('action-dispatcher: click delegation', () => {
     expect(handler.mock.calls[0]![1]).toEqual(['fallback']);
   });
 
-  it('warns (in DEV) but does not throw for unknown actions', () => {
+  it('does not throw for unknown actions (silent no-op)', () => {
     installDispatcher();
     const btn = document.createElement('button');
     btn.dataset.action = 'never-registered';
     document.body.appendChild(btn);
 
     expect(() => click(btn)).not.toThrow();
-    expect(console.warn).toHaveBeenCalledWith(
-      expect.stringContaining('never-registered'),
-    );
   });
 
   it('does nothing when the click target has no data-action ancestor', () => {
@@ -182,9 +178,8 @@ describe('action-dispatcher: programmatic dispatch', () => {
     expect(handler.mock.calls[0]![1]).toEqual(['extra-arg']);
   });
 
-  it('dispatchAction warns and returns silently for unknown actions', () => {
+  it('dispatchAction returns silently for unknown actions', () => {
     expect(() => dispatchAction('nope')).not.toThrow();
-    expect(console.warn).toHaveBeenCalled();
   });
 });
 

@@ -81,16 +81,7 @@ async function boot(): Promise<void> {
   if (graphManager.warnings.length > 0) {
     const errors = graphManager.warnings.filter((w) => w.severity === 'error');
     const warns = graphManager.warnings.filter((w) => w.severity === 'warning');
-    console.warn(
-      `[pharma-graph] frontmatter warnings: ${errors.length} error(s), ${warns.length} warning(s)` +
-        ` — details follow. See docs/问题清单.md #14.`,
-    );
-    for (const w of graphManager.warnings) {
-      const tag = w.severity === 'error' ? '[error]' : '[warn]';
-      const field = w.field ? ` [${w.field}]` : '';
-      // eslint-disable-next-line no-console
-      console.warn(`${tag} ${w.file}${field} — ${w.message}`);
-    }
+    void errors; void warns;
   }
 
   const container = document.getElementById('cy');
@@ -195,7 +186,6 @@ async function boot(): Promise<void> {
     const e = document.getElementById('stat-edges');
     if (n) n.textContent = 'error';
     if (e) e.textContent = (err as Error).message;
-    console.error('[pharma-graph] Boot error:', err);
     return;
   }
 
