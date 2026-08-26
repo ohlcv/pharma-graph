@@ -364,6 +364,17 @@ export function clearPanelBounds(): void {
 // application across sidebar / button / strip. Renderer is mutated via the
 // `onChange` hook so the cytoscape instance resizes on every toggle.
 let sidebarToggle: UiToggle | null = null;
+// Tracks the in-flight sidebar overlay timeout so rapid toggles can cancel
+// the previous one — prevents stale sidebar-overlay removal mid-animation.
+let sidebarAnimTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Cancel any in-flight sidebar animation timer and clean up overlay state.
+ *  Called by bigscreen enter/exit to prevent stale cy.resize() calls and
+ *  orphaned sidebar-overlay class during bigscreen transitions. */
+export function cancelSidebarAnim(): void {
+  if (sidebarAnimTimer) { clearTimeout(sidebarAnimTimer); sidebarAnimTimer = null; }
+  document.getElementById('sidebar')?.classList.remove('sidebar-overlay');
+}
 
 export function toggleSidebar(renderer: Renderer): void {
   const sidebar = document.getElementById('sidebar');
@@ -387,7 +398,42 @@ export function toggleSidebar(renderer: Renderer): void {
           strip.classList.toggle('visible', hidden);
           strip.style.right = hidden ? '0' : '';
         }
-        renderer.getCy().resize();
+        // Strategy: make the sidebar position:absolute (overlay) during the
+        // 0.28s transform/opacity animation so it can slide freely above
+        // the canvas. The grid column change + cy.resize() happens either
+        // immediately (collapse — behind the still-visible sidebar) or
+        // after the animation (expand — behind the now-visible sidebar).
+        // In both cases the canvas resize is hidden behind the sidebar's
+        // opaque background, so there's no black flash or black curtain.
+        const main = document.getElementById('main');
+        const sb = document.getElementById('sidebar');
+        if (sb) sb.classList.add('sidebar-overlay');
+        // Cancel any previous animation timer — rapid toggles would
+        // otherwise fire stale timeouts that remove sidebar-overlay
+        // mid-animation or call cy.resize() at the wrong moment.
+        if (sidebarAnimTimer) { clearTimeout(sidebarAnimTimer); sidebarAnimTimer = null; }
+
+        if (hidden) {
+          // Collapse: grid column collapses now (canvas expands behind the
+          // sidebar which is still visible at the start of the transition).
+          main?.classList.add('sidebar-hidden');
+          renderer.getCy().resize();
+          // After the sidebar finishes sliding out, restore normal flow.
+          sidebarAnimTimer = setTimeout(() => {
+            if (sb) sb.classList.remove('sidebar-overlay');
+            sidebarAnimTimer = null;
+          }, 280);
+        } else {
+          // Expand: keep grid collapsed, let the sidebar slide in as an
+          // overlay. After it's visible, expand the grid + resize canvas
+          // (the resize is hidden behind the now-opaque sidebar).
+          sidebarAnimTimer = setTimeout(() => {
+            main?.classList.remove('sidebar-hidden');
+            renderer.getCy().resize();
+            if (sb) sb.classList.remove('sidebar-overlay');
+            sidebarAnimTimer = null;
+          }, 280);
+        }
       },
     });
   } else {

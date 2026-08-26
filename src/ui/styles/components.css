@@ -267,11 +267,18 @@
   border-left: 1px solid var(--border); overflow-y: auto;
   display: flex; flex-direction: column; transform: translateX(0);
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity   0.28s ease,
-              width     0.28s cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: transform;
+              opacity   0.28s ease;
+  will-change: transform, opacity;
 }
 #sidebar.hidden { transform: translateX(100%); opacity: 0; pointer-events: none; }
+
+/* Temporary overlay state during sidebar toggle animation. The sidebar
+   leaves the grid flow and floats above the canvas so it can slide
+   in/out freely while the grid column changes behind it (hidden by the
+   sidebar's own opaque background). Prevents the "black curtain" gap. */
+#sidebar.sidebar-overlay {
+  position: absolute; right: 0; top: 0; bottom: 0; width: 260px; z-index: 6;
+}
 
 .sidebar-strip {
   position: absolute; right: 0; top: 50%; transform: translateY(-50%);

@@ -36,11 +36,17 @@ export async function loadContent(): Promise<LoadedContent> {
 
   const responses = await Promise.all(
     manifest.files.map((rel) =>
-      // encodeURI leaves `+`, `(`, `)`, etc. literal — but servers (nginx default)
-      // decode `+` as space, breaking paths like 强抗氧化+金属离子螯合.md.
-      // encodeURIComponent on each segment is too aggressive (breaks `/`),
-      // so split on `/`, encode each piece, then re-join.
-      fetch('/content/' + rel.split('/').map(encodeURIComponent).join('/')).then((r) => {
+      // encodeURI handles spaces (%20) while leaving `+`, `(`, `)`, `,` literal.
+      // Vite's dev server cannot resolve the percent-encoded forms of these
+      // (e.g. %2B for `+`, %2C for `,`) and returns the SPA fallback instead.
+      // `#` and `?` are additionally encoded — encodeURI leaves them literal,
+      // which would break URL semantics (fragment / query parsing).
+      // Note: production behind nginx may still decode literal `+` as space;
+      // if that becomes an issue, rename the offending files rather than
+      // re-introducing encodeURIComponent (which breaks Vite dev server).
+      fetch('/content/' + rel.split('/').map(
+        (s) => encodeURI(s).replace(/#/g, '%23').replace(/\?/g, '%3F'),
+      ).join('/')).then((r) => {
         if (!r.ok) throw new Error(`[content-loader] ${rel}: ${r.status}`);
         return r.text().then((text) => [rel, text] as const);
       }),

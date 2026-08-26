@@ -2,6 +2,8 @@
 // Cinema / bigscreen mode: hide all chrome UI + request fullscreen.
 // Single root class is on <html> (not #app) to avoid cytoscape overlay pollution.
 
+import { cancelSidebarAnim } from './drag-manager';
+
 const STORAGE_KEY = 'pharma-graph:bigscreen';
 
 /** DOM element that holds the hint toast. Reused on every mode switch. */
@@ -104,6 +106,11 @@ export function restoreSidebar(): void {
   const btn     = document.getElementById('btn-sidebar-toggle');
   const strip   = document.getElementById('sidebar-strip');
 
+  // Clean up any stale sidebar-overlay from an in-flight toggle animation
+  // that was interrupted by bigscreen exit. Without this, the sidebar
+  // could remain position:absolute after exit, detached from the grid.
+  sidebar?.classList.remove('sidebar-overlay');
+
   // Force-clear any in-flight transform/opacity transition on the
   // sidebar before writing the new state. Without this, a pending
   // transition from a previous toggle (or from the bigscreen hide)
@@ -117,6 +124,8 @@ export function restoreSidebar(): void {
     void sidebar.offsetWidth;
     sidebar.style.transition = '';
   }
+  // Keep #main.sidebar-hidden in sync — see drag-manager.ts onChange.
+  document.getElementById('main')?.classList.toggle('sidebar-hidden', snap.hidden);
   if (btn)     btn.classList.toggle('active', snap.btnActive);
   if (strip) {
     strip.classList.toggle('visible', snap.stripVisible);
@@ -238,6 +247,7 @@ export async function enterBigscreen(): Promise<void> {
   if (isBigscreen()) return;
 
   captureSidebar();
+  cancelSidebarAnim();
 
   if (_isTourActive()) {
     captureViewport();
@@ -258,6 +268,8 @@ export async function enterBigscreen(): Promise<void> {
 /** Exit bigscreen: remove class, exit fullscreen, remove preference. */
 export async function exitBigscreen(): Promise<void> {
   if (!isBigscreen()) return;
+
+  cancelSidebarAnim();
 
   // We do NOT call captureSidebar() here. The snapshot was taken at
   // enterBigscreen() time, which is the correct "before bigscreen"

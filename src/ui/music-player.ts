@@ -62,21 +62,25 @@ export function initMusicPlayer(): void {
     trackIdx = (trackIdx + 1) % queue.length;
     if (trackIdx === 0) buildQueue();
     audio.src = '/audio/' + queue[trackIdx];
-    audio.load();
     audio.play().catch(() => {});
   }
 
   audio.volume = 0.45;
   audio.addEventListener('ended', playNext);
   buildQueue();
-  audio.src = '/audio/' + queue[0];
-  audio.load();
+  // Don't set src/load at init — <audio preload="none"> causes the browser to
+  // abort the fetch immediately, surfacing as net::ERR_ABORTED. Set src lazily
+  // on the first user click instead (also respects autoplay policies).
 
   function toggleMusic() {
     if (playing) {
       audio.pause();
       setPlaying(false);
     } else {
+      // Lazy-load: set src on first play (avoids ERR_ABORTED at boot).
+      if (!audio.src) {
+        audio.src = '/audio/' + queue[trackIdx];
+      }
       audio.play().then(() => setPlaying(true)).catch(() => {});
     }
   }
