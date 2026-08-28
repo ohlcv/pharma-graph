@@ -15,6 +15,15 @@
 //   - search-ui.ts       → initSearchUI
 //   - music-player.ts    → initMusicPlayer
 //   - debug-bridge.ts    → installDebugBridge
+//
+// ============================================================================
+// Safari / 微信 WKWebView 旧内核兼容：polyfill 必须放在**所有业务 import 之前**
+//   覆盖对象：Safari ≤ 15.3 / iOS ≤ 15.3 / 微信内置浏览器旧版 WKWebView
+//   否则会因 ??=、&&=、Object.hasOwn、Array.prototype.at、structuredClone、
+//   regex d-flag 等语法直接 SyntaxError → 入口 type=module 完全不执行 → 白屏
+// ============================================================================
+import 'core-js/stable';
+import 'regenerator-runtime/runtime.js';
 
 import './styles/index.css';
 import { Renderer } from '../core/renderer.js';

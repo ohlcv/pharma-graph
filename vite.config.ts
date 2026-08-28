@@ -145,6 +145,15 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    // ──────────────────────────────────────────────────────────────────────
+    // 语法降级目标：兼容 Safari 13（2019 年 macOS Catalina 自带）、iOS 12、
+    //   Chrome 73+、Firefox 老版本。这会让 Rolldown/Vite 把 ??= / &&= / ||=
+    //   / class static block / Array.prototype.at 等 Safari 15.4+ 才支持的
+    //   语法，全部降级为可执行的等价写法，避免「SyntaxError → 白屏」。
+    //   进一步的 runtime polyfill（Map.groupBy / Object.hasOwn / at / structuredClone）
+    //   已在 src/ui/main.ts 顶部通过 core-js + regenerator-runtime 引入。
+    // ──────────────────────────────────────────────────────────────────────
+    target: ['es2019', 'safari13', 'ios12', 'chrome73', 'firefox67', 'edge79'],
   },
   plugins: [contentManifestPlugin()],
   optimizeDeps: {
