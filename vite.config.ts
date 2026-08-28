@@ -8,13 +8,19 @@ const CONTENT_DIR = 'public/content';
 const PUBLIC_DIR = 'public';
 const MANIFEST_FILENAME = 'content-manifest.json';
 const SITEMAP_FILENAME = 'sitemap.xml';
+const GRAPH_DATA_FILENAME = 'static-graph-data.json';
 
 /**
- * 构建时生成的精简图谱数据 JSON（节点 + 边），注入到 index.html 的
- * <script type="application/json" id="static-graph-data"> 供搜索引擎爬虫
- * 不执行 JS 也能读取全部节点名称和关系。空字符串表示尚未生成。
+ * 占位符替换所需的计数（节点 / 边）——不依赖内联 JSON，避免 Safari 桌面 /
+ * 微信 WKWebView 因超大型内联 <script> 触发 HTML 解析崩溃。
+ * 完整图谱 JSON 写入 public/static-graph-data.json 独立文件，并在
+ * <head> 用 <link rel="alternate" type="application/json"> 声明位置。
+ * noscriptInjection 是可见文本（药物 + 疾病索引），所有爬虫/AI 工具
+ * 都能直接读到节点名称，无需执行 JS 或解析外部文件。
  */
-let staticGraphDataJson = '';
+let staticNodeCount = 0;
+let staticEdgeCount = 0;
+let noscriptInjection = '';
 
 interface StaticNode {
   id: string;
@@ -209,7 +215,8 @@ async function buildManifest(): Promise<void> {
   lines.push('');
   await writeFile(join(publicRoot, SITEMAP_FILENAME), lines.join('\n'), 'utf8');
 
-  // 3) 静态图谱数据 JSON — 注入 index.html 供爬虫读取（无需执行 JS）
+  // 3) 静态图谱数据 → 写入独立 JSON 文件（Safari/微信 WKWebView 对几百 KB 的内联
+  //    <script type="application/json"> 会触发 HTML 解析崩溃，必须拆成外部文件）
   const nodes: StaticNode[] = [];
   const edges: StaticEdge[] = [];
   for (const e of entries) {
@@ -221,9 +228,41 @@ async function buildManifest(): Promise<void> {
       edges.push({ source: fm.id, target: edge.target, type: edge.type });
     }
   }
-  staticGraphDataJson = JSON.stringify({ nodes, edges });
-  // 转义 < 防止浏览器误关闭 <script> 标签
-  staticGraphDataJson = staticGraphDataJson.replace(/</g, '\\u003c');
+  staticNodeCount = nodes.length;
+  staticEdgeCount = edges.length;
+  await writeFile(
+    join(publicRoot, GRAPH_DATA_FILENAME),
+    JSON.stringify({ nodes, edges }),
+    'utf-8',
+  );
+
+  // 4) 构造 noscript 可见文本注入段：所有药物(medication) + 疾病(illness)
+  //    按字典序去重排序，所有爬虫和 AI 工具都能直接在纯可见文本读到节点名。
+  const drugLabels: string[] = [];
+  const illnessLabels: string[] = [];
+  for (const n of nodes) {
+    if (!n.label) continue;
+    if (n.essence === 'medication') drugLabels.push(n.label);
+    else if (n.essence === 'illness') illnessLabels.push(n.label);
+  }
+  const dedupSorted = (arr: string[]): string[] => Array.from(new Set(arr)).sort((a, b) => a.localeCompare(b, 'zh'));
+  const drugs = dedupSorted(drugLabels);
+  const illnesses = dedupSorted(illnessLabels);
+  const escaped = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const drugHtml = drugs.length
+    ? `<div style="font-size:0.92rem;line-height:1.9;color:#1e293b;">${drugs.map(escaped).join(' · ')}</div>`
+    : '';
+  const illnessHtml = illnesses.length
+    ? `<div style="margin-top:1.25rem;font-size:0.92rem;line-height:1.9;color:#1e293b;">${illnesses.map(escaped).join(' · ')}</div>`
+    : '';
+  noscriptInjection =
+    `\n    <section style="margin-top:2rem;">\n` +
+    `      <h2 style="color:#06b6d4;border-left:4px solid #06b6d4;padding-left:0.75rem;">🧬 完整药物与疾病索引（共 ${drugs.length} 种药物 · ${illnesses.length} 种疾病，按拼音排序）</h2>\n` +
+    `      <p style="color:#475569;font-size:0.9rem;">以下是知识图谱收录的全部具体药物和疾病名称，支持搜索：</p>\n` +
+    (drugHtml ? `      ${drugHtml}\n` : '') +
+    (illnessHtml ? `      ${illnessHtml}\n` : '') +
+    `    </section>\n`;
 }
 
 function contentManifestPlugin(): Plugin {
@@ -241,19 +280,17 @@ function contentManifestPlugin(): Plugin {
       }
     },
     transformIndexHtml(html: string): string {
-      if (!staticGraphDataJson) return html;
+      if (staticNodeCount === 0) return html;
 
-      // 解析节点/边数量，用于替换页面可见占位符
-      const data = JSON.parse(staticGraphDataJson) as { nodes: unknown[]; edges: unknown[] };
-      const nodeCount = String(data.nodes.length);
-      const edgeCount = String(data.edges.length);
+      const nodeCount = String(staticNodeCount);
+      const edgeCount = String(staticEdgeCount);
 
       let out = html;
 
-      // 1) 注入 JSON 到 <div id="app"> 之前——爬虫不执行 JS 也能读取全部节点和关系
+      // 1) 在 </head> 之前声明完整图谱 JSON 的位置，给能抓取外部文件的爬虫使用
       out = out.replace(
-        '<div id="app">',
-        `<script type="application/json" id="static-graph-data">${staticGraphDataJson}</script>\n\n<div id="app">`,
+        '</head>',
+        '  <link rel="alternate" type="application/json" href="/static-graph-data.json" title="药学知识图谱完整结构化数据（节点与关系边）">\n</head>',
       );
 
       // 2) 替换可见占位符为真实数字（JS 运行后会覆盖，对用户无影响）
@@ -264,7 +301,16 @@ function contentManifestPlugin(): Plugin {
 
       // 3) 替换"图谱为空"提示——爬虫看到的是真实状态而非空状态
       out = out.replace('图谱为空', '图谱数据已就绪');
-      out = out.replace('请选择或添加节点以开始探索', `${nodeCount} 个药学知识节点，${edgeCount} 条关联关系`);
+      out = out.replace(
+        '请选择或添加节点以开始探索',
+        `${nodeCount} 个药学知识节点，${edgeCount} 条关联关系`,
+      );
+
+      // 4) 在 </noscript> 之前注入完整药物 + 疾病索引（可见文本，任何 AI
+      //    工具和简单爬虫都能直接读到节点名，无需执行 JS 或解析外部 JSON）
+      if (noscriptInjection) {
+        out = out.replace('</noscript>', `${noscriptInjection}</noscript>`);
+      }
 
       return out;
     },
