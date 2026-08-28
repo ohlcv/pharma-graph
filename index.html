@@ -4,6 +4,27 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+  <!--
+    裸域 → www 跳转兜底：防止用户直接访问 https://pharma.ac.cn/ （不带 www）
+    时因 DNS / 服务器监听 / TLS 证书未覆盖而白屏或超时。
+    必须放在 <head> 最前面，任何其他资源（CSS、JS、图片）加载之前执行。
+    注：这只能救回「TCP 已握手但渲染到了我们这段 HTML」的场景。
+    当前（2026-08-28）的核心问题是：根域 pharma.ac.cn 的 A 记录指向的
+    216.198.79.1 根本不监听 80/443 端口，因此必须在 DNS/Vercel 侧修复
+    （见仓库操作清单）。此脚本为双重保险。
+  -->
+  <script>
+    (function () {
+      var host = location.hostname;
+      if (host === 'pharma.ac.cn') {
+        var target = 'https://www.pharma.ac.cn' +
+          location.pathname + location.search + location.hash;
+        // HTTP 301 级别的语义：replace 不留下历史记录，避免点返回死循环
+        location.replace(target);
+      }
+    })();
+  </script>
+
   <!-- ── Primary SEO ───────────────────────────────────────────── -->
   <title>药学知识图谱 - 执业药师备考学习可视化</title>
   <meta name="description" content="药学家族关系星图｜基于执业药师考试（药学专业知识一·二·药学综合知识与技能）的交互式知识图谱学习平台。覆盖药剂学、药理学、药物化学、药动学、临床用药等学科，支持节点搜索、关系推理、漫游学习与多种布局，系统化梳理药物脉络，助力高效备考与记忆。">
