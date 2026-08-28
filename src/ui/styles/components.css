@@ -273,7 +273,10 @@
   flex: 0 0 260px; width: 260px;
   height: 100%;
 }
-#sidebar.hidden { transform: translateX(100%); opacity: 0; pointer-events: none; }
+#sidebar.hidden {
+  transform: translateX(100%); opacity: 0; pointer-events: none;
+  flex: 0 0 0; width: 0; overflow: hidden; border-left: none;
+}
 
 /* Temporary overlay state during sidebar toggle animation. The sidebar
    leaves the grid flow and floats above the canvas so it can slide
@@ -281,6 +284,9 @@
    sidebar's own opaque background). Prevents the "black curtain" gap. */
 #sidebar.sidebar-overlay {
   position: absolute; right: 0; top: 0; bottom: 0; width: 260px; z-index: 6;
+  background: rgb(12, 18, 34);
+  opacity: 1;
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar-strip {

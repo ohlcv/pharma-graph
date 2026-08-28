@@ -234,3 +234,85 @@ export function toggleSection(name: string): void {
 3. **状态同步**：任何通过 JS 修改的样式（如 `max-height`）都需要在所有状态恢复路径（初始化、大屏切换、持久化）中同步，否则会出现状态不一致。
 
 4. **未来建议**：如果需要更复杂的折叠动画（如 FLIP 技术），可考虑使用 `element.animate()` Web Animations API，它支持更精确的高度动画控制。
+
+---
+
+## 问题三：折叠侧栏后"黑幕"挡住节点（反复出现）
+
+### 3.1 问题描述
+
+点击"切换侧栏"按钮折叠 sidebar 后，canvas 右侧出现黑色半透明面板挡住节点。此问题在修复后曾再次出现（回归），经多次排查最终定位根因。
+
+### 3.2 排查过程
+
+**第一次修复尝试：sidebar-overlay 背景不透明**
+
+sidebar 背景为 `rgba(12, 18, 34, 0.7)`（30% 透明）。折叠/展开动画期间 sidebar 进入 `sidebar-overlay` 浮层模式（`position: absolute`），canvas 在其背后 resize，30% 透明度让黑色透出。
+
+修复：给 `#sidebar.sidebar-overlay` 加 `background: rgb(12, 18, 34)` 完全不透明。
+
+结果：背景不透明了，但问题依然存在。
+
+**第二次修复尝试：opacity 不淡出**
+
+发现 sidebar 在动画期间 `opacity: 0.03`（几乎透明）。`#sidebar.hidden` 设置 `opacity: 0` 带 280ms 过渡，sidebar 滑出时整体淡出，不透明背景跟着变透明。
+
+修复：给 `#sidebar.sidebar-overlay` 加 `opacity: 1` + 只过渡 transform 不过渡 opacity。
+
+结果：动画期间 opacity 正确为 1，但折叠**完成后**问题依然存在。
+
+**第三次修复（最终）：CSS @layer 优先级冲突**
+
+折叠完成后检查 computed style 发现：
+- `width: 260px`（应為 0）
+- `flex: 0 0 260px`（应为 0）
+- `opacity: 0.053`（仍在淡出中）
+- `overflow: hidden auto`（overflow-y 未被覆盖）
+
+**根因**：CSS `@layer` 声明顺序为 `base, shared, layout, ..., sidebar, ...`。`sidebar` 层优先级高于 `layout` 层。
+
+- `#sidebar` 基础规则在 `@layer sidebar` 中设了 `width: 260px; flex: 0 0 260px; overflow-y: auto`
+- `#main.sidebar-hidden #sidebar` 在 `@layer layout` 中设了 `width: 0; flex: 0 0 0; overflow: hidden`
+- 由于 `sidebar` 层 > `layout` 层，**后者被完全覆盖**，sidebar 折叠后仍占 260px 宽
+
+### 3.3 最终解决方案
+
+将 `flex/width/overflow` 覆盖从 `@layer layout` 移到 `@layer sidebar` 的 `#sidebar.hidden` 规则中。同层内 specificity `#sidebar.hidden`（1 ID + 1 class）> `#sidebar`（1 ID），正确覆盖：
+
+```css
+/* components.css @layer sidebar 内 */
+#sidebar.hidden {
+  transform: translateX(100%); opacity: 0; pointer-events: none;
+  flex: 0 0 0; width: 0; overflow: hidden; border-left: none;
+}
+
+#sidebar.sidebar-overlay {
+  position: absolute; right: 0; top: 0; bottom: 0; width: 260px; z-index: 6;
+  background: rgb(12, 18, 34);
+  opacity: 1;
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+```
+
+### 3.4 验证
+
+| 属性 | 修复前（折叠后） | 修复后（折叠后） |
+|---|---|---|
+| width | `260px` | `0px` ✅ |
+| flex | `0 0 260px` | `0 0 0px` ✅ |
+| opacity | `0.053` | `0` ✅ |
+| overflow | `hidden auto` | `hidden` ✅ |
+
+| 属性 | 修复前（动画中 50ms） | 修复后（动画中 50ms） |
+|---|---|---|
+| opacity | `0.03` | `1` ✅ |
+| background | `rgba(12,18,34,0.7)` | `rgb(12,18,34)` ✅ |
+| position | `static` | `absolute` ✅ |
+
+### 3.5 经验总结
+
+1. **CSS `@layer` 优先级陷阱**：当 `@layer` 声明顺序使某层优先级更高时，该层中的低 specificity 规则会覆盖其他层中的高 specificity 规则。跨层覆盖属性时，必须将覆盖规则放在同一层或更高层。
+
+2. **opacity 过渡与背景透明的交互**：`opacity` 作用于整个元素（包括子元素和背景），即使背景色设为不透明，`opacity < 1` 仍会让整个元素半透明。折叠动画应只过渡 `transform`，不过渡 `opacity`，或在 overlay 期间强制 `opacity: 1`。
+
+3. **回归根因**：此问题之前"修复"过，但只修了表面（背景不透明、opacity 不淡出），没有修到根因（@layer 优先级冲突导致 `width/flex` 未生效）。反复出现的教训：**务必用 computed style 验证最终状态**，而非只看动画中间状态。
