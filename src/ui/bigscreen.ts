@@ -71,8 +71,6 @@ interface SidebarSectionSnapshot {
 interface SidebarSnapshot {
   hidden: boolean;
   btnActive: boolean;
-  stripVisible: boolean;
-  stripRight: string;
   sections: SidebarSectionSnapshot[];
 }
 
@@ -81,13 +79,10 @@ let _preBigscreenSidebar: SidebarSnapshot | null = null;
 function captureSidebar(): void {
   const sidebar = document.getElementById('sidebar');
   const btn     = document.getElementById('btn-sidebar-toggle');
-  const strip   = document.getElementById('sidebar-strip');
   if (!sidebar) return;
   _preBigscreenSidebar = {
     hidden: sidebar.classList.contains('hidden'),
     btnActive: btn?.classList.contains('active') ?? false,
-    stripVisible: strip?.classList.contains('visible') ?? false,
-    stripRight: strip?.style.right ?? '',
     sections: Array.from(
       document.querySelectorAll<HTMLElement>('.sidebar-section, .legend-block'),
     ).map((el) => ({
@@ -104,7 +99,6 @@ export function restoreSidebar(): void {
 
   const sidebar = document.getElementById('sidebar');
   const btn     = document.getElementById('btn-sidebar-toggle');
-  const strip   = document.getElementById('sidebar-strip');
 
   // Clean up any stale sidebar-overlay from an in-flight toggle animation
   // that was interrupted by bigscreen exit. Without this, the sidebar
@@ -127,10 +121,6 @@ export function restoreSidebar(): void {
   // Keep #main.sidebar-hidden in sync — see drag-manager.ts onChange.
   document.getElementById('main')?.classList.toggle('sidebar-hidden', snap.hidden);
   if (btn)     btn.classList.toggle('active', snap.btnActive);
-  if (strip) {
-    strip.classList.toggle('visible', snap.stripVisible);
-    strip.style.right = snap.stripRight;
-  }
 
   const sectionEls = document.querySelectorAll<HTMLElement>('.sidebar-section, .legend-block');
   sectionEls.forEach((el, i) => {

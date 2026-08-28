@@ -289,19 +289,6 @@
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.sidebar-strip {
-  position: absolute; right: 0; top: 50%; transform: translateY(-50%);
-  z-index: 10; width: 20px; height: 56px;
-  background: rgba(12,18,34,0.55); backdrop-filter: blur(12px);
-  border: 1px solid var(--border); border-right: none; border-radius: 10px 0 0 10px;
-  cursor: pointer; align-items: center; justify-content: center;
-  color: var(--muted); transition: background 0.14s, color 0.14s, opacity 0.28s ease;
-  opacity: 0; pointer-events: none;
-}
-#main.sidebar-hidden .sidebar-strip { opacity: 1; pointer-events: auto; }
-.sidebar-strip:hover { background: rgba(99,102,241,0.2); color: var(--accent); }
-.sidebar-strip svg { width: 12px; height: 12px; }
-
 .sidebar-section { padding: 0; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .sidebar-section__head {
   display: flex; align-items: center; justify-content: space-between;
@@ -1171,7 +1158,6 @@ html.bigscreen #app::after {
    least-invasive way to hide it without touching its DOM state. */
 html.bigscreen .topbar,
 html.bigscreen .toolbar,
-html.bigscreen #sidebar-strip,
 html.bigscreen #tour-dt,
 html.bigscreen #zoom-indicator { display: none !important; }
 

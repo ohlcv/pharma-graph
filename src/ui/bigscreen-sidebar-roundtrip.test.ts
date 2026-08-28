@@ -46,7 +46,6 @@ class NoopResizeObserver {
 describe('bigscreen sidebar round-trip', () => {
   let sidebar: HTMLElement;
   let btn: HTMLElement;
-  let strip: HTMLElement;
   let main: HTMLElement;
   let cyContainer: HTMLElement;
   let cy: {
@@ -83,13 +82,11 @@ describe('bigscreen sidebar round-trip', () => {
       </aside>
       <div id="main">
         <button id="btn-sidebar-toggle" class="btn" data-action="toggle-sidebar"></button>
-        <div id="sidebar-strip" class="sidebar-strip"></div>
         <div id="cy"></div>
       </div>
     `;
     sidebar = document.getElementById('sidebar')!;
     btn = document.getElementById('btn-sidebar-toggle')!;
-    strip = document.getElementById('sidebar-strip')!;
     main = document.getElementById('main')!;
     cyContainer = document.getElementById('cy')!;
 
@@ -145,8 +142,6 @@ describe('bigscreen sidebar round-trip', () => {
     // UiToggle manipulation). For this test we just add the class.
     sidebar.classList.add('hidden');
     btn.classList.remove('active');
-    strip.classList.add('visible');
-    strip.style.right = '0';
 
     expect(sidebar.classList.contains('hidden')).toBe(true);
 

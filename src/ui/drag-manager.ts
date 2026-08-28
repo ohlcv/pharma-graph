@@ -379,7 +379,6 @@ export function cancelSidebarAnim(): void {
 export function toggleSidebar(renderer: Renderer): void {
   const sidebar = document.getElementById('sidebar');
   const btn = document.getElementById('btn-sidebar-toggle');
-  const strip = document.getElementById('sidebar-strip');
   if (!sidebar) return;
   if (!sidebarToggle) {
     sidebarToggle = new UiToggle({
@@ -389,10 +388,6 @@ export function toggleSidebar(renderer: Renderer): void {
       applyTo: sidebar,
       onChange: (hidden) => {
         if (btn) btn.classList.toggle('active', !hidden);
-        if (strip) {
-          strip.classList.toggle('visible', hidden);
-          strip.style.right = hidden ? '0' : '';
-        }
         // Strategy: make the sidebar position:absolute (overlay) during the
         // 0.28s transform/opacity animation so it can slide freely above
         // the canvas. The grid column change + cy.resize() happens either
