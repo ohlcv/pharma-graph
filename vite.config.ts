@@ -1,40 +1,12 @@
 import { defineConfig, type Plugin } from 'vite';
-import { readdir, readFile, writeFile, stat, mkdir } from 'node:fs/promises';
+import { readdir, writeFile, stat, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, relative, sep, posix } from 'node:path';
-import { parse as yamlParse } from 'yaml';
 
 const CONTENT_DIR = 'public/content';
 const PUBLIC_DIR = 'public';
 const MANIFEST_FILENAME = 'content-manifest.json';
 const SITEMAP_FILENAME = 'sitemap.xml';
-const GRAPH_DATA_FILENAME = 'static-graph-data.json';
-
-/**
- * 占位符替换所需的计数（节点 / 边）——不依赖内联 JSON，避免 Safari 桌面 /
- * 微信 WKWebView 因超大型内联 <script> 触发 HTML 解析崩溃。
- * 完整图谱 JSON 写入 public/static-graph-data.json 独立文件，并在
- * <head> 用 <link rel="alternate" type="application/json"> 声明位置。
- * noscriptInjection 是可见文本（药物 + 疾病索引），所有爬虫/AI 工具
- * 都能直接读到节点名称，无需执行 JS 或解析外部文件。
- */
-let staticNodeCount = 0;
-let staticEdgeCount = 0;
-let noscriptInjection = '';
-
-interface StaticNode {
-  id: string;
-  label: string;
-  essence: string;
-  field: string;
-  tier: string;
-}
-
-interface StaticEdge {
-  source: string;
-  target: string;
-  type: string;
-}
 
 /**
  * Escape XML special characters for sitemap <loc> / <lastmod> text nodes.
@@ -66,71 +38,6 @@ function isoDate(d: Date): string {
   const m = String(d.getUTCMonth() + 1).padStart(2, '0');
   const day = String(d.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
-}
-
-/**
- * 简化版 frontmatter 解析（构建时用，不依赖 src/parser/frontmatter.ts 的完整警告系统）。
- * 只提取 SEO 需要的字段：id / label / essence / field / tier / edges_out。
- * 与 frontmatter.ts 的 pickSource 逻辑一致：优先读 `data:` 嵌套块，兼容 legacy 顶层 edges_out。
- */
-function parseFrontmatterSimple(
-  raw: string,
-  filePath: string,
-): {
-  id: string;
-  label: string;
-  essence: string;
-  field: string;
-  tier: string;
-  edges: Array<{ target: string; type: string }>;
-} | null {
-  const trimmed = raw.replace(/^\uFEFF/, '');
-  const match = trimmed.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!match) return null;
-
-  let data: Record<string, unknown>;
-  try {
-    data = (yamlParse(match[1]) as Record<string, unknown>) ?? {};
-  } catch {
-    return null;
-  }
-
-  // 处理 data: 嵌套块（与 frontmatter.ts pickSource 一致）
-  const nested = data['data'];
-  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
-    const block = nested as Record<string, unknown>;
-    const rootEdges = data['edges_out'];
-    if (!('edges_out' in block) && Array.isArray(rootEdges)) {
-      block['edges_out'] = rootEdges;
-    }
-    data = block;
-  }
-
-  const id = String(data['id'] ?? '').trim();
-  if (!id) return null;
-
-  const fileBasename = filePath.split(/[/\\]/).pop()?.replace(/\.md$/i, '') ?? id;
-  const label =
-    (typeof data['label'] === 'string' ? data['label'].trim() : '') || fileBasename;
-  const essence = typeof data['essence'] === 'string' ? data['essence'].trim() : '';
-  const field = typeof data['field'] === 'string' ? data['field'].trim() : '';
-  const tier = typeof data['tier'] === 'string' ? data['tier'].trim() : '';
-
-  const edgesRaw = data['edges_out'];
-  const edges: Array<{ target: string; type: string }> = [];
-  if (Array.isArray(edgesRaw)) {
-    for (const e of edgesRaw) {
-      if (e && typeof e === 'object' && !Array.isArray(e)) {
-        const obj = e as Record<string, unknown>;
-        const target = String(obj['target'] ?? '').trim();
-        if (target) {
-          edges.push({ target, type: String(obj['type'] ?? '').trim() || 'relates' });
-        }
-      }
-    }
-  }
-
-  return { id, label, essence, field, tier, edges };
 }
 
 /**
@@ -214,55 +121,6 @@ async function buildManifest(): Promise<void> {
   lines.push('</urlset>');
   lines.push('');
   await writeFile(join(publicRoot, SITEMAP_FILENAME), lines.join('\n'), 'utf8');
-
-  // 3) 静态图谱数据 → 写入独立 JSON 文件（Safari/微信 WKWebView 对几百 KB 的内联
-  //    <script type="application/json"> 会触发 HTML 解析崩溃，必须拆成外部文件）
-  const nodes: StaticNode[] = [];
-  const edges: StaticEdge[] = [];
-  for (const e of entries) {
-    const raw = await readFile(e.abs, 'utf-8');
-    const fm = parseFrontmatterSimple(raw, e.rel);
-    if (!fm) continue;
-    nodes.push({ id: fm.id, label: fm.label, essence: fm.essence, field: fm.field, tier: fm.tier });
-    for (const edge of fm.edges) {
-      edges.push({ source: fm.id, target: edge.target, type: edge.type });
-    }
-  }
-  staticNodeCount = nodes.length;
-  staticEdgeCount = edges.length;
-  await writeFile(
-    join(publicRoot, GRAPH_DATA_FILENAME),
-    JSON.stringify({ nodes, edges }),
-    'utf-8',
-  );
-
-  // 4) 构造 noscript 可见文本注入段：所有药物(medication) + 疾病(illness)
-  //    按字典序去重排序，所有爬虫和 AI 工具都能直接在纯可见文本读到节点名。
-  const drugLabels: string[] = [];
-  const illnessLabels: string[] = [];
-  for (const n of nodes) {
-    if (!n.label) continue;
-    if (n.essence === 'medication') drugLabels.push(n.label);
-    else if (n.essence === 'illness') illnessLabels.push(n.label);
-  }
-  const dedupSorted = (arr: string[]): string[] => Array.from(new Set(arr)).sort((a, b) => a.localeCompare(b, 'zh'));
-  const drugs = dedupSorted(drugLabels);
-  const illnesses = dedupSorted(illnessLabels);
-  const escaped = (s: string) =>
-    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const drugHtml = drugs.length
-    ? `<div style="font-size:0.92rem;line-height:1.9;color:#1e293b;">${drugs.map(escaped).join(' · ')}</div>`
-    : '';
-  const illnessHtml = illnesses.length
-    ? `<div style="margin-top:1.25rem;font-size:0.92rem;line-height:1.9;color:#1e293b;">${illnesses.map(escaped).join(' · ')}</div>`
-    : '';
-  noscriptInjection =
-    `\n    <section style="margin-top:2rem;">\n` +
-    `      <h2 style="color:#06b6d4;border-left:4px solid #06b6d4;padding-left:0.75rem;">🧬 完整药物与疾病索引（共 ${drugs.length} 种药物 · ${illnesses.length} 种疾病，按拼音排序）</h2>\n` +
-    `      <p style="color:#475569;font-size:0.9rem;">以下是知识图谱收录的全部具体药物和疾病名称，支持搜索：</p>\n` +
-    (drugHtml ? `      ${drugHtml}\n` : '') +
-    (illnessHtml ? `      ${illnessHtml}\n` : '') +
-    `    </section>\n`;
 }
 
 function contentManifestPlugin(): Plugin {
@@ -278,41 +136,6 @@ function contentManifestPlugin(): Plugin {
       if (ctx.file.endsWith('.md')) {
         await buildManifest();
       }
-    },
-    transformIndexHtml(html: string): string {
-      if (staticNodeCount === 0) return html;
-
-      const nodeCount = String(staticNodeCount);
-      const edgeCount = String(staticEdgeCount);
-
-      let out = html;
-
-      // 1) 在 </head> 之前声明完整图谱 JSON 的位置，给能抓取外部文件的爬虫使用
-      out = out.replace(
-        '</head>',
-        '  <link rel="alternate" type="application/json" href="/static-graph-data.json" title="药学知识图谱完整结构化数据（节点与关系边）">\n</head>',
-      );
-
-      // 2) 替换可见占位符为真实数字（JS 运行后会覆盖，对用户无影响）
-      out = out.replace('id="stat-nodes">—<', `id="stat-nodes">${nodeCount}<`);
-      out = out.replace('id="stat-edges">—<', `id="stat-edges">${edgeCount}<`);
-      out = out.replace('id="bs-stat-nodes">—<', `id="bs-stat-nodes">${nodeCount}<`);
-      out = out.replace('id="bs-stat-edges">—<', `id="bs-stat-edges">${edgeCount}<`);
-
-      // 3) 替换"图谱为空"提示——爬虫看到的是真实状态而非空状态
-      out = out.replace('图谱为空', '图谱数据已就绪');
-      out = out.replace(
-        '请选择或添加节点以开始探索',
-        `${nodeCount} 个药学知识节点，${edgeCount} 条关联关系`,
-      );
-
-      // 4) 在 </noscript> 之前注入完整药物 + 疾病索引（可见文本，任何 AI
-      //    工具和简单爬虫都能直接读到节点名，无需执行 JS 或解析外部 JSON）
-      if (noscriptInjection) {
-        out = out.replace('</noscript>', `${noscriptInjection}</noscript>`);
-      }
-
-      return out;
     },
   };
 }
