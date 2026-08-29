@@ -190,7 +190,7 @@ export function initSheetDrag(): void {
 
 // ── Desktop panel drag + resize ───────────────────────────────────────────────
 
-const PANEL_BOUNDS_KEY = 'detailPanel.bounds.v2';
+const PANEL_BOUNDS_KEY = 'detailPanel.bounds.v3';
 const PANEL_DEFAULT_W = 360;
 const PANEL_DEFAULT_H = 360;
 const PANEL_MIN_W = 280;
@@ -262,11 +262,12 @@ export function initPanelDrag(): void {
   // on the header (CSS) keeps pointer events flowing on mobile.
   header.addEventListener('pointerdown', (e: PointerEvent) => {
     if (!panel.classList.contains('visible')) return;
+    const rect = panel.getBoundingClientRect();
     dragState = {
       startX: e.clientX,
       startY: e.clientY,
-      startLeft: panel.offsetLeft,
-      startTop: panel.offsetTop,
+      startLeft: rect.left,
+      startTop: rect.top,
       el: panel,
     };
     panel.classList.add('dragging');
@@ -294,11 +295,12 @@ function stopPanelDrag(): void {
   document.removeEventListener('pointerup', stopPanelDrag);
   if (dragState) {
     dragState.el.classList.remove('dragging');
+    const r = dragState.el.getBoundingClientRect();
     savePanelBounds({
-      left: dragState.el.offsetLeft,
-      top: dragState.el.offsetTop,
-      width: dragState.el.offsetWidth,
-      height: dragState.el.offsetHeight,
+      left: r.left,
+      top: r.top,
+      width: r.width,
+      height: r.height,
     });
     dragState = null;
   }
@@ -329,9 +331,10 @@ export function initPanelResize(): void {
 function onPanelResize(e: PointerEvent): void {
   if (!resizeState || uiState.isPanelPinned) return;
   const { el, startW, startH } = resizeState;
+  const r = el.getBoundingClientRect();
   const next = clampBounds({
-    left: el.offsetLeft,
-    top: el.offsetTop,
+    left: r.left,
+    top: r.top,
     width: startW + (e.clientX - resizeState.startX),
     height: startH + (e.clientY - resizeState.startY),
   });
@@ -344,11 +347,12 @@ function stopPanelResize(): void {
   document.removeEventListener('pointerup', stopPanelResize);
   if (resizeState) {
     resizeState.el.classList.remove('resizing');
+    const r = resizeState.el.getBoundingClientRect();
     savePanelBounds({
-      left: resizeState.el.offsetLeft,
-      top: resizeState.el.offsetTop,
-      width: resizeState.el.offsetWidth,
-      height: resizeState.el.offsetHeight,
+      left: r.left,
+      top: r.top,
+      width: r.width,
+      height: r.height,
     });
     resizeState = null;
   }
