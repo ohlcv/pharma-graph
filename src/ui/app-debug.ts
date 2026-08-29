@@ -7,6 +7,8 @@ import cytoscape from 'cytoscape';
 import type { NodeSingular } from 'cytoscape';
 import { Renderer } from '../core/renderer.js';
 import { HighlightEngine } from './highlight-engine.js';
+import { uiState } from './state.js';
+import { PANEL_BOUNDS_KEY, clearPanelBounds } from './drag-manager.js';
 
 export let debugOverlayActive = false;
 let _prevSelectedNodeId: string | null = null;
@@ -182,6 +184,17 @@ export function initDebugOverlay(renderer: Renderer): void {
       <div class="dbg-coverage" id="dbg-coverage"></div>
     </div>
 
+    <!-- 节点详情面板诊断（DOM / z-index / containing block / 事件监听 / saved bounds） -->
+    <div class="dbg-section">
+      <div class="dbg-section__label">📋 节点详情面板诊断</div>
+      <div id="dbg-panel-diag" style="font-size:10.5px;line-height:1.65;color:#cbd5e1;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">—</div>
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        <button id="dbg-btn-refresh-diag" class="btn btn--ghost btn--sm" type="button">🔄 刷新诊断</button>
+        <button id="dbg-btn-reset-panel-bounds" class="btn btn--ghost btn--sm" type="button" style="color:#f87171;border-color:rgba(248,113,113,0.35)">♻ 重置面板位置</button>
+        <button id="dbg-btn-reposition-panel" class="btn btn--ghost btn--sm" type="button">⤴ 强制重新定位</button>
+      </div>
+    </div>
+
     <!-- 冲突警告 -->
     <div class="dbg-conflict" id="dbg-conflict" style="display:none"></div>
 
@@ -213,6 +226,28 @@ export function initDebugOverlay(renderer: Renderer): void {
   // users can still dismiss without dragging.
   const headerEl = panel.querySelector<HTMLElement>('#dbg-header');
   if (headerEl) attachDragHandlers(panel, headerEl);
+
+  // ── Node panel diagnostic buttons ─────────────────────────────────
+  panel.querySelector<HTMLButtonElement>('#dbg-btn-refresh-diag')
+    ?.addEventListener('click', () => updateNodePanelDiagnostics());
+  panel.querySelector<HTMLButtonElement>('#dbg-btn-reset-panel-bounds')
+    ?.addEventListener('click', () => {
+      clearPanelBounds();
+      updateNodePanelDiagnostics();
+      // Also nudge the panel back into default positioning on next open.
+      const np = document.getElementById('node-panel');
+      if (np) {
+        np.style.left = '';
+        np.style.top = '';
+        np.style.right = '';
+      }
+    });
+  panel.querySelector<HTMLButtonElement>('#dbg-btn-reposition-panel')
+    ?.addEventListener('click', () => {
+      clearPanelBounds();
+      uiState.detailPanel?.repositionCurrent();
+      updateNodePanelDiagnostics();
+    });
 }
 
 /**
@@ -372,6 +407,155 @@ function nodeProps(node: NodeSingular): string {
   ].join('');
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Node panel diagnostics — walks the DOM / CSS / event chain to figure out
+// why the detail panel looks wrong or can't be dragged. Results are shown
+// inside the 取证面板 so users on production (vercel) can self-serve.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function ok(v: string): string { return `<span style="color:#4ade80">✓ ${v}</span>`; }
+function warn(v: string): string { return `<span style="color:#fbbf24">⚠ ${v}</span>`; }
+function bad(v: string): string { return `<span style="color:#f87171">✗ ${v}</span>`; }
+function info(v: string): string { return `<span style="color:#94a3b8">${v}</span>`; }
+const L = (k: string, v: string) => `<div><span style="color:#64748b">${k}</span> ${v}</div>`;
+
+/** Walk upward from #node-panel looking for any ancestor whose CSS would
+ *  trap `position: fixed` (transform / filter / will-change / perspective /
+ *  contain:paint). If any is found, `position:fixed` is effectively
+ *  `position:absolute` relative to that ancestor → panel is clipped /
+ *  misscaled. Returns list of `[{elem, reason, value}]`. */
+function findAncestorContainingBlocks(start: Element | null):
+    Array<{ tag: string; id: string; reason: string; value: string }> {
+  const out: Array<{ tag: string; id: string; reason: string; value: string }> = [];
+  let el: Element | null = start;
+  while (el && el.tagName !== 'HTML') {
+    el = el.parentElement;
+    if (!el) break;
+    const cs = getComputedStyle(el);
+    const checks: Array<[string, (v: string) => boolean]> = [
+      ['transform',      (v) => v !== 'none' && v !== 'matrix(1, 0, 0, 1, 0, 0)'],
+      ['filter',         (v) => v !== 'none'],
+      ['will-change',    (v) => /transform|perspective|filter/.test(v) && v !== 'auto'],
+      ['perspective',    (v) => v !== 'none'],
+      ['contain',        (v) => /paint|layout|strict|content/.test(v) && v !== 'none'],
+    ];
+    for (const [name, badFn] of checks) {
+      const val = (cs as any)[name];
+      if (val && badFn(val)) {
+        out.push({
+          tag: el.tagName.toLowerCase(),
+          id: (el as HTMLElement).id || '',
+          reason: name,
+          value: val.slice(0, 80),
+        });
+      }
+    }
+  }
+  return out;
+}
+
+export function updateNodePanelDiagnostics(): void {
+  const out = document.getElementById('dbg-panel-diag') as HTMLElement | null;
+  if (!out) return;
+  const p = document.getElementById('node-panel');
+  if (!p) { out.innerHTML = bad('#node-panel 不存在于 DOM'); return; }
+  const h = document.getElementById('node-panel-header');
+  const cs = getComputedStyle(p);
+  const hcs = h ? getComputedStyle(h) : null;
+  const r = p.getBoundingClientRect();
+  const hr = h ? h.getBoundingClientRect() : null;
+  const vpW = window.innerWidth;
+  const vpH = window.innerHeight;
+  const MIN_TOP = 56 + 44 + 8;  // topbar(56) + toolbar(44) + pad(8) = 108px
+
+  const rows: string[] = [];
+
+  // — 1) DOM tree position —
+  const parentId = p.parentElement?.id || p.parentElement?.tagName || '?';
+  const correctParent = parentId === 'app';
+  rows.push(L('DOM 父级', correctParent ? ok(`#${parentId} ✓ (在 #main 外)`) : bad(`#${parentId} → 不应在 #main 内`)));
+
+  // — 2) Containing block — position:fixed must be relative to viewport.
+  const traps = findAncestorContainingBlocks(p);
+  if (traps.length === 0) {
+    rows.push(L('containing block', ok('viewport (无祖先 transform/filter)')));
+  } else {
+    rows.push(L('containing block', bad('被祖先困住 → position:fixed 实际是 absolute')));
+    for (const t of traps) {
+      rows.push('  ' + info(`<${t.tag}>${t.id ? '#' + t.id : ''} — ${t.reason}: ${t.value}`));
+    }
+  }
+
+  // — 3) Positioning —
+  const topOK = r.top >= MIN_TOP - 0.5;
+  const overlapTB = r.top < 56;        // overlaps topbar (y<56 means above bottom of topbar)
+  const overlapTool = r.top < (56 + 44) && r.top + r.height > 56;  // overlaps toolbar band
+  const leftOK = r.left >= 0 && r.left + r.width <= vpW + 0.5;
+  const topInfo = `${r.top.toFixed(0)}px (需要≥${MIN_TOP}px, topbar底=56 toolbar底=100)`;
+  rows.push(L('rect.top',    topOK ? ok(topInfo) : (overlapTB ? bad(topInfo + ' ⚠ 与topbar重叠!') : warn(topInfo + ' 与toolbar重叠'))));
+  rows.push(L('rect.left',   leftOK ? ok(`${r.left.toFixed(0)}px`) : warn(`${r.left.toFixed(0)}px (超出viewport左)`)));
+  rows.push(L('rect size',   info(`${r.width.toFixed(0)} × ${r.height.toFixed(0)}`)));
+  rows.push(L('viewport',    info(`${vpW} × ${vpH}`)));
+  rows.push(L('computed position/z-index', info(`${cs.position} / z=${cs.zIndex}`)));
+  rows.push(L('left/top explicit', info(`left=${cs.left} top=${cs.top} right=${cs.right}`)));
+
+  // — 4) Classes / visibility —
+  const cls = Array.from(p.classList).join('.');
+  rows.push(L('classList', info(cls || '(空)')));
+  rows.push(L('visibility',
+    cs.visibility === 'visible' ? ok('visible') : bad(cs.visibility)));
+  rows.push(L('pointer-events',
+    cs.pointerEvents === 'none' ? bad('none (整面板无法接收指针!)') : ok(cs.pointerEvents)));
+
+  // — 5) Header pointer capture test (the user drags from here) —
+  if (hcs && hr) {
+    rows.push(L('header 可见性',
+      hcs.visibility === 'visible' ? ok('visible') : bad(hcs.visibility)));
+    rows.push(L('header pointer-events',
+      hcs.pointerEvents === 'none' ? bad('none → 无法拖!') : ok(hcs.pointerEvents)));
+    rows.push(L('header cursor',
+      /grab|grabbing|move/.test(hcs.cursor) ? ok(hcs.cursor) : warn(`${hcs.cursor} (未设置拖拽提示)`)));
+    rows.push(L('header 顶部y',
+      hr.top >= MIN_TOP - 0.5 ? ok(`${hr.top.toFixed(0)}px`) :
+        bad(`${hr.top.toFixed(0)}px < ${MIN_TOP} → 头部在工具栏下!`)));
+    rows.push(L('header 区域',
+      info(`${hr.width.toFixed(0)} × ${hr.height.toFixed(0)}  (拖动手柄)`)));
+    // Check if header's bounding rect overlaps topbar (0..56) / toolbar (56..100)
+    if (hr.top < 56) rows.push('  ' + bad('header 伸进 topbar! topbar z-index=10 → pointerdown 会被toolbar上面元素拦截'));
+    else if (hr.top < 100) rows.push('  ' + warn('header 伸进 toolbar (z-index=25) 区域 — 可能被toolbar按钮拦截'));
+  }
+
+  // — 6) localStorage saved bounds —
+  try {
+    const raw = localStorage.getItem(PANEL_BOUNDS_KEY);
+    if (!raw) {
+      rows.push(L('saved bounds', ok('(无) 每次打开都会重新定位')));
+    } else {
+      const v = JSON.parse(raw);
+      rows.push(L('saved bounds', info(`v5: left=${v.left} top=${v.top} w=${v.width} h=${v.height}`)));
+      if (typeof v.top === 'number' && v.top < MIN_TOP) {
+        rows.push('  ' + bad(`saved top=${v.top} < ${MIN_TOP} → 打开时会放在工具栏区域! 点"重置面板位置"清除`));
+      }
+    }
+  } catch (e: any) {
+    rows.push(L('saved bounds', bad(`解析失败: ${e?.message || e}`)));
+  }
+
+  // — 7) Stacking context vs top bars —
+  const tb = document.querySelector<HTMLElement>('.topbar');
+  const tl = document.querySelector<HTMLElement>('.toolbar');
+  const tbs = tb ? getComputedStyle(tb) : null;
+  const tls = tl ? getComputedStyle(tl) : null;
+  const pz = parseInt(cs.zIndex || '0', 10) || 0;
+  const tbz = tbs ? (parseInt(tbs.zIndex || '0', 10) || 0) : 0;
+  const tlz = tls ? (parseInt(tls.zIndex || '0', 10) || 0) : 0;
+  rows.push(L('z-index 对比',
+    `panel(z=${pz}) vs topbar(z=${tbz})${pz > tbz ? ' ✓' : ' ✗'}  vs toolbar(z=${tlz})${pz > tlz ? ' ✓' : ' ✗'}`));
+  if (pz <= tlz) rows.push('  ' + bad('panel z-index ≤ toolbar → toolbar 会盖住header → 拖不动!'));
+
+  out.innerHTML = rows.join('');
+}
+
 export function updateForensicPanel(renderer: Renderer): void {
   if (!debugOverlayActive) return;
   const cy = renderer.getCy();
@@ -486,6 +670,9 @@ export function updateForensicPanel(renderer: Renderer): void {
     const layerWarn= noLayer> 0 ? `<span style="color:#f87171">⚠ layer 缺失: ${noLayer}/${total}</span>` : `<span style="color:#4ade80">✓ layer 全覆盖</span>`;
     coverageEl.innerHTML = `<div style="font-size:9px;line-height:1.8">${typeWarn}<br>${catWarn}<br>${layerWarn}</div>`;
   }
+
+  // ── Node panel diagnostics ─────────────────────────────────────────
+  updateNodePanelDiagnostics();
 
   _prevSelectedNodeId = null;
   _prevSelectedNodeName = null;
