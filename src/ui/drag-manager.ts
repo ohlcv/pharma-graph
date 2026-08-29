@@ -190,7 +190,7 @@ export function initSheetDrag(): void {
 
 // ── Desktop panel drag + resize ───────────────────────────────────────────────
 
-const PANEL_BOUNDS_KEY = 'detailPanel.bounds.v4';
+const PANEL_BOUNDS_KEY = 'detailPanel.bounds.v5';
 const PANEL_DEFAULT_W = 360;
 const PANEL_DEFAULT_H = 360;
 const PANEL_MIN_W = 280;
@@ -199,6 +199,11 @@ const PANEL_MIN_H = 240;
  *  is snapped back if dragged outside. */
 const PANEL_PAD = 8;
 const TOPBAR_H = 56;
+const TOOLBAR_H = 44;
+// Header of the panel must sit below topbar(56px) + toolbar(44px) = 100px
+// so it never overlaps either bar's visual area (they have native pointer
+// capture for their own children).
+const PANEL_MIN_TOP = TOPBAR_H + TOOLBAR_H + PANEL_PAD;  // = 108px
 
 interface PanelBounds { left: number; top: number; width: number; height: number; }
 
@@ -211,9 +216,9 @@ function clampBounds(b: PanelBounds): PanelBounds {
   // Constrain size first so the left/top clamp below accounts for the actual
   // rendered width/height (panel may have been resized below its CSS default).
   const w = Math.max(PANEL_MIN_W, Math.min(b.width, vpW - PANEL_PAD * 2));
-  const h = Math.max(PANEL_MIN_H, Math.min(b.height, vpH - TOPBAR_H - PANEL_PAD * 2));
+  const h = Math.max(PANEL_MIN_H, Math.min(b.height, vpH - PANEL_MIN_TOP - PANEL_PAD));
   const left = Math.max(PANEL_PAD, Math.min(b.left, vpW - w - PANEL_PAD));
-  const top = Math.max(TOPBAR_H + PANEL_PAD, Math.min(b.top, vpH - h - PANEL_PAD));
+  const top = Math.max(PANEL_MIN_TOP, Math.min(b.top, vpH - h - PANEL_PAD));
   return { left, top, width: w, height: h };
 }
 

@@ -154,8 +154,12 @@ export class DetailPanel {
     const vpW = window.innerWidth;
     const vpH = window.innerHeight;
     const TOPBAR_H = 56;
+    const TOOLBAR_H = 44;
     const PAD = 8;
     const SIDEBAR_W = 260;
+    // Must sit below topbar(56) + toolbar(44) = 100px so panel header never
+    // overlaps the top bars visually or event-wise.
+    const MIN_TOP = TOPBAR_H + TOOLBAR_H + PAD;  // 108px
 
     // Once the user has dragged or resized the panel, leave it where they
     // put it. We only reposition when no saved bounds exist — i.e. the
@@ -164,7 +168,7 @@ export class DetailPanel {
 
     const sbW = (document.getElementById('sidebar')?.classList.contains('hidden') ?? true) ? 0 : SIDEBAR_W;
     const left = vpW - pW - PAD - sbW;
-    const top = Math.max(TOPBAR_H + PAD, Math.round((vpH - pH) / 2));
+    const top = Math.max(MIN_TOP, Math.round((vpH - pH) / 2));
 
     this.panel.style.right = 'auto';
     this.panel.style.left = left + 'px';
