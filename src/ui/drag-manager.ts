@@ -190,7 +190,7 @@ export function initSheetDrag(): void {
 
 // ── Desktop panel drag + resize ───────────────────────────────────────────────
 
-const PANEL_BOUNDS_KEY = 'detailPanel.bounds';
+const PANEL_BOUNDS_KEY = 'detailPanel.bounds.v2';
 const PANEL_DEFAULT_W = 360;
 const PANEL_DEFAULT_H = 360;
 const PANEL_MIN_W = 280;

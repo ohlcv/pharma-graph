@@ -155,13 +155,15 @@ export class DetailPanel {
     const vpH = window.innerHeight;
     const TOPBAR_H = 56;
     const PAD = 8;
+    const SIDEBAR_W = 260;
 
     // Once the user has dragged or resized the panel, leave it where they
     // put it. We only reposition when no saved bounds exist — i.e. the
     // very first open of the session.
     if (hasSavedBounds()) return;
 
-    const left = vpW - pW - PAD;
+    const sbW = (document.getElementById('sidebar')?.classList.contains('hidden') ?? true) ? 0 : SIDEBAR_W;
+    const left = vpW - pW - PAD - sbW;
     const top = Math.max(TOPBAR_H + PAD, Math.round((vpH - pH) / 2));
 
     this.panel.style.right = 'auto';
