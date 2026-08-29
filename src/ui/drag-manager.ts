@@ -240,6 +240,7 @@ function savePanelBounds(b: PanelBounds): void {
 export function restorePanelBounds(panel: HTMLElement): void {
   const saved = loadPanelBounds();
   if (!saved) return;
+  panel.style.right = 'auto';
   panel.style.left = saved.left + 'px';
   panel.style.top = saved.top + 'px';
   panel.style.width = saved.width + 'px';
@@ -283,6 +284,7 @@ function onPanelDrag(e: PointerEvent): void {
     width: el.offsetWidth,
     height: el.offsetHeight,
   });
+  el.style.right = 'auto';
   el.style.left = next.left + 'px';
   el.style.top = next.top + 'px';
 }

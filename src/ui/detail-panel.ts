@@ -164,6 +164,7 @@ export class DetailPanel {
     const left = vpW - pW - PAD;
     const top = Math.max(TOPBAR_H + PAD, Math.round((vpH - pH) / 2));
 
+    this.panel.style.right = 'auto';
     this.panel.style.left = left + 'px';
     this.panel.style.top = top + 'px';
   }
