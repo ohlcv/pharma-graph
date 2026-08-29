@@ -244,7 +244,7 @@
 
 /* ── Zoom indicator ─────────────────────────────────────────────────────── */
 .zoom-indicator {
-  position: fixed; bottom: 16px; right: 16px; z-index: 30;
+  position: fixed; bottom: 16px; right: 16px; z-index: 20;
   background: rgba(12, 18, 34, 0.88);
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border); border-radius: 8px;

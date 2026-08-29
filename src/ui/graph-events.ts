@@ -59,10 +59,10 @@ function setCytoscapeDragMode(cy: cytoscape.Core, on: boolean): void {
 
 export function initGraphEvents(deps: GraphEventDeps): void {
   const { cy } = deps;
+  const dbgBtn = document.getElementById('debug-toggle');
 
   cy.on('tap', 'node', (evt) => {
     const node = evt.target;
-    const dbgBtn = document.getElementById('debug-toggle');
     if (dbgBtn) {
       dbgBtn.style.transition = 'none';
       dbgBtn.style.background = '#4338ca';
