@@ -2,7 +2,7 @@
 data:
   id: rna-synthesis-antitumor
   label: 干扰转录过程和阻止RNA合成的药物（作用于核酸转录药物）
-  essence: section
+  essence: module
   field: pharmacology
   tier: management
   location:

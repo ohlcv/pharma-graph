@@ -2,7 +2,7 @@
 data:
   id: direct-dna-acting-antitumor
   label: 直接影响DNA结构和功能的药物
-  essence: section
+  essence: module
   field: pharmacology
   tier: management
   location:
