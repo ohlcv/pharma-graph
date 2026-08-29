@@ -184,8 +184,11 @@ async function boot(): Promise<void> {
 
     const sidebar = document.getElementById('sidebar');
     const sidebarBtn = document.getElementById('btn-sidebar-toggle');
+    const nodePanel = document.getElementById('node-panel');
     if (sidebar && sidebarBtn)
       sidebarBtn.classList.toggle('active', !sidebar.classList.contains('hidden'));
+    if (nodePanel && sidebar)
+      nodePanel.classList.toggle('sidebar-hidden-adjust', sidebar.classList.contains('hidden'));
 
     initSheetDrag();
     initPanelDrag();

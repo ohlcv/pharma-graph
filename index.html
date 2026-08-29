@@ -288,38 +288,6 @@
     <div id="cy">
     </div>
 
-    <!-- ── Left floating node detail ─────────────────────────────────── -->
-    <div id="node-panel" class="node-panel" role="dialog" aria-label="节点详情">
-      <div class="node-panel__header" id="node-panel-header">
-        <span class="node-panel__title">节点详情</span>
-        <div class="node-panel__tabs" role="tablist" aria-label="详情面板标签">
-          <button class="node-panel__tab active" id="lp-tab-overview"
-                  role="tab" aria-selected="true"  aria-controls="lp-overview-page"
-                  aria-label="概述" tabindex="0">概</button>
-          <button class="node-panel__tab"        id="lp-tab-body"
-                  role="tab" aria-selected="false" aria-controls="lp-body-page"
-                  aria-label="正文" tabindex="-1">文</button>
-        </div>
-        <button class="node-panel__pin" id="lp-btn-pin" aria-label="固定位置" title="固定位置">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 4v6l-2 4v2h10v-2l-2 -4v-6"/>
-            <path d="M12 16l0 5"/>
-            <path d="M8 4l8 0"/>
-          </svg>
-        </button>
-        <button class="node-panel__close" data-action="close-node-panel" aria-label="关闭">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
-      <div class="node-panel__resize" id="node-panel-resize" aria-hidden="true"></div>
-      <div class="node-panel__body">
-        <div id="lp-overview-page" class="np-page" role="tabpanel" aria-labelledby="lp-tab-overview"></div>
-        <div id="lp-body-page"    class="np-page" role="tabpanel" aria-labelledby="lp-tab-body"     style="display:none"></div>
-      </div>
-    </div>
-
     <!-- ── Desktop sidebar ───────────────────────────────────────────── -->
     <aside id="sidebar">
 
@@ -476,6 +444,41 @@
     </aside><!-- /desktop sidebar -->
 
   </div><!-- /main -->
+
+  <!-- ── Floating node detail panel (outside #main so position:fixed
+         uses the viewport as containing block — will-change:transform
+         on #cy would otherwise trap fixed descendants inside #main,
+         causing overflow:hidden to clip the panel and break drag.)  -->
+  <div id="node-panel" class="node-panel" role="dialog" aria-label="节点详情">
+    <div class="node-panel__header" id="node-panel-header">
+      <span class="node-panel__title">节点详情</span>
+      <div class="node-panel__tabs" role="tablist" aria-label="详情面板标签">
+        <button class="node-panel__tab active" id="lp-tab-overview"
+                role="tab" aria-selected="true"  aria-controls="lp-overview-page"
+                aria-label="概述" tabindex="0">概</button>
+        <button class="node-panel__tab"        id="lp-tab-body"
+                role="tab" aria-selected="false" aria-controls="lp-body-page"
+                aria-label="正文" tabindex="-1">文</button>
+      </div>
+      <button class="node-panel__pin" id="lp-btn-pin" aria-label="固定位置" title="固定位置">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 4v6l-2 4v2h10v-2l-2 -4v-6"/>
+          <path d="M12 16l0 5"/>
+          <path d="M8 4l8 0"/>
+        </svg>
+      </button>
+      <button class="node-panel__close" data-action="close-node-panel" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="node-panel__resize" id="node-panel-resize" aria-hidden="true"></div>
+    <div class="node-panel__body">
+      <div id="lp-overview-page" class="np-page" role="tabpanel" aria-labelledby="lp-tab-overview"></div>
+      <div id="lp-body-page"    class="np-page" role="tabpanel" aria-labelledby="lp-tab-body"     style="display:none"></div>
+    </div>
+  </div>
 
   <!-- ── Mobile: always-visible close handle (outside sheet so it's visible when closed) -->
   <div id="sheet-close-bar" data-action="close-bottom-sheet">

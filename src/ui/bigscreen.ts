@@ -120,6 +120,7 @@ export function restoreSidebar(): void {
   }
   // Keep #main.sidebar-hidden in sync — see drag-manager.ts onChange.
   document.getElementById('main')?.classList.toggle('sidebar-hidden', snap.hidden);
+  document.getElementById('node-panel')?.classList.toggle('sidebar-hidden-adjust', snap.hidden);
   if (btn)     btn.classList.toggle('active', snap.btnActive);
 
   const sectionEls = document.querySelectorAll<HTMLElement>('.sidebar-section, .legend-block');

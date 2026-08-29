@@ -190,7 +190,7 @@ export function initSheetDrag(): void {
 
 // ── Desktop panel drag + resize ───────────────────────────────────────────────
 
-const PANEL_BOUNDS_KEY = 'detailPanel.bounds.v3';
+const PANEL_BOUNDS_KEY = 'detailPanel.bounds.v4';
 const PANEL_DEFAULT_W = 360;
 const PANEL_DEFAULT_H = 360;
 const PANEL_MIN_W = 280;
@@ -403,6 +403,7 @@ export function toggleSidebar(renderer: Renderer): void {
         // opaque background, so there's no black flash or black curtain.
         const main = document.getElementById('main');
         const sb = document.getElementById('sidebar');
+        const nodePanel = document.getElementById('node-panel');
         if (sb) sb.classList.add('sidebar-overlay');
         // Cancel any previous animation timer — rapid toggles would
         // otherwise fire stale timeouts that remove sidebar-overlay
@@ -413,6 +414,7 @@ export function toggleSidebar(renderer: Renderer): void {
           // Collapse: grid column collapses now (canvas expands behind the
           // sidebar which is still visible at the start of the transition).
           main?.classList.add('sidebar-hidden');
+          nodePanel?.classList.add('sidebar-hidden-adjust');
           renderer.getCy().resize();
           // After the sidebar finishes sliding out, restore normal flow.
           sidebarAnimTimer = setTimeout(() => {
@@ -425,6 +427,7 @@ export function toggleSidebar(renderer: Renderer): void {
           // (the resize is hidden behind the now-opaque sidebar).
           sidebarAnimTimer = setTimeout(() => {
             main?.classList.remove('sidebar-hidden');
+            nodePanel?.classList.remove('sidebar-hidden-adjust');
             renderer.getCy().resize();
             if (sb) sb.classList.remove('sidebar-overlay');
             sidebarAnimTimer = null;
