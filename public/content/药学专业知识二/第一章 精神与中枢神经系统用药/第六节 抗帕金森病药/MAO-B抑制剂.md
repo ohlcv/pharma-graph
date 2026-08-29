@@ -22,9 +22,6 @@ data:
     - target: dopaminergic-drugs
       type: isa
       reason: MAO-B 抑制剂是拟多巴胺类药亚类
-    - target: notion-mao-b-inhibitor-adr
-      type: prerequisite
-      reason: MAO-B 抑制剂不良反应与相互作用独立节点
 ---
 
 # MAO-B 抑制剂

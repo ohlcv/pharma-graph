@@ -24,7 +24,7 @@
     radial-gradient(ellipse 120% 80% at 12% -5%, rgba(129,140,248,0.22) 0%, transparent 65%),
     radial-gradient(ellipse 100% 70% at 88% 95%, rgba(6,182,212,0.16) 0%, transparent 60%);
   mix-blend-mode: screen;
-  pointer-events: none; z-index: 0;
+  pointer-events: none; z-index: -1;
 }
 
 /* ── Main layout ──────────────────────────────────────────────────────────── */
@@ -34,7 +34,7 @@
 #main {
   display: flex;
   overflow: hidden; height: calc(100vh - 56px - 44px);
-  position: relative; z-index: 1; min-width: 0;
+  position: relative; min-width: 0;
 }
 #main.sidebar-hidden #cy { flex: 1 1 auto; }
 #main.sidebar-hidden #sidebar {

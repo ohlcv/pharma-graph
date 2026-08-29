@@ -2,7 +2,7 @@
 data:
   id: notion-ccb-vs-beta-blocker-comparison
   label: CCB与β受体阻断剂对比
-  essence: notion
+  essence: concept
   field: pharmacology
   tier: management
   location:
