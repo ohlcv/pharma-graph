@@ -15,6 +15,8 @@ import {
   TIER_LABEL,
   EDGE_TYPE_STYLE,
   EDGE_TYPE_LABEL,
+  LEVEL_BORDER_COLOR,
+  LEVEL_LABEL,
 } from '../core/config.js';
 import { buildLegend } from './legend-factory.js';
 
@@ -27,6 +29,7 @@ let activeShapeFilter: string | null = null;
 let activeFieldFilter: string | null = null;
 let activeTierFilter: string | null = null;
 let activeEdgeFilter: string | null = null;
+let activeLevelFilter: number | null = null;
 
 export function getActiveShapeFilter(): string | null {
   return activeShapeFilter;
@@ -42,23 +45,34 @@ function clearAllFilters(): void {
   activeFieldFilter = null;
   activeTierFilter = null;
   activeEdgeFilter = null;
+  activeLevelFilter = null;
   staticEls(
-    '.legend-row', '.legend-field-row', '.legend-tier-row', '.legend-edge-row',
+    '.legend-row', '.legend-field-row', '.legend-tier-row', '.legend-edge-row', '.legend-level-row',
     '.shape-filter-item', '.bs-chip',
   ).forEach((el) => el.classList.remove('active'));
 }
 
 // ── Axis populators ────────────────────────────────────────────────────────────
 
+// Module-level cy reference for filter functions that need direct access.
+let legendCy: Core | null = null;
+
 const NODE_TYPE_SHAPE_MAP: Record<string, string> = {
+  module: 'round-rectangle',
+  classification: 'hexagon',
   concept: 'octagon',
   medication: 'ellipse',
   illness: 'diamond',
+  process: 'star',
+  notion: 'tag',
+  mnemonic: 'vee',
+  summary: 'pentagon',
+  table: 'rectangle',
+  note: 'round-tag',
+  // 历史兼容
+  section: 'tag',
   route: 'triangle',
   substance: 'pentagon',
-  process: 'star',
-  module: 'round-rectangle',
-  section: 'tag',
 };
 
 function makeShapeSwatch(shape: string): string {
@@ -117,6 +131,26 @@ export function populateTierLegend(cy: Core): void {
     desktopRow: (k, label) => `<div class="legend-tier-row" data-tier="${k}"><span class="legend-swatch" style="background:${NODE_TIER_STYLE[k]?.bgColor ?? '#f1f5f9'};border:2px solid #ffffff"></span><span class="legend-row__label">${label}</span><span class="legend-row__count" id="legend-tier-count-${k}"></span></div>`,
     mobileChip: (k, label) => `<div class="bs-chip bs-chip--tier" data-tier="${k}"><span class="bs-chip__swatch" style="background:${NODE_TIER_STYLE[k]?.bgColor ?? '#f1f5f9'};border:2px solid #ffffff"></span><span>${label}</span><span class="bs-chip__count" id="bs-tier-count-${k}"></span></div>`,
     onClick: (key, highlight) => highlightTier(key, highlight),
+  });
+}
+
+// ── Level legend (结构级别 → 边框色) ────────────────────────────────────────────
+
+export function populateLevelLegend(cy: Core): void {
+  legendCy = cy;
+  buildLegend(cy, {
+    labels: LEVEL_LABEL,
+    countScope: 'nodes',
+    countSelector: '[level = "${key}"]',
+    desktopContainerId: 'legend-level-grid',
+    mobileContainerId: 'bs-level-chips',
+    desktopCountPrefix: 'legend-level-count-',
+    mobileCountPrefix: 'bs-level-count-',
+    rowClass: 'legend-level-row',
+    dataKey: 'data-level',
+    desktopRow: (k, label) => `<div class="legend-level-row" data-level="${k}"><span class="legend-swatch" style="background:#f8fafc;border:2px solid ${LEVEL_BORDER_COLOR[Number(k)] ?? '#94a3b8'}"></span><span class="legend-row__label">${label}</span><span class="legend-row__count" id="legend-level-count-${k}"></span></div>`,
+    mobileChip: (k, label) => `<div class="bs-chip bs-chip--level" data-level="${k}"><span class="bs-chip__swatch" style="background:#f8fafc;border:2px solid ${LEVEL_BORDER_COLOR[Number(k)] ?? '#94a3b8'}"></span><span>${label}</span><span class="bs-chip__count" id="bs-level-count-${k}"></span></div>`,
+    onClick: (key, highlight) => highlightLevel(String(key), highlight),
   });
 }
 
@@ -226,6 +260,24 @@ export function highlightTier(tier: string, highlight: HighlightEngine): void {
   highlight.highlightTier(tier);
   activateAxis('.legend-tier-row[data-tier]', 'data-tier', tier);
   activateAxis('.bs-chip[data-tier]', 'data-tier', tier);
+}
+
+export function highlightLevel(level: string, highlight: HighlightEngine): void {
+  if (activeLevelFilter === Number(level)) {
+    clearAllFilters();
+    highlight.reset();
+    return;
+  }
+  clearAllFilters();
+  activeLevelFilter = Number(level);
+  const cy = legendCy;
+  if (cy) {
+    cy.nodes(`[level = "${level}"]`).addClass('highlighted');
+    cy.nodes(`[level != "${level}"]`).addClass('dimmed');
+    cy.edges().addClass('dimmed');
+  }
+  activateAxis('.legend-level-row[data-level]', 'data-level', level);
+  activateAxis('.bs-chip[data-level]', 'data-level', level);
 }
 
 export function highlightEdgeTypeFilter(edge: string, highlight: HighlightEngine): void {

@@ -7,6 +7,7 @@ import {
   isValidEssence,
   isValidField,
   isValidTier,
+  isValidLevel,
   isValidEdgeType,
 } from "../src/parser/schema.js";
 import path from "path";
@@ -100,6 +101,16 @@ export async function validate(): Promise<void> {
         file: relPath,
         field: 'tier',
         message: `tier 值 "${fm.tier}" 不在已知层级列表中`,
+        severity: 'warning',
+      });
+    }
+
+    // Validate level field (must be 1-6)
+    if (fm.level !== undefined && !isValidLevel(fm.level)) {
+      errors.push({
+        file: relPath,
+        field: 'level',
+        message: `level 值 "${fm.level}" 不在有效范围 (1-6)`,
         severity: 'warning',
       });
     }

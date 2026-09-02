@@ -37,8 +37,10 @@ describe('edge-types SSOT', () => {
   });
 
   it('isEdgeType is a sound type guard', () => {
-    expect(isEdgeType('has')).toBe(true);
-    expect(isEdgeType('relates')).toBe(true);
+    expect(isEdgeType('link')).toBe(true);
+    expect(isEdgeType('parent')).toBe(true);
+    expect(isEdgeType('has')).toBe(false); // 旧边类型，已废弃
+    expect(isEdgeType('relates')).toBe(false); // 旧边类型，已废弃
     expect(isEdgeType('not-a-real-type')).toBe(false);
     expect(isEdgeType(null)).toBe(false);
     expect(isEdgeType(undefined)).toBe(false);

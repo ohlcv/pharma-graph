@@ -14,6 +14,7 @@ import {
   FIELD_COLOR,
   EDGE_TYPE_STYLE,
   NODE_TIER_STYLE,
+  LEVEL_BORDER_COLOR,
   LAYOUTS,
   LayoutConfig,
   DEFAULT_LAYOUT,
@@ -64,9 +65,9 @@ const STYLESHEET: any[] = (() => {
     };
   });
 
-  // Field 规则 — 边框色（区分学科归属）
-  const fieldRules = Object.entries(FIELD_COLOR).map(([key, color]) => ({
-    selector: `node[field = "${key}"]`,
+  // Level 规则 — 边框色（思维导图结构级别 1-6）
+  const levelRules = Object.entries(LEVEL_BORDER_COLOR).map(([lvl, color]) => ({
+    selector: `node[level = "${lvl}"]`,
     style: { 'border-color': color, 'border-width': 2 },
   }));
 
@@ -82,18 +83,22 @@ const STYLESHEET: any[] = (() => {
     const b = Math.max(0, parseInt(h.slice(4, 6), 16) - amount);
     return '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
   };
-  const edgeTypeRules = Object.entries(EDGE_TYPE_STYLE).map(([type, s]) => ({
-    selector: `edge[edgeType = "${type}"]`,
-    style: {
-      'line-color': s.color,
-      'line-fill': 'linear-gradient',
-      'line-gradient-stop-positions': '0% 100%',
-      'line-gradient-stop-colors': `${s.color} ${darken(s.color, 80)}`,
-      'target-arrow-color': s.color,
-      'line-style': s.lineStyle as cytoscape.Css.LineStyle,
-      'target-arrow-shape': (s.arrow === 'none' ? 'none' : 'triangle') as cytoscape.Css.ArrowShape,
-    },
-  }));
+  const edgeTypeRules = Object.entries(EDGE_TYPE_STYLE).map(([type, s]) => {
+    const isBidirectional = type === 'contrast';
+    return {
+      selector: `edge[edgeType = "${type}"]`,
+      style: {
+        'line-color': s.color,
+        'line-fill': 'linear-gradient',
+        'line-gradient-stop-positions': '0% 100%',
+        'line-gradient-stop-colors': `${s.color} ${darken(s.color, 80)}`,
+        'target-arrow-color': s.color,
+        'line-style': s.lineStyle as cytoscape.Css.LineStyle,
+        'target-arrow-shape': (s.arrow === 'none' ? 'none' : 'triangle') as cytoscape.Css.ArrowShape,
+        ...(isBidirectional ? { 'source-arrow-shape': 'triangle' as cytoscape.Css.ArrowShape, 'source-arrow-color': s.color } : {}),
+      },
+    };
+  });
 
   return [
     // ① 节点基础样式
@@ -136,8 +141,8 @@ const STYLESHEET: any[] = (() => {
         'transition-timing-function': 'ease-out',
       },
     },
-    // ② field 边框色 (学科色, 1.5px ring 表达"属哪一科")
-    ...fieldRules,
+    // ② level 边框色 (思维导图结构级别 1-6)
+    ...levelRules,
     // ③ essence 形状（节点本质决定形状）
     ...nodeTypeRules,
     // ④ tier 填充色 — halo 已移除 (Batch G), 形状各异的节点不强制套椭圆外圈
@@ -454,6 +459,7 @@ export class Renderer {
           essence: n.essence || 'default',
           field: n.field || '',
           tier: n.tier,
+          level: n.level,
           // Display aliases — debug panel + older code paths read these directly.
           // Kept in sync with the new-schema values via build-graph.ts.
           type: n.essence || 'default',

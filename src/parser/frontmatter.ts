@@ -19,10 +19,12 @@ export interface NodeMeta {
   label: string;
   /** 节点本质（决定形状） */
   essence?: string;
-  /** 学科领域（决定边框色） */
+  /** 学科领域 */
   field?: string;
   /** 自然分层（决定填充色） */
   tier?: string;
+  /** 思维导图结构级别 1-6（决定边框色） */
+  level?: number;
   summary?: string;
   location?: {
     book?: string;
@@ -168,6 +170,8 @@ export function parseFrontmatterWithWarnings(
   const essence = getField(fm, 'essence') ?? '';
   const field   = getField(fm, 'field')   ?? '';
   const tier    = getField(fm, 'tier');
+  const levelRaw = fm['level'];
+  const level = typeof levelRaw === 'number' ? levelRaw : undefined;
 
   const rawSummary = fm['summary'] as Record<string, unknown> | string | undefined;
   const summary =
@@ -240,6 +244,7 @@ export function parseFrontmatterWithWarnings(
       essence,
       field,
       tier,
+      level,
       summary,
       edges_out: edges.length > 0 ? edges : undefined,
       tags: tags.length > 0 ? tags : undefined,

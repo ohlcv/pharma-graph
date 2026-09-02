@@ -92,6 +92,7 @@ export function buildGraph(
       essence: fm.essence ?? '',
       field: fm.field ?? '',
       tier: fm.tier,
+      level: fm.level,
       type: fm.essence ?? '',
       category: fm.field ?? '',
       layer: fm.tier,
