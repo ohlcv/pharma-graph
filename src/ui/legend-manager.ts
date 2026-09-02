@@ -69,6 +69,7 @@ const NODE_TYPE_SHAPE_MAP: Record<string, string> = {
   summary: 'pentagon',
   table: 'rectangle',
   note: 'round-tag',
+  route: 'triangle',
 };
 
 function makeShapeSwatch(shape: string): string {
