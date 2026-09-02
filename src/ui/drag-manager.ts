@@ -213,12 +213,16 @@ let resizeState: { startX: number; startY: number; startW: number; startH: numbe
 function clampBounds(b: PanelBounds): PanelBounds {
   const vpW = window.innerWidth;
   const vpH = window.innerHeight;
+  const isMobile = vpW <= 768;
+  const minW = isMobile ? 200 : PANEL_MIN_W;
+  const minH = isMobile ? 120 : PANEL_MIN_H;
+  const minTop = isMobile ? PANEL_PAD : PANEL_MIN_TOP;  // mobile: no topbar/toolbar in the way
   // Constrain size first so the left/top clamp below accounts for the actual
   // rendered width/height (panel may have been resized below its CSS default).
-  const w = Math.max(PANEL_MIN_W, Math.min(b.width, vpW - PANEL_PAD * 2));
-  const h = Math.max(PANEL_MIN_H, Math.min(b.height, vpH - PANEL_MIN_TOP - PANEL_PAD));
+  const w = Math.max(minW, Math.min(b.width, vpW - PANEL_PAD * 2));
+  const h = Math.max(minH, Math.min(b.height, vpH - minTop - PANEL_PAD));
   const left = Math.max(PANEL_PAD, Math.min(b.left, vpW - w - PANEL_PAD));
-  const top = Math.max(PANEL_MIN_TOP, Math.min(b.top, vpH - h - PANEL_PAD));
+  const top = Math.max(minTop, Math.min(b.top, vpH - h - PANEL_PAD));
   return { left, top, width: w, height: h };
 }
 
@@ -243,6 +247,17 @@ function savePanelBounds(b: PanelBounds): void {
  * (subsequent `show()` calls on the same node shouldn't jump the user).
  */
 export function restorePanelBounds(panel: HTMLElement): void {
+  // Mobile: skip desktop saved bounds — they have wrong dimensions for a
+  // phone viewport (e.g. height=571 from desktop max-height) and the
+  // inline minHeight would override CSS max-height, forcing the panel to
+  // fill the entire screen.
+  if (window.innerWidth <= 768) {
+    panel.style.left = '';
+    panel.style.top = '';
+    panel.style.width = '';
+    panel.style.minHeight = '';
+    return;
+  }
   const saved = loadPanelBounds();
   if (!saved) return;
   panel.style.right = 'auto';
@@ -252,8 +267,11 @@ export function restorePanelBounds(panel: HTMLElement): void {
   panel.style.minHeight = saved.height + 'px';
 }
 
-/** True iff the user has dragged or resized the panel at least once. */
+/** True iff the user has dragged or resized the panel at least once.
+ *  On mobile we always return false — desktop saved bounds are meaningless
+ *  on a phone viewport and would prevent reposition() from running. */
 export function hasSavedBounds(): boolean {
+  if (window.innerWidth <= 768) return false;
   return loadPanelBounds() !== null;
 }
 
@@ -300,13 +318,17 @@ function stopPanelDrag(): void {
   document.removeEventListener('pointerup', stopPanelDrag);
   if (dragState) {
     dragState.el.classList.remove('dragging');
-    const r = dragState.el.getBoundingClientRect();
-    savePanelBounds({
-      left: r.left,
-      top: r.top,
-      width: r.width,
-      height: r.height,
-    });
+    // Don't persist mobile drag positions — they're viewport-specific and
+    // would corrupt the desktop experience on next visit.
+    if (window.innerWidth > 768) {
+      const r = dragState.el.getBoundingClientRect();
+      savePanelBounds({
+        left: r.left,
+        top: r.top,
+        width: r.width,
+        height: r.height,
+      });
+    }
     dragState = null;
   }
 }
@@ -352,13 +374,15 @@ function stopPanelResize(): void {
   document.removeEventListener('pointerup', stopPanelResize);
   if (resizeState) {
     resizeState.el.classList.remove('resizing');
-    const r = resizeState.el.getBoundingClientRect();
-    savePanelBounds({
-      left: r.left,
-      top: r.top,
-      width: r.width,
-      height: r.height,
-    });
+    if (window.innerWidth > 768) {
+      const r = resizeState.el.getBoundingClientRect();
+      savePanelBounds({
+        left: r.left,
+        top: r.top,
+        width: r.width,
+        height: r.height,
+      });
+    }
     resizeState = null;
   }
 }
