@@ -44,7 +44,7 @@ function applySheetState(open: boolean): void {
 export function syncTourBarPosition(): void {
   const tourBar = document.getElementById('tour-status');
   if (!tourBar) return;
-  if (window.innerWidth > 640) { tourBar.style.top = ''; tourBar.style.bottom = ''; }
+  if (window.innerWidth > 768) { tourBar.style.top = ''; tourBar.style.bottom = ''; }
 }
 
 // ── Mobile sheet drag ─────────────────────────────────────────────────────────
@@ -418,7 +418,9 @@ export function toggleSidebar(renderer: Renderer): void {
   if (!sidebarToggle) {
     sidebarToggle = new UiToggle({
       initial: sidebar.classList.contains('hidden'),
-      persist: 'sidebar.hidden',
+      // Only persist on desktop — mobile sidebar is display:none via CSS
+      // and toggling it on mobile would corrupt the desktop state.
+      persist: window.innerWidth > 768 ? 'sidebar.hidden' : undefined,
       cssClass: 'hidden',
       applyTo: sidebar,
       onChange: (hidden) => {

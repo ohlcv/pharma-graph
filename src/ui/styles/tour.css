@@ -39,10 +39,10 @@
 .tour-state--running .tour-state-target,
 .tour-state--paused  .tour-state-target { display: flex; }
 /* On desktop, only the first .tour-dt (via #tour-dt) should show; hide all others */
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   #tour-dt { display: none; }
 }
-@media (min-width: 641px) {
+@media (min-width: 769px) {
   .tour-state--running .tour-mob,
   .tour-state--paused  .tour-mob { display: none; }
   /* Also hide the second desktop bar (it has no id="tour-dt") */
@@ -133,7 +133,7 @@
     }
     
     /* 桌面版在手机视口隐藏，由 JS 控制 mobile 下该显示哪个 */
-    @media (max-width: 640px) {
+    @media (max-width: 768px) {
       .tour-dt { display: none; }
     }
     
@@ -281,12 +281,12 @@
     }
     
     /* 手机版在桌面视口隐藏，由 JS 控制 desktop 下该显示哪个 */
-    @media (min-width: 641px) {
+    @media (min-width: 769px) {
       .tour-mob { display: none; }
     }
-    
-    /* 手机版外观（只在 ≤640px 生效） */
-    @media (max-width: 640px) {
+
+    /* 手机版外观（只在 ≤768px 生效） */
+    @media (max-width: 768px) {
       .tour-mob.tour-visible { display: flex; }
       .tour-mob {
         /* 注意：不写 display，由 JS 控制 */

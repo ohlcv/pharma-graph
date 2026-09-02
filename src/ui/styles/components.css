@@ -608,6 +608,7 @@
 /* ── Mobile: auto-sized panel, same drag/resize as desktop ─────────── */
 @media (max-width: 768px) {
   #node-panel {
+    top: 108px; right: auto; left: 8px;
     width: auto;
     max-width: calc(100vw - 16px);
     height: auto;
