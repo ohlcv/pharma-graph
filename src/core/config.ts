@@ -79,12 +79,12 @@ export const ESSENCE_LABEL: Record<string, string> = {
 // ── Level → 边框色（思维导图结构级别 1-6）──────────────────────────────────────
 
 export const LEVEL_BORDER_COLOR: Record<number, string> = {
-  1: '#1e293b',   // 一级 — 最深结构色（slate-800）
-  2: '#334155',   // 二级 — 深结构色（slate-700）
-  3: '#475569',   // 三级 — 中结构色（slate-600）
-  4: '#64748b',   // 四级 — 中浅结构色（slate-500）
-  5: '#94a3b8',   // 五级 — 浅结构色（slate-400）
-  6: '#cbd5e1',   // 六级 — 最浅结构色（slate-300）
+  1: '#ef4444',   // 一级 — 红色
+  2: '#f97316',   // 二级 — 橙色
+  3: '#eab308',   // 三级 — 黄色
+  4: '#22c55e',   // 四级 — 绿色
+  5: '#06b6d4',   // 五级 — 青色
+  6: '#8b5cf6',   // 六级 — 紫色
 };
 
 export const LEVEL_LABEL: Record<number, string> = {
