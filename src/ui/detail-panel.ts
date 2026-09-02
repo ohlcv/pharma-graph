@@ -147,19 +147,23 @@ export class DetailPanel {
   }
 
   reposition(nodeId: string, _W?: number, _H?: number): void {
+    // Mobile: skip reposition — CSS already positions the panel correctly
+    // (left: 8px, right: auto) and the reposition logic calculates wrong
+    // left values for width:auto panels, causing the panel to appear
+    // off-screen on first open.
+    if (window.innerWidth <= 768) return;
+
     if (!this.panel.classList.contains('visible') || uiState.isPanelPinned) return;
 
     const pW = this.panel.offsetWidth;
     const pH = this.panel.offsetHeight;
     const vpW = window.innerWidth;
     const vpH = window.innerHeight;
-    const TOPBAR_H = 56;
-    const TOOLBAR_H = 44;
     const PAD = 8;
     const SIDEBAR_W = 260;
     // Must sit below topbar(56) + toolbar(44) = 100px so panel header never
     // overlaps the top bars visually or event-wise.
-    const MIN_TOP = TOPBAR_H + TOOLBAR_H + PAD;  // 108px
+    const MIN_TOP = 108;
 
     // Once the user has dragged or resized the panel, leave it where they
     // put it. We only reposition when no saved bounds exist — i.e. the

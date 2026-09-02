@@ -342,6 +342,10 @@ export function initPanelResize(): void {
     if (!panel.classList.contains('visible')) return;
     e.preventDefault();
     e.stopPropagation(); // don't bubble to header → no drag kickoff
+    // Bypass CSS max-width during resize — the user's drag is authoritative.
+    // Without this, dragging right when already at max-width results in
+    // offsetWidth capping the calculation and the panel only growing in height.
+    panel.style.maxWidth = 'none';
     resizeState = {
       startX: e.clientX,
       startY: e.clientY,
