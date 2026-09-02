@@ -134,19 +134,6 @@ export function populateTierLegend(cy: Core): void {
 
 export function populateLevelLegend(cy: Core): void {
   legendCy = cy;
-  // 计算每个层级的节点数量，用于确定 swatch 大小
-  const levelCounts: Record<number, number> = {};
-  for (const k of Object.keys(LEVEL_LABEL)) {
-    levelCounts[Number(k)] = cy.nodes(`[level = ${k}]`).not('.layer-parent').length;
-  }
-  const maxCount = Math.max(...Object.values(levelCounts), 1);
-  const swatchSize = (count: number) => {
-    const minSize = 12;
-    const maxSize = 24;
-    const ratio = count / maxCount;
-    return minSize + (maxSize - minSize) * ratio;
-  };
-
   buildLegend(cy, {
     labels: LEVEL_LABEL,
     countScope: 'nodes',
@@ -157,16 +144,8 @@ export function populateLevelLegend(cy: Core): void {
     mobileCountPrefix: 'bs-level-count-',
     rowClass: 'legend-level-row',
     dataKey: 'data-level',
-    desktopRow: (k, label) => {
-      const count = levelCounts[Number(k)] ?? 0;
-      const size = swatchSize(count);
-      return `<div class="legend-level-row" data-level="${k}"><span class="legend-swatch" style="width:${size}px;height:${size}px;background:#f8fafc;border:2px solid ${LEVEL_BORDER_COLOR[Number(k)] ?? '#94a3b8'}"></span><span class="legend-row__label">${label}</span><span class="legend-row__count" id="legend-level-count-${k}"></span></div>`;
-    },
-    mobileChip: (k, label) => {
-      const count = levelCounts[Number(k)] ?? 0;
-      const size = swatchSize(count);
-      return `<div class="bs-chip bs-chip--level" data-level="${k}"><span class="bs-chip__swatch" style="width:${size}px;height:${size}px;background:#f8fafc;border:2px solid ${LEVEL_BORDER_COLOR[Number(k)] ?? '#94a3b8'}"></span><span>${label}</span><span class="bs-chip__count" id="bs-level-count-${k}"></span></div>`;
-    },
+    desktopRow: (k, label) => `<div class="legend-level-row" data-level="${k}"><span class="legend-swatch" style="background:#f8fafc;border:2px solid ${LEVEL_BORDER_COLOR[Number(k)] ?? '#94a3b8'}"></span><span class="legend-row__label">${label}</span><span class="legend-row__count" id="legend-level-count-${k}"></span></div>`,
+    mobileChip: (k, label) => `<div class="bs-chip bs-chip--level" data-level="${k}"><span class="bs-chip__swatch" style="background:#f8fafc;border:2px solid ${LEVEL_BORDER_COLOR[Number(k)] ?? '#94a3b8'}"></span><span>${label}</span><span class="bs-chip__count" id="bs-level-count-${k}"></span></div>`,
     onClick: (key, highlight) => highlightLevel(String(key), highlight),
   });
 }
