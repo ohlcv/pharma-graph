@@ -604,6 +604,20 @@
   visibility: hidden; opacity: 0; pointer-events: none;
   transition: opacity 0.22s ease, visibility 0.22s; touch-action: none;
 }
+
+/* ── Mobile: panel becomes a bottom sheet, sizes to content ────────── */
+@media (max-width: 768px) {
+  #node-panel {
+    top: auto !important; left: 8px !important; right: 8px !important;
+    bottom: 8px; width: auto; max-width: none;
+    max-height: 55vh;  /* half screen, not 85% */
+    border-radius: 14px;
+  }
+  #node-panel.sidebar-hidden-adjust { right: 8px; }
+  /* No drag/resize on mobile — panel is full width, nothing to move */
+  #node-panel .node-panel__header { cursor: default; }
+  #node-panel .node-panel__resize { display: none; }
+}
 /* When sidebar is hidden, panel can sit at the right edge. */
 #node-panel.sidebar-hidden-adjust { right: 16px; }
 #node-panel.visible { visibility: visible; opacity: 1; pointer-events: auto; display: flex; animation: np-in 0.3s cubic-bezier(0.34, 1.4, 0.64, 1) both; }

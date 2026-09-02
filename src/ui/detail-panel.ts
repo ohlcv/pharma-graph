@@ -149,6 +149,9 @@ export class DetailPanel {
   reposition(nodeId: string, _W?: number, _H?: number): void {
     if (!this.panel.classList.contains('visible') || uiState.isPanelPinned) return;
 
+    // Mobile: CSS bottom-sheet handles positioning, skip JS layout.
+    if (window.innerWidth <= 768) return;
+
     const pW = this.panel.offsetWidth;
     const pH = this.panel.offsetHeight;
     const vpW = window.innerWidth;
