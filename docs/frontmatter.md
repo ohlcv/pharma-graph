@@ -22,7 +22,7 @@ data:
   id: 唯一标识
   label: 显示名称
   essence: 节点本质
-  level: 思维导图层级
+  level: 节点层级
   tier: 知识层级
 
   location:
@@ -1157,7 +1157,7 @@ C ─┘
 [本质]
  essence
 
-[思维导图层级]
+[节点层级]
  level
 
 [知识层级]

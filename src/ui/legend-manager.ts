@@ -137,7 +137,7 @@ export function populateLevelLegend(cy: Core): void {
   buildLegend(cy, {
     labels: LEVEL_LABEL,
     countScope: 'nodes',
-    countSelector: '[level = "${key}"]',
+    countSelector: '[level = ${key}]',
     desktopContainerId: 'legend-level-grid',
     mobileContainerId: 'bs-level-chips',
     desktopCountPrefix: 'legend-level-count-',
