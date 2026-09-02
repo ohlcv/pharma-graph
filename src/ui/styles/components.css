@@ -605,11 +605,12 @@
   transition: opacity 0.22s ease, visibility 0.22s; touch-action: none;
 }
 
-/* ── Mobile: smaller panel, same drag/resize as desktop ────────────── */
+/* ── Mobile: auto-sized panel, same drag/resize as desktop ─────────── */
 @media (max-width: 768px) {
   #node-panel {
-    width: calc(100vw - 16px);
+    width: auto;
     max-width: calc(100vw - 16px);
+    height: auto;
     max-height: 40vh;
   }
 }
