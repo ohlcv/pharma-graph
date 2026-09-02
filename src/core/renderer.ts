@@ -67,7 +67,7 @@ const STYLESHEET: any[] = (() => {
 
   // Level 规则 — 边框色（思维导图结构级别 1-6）
   const levelRules = Object.entries(LEVEL_BORDER_COLOR).map(([lvl, color]) => ({
-    selector: `node[level = "${lvl}"]`,
+    selector: `node[level = ${lvl}]`,
     style: { 'border-color': color, 'border-width': 2 },
   }));
 
