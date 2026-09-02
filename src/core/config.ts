@@ -28,10 +28,6 @@ export const NODE_TYPE_SHAPE: Record<string, string> = {
   summary: 'pentagon',              // 总结/归纳 — 五边形
   table: 'rectangle',              // 表格/对照表 — 矩形
   note: 'round-tag',               // 注意/提示/笔记 — 圆角标签形
-  // 历史兼容
-  section: 'tag',
-  route: 'triangle',
-  substance: 'pentagon',
 };
 
 export const NODE_TYPE_COLOR: Record<string, string> = {
@@ -46,10 +42,6 @@ export const NODE_TYPE_COLOR: Record<string, string> = {
   summary: '#fde68a',             // 浅黄 — 总结
   table: '#94a3b8',               // 灰蓝 — 表格
   note: '#fca5a5',               // 浅红 — 注意/提示
-  // 历史兼容
-  section: '#d1d5db',
-  route: '#22d3ee',
-  substance: '#c4b5fd',
   default: '#94a3b8',
 };
 
@@ -65,10 +57,6 @@ export const NODE_TYPE_COLOR_DARK: Record<string, string> = {
   summary: '#ca8a04',
   table: '#64748b',
   note: '#dc2626',
-  // 历史兼容
-  section: '#94a3b8',
-  route: '#0891b2',
-  substance: '#7c3aed',
   default: '#64748b',
 };
 
@@ -86,10 +74,6 @@ export const ESSENCE_LABEL: Record<string, string> = {
   summary: '总结',
   table: '表格',
   note: '注意',
-  // 历史兼容
-  section: '标签',
-  route: '通路',
-  substance: '成分',
 };
 
 // ── Level → 边框色（思维导图结构级别 1-6）──────────────────────────────────────

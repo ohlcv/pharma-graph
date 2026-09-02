@@ -9,7 +9,7 @@ import type { Core } from 'cytoscape';
 import { getCurrentLayout } from './layout-manager.js';
 import {
   populateEssenceLegend,
-  populateFieldLegend,
+  populateLevelLegend,
   populateTierLegend,
   populateEdgeLegend,
 } from './legend-manager.js';
@@ -88,7 +88,7 @@ function doUpdateStats(cy: Core): void {
     if (el) el.textContent = getCurrentLayout().toUpperCase();
 
     populateEssenceLegend(cy);
-    populateFieldLegend(cy);
+    populateLevelLegend(cy);
     populateTierLegend(cy);
     populateEdgeLegend(cy);
   });

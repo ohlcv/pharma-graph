@@ -313,16 +313,16 @@
               </div>
             </div>
           </div>
-          <!-- 学科领域（边框色，动态） -->
-          <div class="legend-block legend-section" data-section="legend-field" data-section-state="open">
-            <div class="legend-section__head" data-action="toggle-section" data-arg="legend-field" aria-expanded="true" aria-controls="body-legend-field">
-              <span class="legend-section__title">学科领域（边框色）</span>
+          <!-- 思维导图层级（边框色） -->
+          <div class="legend-block legend-section" data-section="legend-level" data-section-state="open">
+            <div class="legend-section__head" data-action="toggle-section" data-arg="legend-level" aria-expanded="true" aria-controls="body-legend-level">
+              <span class="legend-section__title">思维导图层级（边框色）</span>
               <svg class="sidebar-section__chevron open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </div>
-            <div class="legend-section__body" id="body-legend-field">
+            <div class="legend-section__body" id="body-legend-level">
               <div class="legend-section__body-inner">
-              <div class="legend-grid" id="legend-field-grid">
-                <!-- 由 populateFieldLegend() 动态填充 -->
+              <div class="legend-grid legend-grid--2" id="legend-level-grid">
+                <!-- 由 populateLevelLegend() 动态填充 -->
               </div>
               </div>
             </div>
@@ -524,11 +524,11 @@
       </div>
     </div>
 
-    <!-- ── Field chips ──────────────────────────────────── -->
+    <!-- ── Level chips ──────────────────────────────────── -->
     <div class="bs-section">
-      <div class="bs-section__label">学科领域（边框色）</div>
-      <div class="bs-chips" id="bs-field-chips">
-        <!-- 由 populateFieldLegend() 动态填充 -->
+      <div class="bs-section__label">思维导图层级（边框色）</div>
+      <div class="bs-chips" id="bs-level-chips">
+        <!-- 由 populateLevelLegend() 动态填充 -->
       </div>
     </div>
 
