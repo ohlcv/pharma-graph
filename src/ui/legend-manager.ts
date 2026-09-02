@@ -268,8 +268,8 @@ export function highlightLevel(level: string, highlight: HighlightEngine): void 
   activeLevelFilter = Number(level);
   const cy = legendCy;
   if (cy) {
-    cy.nodes(`[level = "${level}"]`).addClass('highlighted');
-    cy.nodes(`[level != "${level}"]`).addClass('dimmed');
+    cy.nodes(`[level = ${level}]`).addClass('highlighted');
+    cy.nodes(`[level != ${level}]`).addClass('dimmed');
     cy.edges().addClass('dimmed');
   }
   activateAxis('.legend-level-row[data-level]', 'data-level', level);

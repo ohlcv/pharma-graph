@@ -505,6 +505,21 @@
 }
 .legend-field-row.active .legend-row__label { color: var(--accent); }
 
+.legend-level-row {
+  display: flex; align-items: center; gap: 7px;
+  padding: 5px 8px; border-radius: 7px;
+  cursor: pointer; border: 1px solid transparent;
+  transition: background 0.12s, border-color 0.12s;
+  user-select: none;
+}
+.legend-level-row:hover { background: rgba(255,255,255,0.04); border-color: var(--border-hi); }
+.legend-level-row.active {
+  background: rgba(99,102,241,0.18);
+  border-color: rgba(99,102,241,0.5);
+  box-shadow: 0 0 12px rgba(99,102,241,0.25);
+}
+.legend-level-row.active .legend-row__label { color: var(--accent); }
+
 .legend-tier-row {
   display: flex; align-items: center; gap: 7px;
   padding: 5px 8px; border-radius: 7px;
