@@ -30,6 +30,38 @@ import { focusOnNode } from './focus-node.js';
  *  on every keystroke while still updating the result count and highlight live. */
 const SEARCH_INPUT_DEBOUNCE_MS = 220;
 
+/**
+ * iOS Safari has a long-standing "form-zoom" behaviour: when the user taps
+ * an `<input>` whose computed font-size is < 16px, Safari scales the entire
+ * viewport up so the input is comfortably readable. On a graph-heavy app this
+ * is catastrophic — the canvas gets zoomed, the layout grows beyond the
+ * viewport, and (because Safari doesn't reliably restore the zoom when the
+ * input blurs) the user is left in a stuck magnified state.
+ *
+ * We already force `font-size: 1rem` (16px) on the mobile search input in
+ * CSS to *prevent* the zoom-in trigger. This is the belt-and-braces fallback
+ * for any device that did manage to zoom: when the input loses focus, if the
+ * visual viewport scale isn't 1, briefly nudge the document to reset it.
+ *
+ * On Android Chrome / desktop browsers `window.visualViewport` exists but
+ * `scale` stays at 1 (no form-zoom), so this is a no-op.
+ */
+function resetViewportZoomIfStretched(): void {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  if (Math.abs(vv.scale - 1) < 0.01) return;
+  // visualViewport.zoom API exists on iOS Safari; falls back silently on
+  // browsers that don't support it (Chrome desktop / Android Chromium).
+  type VvWithZoom = VisualViewport & { zoom?: (scale: number) => void };
+  const zoomFn = (vv as VvWithZoom).zoom;
+  if (typeof zoomFn !== 'function') return;
+  try {
+    zoomFn.call(vv, 1);
+  } catch {
+    // Swallow — some browsers throw if called outside a gesture; not fatal.
+  }
+}
+
 export function initSearchUI(
   cy: cytoscape.Core,
   highlight: HighlightEngine,
@@ -159,4 +191,7 @@ function attachSearchHandlers(input: HTMLInputElement | null, ctx: HandlersCtx):
   // If the user clicks a search result somewhere else (or the input loses
   // focus to the canvas), still cancel any pending auto-center.
   input.addEventListener('blur', () => cancelPendingCenter());
+  // iOS Safari: undo any form-zoom the device may have applied when the input
+  // was focused, so the canvas isn't left in a stretched state.
+  if (window.innerWidth <= 768) input.addEventListener('blur', resetViewportZoomIfStretched);
 }

@@ -1074,7 +1074,7 @@
 
 .bs-mobile-search { display: flex; align-items: center; background: rgba(255,255,255,0.06); border: 1px solid var(--border); border-radius: 8px; margin: 10px 16px 12px; position: relative; }
 .bs-mobile-search__icon  { position: absolute; left: 10px; width: 15px; height: 15px; color: var(--muted); pointer-events: none; flex-shrink: 0; }
-.bs-mobile-search__input { width: 100%; height: 36px; padding: 0 12px 0 34px; background: transparent; border: none; border-radius: inherit; color: var(--text); font-size: 0.8rem; font-family: inherit; outline: none; }
+.bs-mobile-search__input { width: 100%; height: 36px; padding: 0 12px 0 34px; background: transparent; border: none; border-radius: inherit; color: var(--text); font-size: 1rem; font-family: inherit; outline: none; }
 .bs-mobile-search__input::placeholder { color: var(--muted); }
 
 /* ── Mobile responsive ──────────────────────────────────────────────────── */
