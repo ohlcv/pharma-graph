@@ -287,7 +287,7 @@ function buildSummaryHtml(d: cytoscape.NodeDataDefinition): string {
   if (!currentSummary) return '';
 
   const toggleBtn = hasBoth
-    ? `<button class="np-summary__toggle" data-summary-toggle>${uiState.summaryMode === 'short' ? '展开' : '收起'}</button>`
+    ? `<button class="np-summary__toggle" data-summary-toggle>${uiState.summaryMode === 'short' ? '简短' : '详细'}</button>`
     : '';
 
   return `<div class="np-section" data-section-key="summary">
