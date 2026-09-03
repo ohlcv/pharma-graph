@@ -99,7 +99,11 @@ export class DetailPanel {
     });
 
     this.panel.addEventListener('click', (e) => {
-      const toggle = (e.target as HTMLElement).closest<HTMLElement>('.np-section__toggle');
+      const target = e.target as HTMLElement;
+      // Ignore summary toggle button — it has its own handler
+      if (target.closest('[data-summary-toggle]')) return;
+
+      const toggle = target.closest<HTMLElement>('.np-section__toggle');
       if (!toggle) return;
       const section = toggle.closest('.np-section');
       if (!section) return;
@@ -283,13 +287,13 @@ function buildSummaryHtml(d: cytoscape.NodeDataDefinition): string {
   if (!currentSummary) return '';
 
   const toggleBtn = hasBoth
-    ? `<button class="np-summary__toggle" data-summary-toggle>${uiState.summaryMode === 'short' ? '展开详情' : '收起详情'}</button>`
+    ? `<button class="np-summary__toggle" data-summary-toggle>${uiState.summaryMode === 'short' ? '展开' : '收起'}</button>`
     : '';
 
   return `<div class="np-section" data-section-key="summary">
   <div class="np-section__toggle" data-section-key="summary">
     <svg class="np-section__toggle-arrow rotated" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-    <span class="np-section__label">摘要${hasBoth ? '（可切换）' : ''}</span>
+    <span class="np-section__label">摘要</span>
     ${toggleBtn}
   </div>
   <div class="np-section__content">
