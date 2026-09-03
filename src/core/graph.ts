@@ -21,7 +21,12 @@ export interface NodeData {
   tier?: string;    // 知识层次：basic/drug/disease/management/service/legal
   level?: number;   // 思维导图结构级别 1-6（决定边框色）
   layer?: string;   // knowledge layer: foundation / system / clinical / service (legacy)
-  summary?: string;   // full summary text
+  /** 简短摘要 */
+  shortSummary?: string;
+  /** 完整摘要 */
+  fullSummary?: string;
+  /** 兼容旧字段：优先取 shortSummary，否则取 fullSummary */
+  summary?: string;
   location?: NodeLocation;
   tags?: string[];
   body?: string;      // 正文内容（md 文件中 frontmatter 后的部分）

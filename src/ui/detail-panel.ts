@@ -79,6 +79,16 @@ export class DetailPanel {
       this.pinToggle.toggle();
     });
 
+    // Summary toggle button
+    this.panel.addEventListener('click', (e) => {
+      const toggleBtn = (e.target as HTMLElement).closest<HTMLElement>('[data-summary-toggle]');
+      if (!toggleBtn) return;
+      uiState.summaryMode = uiState.summaryMode === 'short' ? 'full' : 'short';
+      if (this._currentNodeId) {
+        this.show(this._currentNodeId);
+      }
+    });
+
     this.panel.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
       const item = target.closest<HTMLElement>('.np-edge-item, .np-neighbor');
@@ -260,14 +270,30 @@ function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
 }
 
 function buildSummaryHtml(d: cytoscape.NodeDataDefinition): string {
-  if (!d.summary) return '';
+  const shortSummary = d.shortSummary as string | undefined;
+  const fullSummary = d.fullSummary as string | undefined;
+  const hasShort = Boolean(shortSummary);
+  const hasFull = Boolean(fullSummary);
+  const hasBoth = hasShort && hasFull;
+
+  // 根据当前模式决定显示哪个摘要
+  const currentSummary =
+    (uiState.summaryMode === 'full' && hasFull) ? fullSummary : shortSummary;
+
+  if (!currentSummary) return '';
+
+  const toggleBtn = hasBoth
+    ? `<button class="np-summary__toggle" data-summary-toggle>${uiState.summaryMode === 'short' ? '展开详情' : '收起详情'}</button>`
+    : '';
+
   return `<div class="np-section" data-section-key="summary">
   <div class="np-section__toggle" data-section-key="summary">
     <svg class="np-section__toggle-arrow rotated" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-    <span class="np-section__label">摘要</span>
+    <span class="np-section__label">摘要${hasBoth ? '（可切换）' : ''}</span>
+    ${toggleBtn}
   </div>
   <div class="np-section__content">
-    <div class="np-summary np-markdown">${renderMarkdown(d.summary as string)}</div>
+    <div class="np-summary np-markdown">${renderMarkdown(currentSummary)}</div>
   </div>
 </div>`;
 }

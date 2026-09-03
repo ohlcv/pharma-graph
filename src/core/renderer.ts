@@ -460,12 +460,14 @@ export class Renderer {
           field: n.field || '',
           tier: n.tier,
           level: n.level,
+          shortSummary: n.shortSummary,
+          fullSummary: n.fullSummary,
+          summary: n.summary,
           // Display aliases — debug panel + older code paths read these directly.
           // Kept in sync with the new-schema values via build-graph.ts.
           type: n.essence || 'default',
           category: n.field || '',
           layer: n.tier,
-          summary: n.summary,
           location: n.location,
           tags: n.tags ?? [],
           body: n.body,

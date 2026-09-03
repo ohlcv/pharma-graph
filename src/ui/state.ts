@@ -86,6 +86,9 @@ export const uiState = {
   /** Active tab in desktop detail panel ('overview' | 'body') */
   activeTab: 'overview' as 'overview' | 'body',
 
+  /** Summary display mode: 'short' or 'full' */
+  summaryMode: 'short' as 'short' | 'full',
+
   /**
    * Whether the desktop node panel is pinned. Read-only proxy to the
    * `UiToggle` registered by DetailPanel. To mutate, call

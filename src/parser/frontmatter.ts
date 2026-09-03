@@ -25,6 +25,11 @@ export interface NodeMeta {
   tier?: string;
   /** 思维导图结构级别 1-6（决定边框色） */
   level?: number;
+  /** 简短摘要 */
+  shortSummary?: string;
+  /** 完整摘要 */
+  fullSummary?: string;
+  /** 兼容旧字段：优先取 shortSummary，否则取 fullSummary */
   summary?: string;
   location?: {
     book?: string;
@@ -174,13 +179,18 @@ export function parseFrontmatterWithWarnings(
   const level = typeof levelRaw === 'number' ? levelRaw : undefined;
 
   const rawSummary = fm['summary'] as Record<string, unknown> | string | undefined;
-  const summary =
-    typeof rawSummary === 'object' && rawSummary !== null
-      ? (getField(rawSummary as Record<string, unknown>, 'short') ??
-         getField(rawSummary as Record<string, unknown>, 'full'))
-      : typeof rawSummary === 'string'
-        ? rawSummary.trim()
-        : undefined;
+  let shortSummary: string | undefined;
+  let fullSummary: string | undefined;
+
+  if (typeof rawSummary === 'object' && rawSummary !== null) {
+    shortSummary = getField(rawSummary as Record<string, unknown>, 'short');
+    fullSummary = getField(rawSummary as Record<string, unknown>, 'full');
+  } else if (typeof rawSummary === 'string') {
+    shortSummary = rawSummary.trim();
+  }
+
+  // summary 保持兼容，优先 short
+  const summary = shortSummary ?? fullSummary;
 
   // edges_out lives under `data:` in the new schema; legacy files keep it at
   // the YAML root. `pickSource` already folded the root-level copy into the
@@ -245,6 +255,8 @@ export function parseFrontmatterWithWarnings(
       field,
       tier,
       level,
+      shortSummary,
+      fullSummary,
       summary,
       edges_out: edges.length > 0 ? edges : undefined,
       tags: tags.length > 0 ? tags : undefined,
