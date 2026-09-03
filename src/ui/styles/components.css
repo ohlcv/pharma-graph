@@ -709,6 +709,24 @@
 .np-section__toggle-arrow { width: 12px; height: 12px; color: var(--muted); transition: transform 0.2s ease; flex-shrink: 0; }
 .np-section__toggle-arrow.rotated { transform: rotate(90deg); }
 
+/* Summary toggle button */
+.np-summary__toggle {
+  margin-left: auto;
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(99,102,241,0.12);
+  border: 1px solid rgba(99,102,241,0.3);
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.np-summary__toggle:hover {
+  background: rgba(99,102,241,0.2);
+  border-color: rgba(99,102,241,0.5);
+}
+
 .np-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .np-tag  { font-size: 0.64rem; font-weight: 500; color: var(--text-2); background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 2px 9px; transition: background 0.12s, color 0.12s, border-color 0.12s; cursor: pointer; }
 .np-tag:hover { background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.4); color: var(--accent); }
