@@ -100,6 +100,12 @@ function attachSearchHandlers(input: HTMLInputElement | null, ctx: HandlersCtx):
 
     cancelPendingCenter();
     if (results.length === 0) return;
+    // Mobile: skip auto-center entirely. The bottom-sheet already gives the
+    // user a way to act on results (chips, layout, etc.), and zooming to
+    // 1.5 on a ~360px-wide canvas centres the camera on a node that's now
+    // visually enormous — covering the bottom-sheet and making its action
+    // buttons unreachable until the user dismisses the search.
+    if (window.innerWidth <= 768) return;
     pendingCenterTimer = setTimeout(() => {
       pendingCenterTimer = null;
       if (document.activeElement !== input) return;
