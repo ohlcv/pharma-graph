@@ -16,6 +16,7 @@ const SAFE_ATTR = ['target', 'rel', 'src', 'href', 'alt', 'title', 'class'];
 const SAFE_TAGS = [
   'a',
   'p',
+  'mark', // 高亮文本
   'span',
   'div',
   'br',
