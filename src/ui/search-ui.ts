@@ -44,8 +44,8 @@ export function initSearchUI(
     wireMirror(mobileInput, desktopInput);
   }
 
-  attachSearchHandlers(desktopInput, { cy, highlight, search, detailPanel });
-  attachSearchHandlers(mobileInput, { cy, highlight, search, detailPanel });
+  attachSearchHandlers(desktopInput, { cy, highlight, search, detailPanel, mirror: mobileInput });
+  attachSearchHandlers(mobileInput, { cy, highlight, search, detailPanel, mirror: desktopInput });
 }
 
 interface HandlersCtx {
@@ -53,6 +53,8 @@ interface HandlersCtx {
   highlight: HighlightEngine;
   search: Search;
   detailPanel: DetailPanel;
+  /** The peer search input (for keep-value-in-sync on Escape). */
+  mirror?: HTMLInputElement | null;
 }
 
 /**
@@ -113,6 +115,10 @@ function attachSearchHandlers(input: HTMLInputElement | null, ctx: HandlersCtx):
     // Escape always works, even mid-composition.
     if (e.key === 'Escape') {
       cancelPendingCenter();
+      // Sync the peer input too — `wireMirror` only fires on `input`,
+      // so programmatic value clear would otherwise leave the other
+      // input showing stale text.
+      if (ctx.mirror && ctx.mirror.value !== '') ctx.mirror.value = '';
       input.value = '';
       search.clear();
       updateStats(cy);

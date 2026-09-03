@@ -65,7 +65,7 @@ const NODE_TYPE_SHAPE_MAP: Record<string, string> = {
   illness: 'diamond',
   process: 'star',
   notion: 'tag',
-  mnemonic: 'vee',
+  mnemonic: 'triangle',              // 记忆口诀 — 上箭头（实际节点形状）
   summary: 'pentagon',
   table: 'rectangle',
   note: 'round-tag',
