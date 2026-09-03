@@ -132,12 +132,6 @@ function attachSearchHandlers(input: HTMLInputElement | null, ctx: HandlersCtx):
 
     cancelPendingCenter();
     if (results.length === 0) return;
-    // Mobile: skip auto-center entirely. The bottom-sheet already gives the
-    // user a way to act on results (chips, layout, etc.), and zooming to
-    // 1.5 on a ~360px-wide canvas centres the camera on a node that's now
-    // visually enormous — covering the bottom-sheet and making its action
-    // buttons unreachable until the user dismisses the search.
-    if (window.innerWidth <= 768) return;
     pendingCenterTimer = setTimeout(() => {
       pendingCenterTimer = null;
       if (document.activeElement !== input) return;
@@ -145,7 +139,12 @@ function attachSearchHandlers(input: HTMLInputElement | null, ctx: HandlersCtx):
       // Preview the first match: move the camera but keep the batch of
       // search-highlighted results visible. `skipHighlight: true` ensures
       // we don't collapse the whole batch down to "the target's neighbours".
-      focusOnNode(cy, results[0], { skipHighlight: true });
+      // On mobile, `zoom: 1` (pan-only) keeps the matched node from growing
+      // so large it covers the bottom-sheet.
+      focusOnNode(cy, results[0], {
+        skipHighlight: true,
+        zoom: window.innerWidth <= 768 ? 1 : undefined,
+      });
     }, SEARCH_INPUT_DEBOUNCE_MS);
   });
 

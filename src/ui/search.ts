@@ -136,11 +136,14 @@ export class Search {
   private focusCurrent(): string | null {
     const id = this.getCurrentId();
     if (!id) return null;
-    // Mobile: don't move the camera. The default focus zoom (1.5) on a
-    // ~360px-wide canvas centres on a node that visually engulfs the
-    // bottom-sheet, hiding its action buttons. Highlights + dimmed
-    // classes still mark the match clearly without yanking the camera.
-    if (!focusOnNode(this.cy, id, { skipCamera: window.innerWidth <= 768 })) return null;
+    const isMobile = window.innerWidth <= 768;
+    // Mobile keeps the current zoom level (1.0 by default) — the desktop
+    // default (1.5) on a ~360px-wide canvas centres the camera on a node
+    // that visually engulfs the bottom-sheet, hiding its action buttons.
+    // Pan-only still gives the user a clear "you've arrived" cue without
+    // blowing up the matched node.
+    const focused = focusOnNode(this.cy, id, isMobile ? { zoom: 1 } : {});
+    if (!focused) return null;
     return id;
   }
 
