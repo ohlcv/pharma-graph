@@ -13,6 +13,7 @@ import {
   SHAPE_LABEL,
   ESSENCE_LABEL,
   NODE_TYPE_COLOR,
+  NODE_TYPE_SHAPE,
   EDGE_TYPE_STYLE,
   EDGE_TYPE_LABEL,
 } from '../core/config.js';
@@ -43,17 +44,10 @@ function clearAllFilters(): void {
 
 // ── Axis populators ────────────────────────────────────────────────────────────
 
-const NODE_TYPE_SHAPE_MAP: Record<string, string> = {
-  module: 'round-rectangle',
-  'strict-class': 'pentagon',
-  'umbrella-class': 'hexagon',
-  concept: 'rectangle',
-  medication: 'ellipse',
-  illness: 'diamond',
-  notion: 'tag',
-  mnemonic: 'triangle',
-  summary: 'octagon',
-};
+// Shapes are read from the canonical NODE_TYPE_SHAPE in config.ts so the
+// legend stays in sync with the actual node renderer. Defensive fallback
+// keeps the legend rendering even if an essence is added without a shape.
+const NODE_TYPE_SHAPE_MAP: Record<string, string> = NODE_TYPE_SHAPE;
 
 function makeShapeSwatch(shape: string): string {
   return `<span class="legend-node--shape shape-${shape}" style="background:#94a3b8"></span>`;
