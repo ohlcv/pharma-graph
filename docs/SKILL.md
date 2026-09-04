@@ -84,6 +84,35 @@ description: "将纸质思维导图照片（或扫描件）转录为符合药学
 ### Step 6 — 分批交付
 一次可处理多个节点，交付时分批呈现（如按分支分组），最终汇总总数与层级结构。汇报中明示：哪些 short/full 是用户提供的、哪些留空、哪些是手写/高亮/印刷来源、口诀归属、命名处理、是否同步了 sitemap。
 
+
+### Step 7 — 打包 zip 一键交付
+
+**所有节点交付完毕后（用户确认全部 OK 且不再追加），把全仓打包成一个 zip，让用户下载即用。**
+
+#### 打包范围（按重要性）
+- 必含：`public/content/`（全部节点 md）、`docs/`（规范文档）
+- 必含：`package.json` + `package-lock.json`（依赖锁）
+- 必含：`scripts/`、`vite.config.ts`、`tsconfig*.json`（项目脚手架）
+- 必含：`README.md`（运行说明）
+- 排除：`node_modules/`、`.git/`、`dist/`、`.vite/`、`coverage/`、`.DS_Store`、`*.log`
+
+#### 打包命令（macOS / Linux）
+```bash
+zip -r pharma-graph-$(date +%Y%m%d).zip . \
+  -x 'node_modules/*' '.git/*' 'dist/*' '.vite/*' \
+     'coverage/*' '.DS_Store' '*.log'
+```
+
+#### 交付清单
+汇报中一并附上：
+- zip 文件名 + 大小（如 `pharma-graph-20260904.zip · 1.2 MB`）
+- zip 内文件总数 + 节点 md 总数（用 `unzip -l` 或 `zipinfo` 提取）
+- 用户 3 步上手：`unzip` → `npm install` → `npm run dev`
+- 已知未完成项 / 留空项（如某些节点 full 未填，等用户提供资料后再补）
+
+#### 注意
+- zip **不入 git**（`.gitignore` 已默认排除 `*.zip`）；仓库交付物是 git 历史本身，zip 只是快照
+- **不要在 Step 7 之前打包**——中途反复打包浪费磁盘；只在用户说「全部好了 / 打包 / 交付」这类收尾信号时触发
 ## 关键决策速查
 
 ### essence 判定（决定形状+颜色）
@@ -125,8 +154,10 @@ description: "将纸质思维导图照片（或扫描件）转录为符合药学
   - 章节入口：`sec-antigout-y2-02-03`
 
 ### 质量优先
-一次处理不完可分批；宁慢勿错，不完整内容不乱猜。交付前用「可能失败」的方式回读验证：
+一次处理不完可分批；宁慢勿错，不完整内容不乱猜。完成全部节点后，先按 Step 7 打包 zip 交付，再用「可能失败」的方式回读验证：
+
 1. 重新解析每个 md 的 YAML frontmatter（确保 `summary.full` 的 `\n` 没被折叠）
 2. 检查文件名 = `data.label`
 3. 检查所有 `edges_out.target` 存在（或为预期骨架边）
 4. 如果改动涉及文件名，同步更新 `public/sitemap.xml`
+5. 用 `unzip -l pharma-graph-*.zip` 反查 zip 内容是否完整
