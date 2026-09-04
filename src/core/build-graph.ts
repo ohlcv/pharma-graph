@@ -141,13 +141,11 @@ export function buildGraph(
     }
   }
 
-  // Invert depth labels: root gets 0, deeper gets larger numbers.
+  // Map raw BFS depth to ring depth: root=0, deeper=larger numbers.
   // This matches the "ring from center" mental model (center=0, rings outward).
-  // We store the raw reverse-BFS depth; the renderer maps it to the spectrum.
-  // Currently: root=0, leaf=maxDepth (root is the "center" visually).
-  const inverted: Record<string, number> = {};
+  const ringDepth: Record<string, number> = {};
   for (const [id, raw] of Object.entries(depth)) {
-    inverted[id] = raw;
+    ringDepth[id] = raw;
   }
 
   // ── Subtree classification (pure structure, no essence checking) ─────────────
@@ -244,7 +242,7 @@ export function buildGraph(
       id: fm.id,
       label: fm.label,
       essence: fm.essence ?? '',
-      depth: inverted[fm.id] ?? 0,
+      depth: ringDepth[fm.id] ?? 0,
       subtreeRoot: subtreeRoot[fm.id],
       shortSummary: fm.shortSummary,
       fullSummary: fm.fullSummary,

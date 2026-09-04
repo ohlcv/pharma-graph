@@ -156,12 +156,17 @@ function hslToHex(h: number, s: number, l: number): string {
 /**
  * 旧兼容：层级 0-6 的静态映射（供 legend / detail-panel 在不确定深度时 fallback）。
  * 保留导出避免破坏现有导入，但新代码请用 getDepthBorderColor()。
+ * @deprecated Use getDepthBorderColor() directly.
  */
-export const LEVEL_BORDER_COLOR: Record<number, string> = (() => {
-  const map: Record<number, string> = { 0: CENTER_BORDER_COLOR };
-  for (let d = 1; d <= 6; d++) map[d] = getDepthBorderColor(d);
-  return map;
-})();
+export const LEVEL_BORDER_COLOR: Record<number, string> = {
+  0: CENTER_BORDER_COLOR,
+  1: getDepthBorderColor(1),
+  2: getDepthBorderColor(2),
+  3: getDepthBorderColor(3),
+  4: getDepthBorderColor(4),
+  5: getDepthBorderColor(5),
+  6: getDepthBorderColor(6),
+};
 
 export const LEVEL_LABEL: Record<number, string> = {
   0: '中心',

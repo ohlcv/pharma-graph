@@ -414,7 +414,7 @@ export class TourEngine {
   private currentStep = 0;
   private pulseRafId: number | null = null;
   private pulsingNode: cytoscape.NodeSingular | null = null;
-  private strategyName = '';
+  private strategyId: TourStrategy = 'has-dfs';
   // Tracks how many times we've rebuilt the visit sequence in the *current*
   private _restartAttempts = 0;
   // Bound handlers for cy graph-mutation events. Stored so that stop() can
@@ -460,7 +460,7 @@ export class TourEngine {
     this._restartAttempts = 0;
 
     const strategy = getStrategy(options.strategy);
-    this.strategyName = strategy.label;
+    this.strategyId = options.strategy;
 
     // Build full sequence
     this.seq = strategy.buildSequence(this.cy);
@@ -704,11 +704,7 @@ export class TourEngine {
   }
 
   private getStrategyId(): TourStrategy {
-    // Try to infer from strategyName
-    for (const s of ALL_STRATEGIES) {
-      if (s.label === this.strategyName) return s.id;
-    }
-    return 'has-dfs';
+    return this.strategyId;
   }
 
   private highlightAndFocus(
@@ -746,7 +742,7 @@ export class TourEngine {
       currentStep: this.currentStep,
       maxDepthReached: depth,
       cycleCount: this.cycleCount,
-      strategyName: this.strategyName,
+      strategyName: getStrategy(this.strategyId).label,
     };
 
     // Pan the camera so this node lands at the center of the cy container.
