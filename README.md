@@ -23,10 +23,9 @@
 
 | 维度 | 说明 |
 |---|---|
-| **节点本质（形状）** | 药物 · 模块 · 章节 · 概念 · 疾病 · 过程 |
-| **学科领域（边框色）** | 药理学 · 药学服务 · 药剂学 · 药物化学 · 生物药剂学 · 药动学 · 毒理学 |
-| **知识层级（填充色）** | 基础 → 服务 → 管理 → 临床 → 进阶 |
-| **关联关系（边类型）** | 属种 (isa) · 包含 (has) · 前置 (prerequisite) · 治疗 (treats) · 相关 (relates) · 机制 (mechanism) · 兄弟 (sibling) · 特化 (specializes) · 致因 (causes) · 禁忌 (contraindicates) · 代谢 (metabolizes) |
+| **节点本质（形状 + 填充色）** | `module` 圆角矩形 · `strict-class` 五边形 · `umbrella-class` 六边形 · `concept` 正方形 · `medication` 椭圆 · `illness` 菱形 · `notion` tag · `mnemonic` vee · `summary` 八边形 |
+| **关联关系（边类型）** | `subclass_of`（子类→父类） · `part_of`（局部→整体） · `instance_of`（实例→类别） · `disjoint_with`（互斥） · `equivalent_to`（等价） |
+| **教材位置** | `location` 字段承载，不参与图形编码 |
 
 </details>
 
@@ -229,16 +228,14 @@ npm run test:coverage   # 测试覆盖率报告
 ---
 id: morphine                              # 唯一标识，全局不重复（英文 kebab-case）
 label: 吗啡                                # 显示名称
-essence: medication                        # 节点本质: medication | module | section | notion | illness | process | concept
-field: pharmacology                        # 学科领域
-tier: clinical                             # 知识层级: basic | service | management | clinical | advanced
+essence: medication                        # 节点本质: module | strict-class | umbrella-class | concept | medication | illness | notion | mnemonic | summary
 edges_out:                                 # 对外关联
   - target: opioid-receptor                # 目标节点 id
-    type: mechanism                        # 关系类型
+    type: instance_of                      # 实例→类别
   - target: acute-pain
-    type: treats
+    type: instance_of   # 治疗
   - target: central-analgesics-chapter
-    type: isa
+    type: subclass_of                      # 子类→父类
 ---
 
 # 吗啡
@@ -258,7 +255,7 @@ edges_out:                                 # 对外关联
 |---|---|
 | **JSON-LD 结构化数据** | WebSite（含站内搜索框） · EducationalOrganization · LearningResource · BreadcrumbList 四实体 |
 | **`<noscript>` 纯文本内容** | 三大科目说明 · 60+ 核心药名标签 · 平台特色 5 条 |
-| **`<script type="application/json">`** | 构建时将全部节点（label/essence/field/tier）与边（source/target/type）注入 HTML，爬虫直接可读 |
+| **`<script type="application/json">`** | 构建时将全部节点（label/essence/location）与边（source/target/type）注入 HTML，爬虫直接可读 |
 | **可见占位符预填** | 侧栏 "节点 — / 边 —" 占位符与"图谱为空"空状态，构建时替换为真实数字与状态 |
 | **sitemap.xml** | 构建时自动生成，首页 + 1100+ Markdown 内容页，按路径深度分级 priority |
 | **robots.txt** | 允许所有主流爬虫，声明 Sitemap 绝对 URL |
