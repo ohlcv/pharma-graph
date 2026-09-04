@@ -231,8 +231,7 @@ describe('TourEngine shouldRestart hook (issue #7)', () => {
   //
   // 测试不依赖真定时器：visitNext 是同步的，循环也只是同步 loopSafety。
   // 装一个 3 节点的 cy，用 registerStrategy 临时注册一个会调用 shouldRestart 的策略。
-  it('shouldRestart returning false: first cycle completes then engine stops without incrementing _restartAttempts', async () => {
-    const { registerStrategy } = await import('./tour.js');
+  it('shouldRestart returning false: first cycle completes then engine stops without incrementing _restartAttempts', () => {
     registerStrategy({
       id: 'test-no-restart',
       label: 'Test: no restart',
