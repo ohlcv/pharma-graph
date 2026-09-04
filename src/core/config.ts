@@ -32,7 +32,7 @@ export const NODE_TYPE_SHAPE: Record<string, string> = {
   'umbrella-class': 'hexagon',        // 伞形分类（粗分类）— 六边形
   concept: 'rectangle',               // 概念/术语 — 正方形（rectangle 是 cytoscape 中最接近正方形的形状）
   medication: 'ellipse',              // 重点药物（详细讲解的制剂）— 椭圆
-  drug: 'ellipse',                    // 普通药物（仅提名的药）— 椭圆（石板灰填充）
+  drug: 'ellipse',                    // 普通药物（仅提名的药）— 椭圆（柔蓝填充）
   illness: 'diamond',                 // 疾病/病理状态 — 菱形
   notion: 'tag',                      // 学习性认知单元 — 标签形
   mnemonic: 'vee',                    // 记忆口诀 — V形
