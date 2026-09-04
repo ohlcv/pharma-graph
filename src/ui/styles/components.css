@@ -261,16 +261,26 @@
 /* ── Sidebar ────────────────────────────────────────────────────────────── */
 @layer sidebar {
 
+:root {
+  /* Sidebar width scales with viewport so 2-column legend rows have
+   * enough room for long Chinese labels like "局部→整体 (123)".
+   * Floor 280px (single-column minimum usability), ceiling 320px
+   * (canvas should keep most of the screen on desktop). The 6vw term
+   * gives extra room on wide screens without hurting narrow ones. */
+  --sidebar-width: clamp(280px, 6vw + 248px, 320px);
+}
+
 #sidebar {
   background: rgba(12, 18, 34, 0.7);
   backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
   border-left: 1px solid var(--border); overflow-y: auto;
   display: flex; flex-direction: column; transform: translateX(0);
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity   0.28s ease;
+              opacity   0.28s ease,
+              width     0.28s cubic-bezier(0.4, 0, 0.2, 1);
   will-change: transform, opacity;
   padding-bottom: 16px;
-  flex: 0 0 260px; width: 260px;
+  flex: 0 0 var(--sidebar-width); width: var(--sidebar-width);
   height: 100%;
 }
 #sidebar.hidden {
@@ -283,7 +293,7 @@
    in/out freely while the grid column changes behind it (hidden by the
    sidebar's own opaque background). Prevents the "black curtain" gap. */
 #sidebar.sidebar-overlay {
-  position: absolute; right: 0; top: 0; bottom: 0; width: 260px; z-index: 6;
+  position: absolute; right: 0; top: 0; bottom: 0; width: var(--sidebar-width); z-index: 6;
   background: rgb(12, 18, 34);
   opacity: 1;
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
@@ -380,12 +390,14 @@
   padding: 0 4px;
 }
 .legend-section[data-section-state="open"] .legend-section__body {
-  max-height: none;
-  overflow-x: auto; /* safety net: long labels overflow → horizontal scroll, not silent clip */
+  max-height: 400px; overflow-y: auto; overflow-x: auto;
+  /* Allow both axes to scroll independently: vertical scroll when content
+   * exceeds max-height, horizontal scroll for long labels. */
   padding: 0 4px 6px;
 }
 
-.legend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+.legend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; min-width: 0; width: 100%; max-width: 100%; overflow-x: auto; }
+.legend-grid--1 { grid-template-columns: 1fr; }
 .legend-grid--2 { grid-template-columns: 1fr 1fr; }
 .legend-grid--3 { grid-template-columns: 1fr 1fr 1fr; }
 .legend-grid--4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
@@ -397,6 +409,10 @@
   cursor: pointer; border: 1px solid transparent;
   transition: background 0.12s, border-color 0.12s;
   user-select: none;
+  /* Prevent long labels from expanding the row past its grid column,
+   * which pushes the count off-screen before overflow-x: auto fires.
+   * The label inside handles its own text ellipsis. */
+  min-width: 0;
 }
 .legend-row:hover { background: rgba(255,255,255,0.04); border-color: var(--border-hi); }
 
@@ -450,20 +466,23 @@
 .legend-node--cat   { width: 8px; height: 8px; border-radius: 50%; display: inline-block; border: 1px solid rgba(255,255,255,0.15); }
 .legend-swatch      { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 .legend-row__label {
-  font-size: 0.7rem; color: var(--text-2); font-weight: 500; flex: 1;
+  font-size: 0.7rem; color: var(--text-2); font-weight: 500;
   /* flex item inside a multi-column grid cell: min-width:0 lets the label
    * shrink below its content width, then ellipsis clips the overflow.
+   * flex: 1 1 auto → basis=auto (not 0%) so short labels expand to fill
+   * available space, not stay at 0-width and let the count get pushed off.
    * Without min-width:0 a long Chinese label pushes its cell past the
    * column track, the whole grid blows out, and on iOS WebView the
    * legend block appears shifted right (clipped by overflow:hidden on
    * the sheet). Visible as the legend block looking "偏右" on iPhone
    * while Android renders fine. */
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.legend-row__count { font-size: 0.6rem; color: var(--muted); font-weight: 400; margin-left: auto; }
+.legend-row__count { font-size: 0.6rem; color: var(--muted); font-weight: 400; flex-shrink: 0; margin-left: auto; }
 .legend-row.active {
   background: rgba(99,102,241,0.18);
   border-color: rgba(99,102,241,0.5);
@@ -479,6 +498,9 @@
   font-size: 0.68rem; color: var(--text-2); font-weight: 500;
   cursor: pointer; border: 1px solid transparent;
   transition: background 0.12s, border-color 0.12s;
+  /* Same as .legend-row: prevent the row itself from expanding past its
+   * grid column on long Chinese labels like "局部→整体". */
+  min-width: 0;
 }
 .legend-edge-row.active {
   background: rgba(99,102,241,0.18);
@@ -492,18 +514,17 @@
 
 .legend-edge-row svg { flex-shrink: 0; }
 .legend-edge-row__label {
-  flex: 1;
-  /* Same fix as .legend-row__label — see comment there. The edge type
-   * label sits inside a single-column legend-edge list, but the count
-   * tag to its right uses margin-left:auto, so without min-width:0 the
-   * label still wins the squeeze and pushes the count off-screen on
-   * narrow viewports. */
-  min-width: 0;
+  flex: 1 1 auto; min-width: 0;
+  /* Same fix as .legend-row__label — see comment there. Edge label sits
+   * inside a 2-column legend grid; min-width:0 lets it ellipsise instead
+   * of blowing the column width. The sidebar width itself is now
+   * responsive (--sidebar-width), so on wider viewports the row has
+   * enough room for full text. */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.legend-edge-row__count { font-size: 0.6rem; color: var(--muted); font-weight: 400; margin-left: auto; }
+.legend-edge-row__count { font-size: 0.6rem; color: var(--muted); font-weight: 400; flex-shrink: 0; margin-left: auto; }
 
 /* category dot in sidebar (dynamic) */
 .legend-cat-dot {
@@ -566,7 +587,7 @@
 @layer node-panel {
 
 #node-panel {
-  position: fixed; top: 72px; right: 276px; left: auto; z-index: 30;
+  position: fixed; top: 72px; right: calc(var(--sidebar-width) + 16px); left: auto; z-index: 30;
   width: 360px; max-width: min(360px, calc(100vw - 24px));
   max-height: calc(100vh - 96px);
   background: rgba(10, 14, 28, 0.90); border-radius: 14px; border: 1px solid rgba(99,102,241,0.18);
