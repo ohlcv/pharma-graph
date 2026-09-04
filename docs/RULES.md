@@ -790,6 +790,82 @@ edges_out:
 | 骨架边补齐       | 仅新增 subclass_of / part_of 边   | `chore(content): 药一第一篇补齐骨架边`                          |
 
 
+## 九、YAML 多行字符串规范（block scalar 必须）
+
+### 9.1 规则
+
+**所有可能跨行的字符串字段，必须用 YAML block scalar 标记 `|` 或 `>`，禁止靠纯缩进实现多行。**
+
+适用范围（与本项目相关的字段）：
+
+- `summary.full` — 节点完整摘要，最常包含表格、列表、对比点
+- `summary.short` — 当摘要较长或含换行时
+- `description` / `note` / `reason` — 任意自由文本字段
+
+### 9.2 错误示例（绝对禁止）
+
+```yaml
+summary:
+  full:                                   # ← plain scalar，YAML 1.2 不允许跨行
+      蛋白质类药（重组XX，XX单抗）药物特点
+
+      | 项目 | 内容 |
+      | ---- | ---- |
+      | 给药途径 | 皮下注射、静脉注射 |
+```
+
+**症状**：所有真实换行被自动折叠成单个空格，解析结果为：
+
+```
+"蛋白质类药...药物特点 | 项目 | 内容 | | ---- | ---- | | 给药途径 | 皮下注射..."
+```
+
+→ 节点面板里表格渲染失败（合并成一行），Markdown 解析器无法识别 GFM 表格语法。
+
+### 9.3 正确示例（必须遵守）
+
+```yaml
+summary:
+  full: |                                 # ← 加 `|` 标记，让 YAML 按 literal block scalar 解析
+      蛋白质类药（重组XX，XX单抗）药物特点
+
+      | 项目 | 内容 |
+      | ---- | ---- |
+      | 给药途径 | 皮下注射、静脉注射 |
+```
+
+→ 解析结果保留所有 `\n`，Markdown 表格正常渲染。
+
+### 9.4 关键细节
+
+| 关注点 | 说明 |
+| --- | --- |
+| 标记字符 | `|` = literal（保留所有换行，推荐）；`>` = folded（折成单行再换行，少用） |
+| 缩进要求 | block scalar 的 body 缩进必须**严格大于** key 的缩进至少 1 格 |
+| 单行字符串 | 如果字符串就是一行，**无需**加 `\|`（plain scalar 不会折叠）。仅当**实际跨行**时才必须加 |
+| 字段白名单 | 仅在 `summary.full` / `summary.short` / `description` / `reason` / `note` 等自由文本字段适用；`id` / `label` / `essence` 等结构字段**永远单行**，不要加 `\|` |
+
+### 9.5 为什么这条规则存在
+
+YAML 1.2 spec 明确规定：plain scalar（无引号、无 `|`/`>` 标记）**不允许包含真实换行**——任何 newline 都会被解析器当作 fold 处理（折成单个空格），这是 spec 强制行为，不是库 bug。本项目使用 `yaml` 库（https://github.com/eemeli/yaml）严格遵循该 spec。
+
+因此**写作者必须显式标记 block scalar**，不能依赖缩进让解析器"猜到"你想跨行。
+
+### 9.6 验证方法
+
+新增/编辑节点后，跑一遍：
+
+```bash
+node -e "const {parse}=require('yaml');const fs=require('fs');const m=fs.readFileSync(process.argv[1],'utf8').match(/^---\\r?\\n([\\s\\S]*?)\\r?\\n---/);console.log(JSON.stringify(parse(m[1]).data.summary,null,2))" 你的文件.md
+```
+
+看输出的 `full` 字段——如果内容里**含有 `\n`**，说明表格行独立成行，渲染正确；如果全部挤成一行（看不到 `\n`），说明漏写了 `|`，需要补上。
+
+### 9.7 历史教训
+
+- **蛋白质类药（重组XX，XX单抗）特点总结**（2026-09 初版）——`summary.full` 因漏写 `|`，表格被折叠成单行，节点面板里表格不可见。修复：在 `full:` 后加 `|`，一行字符的修改。
+
+
 ## 十、样板章节参考：第一章第四节（21 节点）
 
 第一章第四节「抗记忆障碍及改善神经功能药」是新规范的第一个完整落地样板。后续章节照此模式执行。
