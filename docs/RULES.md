@@ -405,16 +405,16 @@ edges_out:
 
 - 判断标准：纸质思维导图上有独立框/独立分支的 → 独立；只是考点旁标注文字的 → 内嵌。
 
-- 独立的口诀/注意节点**自身**用 `support` 边指向主知识节点（不是反过来）。详见 §5.15。
+- 独立的口诀/注意节点**自身**用 `part_of` 边指向主知识节点（不是反过来）。详见 §5.15。
 
 ### 5.5 骨架边补齐（与合并正交）
 
-当某章节的伞形 module in\_deg=0，但本来应该有 `parent` 边指向父级时，属骨架缺失而非过度拆分。
+当某章节的伞形 module `in_deg=0`，但本来应该有层级边指向父级时，属骨架缺失而非过度拆分。
 
 | 场景                      | 处置           |
 | ----------------------- | ------------ |
 | 节点零入度 + 有自身语义           | 合并到伞形/节正文    |
-| 节点零入度 + 是骨架本身（伞形/药物/疾病） | 补 `parent` 边 |
+| 节点零入度 + 是骨架本身（伞形/药物/疾病） | 补 `subclass_of` / `part_of` 边 |
 | 节点零入度 + 是图入口（节、章、book）  | 不动           |
 
 ### 5.6 禁止冗余空模块
@@ -430,7 +430,7 @@ edges_out:
 
 ### 5.7 临床内容下沉模式
 
-药物节点的临床内容（药理作用、适应症、禁忌、相互作用）**写入** **`summary.full`** **字段**，不拆成独立的 `link` 边。
+药物节点的临床内容（药理作用、适应症、禁忌、相互作用）**写入** **`summary.full`** **字段**，不拆成独立的 `instance_of` / `part_of` 边。
 
 ```yaml
 # ✅ 正确：临床内容在 summary.full
@@ -452,13 +452,13 @@ edges_out:
     reason: 导致
 ```
 
-**何时用** **`link`** **边、何时用 summary.full？**
+**何时用 `instance_of` 边、何时用 summary.full？**
 
 | 场景                     | 做法                |
 | ---------------------- | ----------------- |
-| 药物→疾病的对应关系需要图谱导航       | `link` 边 + 独立疾病节点 |
+| 药物→疾病的对应关系需要图谱导航       | `instance_of` 边 + 独立疾病节点 |
 | 药物的药理/适应症/禁忌/相互作用是知识文本 | `summary.full` 内嵌 |
-| 药物之间的相互作用需要可视化         | `link` 边          |
+| 药物之间的相互作用需要可视化         | `instance_of` 边          |
 | 单纯的文字描述考点              | `summary.full` 内嵌 |
 
 ### 5.8 summary 字段填写原则
@@ -880,12 +880,12 @@ tags:
 - **最低要求**：
   - 必须包含**具体对象**（药名 / 分类名 / 疾病名 / 机制名）——不能是"治疗""相关""适用"等空泛词。
   - 必须能独立成句——读者看到 reason 即可理解这条边的语义。
-- **建议模板**（参考上表）：
-  - `parent`：`属于{上级名}`
-  - `link`：`{动词}{对象}`，如 `治疗癫痫`、`导致粒细胞缺乏`、`禁用孕妇`
-  - `support`：`{主知识名}{角色}`，如 `倍他司汀记忆口诀`、`癫痫药物对比`
-  - `contrast`：`易混于{药名}` 或 `对比{分类}内的代表药`
-  - `relate`：自由措辞，不少于 4 字
+- **建议模板**（按 type 提供自然语言）：
+  - `subclass_of`：`属于{上级类名}`，如 `一种苯二氮䓬类`
+  - `instance_of`：`{动作}{对象}`，如 `治疗癫痫持续状态`、`激动GABA_A受体`、`导致粒细胞缺乏`
+  - `part_of`：`{主知识名}{角色}`，如 `吡拉西坦记忆口诀`、`镇静催眠药的一项`、`某节总结`
+  - `disjoint_with`：`与{对方}互斥`，如 `与吡拉西坦互斥（同为酰胺类但不可同用）`
+  - `equivalent_to`：`与{对方}等价`，如 `与苯二氮䓬等价（译名一致）`
 
 **正模式**：
 
@@ -1012,50 +1012,56 @@ ADR-0001 文档保持归档状态，不再修改。本文件取代其在日常�
 | ------ | ---------------- | ------ | ------ | ------------------- |
 | 章级入口   | `module`         | 1      | 1      | 第一章 精神与中枢神经系统用药     |
 | 节级入口   | `module`         | 2      | 1      | 第四节 抗记忆障碍及改善神经功能药   |
-| 药物分类   | `classification` | 3      | 3      | 酰胺类 / 胆碱酯酶抑制剂 / 其他  |
+| 伞形分类   | `umbrella-class` | 3      | 3      | 酰胺类 / 胆碱酯酶抑制剂 / 其他  |
 | 代表药物   | `medication`     | 4      | 12     | 每个药物内置完整临床内容        |
-| 记忆口诀   | `mnemonic`       | 4      | 4      | 与药物同级，**口诀节点自身**用 `support` 边指向主知识（药物 / 分类） |
-| **合计** | <br />           | <br /> | **21** | 无冗余空模块              |
+| 记忆口诀   | `mnemonic`       | 4      | 4      | 与药物同级，**口诀节点自身**用 `part_of` 边指向主知识（药物 / 伞形分类） |
+| **合计** |                  |        | **21** | 无冗余空模块              |
 
 ### 10.2 层级链
 
 ```
 第一章 (module, L1)
-  └─parent─ 第四节 (module, L2)
-      ├─parent─ 酰胺类 (classification, L3)
-      │           ├─parent─ 吡拉西坦 (medication, L4)
-      │           ├─parent─ 茴拉西坦 (medication, L4)
-      │           └─parent─ 奥拉西坦 (medication, L4)
-      ├─parent─ 乙酰胆碱酯酶抑制剂 (classification, L3)
-      │           ├─parent─ 多奈哌齐 (medication, L4)
-      │           ├─parent─ 加兰他敏 (medication, L4)
-      │           ├─parent─ 利斯的明 (medication, L4)
-      │           ├─parent─ 石杉碱甲 (medication, L4)
-      │           └─parent─ 酰胺类分类口诀 (mnemonic, L4) ─support→ 乙酰胆碱酯酶抑制剂
-      └─parent─ 其他改善脑功能药 (classification, L3)
-                  ├─parent─ 倍他司汀 (medication, L4) ←support─ 倍他司汀口诀 (mnemonic, L4)
-                  ├─parent─ 丁苯酞 (medication, L4) ←support─ 丁苯酞口诀 (mnemonic, L4)
-                  ├─parent─ 尼麦角林 (medication, L4) ←support─ 尼麦角林口诀 (mnemonic, L4)
-                  ├─parent─ 胞磷胆碱钠 (medication, L4)
-                  └─parent─ 长春西汀 (medication, L4)
+  └─instance_of─ 第四节 (module, L2)
+      ├─subclass_of─ 酰胺类 (umbrella-class, L3)
+      │           ├─instance_of─ 吡拉西坦 (medication, L4)
+      │           ├─instance_of─ 茴拉西坦 (medication, L4)
+      │           └─instance_of─ 奥拉西坦 (medication, L4)
+      ├─subclass_of─ 乙酰胆碱酯酶抑制剂 (umbrella-class, L3)
+      │           ├─instance_of─ 多奈哌齐 (medication, L4)
+      │           ├─instance_of─ 加兰他敏 (medication, L4)
+      │           ├─instance_of─ 利斯的明 (medication, L4)
+      │           ├─instance_of─ 石杉碱甲 (medication, L4)
+      │           └─part_of─ 酰胺类分类口诀 (mnemonic, L4) ─part_of─ 乙酰胆碱酯酶抑制剂
+      └─subclass_of─ 其他改善脑功能药 (umbrella-class, L3)
+                  ├─instance_of─ 倍他司汀 (medication, L4) ←part_of─ 倍他司汀口诀 (mnemonic, L4)
+                  ├─instance_of─ 丁苯酞 (medication, L4) ←part_of─ 丁苯酞口诀 (mnemonic, L4)
+                  ├─instance_of─ 尼麦角林 (medication, L4) ←part_of─ 尼麦角林口诀 (mnemonic, L4)
+                  ├─instance_of─ 胞磷胆碱钠 (medication, L4)
+                  └─instance_of─ 长春西汀 (medication, L4)
 ```
 
-> **ASCII 图的箭头方向**：子→父用 `├─parent─`（左侧起笔）；辅助→主用 `←support─`（箭头朝左、由辅助节点指向主知识）。
+> **ASCII 图的箭头方向**：层级归属（分类→上位分类、药物→分类）用 `─instance_of─`（分类间用 `─subclass_of─`）；辅助→主用 `─part_of─`（箭头朝左时用 `←part_of─`）。
 >
 > 实际 md 文件里，`edges_out` 永远写在**发起方**那一侧：
-> - `parent` 写在**子节点**（medication / classification / section / chapter / book）文件里。
-> - `support` 写在**辅助节点**（mnemonic / note / table）文件里。
+> - `instance_of` / `subclass_of` 写在**子节点**（medication / umbrella-class / strict-class / section / chapter / book）文件里。
+> - `part_of` 写在**辅助节点**（mnemonic / note / table）文件里。
 >
 > 详见 §5.15。
 
 ### 10.3 边类型使用
 
-整个样板仅使用 2 种边类型：
+整个样板仅使用 3 种边类型：
 
-| 边类型       | 发起方（写在谁的文件里） | 数量               |
-| --------- | -------------- | ---------------- |
-| `parent`  | **子节点**（medication / classification / section） | 20 条（每个非根节点 1 条） |
-| `support` | **辅助节点**（mnemonic 口诀） | 4 条（每个口诀 1 条 `support→` 主知识） |
+
+### 10.3 边类型使用
+
+整个样板仅使用 3 种边类型：
+
+| 边类型 | 发起方（写在谁的文件里） | 数量 | 说明 |
+| --- | --- | --- | --- |
+| `instance_of` | **子节点**（medication / umbrella-class / section / chapter / book） | 20 条（每个非根节点 1 条） | 层级归属：药物→分类、分类→节、节→章、章→书 |
+| `subclass_of` | **严格分类节点**（strict-class） | — | 严格药理分类细分时使用 |
+| `part_of` | **辅助节点**（mnemonic 口诀） | 4 条（每个口诀 1 条 `part_of→` 主知识） | 口诀→主知识、总结→节 |
 
 不使用 `link`/`relate`/`branch`/`contrast` — 临床关系全部在 `summary.full` 文本中。
 

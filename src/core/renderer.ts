@@ -84,7 +84,8 @@ const STYLESHEET: any[] = (() => {
     return '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
   };
   const edgeTypeRules = Object.entries(EDGE_TYPE_STYLE).map(([type, s]) => {
-    const isBidirectional = type === 'contrast';
+    // 对称关系（disjoint_with / equivalent_to）渲染为双向
+    const isBidirectional = type === 'disjoint_with' || type === 'equivalent_to';
     return {
       selector: `edge[edgeType = "${type}"]`,
       style: {

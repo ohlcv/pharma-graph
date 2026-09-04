@@ -59,16 +59,16 @@ let legendCy: Core | null = null;
 
 const NODE_TYPE_SHAPE_MAP: Record<string, string> = {
   module: 'round-rectangle',
-  classification: 'hexagon',
-  concept: 'octagon',
+  'strict-class': 'pentagon',     // 严格分类（细分类）— 五边形
+  'umbrella-class': 'hexagon',    // 伞形分类（粗分类）— 六边形
+  concept: 'rectangle',           // 概念 — 正方形（rectangle 是 cytoscape 最接近正方形的形状）
   medication: 'ellipse',
   illness: 'diamond',
-  process: 'star',
   notion: 'tag',
   mnemonic: 'triangle',              // 记忆口诀 — 上箭头（实际节点形状）
-  summary: 'pentagon',
+  summary: 'octagon',                 // 总结 — 八边形
   table: 'rectangle',
-  note: 'round-tag',
+  note: 'tag',
   route: 'triangle',
 };
 

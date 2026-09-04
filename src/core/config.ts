@@ -146,32 +146,29 @@ export const TIER_LABEL: Record<string, string> = {
 };
 
 // ── Edge type → visual style ────────────────────────────────────────────────
-// 6 种边类型，每种对应一种关系家族。
+// 5 种 OWL/RDF 风格边类型，每种对应一种关系家族。
 // 具体药学语义（治疗/导致/抑制...）放进 reason，不再各占一个 type。
 
 export const EDGE_TYPE_STYLE: Record<string, { color: string; lineStyle: string; arrow: string }> =
   {
-    // 结构关系
-    parent: { color: '#94a3b8', lineStyle: 'solid', arrow: 'none' },      // 灰色实线 — 层级归属
-    branch: { color: '#3b82f6', lineStyle: 'solid', arrow: 'none' },       // 蓝色实线 — 分支展开
-    // 知识关系
-    link: { color: '#22c55e', lineStyle: 'solid', arrow: 'triangle' },     // 绿色实线箭头 — 明确关系
-    relate: { color: '#a78bfa', lineStyle: 'dotted', arrow: 'none' },      // 灰紫点线 — 一般关联
-    // 辅助关系
-    support: { color: '#f97316', lineStyle: 'dashed', arrow: 'triangle' },  // 橙色虚线箭头 — 学习辅助
-    contrast: { color: '#a855f7', lineStyle: 'dashed', arrow: 'triangle' },   // 紫色虚线 — 对比区分（cytoscape 不支持 dash-dot，用 dashed+紫色区分）
+    // 类-类 / 个体-类 / 局部-整体 — 都用三角箭头表示方向
+    subclass_of: { color: '#3b82f6', lineStyle: 'solid', arrow: 'triangle' },   // 蓝色实线箭头 — 类-类层级
+    part_of: { color: '#22c55e', lineStyle: 'solid', arrow: 'triangle' },       // 绿色实线箭头 — 局部-整体
+    instance_of: { color: '#f97316', lineStyle: 'solid', arrow: 'triangle' },   // 橙色实线箭头 — 个体-类
+    // 对称关系 — 点线 + 双向箭头
+    disjoint_with: { color: '#a855f7', lineStyle: 'dashed', arrow: 'triangle' }, // 紫色虚线 — 互斥（cytoscape 不支持 dash-dot，用 dashed+紫色区分）
+    equivalent_to: { color: '#a78bfa', lineStyle: 'dotted', arrow: 'triangle' }, // 灰紫点线 — 等价
     default: { color: '#bdc3c7', lineStyle: 'solid', arrow: 'none' },
   };
 
 // ── Edge type → 中文标签 ─────────────────────────────────────────────────────
 
 export const EDGE_TYPE_LABEL: Record<EdgeType, string> = {
-  parent: '层级',
-  branch: '分支',
-  link: '关系',
-  relate: '关联',
-  support: '辅助',
-  contrast: '对比',
+  subclass_of: '子类→父类',
+  part_of: '局部→整体',
+  instance_of: '实例→类别',
+  disjoint_with: '互斥',
+  equivalent_to: '等价',
 };
 
 // ── Shape → 中文标签 ─────────────────────────────────────────────────────────
@@ -179,7 +176,7 @@ export const EDGE_TYPE_LABEL: Record<EdgeType, string> = {
 export const SHAPE_LABEL: Record<string, string> = {
   ellipse: '椭圆',
   'round-rectangle': '圆角矩形',
-  rectangle: '矩形',
+  rectangle: '矩形 / 正方形',
   diamond: '菱形',
   triangle: '三角形',
   pentagon: '五边形',

@@ -14,7 +14,7 @@ function fm(
     label: id,
     edges_out: edges?.map((e) => ({
       target: e.target,
-      type: e.type ?? 'related',
+      type: e.type ?? 'subclass_of',
       reason: e.reason,
     })),
     body: '',
@@ -93,9 +93,9 @@ describe('buildGraph', () => {
       [
         'a.md',
         fm('a', [
-          { target: 'b', type: 'related' },
-          { target: 'b', type: 'related' }, // duplicate
-          { target: 'b', type: 'related', reason: 'different reason' }, // still same key
+          { target: 'b', type: 'subclass_of' },
+          { target: 'b', type: 'subclass_of' }, // duplicate
+          { target: 'b', type: 'subclass_of', reason: 'different reason' }, // still same key
         ]),
       ],
       ['b.md', fm('b')],

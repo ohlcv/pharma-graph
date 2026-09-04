@@ -112,9 +112,9 @@ id: pharm-4
 label: edge-test
 edges_out:
   - target: ""
-    type: relates
+    type: subclass_of
   - target: pharm-1
-    type: relates
+    type: subclass_of
 ---
 
 body`;
@@ -131,9 +131,9 @@ id: pharm-4b
 label: edge-test
 edges_out:
   - target: ""
-    type: relates
+    type: subclass_of
   - target: pharm-1
-    type: relates
+    type: subclass_of
 ---
 
 body`;
