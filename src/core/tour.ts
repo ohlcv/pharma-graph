@@ -40,26 +40,55 @@ export interface TourStepInfo {
 
 // ── Strategy Interface ─────────────────────────────────────────────────────────
 
-export type TourStrategy =
-  | 'has-dfs'
-  | 'topo-prereq';
+// ── Strategy Registry ─────────────────────────────────────────────────────────
+//
+// 加新漫游策略的唯一入口：调用 registerStrategy() 即可。
+// 旧版的 class + ALL_STRATEGIES 数组 + TOUR_STRATEGY_LABELS 三处同步的模式，
+// 在加第 3 个策略时已经显出摩擦（要碰 type 联合、labels 表、注册数组 4 个地方）。
+//
+// 现在：类型由注册表推导，labels 自动从条目中提取，TourEngine 不感知具体策略。
 
-export const TOUR_STRATEGY_LABELS: Record<TourStrategy, string> = {
-  'has-dfs':    '教材顺序（深度优先）',
-  'topo-prereq':'层级依赖（广度优先）',
-};
+export type TourStrategy = string & { readonly __brand: 'TourStrategy' };
 
-export interface TourStrategyImpl {
-  /** Unique strategy id */
-  id: TourStrategy;
-  /** Human-readable label shown in the UI */
+/** 一个漫游策略的最小定义 */
+export interface TourStrategyDef {
+  id: string;
   label: string;
-  /**
-   * Build the full traversal sequence before the tour starts.
-   * Returns an array of node ids in visit order.
-   */
-  buildSequence(cy: cytoscape.Core): string[];
+  buildSequence: (cy: cytoscape.Core) => string[];
 }
+
+const _strategies: TourStrategyDef[] = [];
+
+/** 注册一个漫游策略。重复注册同 id 会覆盖，dev 模式下打 warn。 */
+export function registerStrategy(def: TourStrategyDef): void {
+  const existing = _strategies.findIndex((s) => s.id === def.id);
+  if (existing >= 0) {
+    _strategies[existing] = def;
+    return;
+  }
+  _strategies.push(def);
+}
+
+/** 列出所有已注册策略（UI 用）。 */
+export function listStrategies(): readonly TourStrategyDef[] {
+  return _strategies;
+}
+
+/** 已知策略 id → 中文 label（自动从注册表导出，保持单一来源）。 */
+export const TOUR_STRATEGY_LABELS: Record<string, string> = new Proxy(
+  {} as Record<string, string>,
+  {
+    get: (_target, prop: string) => _strategies.find((s) => s.id === prop)?.label ?? prop,
+  },
+);
+
+/** 按 id 查策略，找不到则 fallback 到第一个注册项。 */
+export function getStrategy(id: TourStrategy): TourStrategyDef {
+  return _strategies.find((s) => s.id === id) ?? _strategies[0]!;
+}
+
+/** 工具：从字符串字面量构造一个 TourStrategy（保留品牌类型，避免到处用 `as`）。 */
+export const asStrategy = (id: string): TourStrategy => id as TourStrategy;
 
 
 function shuffleInPlace<T>(arr: T[]): void {
@@ -191,11 +220,15 @@ function getLocationKey(node: cytoscape.NodeSingular): string {
 
 
 
-class HasDfsStrategy implements TourStrategyImpl {
-  id = 'has-dfs' as TourStrategy;
-  label = TOUR_STRATEGY_LABELS['has-dfs'];
+// ── E1: 教材顺序（按 location 全局排序）────────────────────────────────────────
+//
+// 之前叫 "has-dfs"，但实际是按 location 排序，不依赖 has 边——名字已经误导很久了。
+// id 保留 'has-dfs' 是为了不破坏已经持久化的用户偏好；UI label 保留旧文案。
 
-  buildSequence(cy: cytoscape.Core): string[] {
+registerStrategy({
+  id: 'has-dfs',
+  label: '教材顺序（深度优先）',
+  buildSequence(cy) {
     // 直接按 location 字段全局排序：book > part > chapter > section > subsection > item
     // 这比 has 边 DFS 更可靠——location 已完整编码教材层级，DFS 反而因边覆盖不均引入乱序。
     const seen = new Set<string>();
@@ -213,16 +246,15 @@ class HasDfsStrategy implements TourStrategyImpl {
         return true;
       })
       .map((n) => n.id());
-  }
-}
+  },
+});
 
 // ── E2: 层级依赖拓扑排序 ───────────────────────────────────────────────────────
 
-class TopoPrereqStrategy implements TourStrategyImpl {
-  id = 'topo-prereq' as TourStrategy;
-  label = TOUR_STRATEGY_LABELS['topo-prereq'];
-
-  buildSequence(cy: cytoscape.Core): string[] {
+registerStrategy({
+  id: 'topo-prereq',
+  label: '层级依赖（广度优先）',
+  buildSequence(cy) {
     const nodes = cy.nodes().not('.layer-parent');
     const edges = cy.edges();
 
@@ -379,19 +411,16 @@ class TopoPrereqStrategy implements TourStrategyImpl {
     seq.push(...toAppend);
 
     return seq;
-  }
-}
+  },
+});
 
 // ── TourEngine ────────────────────────────────────────────────────────────────
 
-export const ALL_STRATEGIES: TourStrategyImpl[] = [
-  new HasDfsStrategy(),
-  new TopoPrereqStrategy(),
-];
-
-export function getStrategy(id: TourStrategy): TourStrategyImpl {
-  return ALL_STRATEGIES.find((s) => s.id === id) ?? ALL_STRATEGIES[0];
-}
+/**
+ * 所有已注册策略（导出别名，保留旧 API 兼容）。
+ * 新代码请用 listStrategies() —— 它返回 readonly 视图。
+ */
+export const ALL_STRATEGIES: readonly TourStrategyDef[] = listStrategies();
 
 export class TourEngine {
   private cy: cytoscape.Core;
@@ -414,7 +443,7 @@ export class TourEngine {
   private currentStep = 0;
   private pulseRafId: number | null = null;
   private pulsingNode: cytoscape.NodeSingular | null = null;
-  private strategyId: TourStrategy = 'has-dfs';
+  private strategyId: TourStrategy = 'has-dfs' as TourStrategy;
   // Tracks how many times we've rebuilt the visit sequence in the *current*
   private _restartAttempts = 0;
   // Bound handlers for cy graph-mutation events. Stored so that stop() can

@@ -172,7 +172,7 @@ export class TourController {
 
   /** Mobile compact-button shortcut: cycle between the two strategies. */
   toggleStrategy(): void {
-    const next: TourStrategy = uiState.tour.strategy === 'has-dfs' ? 'topo-prereq' : 'has-dfs';
+    const next: TourStrategy = (uiState.tour.strategy === 'has-dfs' ? 'topo-prereq' : 'has-dfs') as TourStrategy;
     this.setStrategy(next);
   }
 

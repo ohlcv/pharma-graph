@@ -24,7 +24,7 @@ if (typeof globalThis.requestAnimationFrame !== 'function') {
 
 import { describe, it, expect } from 'vitest';
 import cytoscape from 'cytoscape';
-import { TourEngine } from './tour.js';
+import { TourEngine, asStrategy } from './tour.js';
 
 function makeCy() {
   const cy = cytoscape({ headless: true, styleEnabled: false });
@@ -104,7 +104,7 @@ describe('TourEngine totalExplored live sync (issue #15 fix)', () => {
     engine.start('a', {
       interval: 1,
       maxDepth: 0, // instant stop — we just want the listeners attached
-      strategy: 'has-dfs',
+      strategy: asStrategy('has-dfs'),
       onComplete: () => {},
     });
     expect(engine['totalExplored']).toBe(3);
@@ -117,7 +117,7 @@ describe('TourEngine totalExplored live sync (issue #15 fix)', () => {
     engine.start('a', {
       interval: 1,
       maxDepth: 1,
-      strategy: 'has-dfs',
+      strategy: asStrategy('has-dfs'),
       onComplete: () => {},
     });
     expect(engine['totalExplored']).toBe(3);
@@ -135,7 +135,7 @@ describe('TourEngine totalExplored live sync (issue #15 fix)', () => {
     engine.start('a', {
       interval: 1,
       maxDepth: 1,
-      strategy: 'has-dfs',
+      strategy: asStrategy('has-dfs'),
       onComplete: () => {},
     });
     expect(engine['totalExplored']).toBe(3);
@@ -151,7 +151,7 @@ describe('TourEngine totalExplored live sync (issue #15 fix)', () => {
     engine.start('a', {
       interval: 1,
       maxDepth: 1,
-      strategy: 'has-dfs',
+      strategy: asStrategy('has-dfs'),
       onComplete: () => {},
     });
     expect(engine['totalExplored']).toBe(3);
@@ -169,7 +169,7 @@ describe('TourEngine totalExplored live sync (issue #15 fix)', () => {
     engine.start('a', {
       interval: 1,
       maxDepth: 1,
-      strategy: 'has-dfs',
+      strategy: asStrategy('has-dfs'),
       onComplete: () => {},
     });
     const frozen = engine['totalExplored'];
@@ -187,7 +187,7 @@ describe('TourEngine totalExplored live sync (issue #15 fix)', () => {
     engine.start('a', {
       interval: 1,
       maxDepth: 1,
-      strategy: 'has-dfs',
+      strategy: asStrategy('has-dfs'),
       onComplete: () => {},
     });
     engine.stop();
@@ -195,7 +195,7 @@ describe('TourEngine totalExplored live sync (issue #15 fix)', () => {
     engine.start('a', {
       interval: 1,
       maxDepth: 1,
-      strategy: 'has-dfs',
+      strategy: asStrategy('has-dfs'),
       onComplete: () => {},
     });
     cy.getElementById('b').remove();
@@ -209,7 +209,7 @@ describe('TourEngine totalExplored live sync (issue #15 fix)', () => {
     engine.start('a', {
       interval: 1,
       maxDepth: 1,
-      strategy: 'has-dfs',
+      strategy: asStrategy('has-dfs'),
       onComplete: () => {},
     });
     // Remove before stop() — should still update (start attached).
