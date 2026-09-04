@@ -113,11 +113,30 @@ const SUBTREE_BORDER_SATURATION = 80;
 const SUBTREE_BORDER_LIGHTNESS = 50;
 
 /**
- * 给定子树索引返回边框色。索引用分类根的访问顺序（0, 1, 2, ...）。
- * 超过 360° 步进范围自动循环。
+ * 把任意字符串稳定 hash 到 0..2^32-1（djb2）。
+ * 用于给 subtree id 映射一个与节点遍历顺序无关的颜色桶号，
+ * 保证同一棵树跨刷新、跨加载顺序都拿到同一个色。
  */
-export function getSubtreeBorderColor(index: number): string {
-  const hue = (SUBTREE_HUE_START_DEG + index * SUBTREE_HUE_STEP_DEG) % 360;
+function stableHash(str: string): number {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  }
+  return h >>> 0;
+}
+
+/**
+ * 给定子树 id 返回边框色。
+ *
+ * 设计权衡：
+ *   - 用 id 自身的稳定 hash 决定色相，**与节点遍历顺序无关**——
+ *     同一棵子树跨刷新、跨加载顺序永远拿同一个色。
+ *   - 桶号 = hash % 15，限制实际使用的色相数（避免 360° 全用上导致相邻色相难辨）。
+ *   - 15 这个数字选得不重要——subtree 数超 15 时本来就要循环，调色一致性更重要。
+ */
+export function getSubtreeBorderColor(subtreeId: string): string {
+  const bucket = stableHash(subtreeId) % 15;
+  const hue = (SUBTREE_HUE_START_DEG + bucket * SUBTREE_HUE_STEP_DEG) % 360;
   return hslToHex(hue, SUBTREE_BORDER_SATURATION, SUBTREE_BORDER_LIGHTNESS);
 }
 

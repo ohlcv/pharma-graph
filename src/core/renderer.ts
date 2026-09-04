@@ -337,17 +337,13 @@ export class Renderer {
 
     // Build subtree color map: assign one color per distinct subtreeRoot found
     // across all nodes. Order by first-seen so colors are deterministic.
-    const seenRoots = new Set<string>();
-    const orderedRoots: string[] = [];
+    // 把 subtreeRoot id 映射到稳定颜色——使用 id 自身的 hash 保证同一棵子树
+    // 跨刷新、跨节点遍历顺序都拿到同一个色，避免"调一下文件顺序就全变色"的踩雷。
     for (const n of data.nodes) {
-      if (n.subtreeRoot && !seenRoots.has(n.subtreeRoot)) {
-        seenRoots.add(n.subtreeRoot);
-        orderedRoots.push(n.subtreeRoot);
+      if (n.subtreeRoot) {
+        this.subtreeColorMap[n.subtreeRoot] ??= getSubtreeBorderColor(n.subtreeRoot);
       }
     }
-    orderedRoots.forEach((rootId, idx) => {
-      this.subtreeColorMap[rootId] = getSubtreeBorderColor(idx);
-    });
 
     this.layoutConfigs = layoutConfigs;
     this.currentLayout = layoutName;
