@@ -865,7 +865,8 @@ node -e "const {parse}=require('yaml');const fs=require('fs');const m=fs.readFil
 
 - **蛋白质类药（重组XX，XX单抗）特点总结**（2026-09 初版）——`summary.full` 因漏写 `|`，表格被折叠成单行，节点面板里表格不可见。修复：在 `full:` 后加 `|`，一行字符的修改。
 - **抗风湿药节 7 个 DMARDs**（双醋瑞因 / 托法替布 / 来氟米特 / 柳氮磺吡啶 / 甲氨蝶呤 / 羟氯喹 / 金诺芬，2026-09 初版）——`summary.full` 用了 `(1)(2)(3)(4)` 的纯文本编号格式，没有用 `【标签】` 分段，也没有用 markdown 列表/粗体，节点面板里整段文字读起来像糊墙。修复见 §10。
-- **第三节 抗痛风药 — 16 个文件命名**（2026-09 初版）——全部用英文 `data.id`（`med-allopurinol-y2-02-03.md` 等）作为文件名，导致目录里全是英文字符串，与样板（第一章第四节用中文 label 命名）不一致，文件查找困难。修复：全部重命名为中文 label（`别嘌醇.md`、`苯溴马隆.md` 等），并同步更新 `public/sitemap.xml` 里的 URL。
+- **第三节 抗痛风药 — 16 个文件命名**（2026-09 初版）——全部用英文 `data.id`（`med-allopurinol-y2-02-03.md` 等）作为文件名，导致目录里全是英文字符串，与样板（第一章第四节用中文 label 命名）不一致，文件查找困难。修复：全部重命名为中文 label（`别嘌醇.md`、`苯溴马隆.md` 等）。
+- **sitemap.xml 手动同步极易遗漏**（2026-09 末版）——节点重命名后 sitemap URL 未同步，搜索引擎指向不存在路径。修复：`vite.config.ts` 的 `contentManifestPlugin()` 在每次 `buildStart` 和 `handleHotUpdate`（.md 文件变化）时自动扫描 `public/content/` 重建 sitemap，永远与文件系统一致。**无需再手动维护。**
 
 **约定强化**：文件名 = `data.label`（中文），`data.id` = 英文/拉丁文 ID（用于图的 id 寻址、sitemap、edges_out 引用）。两者分工，不可混用。
 

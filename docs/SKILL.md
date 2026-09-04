@@ -78,8 +78,7 @@ description: "将纸质思维导图照片（或扫描件）转录为符合药学
 - **summary.full 用了 `|` block scalar**（跨行时），且每段以 `【标签】` 起头。
 - 边方向铁律：子→父（subclass_of）、局部→整体（part_of）、实例→类别（instance_of）、口诀→主知识（part_of）；父节点不反向枚举子节点。
 - tags 从 summary 加粗词抽取、语义去重、不写 essence 枚举值；药物节点含分类 tag + 作用 tag。
-- 命名前缀与 essence 匹配；所有 edges_out.target 存在（或为预期骨架边）。
-- 如果文件被引用到 `public/sitemap.xml`，确认 URL 中的文件名部分已与新文件名同步。
+- 命名前缀与 essence 匹配；所有 `edges_out.target` 存在（或为预期骨架边）。
 
 ### Step 6 — 分批交付
 一次可处理多个节点，交付时分批呈现（如按分支分组），最终汇总总数与层级结构。汇报中明示：哪些 short/full 是用户提供的、哪些留空、哪些是手写/高亮/印刷来源、口诀归属、命名处理、是否同步了 sitemap。
@@ -158,6 +157,5 @@ zip -r pharma-graph-$(date +%Y%m%d).zip . \
 
 1. 重新解析每个 md 的 YAML frontmatter（确保 `summary.full` 的 `\n` 没被折叠）
 2. 检查文件名 = `data.label`
-3. 检查所有 `edges_out.target` 存在（或为预期骨架边）
-4. 如果改动涉及文件名，同步更新 `public/sitemap.xml`
-5. 用 `unzip -l pharma-graph-*.zip` 反查 zip 内容是否完整
+3. 检查所有 `edges_out.target` 存在且对应文件可找到（sitemap.xml 已由 `vite.config.ts` 自动维护，无需手动同步）
+4. 用 `unzip -l pharma-graph-*.zip` 反查 zip 内容是否完整
