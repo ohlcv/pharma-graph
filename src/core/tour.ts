@@ -126,6 +126,27 @@ export function getStrategy(id: TourStrategy): TourStrategyDef {
 /** 工具：从字符串字面量构造一个 TourStrategy（保留品牌类型，避免到处用 `as`）。 */
 export const asStrategy = (id: string): TourStrategy => id as TourStrategy;
 
+/**
+ * 按 location 排序的兜底序列：把 cy 里所有非 layer-parent 节点，按
+ * `getLocationKey` 全局排序，跳过 `seen` 里的 id，返回剩余节点 id 数组。
+ *
+ * 用途：所有"主逻辑跑完、还有节点没覆盖到"时用同一套 location 顺序兜底，
+ *      避免每个策略各自写一份 sort+filter。
+ *
+ * @param cy    图实例
+ * @param seen  已访问 / 已加入主序列的 id 集合（按引用读，不写）
+ */
+function buildLocationFallbackSeq(cy: cytoscape.Core, seen: ReadonlySet<string>): string[] {
+  return cy.nodes().not('.layer-parent')
+    .toArray()
+    .sort((a, b) => {
+      const la = getLocationKey(a as cytoscape.NodeSingular);
+      const lb = getLocationKey(b as cytoscape.NodeSingular);
+      return la < lb ? -1 : la > lb ? 1 : 0;
+    })
+    .filter((n) => !seen.has(n.id()))
+    .map((n) => n.id());
+}
 
 function shuffleInPlace<T>(arr: T[]): void {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -267,21 +288,8 @@ registerStrategy({
   buildSequence(cy) {
     // 直接按 location 字段全局排序：book > part > chapter > section > subsection > item
     // 这比 has 边 DFS 更可靠——location 已完整编码教材层级，DFS 反而因边覆盖不均引入乱序。
-    const seen = new Set<string>();
-    return cy.nodes().not('.layer-parent')
-      .toArray()
-      .sort((a, b) => {
-        const la = getLocationKey(a as cytoscape.NodeSingular);
-        const lb = getLocationKey(b as cytoscape.NodeSingular);
-        return la < lb ? -1 : la > lb ? 1 : 0;
-      })
-      .filter((n) => {
-        const id = n.id();
-        if (seen.has(id)) return false;
-        seen.add(id);
-        return true;
-      })
-      .map((n) => n.id());
+    // 内部用 seen 做去重（第一次访问全图时 seen 必为空）。
+    return buildLocationFallbackSeq(cy, new Set());
   },
 });
 
@@ -377,15 +385,8 @@ registerStrategy({
 
     const seqSet = new Set(seq);
 
-    // 未访问节点，按 location key 升序（保证同级入口先于子节点处理）
-    const unvisited = nodes.toArray()
-      .filter((n) => !seqSet.has(n.id()))
-      .sort((a, b) => {
-        const la = getLocationKey(a as cytoscape.NodeSingular);
-        const lb = getLocationKey(b as cytoscape.NodeSingular);
-        return la < lb ? -1 : la > lb ? 1 : 0;
-      })
-      .map((n) => n.id());
+    // 未访问节点：共享的"按 location 兜底"工具，按 location key 升序
+    const unvisited = buildLocationFallbackSeq(cy, seqSet);
 
     // getLocationPrefix：取 location key 中的层级段（不含 item+label 后缀），
     // 用来做"祖先前缀匹配"
