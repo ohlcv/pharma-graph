@@ -57,6 +57,42 @@ export interface TourStrategyDef {
   buildSequence: (cy: cytoscape.Core) => string[];
 }
 
+/**
+ * 策略钩子——策略可以接管漫游引擎的部分行为。
+ * 所有字段可选；TourEngine 在对应阶段检查，有则用，无则走默认逻辑。
+ *
+ * 好处：把"用什么顺序走"（buildSequence）和"每步怎么动"（钩子）解耦，
+ *       加新策略时不必改 TourEngine，往注册表里塞新定义即可。
+ */
+export interface StrategyHooks {
+  /**
+   * 在节点进入视野、开始 highlight 之前调用。
+   * 返回 true 继续，返回 false 跳过这个节点（不 highlight、不 center）。
+   * 可用来按节点类型过滤，或注入自定义日志。
+   */
+  shouldVisit?: (nodeId: string, cy: cytoscape.Core) => boolean;
+
+  /**
+   * 每当一轮完整遍历结束（seqIndex 重置回 0）时调用。
+   * 参数 cy 是当前图实例。
+   * 可用来统计本轮覆盖量，或触发额外动画。
+   */
+  onCycleEnd?: (cy: cytoscape.Core) => void;
+
+  /**
+   * 允许策略自己控制"最多重启几次"。
+   * 默认 TourEngine 的硬上限是 3 次，这个钩子让策略知道当前已重启了几次，
+   * 从而决定是否继续——但最终停不停仍由引擎判断（引擎有 3 次绝对上限保底）。
+   */
+  onRestartAttempt?: (attemptCount: number, cy: cytoscape.Core) => void;
+
+  /**
+   * 游览方向：'forward'（从头到尾，默认）或 'reverse'（从尾到头）。
+   * 目前只在渲染侧用，引擎本身是无状态的。
+   */
+  direction?: 'forward' | 'reverse';
+}
+
 const _strategies: TourStrategyDef[] = [];
 
 /** 注册一个漫游策略。重复注册同 id 会覆盖，dev 模式下打 warn。 */
@@ -444,6 +480,8 @@ export class TourEngine {
   private pulseRafId: number | null = null;
   private pulsingNode: cytoscape.NodeSingular | null = null;
   private strategyId: TourStrategy = 'has-dfs' as TourStrategy;
+  /** 当前策略的钩子（start 时从策略 def 注入）。TourEngine 在各阶段检查，有则用。 */
+  private _hooks: Partial<StrategyHooks> = {};
   // Tracks how many times we've rebuilt the visit sequence in the *current*
   private _restartAttempts = 0;
   // Bound handlers for cy graph-mutation events. Stored so that stop() can
@@ -490,6 +528,7 @@ export class TourEngine {
 
     const strategy = getStrategy(options.strategy);
     this.strategyId = options.strategy;
+    this._hooks = strategy as Partial<StrategyHooks>;
 
     // Build full sequence
     this.seq = strategy.buildSequence(this.cy);
@@ -688,6 +727,8 @@ export class TourEngine {
         const id = this.seq[this.seqIndex];
         const node = this.cy.getElementById(id);
         this.seqIndex++;
+        // 策略钩子：允许策略在节点进入视野前拦截（过滤或自定义行为）
+        if (this._hooks.shouldVisit && !this._hooks.shouldVisit(id, this.cy)) continue;
         if (!node.empty() && !node.hasClass('layer-parent')) {
           this.currentStep++;
           // Use the graph's real BFS depth (0=root/center, higher=outer layers).
@@ -706,6 +747,8 @@ export class TourEngine {
         restarted = true;
         this.cycleCount++;
         this._restartAttempts++;
+        // 策略钩子：通知策略本次重启（策略可在这里记录日志或更新内部状态）
+        this._hooks.onRestartAttempt?.(this._restartAttempts, this.cy);
         if (this._restartAttempts < 3) {
           const strategy = getStrategy(this.getStrategyId());
           this.seq = strategy.buildSequence(this.cy);
@@ -717,6 +760,8 @@ export class TourEngine {
           const seen = new Set<string>();
           this.seq = this.seq.filter((id) => { if (seen.has(id)) return false; seen.add(id); return true; });
           this.seqIndex = 0;
+          // 策略钩子：一轮遍历结束（即将开始新一轮）
+          this._hooks.onCycleEnd?.(this.cy);
           continue;
         }
       }
