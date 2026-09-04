@@ -122,6 +122,16 @@ export function listStrategies(): readonly TourStrategyDef[] {
   return _strategies;
 }
 
+/**
+ * 撤销一个已注册策略（测试用）。
+ * 普通业务代码不应调用——注册表是模块级单例，运行时撤销会破坏 UI 状态。
+ * 仅供 vitest setup/teardown 使用，避免测试间污染。
+ */
+export function unregisterStrategy(id: string): void {
+  const idx = _strategies.findIndex((s) => s.id === id);
+  if (idx >= 0) _strategies.splice(idx, 1);
+}
+
 /** 已知策略 id → 中文 label（自动从注册表导出，保持单一来源）。 */
 export const TOUR_STRATEGY_LABELS: Record<string, string> = new Proxy(
   {} as Record<string, string>,

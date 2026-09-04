@@ -24,7 +24,7 @@ if (typeof globalThis.requestAnimationFrame !== 'function') {
 
 import { describe, it, expect } from 'vitest';
 import cytoscape from 'cytoscape';
-import { TourEngine, asStrategy, registerStrategy, getStrategy } from './tour.js';
+import { TourEngine, asStrategy, registerStrategy, unregisterStrategy } from './tour.js';
 
 function makeCy() {
   const cy = cytoscape({ headless: true, styleEnabled: false });
@@ -250,15 +250,16 @@ describe('TourEngine shouldRestart hook (issue #7)', () => {
     ]);
     const engine = new TourEngine(cy);
     let captured: string | null = null;
-    installOnComplete(engine, (r) => {
-      captured = r;
-    });
 
     engine.start('a', {
       interval: 1_000_000, // 几乎不会触发，但 visitNext 同步跑
       maxDepth: -1,         // infinite mode（否则 maxDepth > 0 会按 depth-reached 收束）
       strategy: asStrategy('test-no-restart'),
-      onComplete: () => {},
+    });
+    // start 会用 options.onComplete 覆盖 engine.onComplete，所以**之后**再装
+    // 真正的捕获回调，否则我们的 captured 永远不会被赋值。
+    installOnComplete(engine, (r) => {
+      captured = r;
     });
 
     // 手动同步驱动 visitNext 把 seq 走完——而不是依赖 setTimeout。
@@ -273,9 +274,6 @@ describe('TourEngine shouldRestart hook (issue #7)', () => {
 
     engine.stop();
     // 清理：撤销测试策略，防止泄漏到后续测试。
-    (_strategies as Array<{ id: string }>).splice(
-      (_strategies as Array<{ id: string }>).findIndex((s) => s.id === 'test-no-restart'),
-      1,
-    );
+    unregisterStrategy('test-no-restart');
   });
 });
