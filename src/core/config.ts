@@ -78,36 +78,24 @@ export const ESSENCE_LABEL: Record<string, string> = {
   summary: '总结',
 };
 
-// ── Depth → 边框色（思维导图结构深度，0=中心节点）──────────────────────────────
+// ── 节点边框色（单套语义：subtree 色环 + 中性灰 fallback）───────────────────────
 //
-// 中心节点 (depth = 0) 用专属金色作视觉锚；其他层按 HSL 色环等距取色，
-// 不依赖层数上限——图谱有几层就给几层自动分配饱和、明度区分明显的色。
+// 之前两套色环并存（depth 色环 hue 0°/37°/... + subtree 色环 hue 200°/24°/...），
+// 用户没法一眼分清"这条边的色是来自 subtree 还是 depth"——两套语义互相覆盖但没图例说清。
+//
+// 现在的设计：
+//   - 唯一语义色 = subtree 色环（按 id hash 稳定映射到 15 个色相桶）
+//   - 没有 subtreeRoot 的节点 → 用**中性灰阶**做 fallback（depth 越深灰越深）
+//   - 中心节点 (depth 0) 保留金色作为视觉锚点——不是颜色环的一部分，是品牌色
+//
+// 这样视觉上一眼就能区分"这棵子树 vs 游离节点"两态，subtree 色不再被 depth 色稀释。
 
 /** 中心节点边框色（视觉锚，不参与光谱） */
 const CENTER_BORDER_COLOR = '#f59e0b';
 
-/** 光谱起点（depth=1 用 hue 0°/红色，往后步进 STEP_DEG） */
-const HUE_START_DEG = 0;
-const HUE_STEP_DEG = 37;
-
-/** 饱和/明度固定——只换色相，保证同层颜色一致、邻层区分明显 */
-const BORDER_SATURATION = 70;
-const BORDER_LIGHTNESS = 45;
-
-// ── Subtree → 边框色（分类子树着色，避开 depth 光谱的色相区间）────────────────
-//
-// 同一棵子树（一个分类根及其所有后代）共享一个色，子树之间色相 24° 步进。
-// 用不同的 hue 起点 + 不同 lightness / saturation，与 depth 色环区分开。
-//
-// 设计权衡：
-//   - depth 色环用 hue 0°→360° 顺时针步进 37°，纯度高
-//   - subtree 色环用 hue 200°→360°→200° 步进 24°，偏冷蓝紫青绿
-//   - 子树比 depth 更鲜亮（lightness 50 vs 45），更容易在密集区域辨识
-//   - 不依赖地图固定表，subtree 数量超出步进会自动循环
-
-/** Subtree 色起点（depth 起点是 0°，错开 200° 避免重叠） */
+/** Subtree 色起点（避开暖色红橙区，从冷蓝紫开始） */
 const SUBTREE_HUE_START_DEG = 200;
-/** Subtree 色相步进（比 depth 小，使多棵子树之间也分布均匀） */
+/** Subtree 色相步进（15 桶循环，够覆盖大多数图谱） */
 const SUBTREE_HUE_STEP_DEG = 24;
 const SUBTREE_BORDER_SATURATION = 80;
 const SUBTREE_BORDER_LIGHTNESS = 50;
@@ -141,16 +129,27 @@ export function getSubtreeBorderColor(subtreeId: string): string {
 }
 
 /**
- * 给定 depth 返回边框色。
- *   depth 0      → 金色（中心节点）
- *   depth ≥ 1    → HSL 色环上等距取色（hue 0°/37°/74°/...）
+ * 给定 depth 返回**中性灰**边框色——只给没有 subtreeRoot 的节点用。
  *
- * 任意深度都能拿到颜色，无需预先定义表。
+ * 设计权衡：
+ *   - 不参与色环，所以不能用色相——否则会跟 subtree 色撞车。
+ *   - depth 越深灰越深，让"靠近中心"的视觉权重自然高于"远端游离节点"。
+ *   - 用离散查找表（8 档灰）而不是线性 lightness 公式：lightness 在
+ *     30%-70% 区间内人眼区分度本来就低，离散表反而更稳。
  */
-export function getDepthBorderColor(depth: number): string {
+const NEUTRAL_GRAY_BY_DEPTH: Record<number, string> = {
+  0: CENTER_BORDER_COLOR, // 中心节点保留金色锚
+  1: '#64748b', // slate-500
+  2: '#94a3b8', // slate-400
+  3: '#cbd5e1', // slate-300
+  4: '#e2e8f0', // slate-200
+  5: '#f1f5f9', // slate-100
+};
+const NEUTRAL_GRAY_FALLBACK = '#cbd5e1'; // 超出 depth 5 的都用这个
+
+export function getNeutralBorderColor(depth: number): string {
   if (depth <= 0) return CENTER_BORDER_COLOR;
-  const hue = (HUE_START_DEG + (depth - 1) * HUE_STEP_DEG) % 360;
-  return hslToHex(hue, BORDER_SATURATION, BORDER_LIGHTNESS);
+  return NEUTRAL_GRAY_BY_DEPTH[depth] ?? NEUTRAL_GRAY_FALLBACK;
 }
 
 /** HSL → #RRGGBB（仅用于边框色——饱和/明度固定，转换是纯数学） */
@@ -173,20 +172,11 @@ function hslToHex(h: number, s: number, l: number): string {
 }
 
 /**
- * 旧兼容：层级 0-6 的静态映射（供 legend / detail-panel 在不确定深度时 fallback）。
- * 保留导出避免破坏现有导入，但新代码请用 getDepthBorderColor()。
- * @deprecated Use getDepthBorderColor() directly.
+ * depth → 中文层级名（detail-panel 还在用，与边框色语义无关）。
+ *
+ * LEVEL_BORDER_COLOR 已废弃：A1 方案后，所有 depth 边框色都经由
+ * getNeutralBorderColor() 按需生成，不再需要一张静态表。
  */
-export const LEVEL_BORDER_COLOR: Record<number, string> = {
-  0: CENTER_BORDER_COLOR,
-  1: getDepthBorderColor(1),
-  2: getDepthBorderColor(2),
-  3: getDepthBorderColor(3),
-  4: getDepthBorderColor(4),
-  5: getDepthBorderColor(5),
-  6: getDepthBorderColor(6),
-};
-
 export const LEVEL_LABEL: Record<number, string> = {
   0: '中心',
   1: '一级',

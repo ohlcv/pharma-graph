@@ -1,6 +1,10 @@
 // src/ui/legend-manager.ts
-// Owns the three legend axes (essence/depth/edge) and the active filter
+// Owns the two remaining legend axes (essence/edge) and the active filter
 // state they expose. Pure UI/UI-state — no layout, no cytoscape binding.
+//
+// （A1 方案：第三轴 depth legend 已删除。无 subtreeRoot 节点用中性灰 fallback，
+//  不再向用户展示"depth 颜色"这条线索——depth 仍可在 detail-panel 看到，但
+//  只作为拓扑文字，不带颜色语义。）
 
 import type { Core } from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
@@ -11,8 +15,6 @@ import {
   NODE_TYPE_COLOR,
   EDGE_TYPE_STYLE,
   EDGE_TYPE_LABEL,
-  LEVEL_LABEL,
-  LEVEL_BORDER_COLOR,
 } from '../core/config.js';
 import { buildLegend } from './legend-factory.js';
 
@@ -20,7 +22,6 @@ import { buildLegend } from './legend-factory.js';
 
 let activeShapeFilter: string | null = null;
 let activeEdgeFilter: string | null = null;
-let activeDepthFilter: number | null = null;
 
 export function getActiveShapeFilter(): string | null {
   return activeShapeFilter;
@@ -34,9 +35,8 @@ export function clearShapeFilter(): void {
 function clearAllFilters(): void {
   activeShapeFilter = null;
   activeEdgeFilter = null;
-  activeDepthFilter = null;
   staticEls(
-    '.legend-row', '.legend-edge-row', '.legend-depth-row',
+    '.legend-row', '.legend-edge-row',
     '.shape-filter-item', '.bs-chip',
   ).forEach((el) => el.classList.remove('active'));
 }
@@ -80,26 +80,6 @@ export function populateEssenceLegend(cy: Core): void {
     desktopRow: (k, label) => `<div class="legend-row" data-type="${k}">${makeEssenceSwatch(k, NODE_TYPE_SHAPE_MAP[k] ?? 'rectangle')}<span class="legend-row__label">${label}</span><span class="legend-row__count" id="legend-essence-count-${k}"></span></div>`,
     mobileChip: (k, label) => `<div class="bs-chip" data-type="${k}">${makeEssenceSwatch(k, NODE_TYPE_SHAPE_MAP[k] ?? 'rectangle')}<span>${label}</span><span class="bs-chip__count" id="bs-essence-count-${k}"></span></div>`,
     onClick: (key, highlight) => highlightShape(key, highlight),
-  });
-}
-
-// ── Depth legend (结构深度 → 边框色，0=中心节点) ────────────────────────────────
-
-export function populateDepthLegend(cy: Core, maxDepth: number): void {
-  buildLegend(cy, {
-    labels: LEVEL_LABEL,
-    countScope: 'nodes',
-    countSelector: '[depth = ${key}]',
-    desktopContainerId: 'legend-depth-grid',
-    mobileContainerId: 'bs-depth-chips',
-    desktopCountPrefix: 'legend-depth-count-',
-    mobileCountPrefix: 'bs-depth-count-',
-    rowClass: 'legend-depth-row',
-    dataKey: 'data-depth',
-    maxKey: maxDepth,
-    desktopRow: (k, label) => `<div class="legend-depth-row" data-depth="${k}"><span class="legend-swatch" style="background:#f8fafc;border:2px solid ${LEVEL_BORDER_COLOR[Number(k)] ?? '#94a3b8'}"></span><span class="legend-row__label">${label}</span><span class="legend-row__count" id="legend-depth-count-${k}"></span></div>`,
-    mobileChip: (k, label) => `<div class="bs-chip bs-chip--depth" data-depth="${k}"><span class="bs-chip__swatch" style="background:#f8fafc;border:2px solid ${LEVEL_BORDER_COLOR[Number(k)] ?? '#94a3b8'}"></span><span>${label}</span><span class="bs-chip__count" id="bs-depth-count-${k}"></span></div>`,
-    onClick: (key, highlight) => highlightDepth(key, highlight),
   });
 }
 
@@ -176,23 +156,6 @@ export function highlightShape(essence: string, highlight: HighlightEngine): voi
     const shapeName = Object.entries(SHAPE_LABEL).find(([, v]) => v === label)?.[0] ?? label;
     if (shapeName === essence || label.toLowerCase().includes(essence)) el.classList.add('active');
   });
-}
-
-export function highlightDepth(depth: string, highlight: HighlightEngine): void {
-  if (activeDepthFilter === Number(depth)) {
-    clearAllFilters();
-    highlight.reset();
-    return;
-  }
-  clearAllFilters();
-  activeDepthFilter = Number(depth);
-  highlight.reset();
-  const cy = highlight.getCy();
-  cy.nodes(`[depth = ${depth}]`).addClass('highlighted');
-  cy.nodes(`[depth != ${depth}]`).addClass('dimmed');
-  cy.edges().addClass('dimmed');
-  activateAxis('.legend-depth-row[data-depth]', 'data-depth', depth);
-  activateAxis('.bs-chip[data-depth]', 'data-depth', depth);
 }
 
 export function highlightEdgeTypeFilter(edge: string, highlight: HighlightEngine): void {

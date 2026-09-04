@@ -24,7 +24,7 @@ if (typeof globalThis.requestAnimationFrame !== 'function') {
 
 import { describe, it, expect } from 'vitest';
 import cytoscape from 'cytoscape';
-import { TourEngine, asStrategy } from './tour.js';
+import { TourEngine, asStrategy, registerStrategy, getStrategy } from './tour.js';
 
 function makeCy() {
   const cy = cytoscape({ headless: true, styleEnabled: false });
@@ -222,5 +222,60 @@ describe('TourEngine totalExplored live sync (issue #15 fix)', () => {
     const previous = engine['totalExplored'];
     cy.getElementById('c').remove();
     expect(engine['totalExplored']).toBe(previous);
+  });
+});
+
+describe('TourEngine shouldRestart hook (issue #7)', () => {
+  // 测试策略钩子：shouldRestart 返回 false 时引擎立即以 'no-more-restarts'
+  // 收束，不再进入下一轮（_restartAttempts 保持 0）。
+  //
+  // 测试不依赖真定时器：visitNext 是同步的，循环也只是同步 loopSafety。
+  // 装一个 3 节点的 cy，用 registerStrategy 临时注册一个会调用 shouldRestart 的策略。
+  it('shouldRestart returning false: first cycle completes then engine stops without incrementing _restartAttempts', async () => {
+    const { registerStrategy } = await import('./tour.js');
+    registerStrategy({
+      id: 'test-no-restart',
+      label: 'Test: no restart',
+      buildSequence: (cy) => cy.nodes().not('.layer-parent').map((n) => n.id()),
+      hooks: {
+        shouldRestart: () => false,
+      },
+    });
+
+    const cy = cytoscape({ headless: true, styleEnabled: false });
+    cy.add([
+      { group: 'nodes', data: { id: 'a' } },
+      { group: 'nodes', data: { id: 'b' } },
+      { group: 'nodes', data: { id: 'c' } },
+    ]);
+    const engine = new TourEngine(cy);
+    let captured: string | null = null;
+    installOnComplete(engine, (r) => {
+      captured = r;
+    });
+
+    engine.start('a', {
+      interval: 1_000_000, // 几乎不会触发，但 visitNext 同步跑
+      maxDepth: -1,         // infinite mode（否则 maxDepth > 0 会按 depth-reached 收束）
+      strategy: asStrategy('test-no-restart'),
+      onComplete: () => {},
+    });
+
+    // 手动同步驱动 visitNext 把 seq 走完——而不是依赖 setTimeout。
+    // seq = [a,b,c]，start 已经访问过 a（seqIndex=1），
+    // visitNext 两次后 seqIndex 越过末尾，进入重启判定分支。
+    (engine as unknown as { visitNext: () => void }).visitNext(); // visit b
+    (engine as unknown as { visitNext: () => void }).visitNext(); // visit c → seq exhausted
+    (engine as unknown as { visitNext: () => void }).visitNext(); // triggers restart logic
+
+    expect(captured).toBe('no-more-restarts');
+    expect(engine['_restartAttempts']).toBe(0); // shouldRestart=false 直接跳过计数
+
+    engine.stop();
+    // 清理：撤销测试策略，防止泄漏到后续测试。
+    (_strategies as Array<{ id: string }>).splice(
+      (_strategies as Array<{ id: string }>).findIndex((s) => s.id === 'test-no-restart'),
+      1,
+    );
   });
 });

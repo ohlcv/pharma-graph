@@ -8,7 +8,8 @@ import {
   ESSENCE_LABEL,
   EDGE_TYPE_LABEL,
   LEVEL_LABEL,
-  LEVEL_BORDER_COLOR,
+  getNeutralBorderColor,
+  getSubtreeBorderColor,
 } from '../core/config.js';
 import { DEFAULT_EDGE_TYPE, isEdgeType } from '../core/edge-types.js';
 import { uiState, registerPinToggle } from './state.js';
@@ -248,7 +249,12 @@ function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
   const essenceText = essenceVal ? (ESSENCE_LABEL[essenceVal] ?? essenceVal) : '—';
   const depthVal = typeof d.depth === 'number' ? d.depth : 0;
   const depthLabel = LEVEL_LABEL[depthVal] ?? `${depthVal}级`;
-  const depthColor = LEVEL_BORDER_COLOR[depthVal] ?? '#94a3b8';
+  // A1：徽章色不再按 depth 取，而是按"是否属于某个子树"——
+  // 有子树时用子树色（与图上一致），游离节点用中性灰 fallback。
+  const subtreeRoot = typeof d.subtreeRoot === 'string' ? d.subtreeRoot : '';
+  const depthColor = subtreeRoot
+    ? getSubtreeBorderColor(subtreeRoot)
+    : getNeutralBorderColor(depthVal);
 
   let location = '';
   if (d.location) {

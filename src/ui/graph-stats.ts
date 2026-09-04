@@ -9,7 +9,6 @@ import type { Core } from 'cytoscape';
 import { getCurrentLayout } from './layout-manager.js';
 import {
   populateEssenceLegend,
-  populateDepthLegend,
   populateEdgeLegend,
 } from './legend-manager.js';
 
@@ -87,11 +86,6 @@ function doUpdateStats(cy: Core): void {
     if (el) el.textContent = getCurrentLayout().toUpperCase();
 
     populateEssenceLegend(cy);
-    const maxDepth = cy.nodes().reduce((max, n) => {
-      const d = n.data('depth') as number | undefined;
-      return typeof d === 'number' && d > max ? d : max;
-    }, 0);
-    populateDepthLegend(cy, maxDepth);
     populateEdgeLegend(cy);
   });
 }

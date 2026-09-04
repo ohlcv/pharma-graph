@@ -12,7 +12,6 @@ import {
   NODE_TYPE_COLOR,
   NODE_TYPE_COLOR_DARK,
   EDGE_TYPE_STYLE,
-  getDepthBorderColor,
   getSubtreeBorderColor,
   LAYOUTS,
   LayoutConfig,
@@ -64,12 +63,30 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
     },
   }));
 
-  // Depth 规则 — 边框色（按图谱实际层数动态生成）
+  // Depth 规则 — 边框色（只覆盖**没有** subtreeRoot 的节点，作为中性灰 fallback）
+  //
+  // 改回去之前的两套光谱，原因是：subtree 色环已经表达"分类归属"，
+  // 没有 subtreeRoot 的节点用什么色都不该再传达"depth 信息"——depth 只
+  // 是渲染时凑巧有的字段，并不携带用户可感知的语义。
+  // 这里用 slate-灰阶：depth 越大灰越浅，让"靠近中心"的节点视觉权重自然高。
+  const NEUTRAL_FALLBACK_BORDER: Record<number, string> = {
+    0: '#f59e0b', // 金色锚（中心节点，无论有无 subtreeRoot 都保留）
+    1: '#64748b',
+    2: '#94a3b8',
+    3: '#cbd5e1',
+    4: '#e2e8f0',
+    5: '#f1f5f9',
+  };
   const depthRules = [];
   for (let d = 0; d <= maxDepth; d++) {
+    const color = NEUTRAL_FALLBACK_BORDER[d] ?? '#cbd5e1';
     depthRules.push({
-      selector: `node[depth = ${d}]`,
-      style: { 'border-color': getDepthBorderColor(d), 'border-width': 2 },
+      // [!subtreeRoot] 表示"未分配子树"的节点；中心节点 (d=0) 例外，
+      // 即使有子树也是金色锚——所以单独写一条规则
+      selector: d === 0
+        ? `node[depth = 0]`
+        : `node[depth = ${d}][!subtreeRoot]`,
+      style: { 'border-color': color, 'border-width': 2 },
     });
   }
 
