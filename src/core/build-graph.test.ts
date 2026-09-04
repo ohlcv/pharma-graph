@@ -66,10 +66,6 @@ describe('buildGraph', () => {
       tags: ['x'],
       body: 'body of A',
     });
-    // node also carries legacy type/category/layer aliases from essence/field/tier
-    expect(r.nodes[0].type).toBe('concept');
-    expect(r.nodes[0].category).toBe('pharmacy');
-    expect(r.nodes[0].layer).toBe('basic');
   });
 
   it('builds edges from edges_out', () => {

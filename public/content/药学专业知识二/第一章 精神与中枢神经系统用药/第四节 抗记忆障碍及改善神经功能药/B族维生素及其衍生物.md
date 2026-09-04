@@ -1,7 +1,7 @@
 ---
 data:
   id: strict-b-vitamins-y2-01-04
-  label: B 族维生素及其衍生物
+  label: B族维生素及其衍生物
   essence: strict-class
   level: 3
   tier: drug

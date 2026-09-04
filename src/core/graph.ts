@@ -14,19 +14,15 @@ export interface NodeData {
   weight: number;
   id: string;
   label: string;
-  type: string;
-  category: string;
-  essence?: string;  // 节点本质：药/疾病/概念/机制/口诀...
-  field?: string;   // 学科归属：pharmaceutics/pharmacology/medicinal_chemistry
+  essence?: string;  // 节点本质：module/strict-class/umbrella-class/concept/medication/illness/notion/mnemonic/summary/table/note
+  field?: string;   // 学科归属：pharmaceutics/pharmacology/medicinal_chemistry/...
   tier?: string;    // 知识层次：basic/drug/disease/management/service/legal
   level?: number;   // 思维导图结构级别 1-6（决定边框色）
-  layer?: string;   // knowledge layer: foundation / system / clinical / service (legacy)
   /** 简短摘要 */
   shortSummary?: string;
   /** 完整摘要 */
   fullSummary?: string;
-  /** 兼容旧字段：优先取 shortSummary，否则取 fullSummary */
-  summary?: string;
+  summary?: string; // 摘要（shortSummary 优先，否则 fullSummary）
   location?: NodeLocation;
   tags?: string[];
   body?: string;      // 正文内容（md 文件中 frontmatter 后的部分）

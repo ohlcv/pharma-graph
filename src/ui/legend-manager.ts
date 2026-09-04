@@ -67,9 +67,6 @@ const NODE_TYPE_SHAPE_MAP: Record<string, string> = {
   notion: 'tag',
   mnemonic: 'triangle',              // 记忆口诀 — 上箭头（实际节点形状）
   summary: 'octagon',                 // 总结 — 八边形
-  table: 'rectangle',
-  note: 'tag',
-  route: 'triangle',
 };
 
 function makeShapeSwatch(shape: string): string {

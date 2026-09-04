@@ -29,7 +29,7 @@ export interface NodeMeta {
   shortSummary?: string;
   /** 完整摘要 */
   fullSummary?: string;
-  /** 兼容旧字段：优先取 shortSummary，否则取 fullSummary */
+  /** 派生字段：优先 shortSummary，否则 fullSummary */
   summary?: string;
   location?: {
     book?: string;
@@ -118,16 +118,14 @@ function basename(filepath: string): string {
 const REQUIRED_FIELDS = ['id'];
 
 /**
- * Resolve the source-of-truth object. Migration puts everything under
- * `data:`, so when that block exists we use it; otherwise we read from
- * the root map. Only the new schema (essence/field/tier) is accepted;
- * legacy type/category/layer is not supported here.
+ * Resolve the source-of-truth object. The new schema nests all metadata
+ * under `data:`. If that block exists, we use it; otherwise we read from
+ * the root map.
  *
- * Legacy files keep `edges_out` at the YAML root while the rest of their
- * metadata sits under `data:`. To keep those files readable without a
- * migration pass, fold the root-level `edges_out` into the nested block
- * before returning. If the nested block already has its own `edges_out`,
- * the root-level copy is dropped (nested wins).
+ * Files that mix `data:` with root-level `edges_out` are still readable:
+ * the root-level `edges_out` is folded into the nested block before
+ * returning. If the nested block already has its own `edges_out`, the
+ * root-level copy is dropped (nested wins).
  */
 function pickSource(yamlRoot: Record<string, unknown>): Record<string, unknown> {
   const nested = yamlRoot['data'];
@@ -189,10 +187,10 @@ export function parseFrontmatterWithWarnings(
     shortSummary = rawSummary.trim();
   }
 
-  // summary 保持兼容，优先 short
+  // summary 派生字段：优先 short，否则 full
   const summary = shortSummary ?? fullSummary;
 
-  // edges_out lives under `data:` in the new schema; legacy files keep it at
+  // edges_out lives under `data:` in the new schema.
   // the YAML root. `pickSource` already folded the root-level copy into the
   // nested block when needed, so a single `fm['edges_out']` lookup covers
   // both layouts. (Reading `data['edges_out']` directly would be equivalent

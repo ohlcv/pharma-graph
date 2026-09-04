@@ -97,12 +97,11 @@ export class HighlightEngine {
     // (and therefore inheriting the default 'ellipse') are still correctly
     // filtered by their essence attribute — which is what the legend counts use.
     // 反查表：cytoscape shape → essence
-    // 关键：rectangle 既对应 concept（正方形）也对应 table，需结合其他属性判断
     const essenceMap: Record<string, string> = {
       ellipse:           'medication',
       octagon:           'summary',
       diamond:           'illness',
-      triangle:          'route',
+      rectangle:         'concept',
       pentagon:          'strict-class',     // 五边形 — 严格分类
       hexagon:           'umbrella-class',   // 六边形 — 伞形分类
       'round-rectangle': 'module',

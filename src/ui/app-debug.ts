@@ -168,7 +168,7 @@ export function initDebugOverlay(renderer: Renderer): void {
 
     <!-- 样式规则对照表 -->
     <div class="dbg-section">
-      <div class="dbg-section__label">type → shape 对照</div>
+      <div class="dbg-section__label">essence → shape 对照</div>
       <div class="dbg-rules-table" id="dbg-rules-table"></div>
     </div>
 
@@ -344,7 +344,7 @@ function buildRulesTable(cy: cytoscape.Core): string {
   // results that don't reflect the field/tier mapping.
   const visible = cy.nodes().not('.layer-parent').filter((n: NodeSingular) => !n.hasClass('dimmed'));
   visible.forEach((n: NodeSingular) => {
-    const t = n.data('type') ?? '?';
+    const t = n.data('essence') ?? '?';
     const shape = n.style('shape') as string;
     const bc = n.style('border-color') as string;
     const bw = n.style('border-width') as string;
@@ -380,13 +380,13 @@ function nodeProps(node: NodeSingular): string {
   const w = node.data('weight') ?? '?';
   const rw = node.renderedWidth().toFixed(1);
   const rh = node.renderedHeight().toFixed(1);
-  const type = node.data('type') ?? '?';
-  const cat = node.data('category') ?? '?';
-  const layer = node.data('layer') ?? '?';
+  const essence = node.data('essence') ?? '?';
+  const field = node.data('field') ?? '?';
+  const tier = node.data('tier') ?? '?';
   const opacity = node.renderedStyle('opacity') as string;
   const classes = (node.classes() as string[]).join(' ');
 
-  const shapeOk = shape !== 'ellipse' || type === 'concept';
+  const shapeOk = shape !== 'ellipse' || essence === 'medication';
   const bcOk = !bc.includes('255,255,255') && !bc.includes('#ffffff');
 
   return [
@@ -402,7 +402,7 @@ function nodeProps(node: NodeSingular): string {
     classBadge('H', node.hasClass('highlighted')),
     classBadge('V', node.hasClass('hovered')),
     `</div>`,
-    `<div class="dbg-props-meta">type=${type} | category=${cat} | layer=${layer} | opacity=${opacity}</div>`,
+    `<div class="dbg-props-meta">essence=${essence} | field=${field} | tier=${tier} | opacity=${opacity}</div>`,
     `<div class="dbg-props-classes">cls:[${classes || '∅'}]</div>`,
   ].join('');
 }
@@ -661,14 +661,14 @@ export function updateForensicPanel(renderer: Renderer): void {
   const coverageEl = el('dbg-coverage');
   if (coverageEl) {
     const allNodes = cy.nodes().not('.layer-parent');
-    const noType   = allNodes.filter((n: NodeSingular) => !n.data('type') || n.data('type') === 'default').length;
-    const noCat    = allNodes.filter((n: NodeSingular) => !n.data('category') || n.data('category') === 'default').length;
-    const noLayer  = allNodes.filter((n: NodeSingular) => !n.data('layer')).length;
-    const total    = allNodes.length;
-    const typeWarn = noType > 0 ? `<span style="color:#f87171">⚠ type 缺失: ${noType}/${total}</span>` : `<span style="color:#4ade80">✓ type 全覆盖</span>`;
-    const catWarn  = noCat  > 0 ? `<span style="color:#f87171">⚠ category 缺失: ${noCat}/${total}</span>`  : `<span style="color:#4ade80">✓ category 全覆盖</span>`;
-    const layerWarn= noLayer> 0 ? `<span style="color:#f87171">⚠ layer 缺失: ${noLayer}/${total}</span>` : `<span style="color:#4ade80">✓ layer 全覆盖</span>`;
-    coverageEl.innerHTML = `<div style="font-size:9px;line-height:1.8">${typeWarn}<br>${catWarn}<br>${layerWarn}</div>`;
+    const noEssence = allNodes.filter((n: NodeSingular) => !n.data('essence')).length;
+    const noField   = allNodes.filter((n: NodeSingular) => !n.data('field')).length;
+    const noTier    = allNodes.filter((n: NodeSingular) => !n.data('tier')).length;
+    const total     = allNodes.length;
+    const essenceWarn = noEssence > 0 ? `<span style="color:#f87171">⚠ essence 缺失: ${noEssence}/${total}</span>` : `<span style="color:#4ade80">✓ essence 全覆盖</span>`;
+    const fieldWarn   = noField   > 0 ? `<span style="color:#f87171">⚠ field 缺失: ${noField}/${total}</span>`   : `<span style="color:#4ade80">✓ field 全覆盖</span>`;
+    const tierWarn    = noTier    > 0 ? `<span style="color:#f87171">⚠ tier 缺失: ${noTier}/${total}</span>`    : `<span style="color:#4ade80">✓ tier 全覆盖</span>`;
+    coverageEl.innerHTML = `<div style="font-size:9px;line-height:1.8">${essenceWarn}<br>${fieldWarn}<br>${tierWarn}</div>`;
   }
 
   // ── Node panel diagnostics ─────────────────────────────────────────

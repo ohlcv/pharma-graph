@@ -10,7 +10,6 @@ import { EDGE_TYPES } from '../core/edge-types.js';
 
 /** Canonical essence values (decide node shape). */
 export const VALID_ESSENCE: readonly string[] = [
-  // 当前规范类型（frontmatter.md §2.1）
   'module',          // 结构模块/入口 — round-rectangle
   'strict-class',    // 严格分类（细分类）— pentagon
   'umbrella-class',  // 伞形分类（粗分类）— hexagon
@@ -20,13 +19,6 @@ export const VALID_ESSENCE: readonly string[] = [
   'notion',          // 学习性认知单元 — tag
   'mnemonic',        // 记忆口诀 — vee
   'summary',         // 总结/归纳 — octagon
-  'table',           // 表格/对照表 — rectangle
-  'note',            // 注意/提示/笔记 — tag
-  // 历史兼容值（旧内容可能仍在使用，不再作为当前规范的固定视觉类型）
-  'classification', 'section', 'route', 'substance', 'part', 'process',
-  'drug', 'disease', 'ingredient', 'mechanism',
-  'bridge', 'service', 'pathogen', 'pathway',
-  'indicator', 'book', 'chapter',
 ] as const;
 
 /** Canonical level values (decide node border color). */

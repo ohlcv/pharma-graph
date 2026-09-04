@@ -40,9 +40,9 @@ export function installDebugBridge(renderer: Renderer): void {
       return {
         id: n.id(),
         label: n.data('label'),
-        type: n.data('type'),
-        category: n.data('category'),
-        layer: n.data('layer'),
+        essence: n.data('essence'),
+        field: n.data('field'),
+        tier: n.data('tier'),
         weight: n.data('weight'),
         shape: n.style('shape'),
         borderColor: n.style('border-color'),

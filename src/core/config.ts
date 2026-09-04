@@ -26,8 +26,6 @@ export const NODE_TYPE_SHAPE: Record<string, string> = {
   notion: 'tag',                      // 学习性认知单元 — 标签形
   mnemonic: 'vee',                    // 记忆口诀 — V形
   summary: 'octagon',                 // 总结/归纳 — 八边形
-  table: 'rectangle',                 // 表格/对照表 — 矩形
-  note: 'tag',                        // 注意/提示/笔记 — 标签形
 };
 
 export const NODE_TYPE_COLOR: Record<string, string> = {
@@ -40,8 +38,6 @@ export const NODE_TYPE_COLOR: Record<string, string> = {
   notion: '#d1d5db',               // 淡灰 — 学习认知
   mnemonic: '#fbbf24',             // 黄色 — 口诀
   summary: '#fde68a',              // 浅黄 — 总结
-  table: '#94a3b8',                // 灰蓝 — 表格
-  note: '#fca5a5',                 // 浅红 — 注意/提示
   default: '#94a3b8',
 };
 
@@ -55,8 +51,6 @@ export const NODE_TYPE_COLOR_DARK: Record<string, string> = {
   notion: '#94a3b8',
   mnemonic: '#d97706',
   summary: '#ca8a04',
-  table: '#64748b',
-  note: '#dc2626',
   default: '#64748b',
 };
 
@@ -72,8 +66,6 @@ export const ESSENCE_LABEL: Record<string, string> = {
   notion: '认知',
   mnemonic: '口诀',
   summary: '总结',
-  table: '表格',
-  note: '注意',
 };
 
 // ── Level → 边框色（思维导图结构级别 1-6）──────────────────────────────────────

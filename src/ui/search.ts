@@ -127,11 +127,6 @@ export class Search {
     return this.results[this._activeIndex];
   }
 
-  /** @deprecated Kept for backwards compat with the existing tests. */
-  getCurrentIndex(): number {
-    return this._activeIndex;
-  }
-
   /** Move the camera to the result at `this._activeIndex` without changing it. */
   private focusCurrent(): string | null {
     const id = this.getCurrentId();
