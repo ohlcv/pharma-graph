@@ -245,7 +245,11 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
       },
     },
     {
-      selector: '.selected-node',
+      // 选中节点 + 邻居高亮共用边框色 + opacity 增强。
+      // 原来两套规则（.selected-node / .highlighted）除了 border-width 差 1px
+      // 完全重复，合并成一套：border-width: 4，邻居也变粗一点（视觉上邻居
+      // 和选中节点统一，参考 A1 方案「中性化」思路）。
+      selector: '.selected-node, .highlighted',
       style: {
         opacity: 1,
         'border-width': 4,
@@ -256,8 +260,6 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
       selector: '.highlighted',
       style: {
         opacity: 0.95,
-        'border-width': 3,
-        'border-color': '#fbbf24', // amber-400
       },
     },
     {
