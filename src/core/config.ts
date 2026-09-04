@@ -18,40 +18,40 @@ import { EDGE_TYPES, type EdgeType } from './edge-types.js';
 
 export const NODE_TYPE_SHAPE: Record<string, string> = {
   module: 'round-rectangle',          // 结构模块/入口 — 圆角矩形
-  classification: 'hexagon',         // 分类/分组标准 — 六边形
-  concept: 'octagon',               // 概念/术语 — 八边形
-  medication: 'ellipse',            // 具体药物/制剂 — 椭圆
-  illness: 'diamond',               // 疾病/病理状态 — 菱形
-  process: 'star',                  // 机制/过程 — 星形
-  notion: 'tag',                    // 学习性认知单元 — 标签形
-  mnemonic: 'vee',                   // 记忆口诀 — V形
-  summary: 'pentagon',              // 总结/归纳 — 五边形
-  table: 'rectangle',              // 表格/对照表 — 矩形
-  note: 'round-tag',               // 注意/提示/笔记 — 圆角标签形
+  'strict-class': 'pentagon',         // 严格分类（细分类）— 五边形
+  'umbrella-class': 'hexagon',        // 伞形分类（粗分类）— 六边形
+  concept: 'rectangle',               // 概念/术语 — 正方形（rectangle 是 cytoscape 中最接近正方形的形状）
+  medication: 'ellipse',              // 具体药物/制剂 — 椭圆
+  illness: 'diamond',                 // 疾病/病理状态 — 菱形
+  notion: 'tag',                      // 学习性认知单元 — 标签形
+  mnemonic: 'vee',                    // 记忆口诀 — V形
+  summary: 'octagon',                 // 总结/归纳 — 八边形
+  table: 'rectangle',                 // 表格/对照表 — 矩形
+  note: 'tag',                        // 注意/提示/笔记 — 标签形
 };
 
 export const NODE_TYPE_COLOR: Record<string, string> = {
   module: '#67e8f9',               // 青色 — 结构模块
-  classification: '#818cf8',       // 靛蓝 — 分类
+  'strict-class': '#818cf8',       // 靛蓝 — 严格分类
+  'umbrella-class': '#a78bfa',     // 浅紫 — 伞形分类
   concept: '#818cf8',              // 靛蓝 — 概念
   medication: '#67e8f9',           // 青色 — 药物
-  illness: '#fca5a5',             // 浅红 — 疾病
-  process: '#f87171',             // 红色 — 过程/机制
-  notion: '#d1d5db',              // 淡灰 — 学习认知
-  mnemonic: '#fbbf24',            // 黄色 — 口诀
-  summary: '#fde68a',             // 浅黄 — 总结
-  table: '#94a3b8',               // 灰蓝 — 表格
-  note: '#fca5a5',               // 浅红 — 注意/提示
+  illness: '#fca5a5',              // 浅红 — 疾病
+  notion: '#d1d5db',               // 淡灰 — 学习认知
+  mnemonic: '#fbbf24',             // 黄色 — 口诀
+  summary: '#fde68a',              // 浅黄 — 总结
+  table: '#94a3b8',                // 灰蓝 — 表格
+  note: '#fca5a5',                 // 浅红 — 注意/提示
   default: '#94a3b8',
 };
 
 export const NODE_TYPE_COLOR_DARK: Record<string, string> = {
   module: '#0891b2',
-  classification: '#4f46e5',
+  'strict-class': '#4f46e5',
+  'umbrella-class': '#7c3aed',
   concept: '#4f46e5',
   medication: '#0891b2',
   illness: '#dc2626',
-  process: '#dc2626',
   notion: '#94a3b8',
   mnemonic: '#d97706',
   summary: '#ca8a04',
@@ -64,11 +64,11 @@ export const NODE_TYPE_COLOR_DARK: Record<string, string> = {
 
 export const ESSENCE_LABEL: Record<string, string> = {
   module: '模块',
-  classification: '分类',
+  'strict-class': '细分类',
+  'umbrella-class': '粗分类',
   concept: '概念',
   medication: '药物',
   illness: '疾病',
-  process: '过程',
   notion: '认知',
   mnemonic: '口诀',
   summary: '总结',

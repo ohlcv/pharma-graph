@@ -1,6 +1,6 @@
 # 节点重构规则
 
-> 适用范围：在已有图谱上，将旧版 frontmatter（12 种边、6 种 essence、无 level）迁移到新版规范（6 种边、11 种 essence、6 级 level），以及迁移完成后的结构性清理（合并、拆分、骨架补齐）。
+> 适用范围：在已有图谱上，将旧版 frontmatter（6 种边、9 种 essence、6 级 level）迁移到新版 OWL/RDF 风格规范（**5 种边**：`subclass_of`/`part_of`/`instance_of`/`disjoint_with`/`equivalent_to`；**9 种 essence**：module/strict-class/umbrella-class/medication/illness/mnemonic/summary/notion/concept），以及迁移完成后的结构性清理（合并、拆分、骨架补齐）。
 >
 > 配套文档：[frontmatter.md](./frontmatter.md) — 字段定义与视觉编码规范（权威来源）。
 >
@@ -8,16 +8,228 @@
 
 ***
 
+## 〇、设计理念
+
+本项目采用 OWL/RDF 风格的 **5 种边关系类型** + **9 种节点本质** 的本体建模：
+
+- **节点本质**：module / strict-class（五边形） / umbrella-class（六边形） / medication / illness / mnemonic / summary / notion / concept（正方形）
+- **边关系**：`subclass_of` / `part_of` / `instance_of` / `disjoint_with` / `equivalent_to`
+
+详细语义见下文「edges_out.type — 边类型」章节。
+
+***
+
+## 零、命名规范
+
+### 命名格式
+
+**统一格式：`前缀-节点英文名-后缀（章节位置）`**
+
+- **前缀**：表示节点本质，一眼判断类型
+- **节点英文名**：药物或分类的英文/拉丁文名称
+- **后缀**：章节位置，格式为 `{书简写}-{章号}-{节号}`（如 `y2-02-01`）
+
+### 章节位置后缀
+
+| 书 | 书简写 | 章号 | 节号 | 示例后缀 |
+| --- | ------ | ---- | ---- | ------- |
+| 药学专业知识一 | `y1` | 两位数字 | 两位数字 | `y1-01-01` |
+| 药学专业知识二 | `y2` | 两位数字 | 两位数字 | `y2-02-01` |
+| 药学综合知识与技能 | `y3` | 两位数字 | 两位数字 | `y3-04-05` |
+| 药事管理与法规 | `y4` | 两位数字 | 两位数字 | `y4-01-01` |
+
+### 前缀对照表
+
+> **完整版见下方「前缀与 essence 对照表」**，以下为简要版。**新规范使用 `strict-` / `umbrella-` 替代旧的 `class-`，使用 `table` 作为 essence 而非独立前缀。**
+
+| 前缀 | 节点类型 | essence | 示例 |
+| ---- | -------- | ------- | ---- |
+| `book-` | 书/篇级入口 | `module` | `book-y2` |
+| `ch-` | 章入口 | `module` | `ch-y2-02` |
+| `sec-` | 节入口 | `module` | `sec-antigout-y2-02-03` |
+| `strict-` | 严格分类（细分类） | `strict-class` | `strict-benzo-y2-01-01` |
+| `umbrella-` | 伞形分类（粗分类） | `umbrella-class` | `umbrella-benzo-y2-01-01` |
+| `med-` | 药物节点 | `medication` | `med-diazepam-y2-01-01` |
+| `memo-` | 口诀节点 | `mnemonic` | `memo-benzo-y2-01-01` |
+| `sum-` | 总结节点 | `summary` | `sum-benzo-y2-01` |
+| `note-` | 注意节点 | `note` | `note-methotrexate-y2-02-02` |
+| `conc-` | 概念节点 | `concept` | `conc-bioavailability-y1-04` |
+| `notion-` | 经验认知节点 | `notion` | `notion-monitor-y3-04` |
+
+### 前缀与 essence 对照表
+
+| 前缀 | 节点类型 | essence | 形状 | 示例 |
+| ---- | -------- | ------- | ---- | ---- |
+| `book-` | 书/篇级入口 | `module` | 圆角矩形 | `book-y2` |
+| `ch-` | 章入口 | `module` | 圆角矩形 | `ch-y2-02` |
+| `sec-` | 节入口 | `module` | 圆角矩形 | `sec-antigout-y2-02-03` |
+| `strict-` | 严格分类（细分类） | `strict-class` | 五边形 | `strict-benzo-y2-01-01` |
+| `umbrella-` | 伞形分类（粗分类） | `umbrella-class` | 六边形 | `umbrella-benzo-y2-01-01` |
+| `med-` | 药物节点 | `medication` | 椭圆 | `med-diazepam-y2-01-01` |
+| `memo-` | 口诀节点 | `mnemonic` | vee | `memo-benzo-y2-01-01` |
+| `sum-` | 总结节点 | `summary` | 八边形 | `sum-benzo-y2-01` |
+| `note-` | 注意节点 | `note` | tag | `note-methotrexate-y2-02-02` |
+| `conc-` | 概念节点 | `concept` | 正方形 | `conc-bioavailability-y1-04` |
+| `notion-` | 经验认知节点 | `notion` | tag | `notion-monitor-y3-04` |
+
+### essence — 节点本质（决定形状）
+
+| essence | 中文含义 | 形状 | 使用范围 |
+| ------- | -------- | ---- | -------- |
+| `module` | 结构模块/入口 | 圆角矩形 | 篇、章、节、主题入口等结构节点 |
+| `strict-class` | 严格分类（细分类） | 五边形 | 按药理/化学严格标准划分的分类（亚类、分类依据、分组节点） |
+| `umbrella-class` | 伞形分类（粗分类） | 六边形 | 按临床用途、功能、机制、酶划分的聚类集合 |
+| `concept` | 概念/术语 | 正方形 | 教材定义明确、具有边界的知识概念 |
+| `medication` | 具体药物/制剂 | 椭圆 | 通用名、具体制剂、代表药物 |
+| `illness` | 疾病/病理状态/综合征 | 菱形 | 可被治疗、禁忌、导致或独立讨论的疾病/状态 |
+| `notion` | 学习性认知单元 | tag | 经验性认识、临床提示、易混概念、经验归纳 |
+| `mnemonic` | 记忆口诀 | vee | 口诀、首字母记忆、顺口溜、分类速记 |
+| `summary` | 总结/归纳 | 八边形 | 对多个节点进行收束、压缩、归纳的总结节点 |
+| `table` | 表格/对照表 | 矩形 | 原纸图中需要作为独立知识载体展示的表格或对照结构 |
+| `note` | 注意/提示/笔记 | tag | 【注意】、【提示】、易错提醒、补充说明 |
+
+### level — 思维导图结构级别（决定边框色，来源：frontmatter.md §2.2）
+
+取值严格为 `1–6`，含义与教材目录完全独立：
+
+| level | 含义 | 典型节点 |
+| ----: | ---- | -------- |
+| `1` | 一级主节点 | 总主题、核心主题、一级大分支 |
+| `2` | 二级节点 | 一级主题下的主要分类/模块 |
+| `3` | 三级节点 | 二级节点展开出的知识分支 |
+| `4` | 四级节点 | 具体知识点、代表药物 |
+| `5` | 五级节点 | 考点维度、属性展开 |
+| `6` | 六级节点 | 最末级辅助：口诀、总结、注意、表格等 |
+
+> **父子判定规则**：`level` 数字大的节点是子节点。分类层级用 `subclass_of`；章节局部→整体用 `part_of`。
+
+### tier — 知识层级（决定填充色，来源：frontmatter.md §2.3）
+
+| tier | 中文 | 典型内容 | 填充色语义 |
+| ---- | ---- | -------- | ---------- |
+| `basic` | 基础层 | 生理、病理、基础药理机制、基础概念 | 基础色 |
+| `drug` | 药物层 | 具体药物、制剂、药物类别 | **淡蓝色** |
+| `disease` | 疾病层 | 疾病、诊断、症状综合征、病理状态 | **粉红色** |
+| `management` | 管理层 | 用药管理、合理用药、监护与决策 | 管理色 |
+| `service` | 服务层 | 药学服务流程、服务模块 | 服务色 |
+| `legal` | 法律层 | 法规、政策、伦理 | 法律色 |
+
+> **`level` 与 `tier` 必须正交**：level = 纸图结构位置，tier = 药学知识自然层级。两者互不影响，可以出现 `level: 3 + tier: drug`（如分类节点）或 `level: 4 + tier: disease`（如具体疾病节点）。
+
+### edges_out.type — 边类型（决定边的颜色、虚实与方向）
+
+**只使用以下 5 种边类型**，不得自创其他 type：
+
+| type | 中文 | 核心语义 | 方向规则 | 线型 | 颜色 |
+| ---- | ---- | -------- | -------- | ---- | ---- |
+| `subclass_of` | 是一种（类-类） | A 是 B 的一种子类，集合 A ⊂ 集合 B | **子类 → 父类** | 实线+三角箭头 | 蓝色 |
+| `part_of` | 是一部分（局部-整体） | A 是 B 的一个构件、片段、模块，A 不是 B 的一种 | **局部 → 整体** | 实线+三角箭头 | 绿色 |
+| `instance_of` | 是实例（个体-类） | A 是 B 的一个实例/代表药物 | **实例 → 类别** | 实线+三角箭头 | 橙色 |
+| `disjoint_with` | 互斥 | 两类互斥，不能同时属于 | **对称（A ↔ B，存一条即可）** | 点划线 | 紫色 |
+| `equivalent_to` | 等价 | 两名称语义完全相等 | **对称（A ↔ B，存一条即可）** | 点线 | 灰紫 |
+
+### 边关系语义详解
+
+#### subclass_of — 类-类，A 是一种 B
+
+> A `subclass_of` B → A 是 B 这个大类里的小种类，**二者都是类**。
+>
+> 集合视角：A 集合 ⊂ B 集合。
+
+**方向**：子类 → 父类
+
+**示例**：
+```yaml
+# 短效苯二氮䓬 subclass_of 苯二氮䓬类
+# 西药一 subclass_of 执业药师（西药）考试科目
+edges_out:
+  - target: 苯二氮䓬类
+    type: subclass_of
+    reason: 一种苯二氮䓬
+```
+
+#### part_of — 局部-整体，A 是 B 的构件
+
+> A `part_of` B → A 是 B 内部的一个构件、片段、模块，**A 不是 B 的种类**。
+
+**方向**：局部 → 整体
+
+**示例**：
+```yaml
+# 不良反应 part_of 药物画像
+# 口诀 part_of 知识体系
+# 第一节 part_of 第一章
+edges_out:
+  - target: 药物画像
+    type: part_of
+    reason: 是药物画像的一部分
+```
+
+#### instance_of — 个体-类，A 是 B 的实例
+
+> A `instance_of` B → A 是 B 的一个具体实例（通常是具体药物 → 伞形/严格分类）。
+
+**方向**：实例 → 类别
+
+**示例**：
+```yaml
+# 丁苯酞 instance_of 改善脑功能药
+# 地西泮 instance_of 苯二氮䓬类
+edges_out:
+  - target: 改善脑功能药
+    type: instance_of
+    reason: 是一种改善脑功能药物
+```
+
+#### disjoint_with — 互斥（对称）
+
+> A `disjoint_with` B → A 和 B 互斥，不能同时成立。
+
+**方向**：对称（A ↔ B，存一条即可）
+
+**示例**：
+```yaml
+# 苯二氮䓬类 disjoint_with 非苯二氮䓬类
+edges_out:
+  - target: 非苯二氮䓬类
+    type: disjoint_with
+    reason: 互斥分类
+```
+
+#### equivalent_to — 等价（对称）
+
+> A `equivalent_to` B → A 和 B 语义完全相等（等价名、同义词）。
+
+**方向**：对称（A ↔ B，存一条即可）
+
+**示例**：
+```yaml
+# 阿司匹林 equivalent_to 乙酰水杨酸
+edges_out:
+  - target: 乙酰水杨酸
+    type: equivalent_to
+    reason: 等价名
+```
+
+### 四维可视化总览
+
+| 维度 | 字段 | 可视化作用 |
+| ---- | ---- | ---------- |
+| 形状 | `essence` | 节点形状 |
+| 边框色 | `level` | 思维导图结构级别 |
+| 填充色 | `tier` | 药学知识自然层级 |
+| 边样式 | `edges_out.type` | 边的颜色、虚实与方向 |
+
+***
+
 ## 一、迁移总览
 
-当前图谱有 **1083 个 .md 文件**，使用 12 种旧边类型和 6 种旧 essence 值，无 `level` 字段。需要迁移到新规范：
+当前图谱需要将旧的 6 种边类型（parent/branch/link/relate/support/contrast）迁移到新的 5 种 OWL 风格边类型：
 
-| 维度       | 旧版                                                                                                                   | 新版                                                  | 迁移方式                      |
-| -------- | -------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ------------------------- |
-| 边类型      | 12 种（isa/has/treats/relates/prerequisite/mechanism/activates/sibling/specializes/causes/contraindicates/metabolizes） | 6 种（parent/branch/link/relate/support/contrast）     | 批量脚本 + 人工校验               |
-| essence  | 6 种（medication/module/illness/concept/process/section）                                                               | 11 种（新增 classification/mnemonic/summary/table/note） | 按语义逐个重分类                  |
-| level    | 不存在                                                                                                                  | 1-6 级                                               | 按 location 层级批量赋值 + 人工微调  |
-| ADR-0001 | isa/has 方向规则                                                                                                         | parent/branch 方向规则                                  | isa→parent，has→branch 或删除 |
+| 维度 | 旧版 | 新版 |
+| ---- | ---- | ---- |
+| 边类型 | 6 种（parent/branch/link/relate/support/contrast） | **5 种**（subclass_of / part_of / instance_of / disjoint_with / equivalent_to） |
+| essence | 9 种（含 classification，已废弃） | 9 种（module/strict-class/umbrella-class/medication/illness/mnemonic/summary/notion/concept） |
 
 ***
 
@@ -25,83 +237,81 @@
 
 每条旧边必须按下表迁移到新边类型。**具体药学语义写进** **`reason`，不再各占一个** **`type`。**
 
-| 旧边类型              | 数量   | 新边类型         | reason 写法             | 迁移说明                                               |
-| ----------------- | ---- | ------------ | --------------------- | -------------------------------------------------- |
-| `isa`             | 1096 | `parent`     | 保留原 reason            | 层级归属，子→父方向不变                                       |
-| `has`             | 598  | `branch` 或删除 | 保留原 reason            | 父→子的 has：改为 branch；子→父的反向 has：删除（已由子节点的 parent 覆盖） |
-| `treats`          | 345  | `link`       | `reason: 治疗{疾病名}`     | 药物→疾病的明确关系                                         |
-| `relates`         | 318  | `relate`     | 保留原 reason            | 一般关联，兜底关系                                          |
-| `prerequisite`    | 261  | `link`       | `reason: 前置依赖——{说明}`  | 学习前置关系，是明确知识关系                                     |
-| `mechanism`       | 114  | `link`       | `reason: 机制——{说明}`    | 药物→机制的明确关系                                         |
-| `activates`       | 14   | `link`       | `reason: 激动{靶点}`      | 药物→靶点的明确关系                                         |
-| `sibling`         | 12   | `relate`     | 保留原 reason            | 同级关联                                               |
-| `specializes`     | 9    | `link`       | `reason: 特化——{说明}`    | 特化/衍生关系                                            |
-| `causes`          | 5    | `link`       | `reason: 导致{不良反应}`    | 药物→ADR 的明确关系                                       |
-| `contraindicates` | 3    | `link`       | `reason: 禁忌——{人群/状态}` | 药物→禁忌的明确关系                                         |
-| `metabolizes`     | 1    | `link`       | `reason: 代谢——{说明}`    | 药物→代谢酶的明确关系                                        |
+### 边类型迁移总览（旧 6 种 → 新 5 种）
 
-### 迁移后的 6 种边类型语义
-
-> **方向判定规则**：所有边的方向都**由 `level` 数字大的节点指向 `level` 数字小的节点**（子→父）。同 `level` 之间用 `contrast` 双向或 `relate` 单向。
->
-> **业务主动方例外**：`support` / `link` 边允许由"业务主动方 / 提供方"发起（如口诀节点发起 `support→药物`），不强制 level 大→小——以"新增节点时不必回来修改其他节点"为准。
->
-> **理由**：所有 `edges_out` 都是"这个节点向外辐射的引用关系"，新增一个子节点只需要新建它自己的 md 文件，**不必修改任何已有节点的 `edges_out`**。这是文档自治的前提。
-
-| 边类型        | 回答什么             | 方向（`edges_out` 写在…这边）       | 视觉       | 典型场景                          |
-| ---------- | ---------------- | ------------------------- | -------- | ----------------------------- |
-| `parent`   | "A 属于 B 的层级"     | 子节点（level 大）写 `parent→` 父节点 | 灰色实线无箭头  | 药物→分类→节→章（永远是子→父）            |
-| `branch`   | "A 展开为 B"        | 父节点（level 小）写 `branch→` 子节点 | 蓝色实线无箭头  | **实际不使用**——level 已承载层级，branch 与 parent 二选一 |
-| `link`     | "A 和 B 有明确的药学关系" | 业务主动方（提供方）发起                | 绿色实线三角箭头 | 治疗/导致/禁忌/机制/代谢（reason 承载具体语义）   |
-| `relate`   | "A 和 B 有弱关联"     | 任意一方（推荐 level 大 / 提供方）     | 灰紫点线无箭头  | 同级关联、一般参考                     |
-| `support`  | "A 配一个学习辅助 B"    | **辅助方**（口诀、注意、对比表）发起       | 橙色虚线三角箭头 | **口诀节点**写 `support→药物/分类`，**对比表**写 `support→分类/节` |
-| `contrast` | "A 和 B 需要横向对比"   | 任意一方（双向视觉）                  | 紫色虚线双向箭头 | 易混药物对比（两侧互写 `contrast→` 对方，或单边写、渲染端补双向） |
+| 旧边类型 | 新边类型 | reason 写法 | 迁移说明 |
+| -------- | -------- | ----------- | -------- |
+| `parent`（子→父层级归属） | `subclass_of` 或 `part_of` | 根据是否是种类关系决定 | 分类层级→`subclass_of`；章节局部→整体→`part_of` |
+| `branch`（分支展开） | `subclass_of` 或 `part_of` | 保留 reason | 与 parent 二选一，统一用 `subclass_of`/`part_of` |
+| `link`（明确关系） | `subclass_of` / `instance_of` / `part_of` | 保留具体语义 | 治疗/导致/禁忌等明确关系，根据语义归类 |
+| `relate`（一般关联） | `part_of` | 保留原 reason | 一般关联视为知识整体的一部分 |
+| `support`（学习辅助） | `part_of` | 保留 reason | 口诀/总结/注意→主知识，归为整体一部分 |
+| `contrast`（对比） | `disjoint_with` | 保留 reason | 等同于互斥分类 |
 
 ### 关键迁移规则
 
-1. **`has`** **的双向清理**：旧版 A has→ B 和 B has→ A 同时存在的双向配对，迁移后只保留 `branch`（父→子方向），删除子→父的反向边。**实际落地时** `branch` 与 `parent` 二选一，统一用 `parent` 子→父方向。
-2. **`reason`** **不可空**：迁移到 `link` 的边，如果原 reason 为空，必须补写具体语义（如 `reason: 治疗癫痫`）。具体措辞 AI 可基于用户资料判断，但必须明确（不得写"治疗""相关"这种空泛词）。
-3. **`parent`** **和** **`branch`** **不共存**：同一对节点不能同时有 `parent` 和 `branch`。统一用 `parent`，方向子→父。
-4. **`support`** **是新关系**：旧版口诀/注意内嵌在正文里没有边。迁移时，如果口诀/注意已升级为独立节点（essence: mnemonic/note），**由辅助节点（口诀/注意）发起 `support` 边指向主知识节点**（不是反过来）。理由：新增口诀时只新增口诀 md 即可，不必修改药物 md。
+1. **`subclass_of` 和 `part_of` 的判定**：
+   - 父子是"种类关系"（分类→分类、药物→分类亚类）→ `subclass_of`
+   - 父子是"局部→整体"（章节结构、知识组成）→ `part_of`
+
+2. **`instance_of` 用于具体个体→类别**：如丁苯酞（药物实例）→ 改善脑功能药（伞形分类）
+
+3. **`support` 完全废弃**：旧版口诀/注意/总结发起 `support →` 主知识，统一改为 `part_of`
+
+4. **`contrast` 改用 `disjoint_with`**：对比关系就是互斥分类
+
+5. **`equivalent_to`** 是新增的边类型，旧版无对应迁移
+
+6. **`reason`** 不可空：必须写具体药学语义，不得写空泛词
 
 ***
 
 ## 三、essence 迁移
 
-### 3.1 保留不变的 essence（6 种，直接沿用）
+### 3.1 保留不变的 essence（7 种，直接沿用）
 
-| 旧 essence    | 新 essence    | 说明                                          |
-| ------------ | ------------ | ------------------------------------------- |
-| `medication` | `medication` | 不变                                          |
-| `module`     | `module`     | 不变                                          |
-| `illness`    | `illness`    | 不变                                          |
-| `concept`    | `concept`    | 不变（但需逐个检查是否应改为 `notion` 或 `classification`） |
-| `process`    | `process`    | 不变                                          |
-| `section`    | 见下           | 需逐个重分类                                      |
+| 旧 essence | 新 essence | 说明 |
+| ---------- | ---------- | ---- |
+| `medication` | `medication` | 不变 |
+| `module` | `module` | 不变 |
+| `illness` | `illness` | 不变 |
+| `concept` | `concept` | 不变（但需逐个检查是否应改为 `notion` 或 `strict-class`/`umbrella-class`） |
+| `notion` | `notion` | 不变 |
+| `mnemonic` | `mnemonic` | 不变 |
+| `summary` | `summary` | 不变 |
 
-### 3.2 `section` 重分类
+### 3.2 `classification` 拆分（新增 strict-class / umbrella-class）
+
+旧版 `classification` 是统一分类节点。按粒度拆分为两种新 essence：
+
+| classification 节点的实际内容 | 迁移到 | 形状 | 说明 |
+| ---------------------------- | ----- | ---- | ---- |
+| 严格分类（细分类、亚类、药理/化学标准分类） | `strict-class` | 五边形 | 按严格标准划分的子类 |
+| 伞形分类（粗分类、临床用途、机制、酶聚类） | `umbrella-class` | 六边形 | 按功能/用途/机制聚合的分类 |
+
+### 3.3 `section` 重分类
 
 `section` 是位置标记（"这是第几节"），不是知识本体。按实际语义重分类：
 
-| section 节点的实际内容      | 迁移到              | 理由            |
-| -------------------- | ---------------- | ------------- |
-| 章节入口（如"第二节 抗癫痫发作药物"） | `module`         | 是结构容器，不是独立知识点 |
-| 分类标准（如"按作用机制分类"）     | `classification` | 本质是分类依据       |
-| 学习认知单元（如"用药监护"）      | `notion`         | 本质是学习性认知      |
+| section 节点的实际内容 | 迁移到 | 理由 |
+| -------------------- | ----- | ---- |
+| 章节入口（如"第二节 抗癫痫发作药物"） | `module` | 是结构容器，不是独立知识点 |
+| 分类标准（如"按作用机制分类"） | `strict-class` / `umbrella-class` | 本质是分类依据 |
+| 学习认知单元（如"用药监护"） | `notion` | 本质是学习性认知 |
 
-### 3.3 `concept` 拆分检查
+### 3.4 `concept` 拆分检查
 
 旧版 `concept` 是万能兜底。逐个检查，按新语义重新归类：
 
-| concept 节点的实际内容   | 迁移到              | 理由                        |
-| ----------------- | ---------------- | ------------------------- |
-| 药物分类/分组标准         | `classification` | 本质是分类                     |
-| 学习性认知单元（监护、评价、原则） | `notion`         | 本质是"怎么学/怎么用"              |
-| 纯概念/术语（如"首过效应"）   | `concept`        | 保留不变                      |
-| 口诀/记忆辅助           | `mnemonic`       | 独立后由**辅助节点自身**的 `edges_out` 写 `support → 主知识`（参见 §5.15）|
-| 总结/归纳             | `summary`        | 独立后由**辅助节点自身**的 `edges_out` 写 `support → 主知识`（参见 §5.15）|
-| 对比表格              | `table`          | 独立后由**辅助节点自身**的 `edges_out` 写 `support / contrast → 主知识`（参见 §5.15）|
-| 注意/提示/笔记          | `note`           | 独立后由**辅助节点自身**的 `edges_out` 写 `support → 主知识`（参见 §5.15）|
+| concept 节点的实际内容 | 迁移到 | 理由 |
+| ------------------- | ----- | ---- |
+| 药物分类/分组标准 | `strict-class` / `umbrella-class` | 本质是分类 |
+| 学习性认知单元（监护、评价、原则） | `notion` | 本质是"怎么学/怎么用" |
+| 纯概念/术语（如"首过效应"） | `concept` | 保留不变 |
+| 口诀/记忆辅助 | `mnemonic` | 独立后由**辅助节点自身**的 `edges_out` 写 `part_of → 主知识` |
+| 总结/归纳 | `summary` | 独立后由**辅助节点自身**的 `edges_out` 写 `part_of → 主知识` |
+| 对比表格 | `table` | 独立后由**辅助节点自身**的 `edges_out` 写 `part_of → 主知识` |
+| 注意/提示/笔记 | `note` | 独立后由**辅助节点自身**的 `edges_out` 写 `part_of → 主知识` |
 
 ### 3.4 新增节点类型的使用条件
 
@@ -235,10 +445,10 @@ summary:
 # ❌ 错误：为每个临床关系建独立边
 edges_out:
   - target: some-disease
-    type: link
+    type: instance_of
     reason: 治疗
   - target: some-adr
-    type: link
+    type: instance_of
     reason: 导致
 ```
 
@@ -490,7 +700,7 @@ tags:
 
 口诀（mnemonic）必须**双轨呈现**，缺一不可：
 
-1. **独立 `mnemonic` 节点**：按 §3.4 / §5.4 决定是否独立成节点；独立时由**口诀节点自身**的 `edges_out` 写 `support → 主知识节点`（参见 §5.15 + §10.4）。理由：新增口诀时只新增口诀 md，不必回去修改主知识节点的 `edges_out`。
+1. **独立 `mnemonic` 节点**：按 §3.4 / §5.4 决定是否独立成节点；独立时由**口诀节点自身**的 `edges_out` 写 `part_of → 主知识节点`（参见 §5.15 + §10.4）。理由：新增口诀时只新增口诀 md，不必回去修改主知识节点的 `edges_out`。
 2. **同时写入对应主知识节点的 `summary`**：让用户即使不展开图谱也能直接看到口诀。
 
 | 口诀类型      | 独立 `mnemonic` 节点                    | 同时写入…的 `summary`                         |
@@ -533,7 +743,7 @@ tags:
 
 **正模式**：
 
-1. ✅ 表格单独建独立 `essence: table` 节点，**由表格节点自身**的 `edges_out` 写 `support →` 上表所列的父节点（节 / 分类 / 药物）。理由：新增对比表时只新增表 md，不必回去修改父节点（参见 §5.15）。
+1. ✅ 表格单独建独立 `essence: table` 节点，**由表格节点自身**的 `edges_out` 写 `part_of →` 上表所列的父节点（节 / 分类 / 药物）。理由：新增对比表时只新增表 md，不必回去修改父节点（参见 §5.15）。
 2. ✅ 表格节点的 `summary.full` 用 Markdown 表格语法（marked + DOMPurify 已放行 `table/thead/tbody/tr/th/td`）。
 
 **反模式**：
@@ -559,7 +769,7 @@ tags:
 | 字段                       | 重写时怎么处理                                              |
 | ------------------------ | ----------------------------------------------------- |
 | `data.id`                | **沿用旧值**（保持 ID 不变以免破坏所有指向该节点的边）                     |
-| `data.label`             | **沿用旧值**（除非用户明确要求改名）                                  |
+| `data.label`             | **沿用旧值**（除非用户明确要求改名）；必须是**中文**                           |
 | `data.location`          | **可参考**（仅作为目录位置依据，不强制沿用）                             |
 | `data.essence`           | **不沿用**，按新资料重新判定                                     |
 | `data.level`             | **不沿用**，按 §4 重新赋值                                    |
@@ -570,7 +780,8 @@ tags:
 
 **铁律**：
 
-1. ❌ **不**因"沿用比重新写安全"就保留旧值——除非该字段不在本表"不沿用"列。
+1. ❌ **`id` 必须是英文**，不得使用中文拼音或中文汉字；`label` 必须是中文。
+2. ❌ **不**因"沿用比重新写安全"就保留旧值——除非该字段不在本表"不沿用"列。
 2. ❌ **不**因"旧文档里有合理内容"就复制粘贴到新文档——必须由用户提供为准。
 3. ❌ **不**因"用户没说就按惯例补"——见 §5.8。
 4. ✅ 用户资料缺失时（如只给药名没给临床信息），**主动列出哪些字段无资料、等待用户补充**，而不是擅自补默认值。
@@ -627,47 +838,40 @@ tags:
 
 | 方向规则                       | 由谁写                                |
 | -------------------------- | ---------------------------------- |
-| **父子层级**（level 大→level 小）  | 子节点写 `parent → 父节点`                |
-| **辅助学习**（口诀/注意/对比表 → 主知识）   | **辅助节点**写 `support → 主知识节点`        |
-| **同级对比**（同 level 之间的横向对比）   | **任一侧**写 `contrast → 对侧`（双向视觉）   |
-| **药学关系**（治疗/禁忌/相互作用/代谢）     | **业务主动方 / 提供方**写 `link → 目标节点`    |
-| **一般关联**（弱参考）              | **任一侧**写 `relate → 目标`（推荐 level 较大的） |
+| **类-类层级**（子类 → 父类）          | 子类写 `subclass_of → 父类`             |
+| **局部-整体**（局部 → 整体）          | 局部写 `part_of → 整体`                |
+| **个体-类**（实例 → 类别）          | 实例写 `instance_of → 类别`            |
+| **辅助学习**（口诀/注意/对比表 → 主知识）   | **辅助节点**写 `part_of → 主知识节点`       |
+| **等价/互斥**（双向语义）            | **任一侧**写 `equivalent_to` / `disjoint_with → 对方`（存一条即可） |
 
 **禁止**：
 
-1. ❌ 父节点（level 小）写一堆 `edges_out` 指向子节点（level 大）——新增子节点时必须回来改父节点。
-2. ❌ 子节点写 `parent → 父节点` 的同时又写 `support → 父节点`——同方向重复。
-3. ❌ 双向边正反都写（同一对节点同时 A→B 和 B→A 两条 `parent` / `support` / `relate`）——单向即可。
-4. ❌ 用 `parent` 来表达 `support`（"口诀属于药物的层级"是错的，口诀是辅助不是子分类）。
+1. ❌ 父节点（子类/上层）写一堆 `edges_out` 指向子节点——新增子节点时必须回来改父节点。
+2. ❌ 子节点写 `subclass_of` → 父节点的同时又写 `part_of` → 父节点——同方向重复。
+3. ❌ 双向边正反都写（同一对节点同时 A→B 和 B→A 两条 `subclass_of` / `part_of`）——单向即可。
+4. ❌ 用 `subclass_of` 来表达 `part_of`（"口诀属于药物的层级"是错的，口诀是局部-整体）。
 5. ❌ 把节点之间的引用全部塞到父节点里（错把"全局索引"当成 `edges_out`）——这是数据冗余和编辑耦合。
 
 **正模式**：
 
-1. ✅ **新增子节点时**：只需新建该子节点的 md 文件，写自己的 `parent → 父节点`。**不必回去修改父节点**。
-2. ✅ **新增口诀节点时**：只需新建口诀 md，写 `support → 主知识节点`。**不必回去修改主知识节点**。
-3. ✅ **新增对比表节点时**：只需新建表 md，写 `support → 父分类/节节点`。
-4. ✅ **业务主动方写边**：药物 A 提到"与 B 相互作用" → 在 A 的 `edges_out` 写 `link → B`，不在 B 里写。
-5. ✅ **同 level 的 contrast**：A 和 B 互为易混药时，A 写 `contrast → B`（单边即可，渲染端补双向视觉）。
+1. ✅ **新增子节点时**：只需新建该子节点的 md 文件，写自己的 `subclass_of` / `part_of → 父节点`。**不必回去修改父节点**。
+2. ✅ **新增口诀节点时**：只需新建口诀 md，写 `part_of → 主知识节点`。**不必回去修改主知识节点**。
+3. ✅ **新增对比表节点时**：只需新建表 md，写 `part_of → 父分类/节节点`。
+4. ✅ **互斥/等价关系单边写**：苯二氮䓬类 `disjoint_with` 非苯二氮䓬类 写一条即可，渲染端补双向视觉。
 
 #### 5.15.2 边类型选择决策表
 
 | 关系                          | 用什么 type | 方向（写在谁的文件里）  | reason 措辞规范               |
 | --------------------------- | -------- | ------------ | ----------------------- |
-| 药物 A 属于分类 X                | `parent` | 药物 A 写       | `属于{分类名}`                |
-| 药物 A 属于节节点 / 章节点           | `parent` | 药物 A 写       | `属于{节/章名}`               |
-| 分类 X 属于节节点                 | `parent` | 分类 X 写       | `属于{节名}`                 |
-| 节节点 属于章节点                 | `parent` | 节节点写         | `属于{章名}`                 |
-| 药物 A 治疗疾病 B                | `link`   | 药物 A 写       | `治疗{疾病名}`                |
-| 药物 A 引起不良反应 B              | `link`   | 药物 A 写       | `导致{ADR名}`                |
-| 药物 A 禁用人群 B（孕妇 / 儿童 / 老人）   | `link`   | 药物 A 写       | `禁用{人群}`                 |
-| 药物 A 配伍禁忌 B                | `link`   | 药物 A 写       | `配伍禁忌——{说明}`             |
-| 药物 A 的机制是 B                | `link`   | 药物 A 写       | `机制——{说明}`               |
-| 药物 A 被 B 代谢                | `link`   | 药物 A 写       | `被{B}代谢`                |
-| 口诀节点 ↔ 药物/分类               | `support` | **口诀节点**写     | `{主知识名}记忆口诀`            |
-| 注意/提示节点 ↔ 药物                | `support` | **注意节点**写     | `{药物名}注意事项`             |
-| 对比表节点 ↔ 分类/节                | `support` | **对比表节点**写    | `{分类/节名}药物对比`           |
-| 药物 A 易混于药物 B               | `contrast` | **任一侧**写     | `易混于{药名}`               |
-| 任意两节点的弱关联                  | `relate`  | **任一侧**写     | 自由措辞，但不少于 4 字（如 `同类退热药参考`） |
+| 分类 X 是分类 Y 的子类              | `subclass_of` | 分类 X 写       | `一种{分类Y}`               |
+| 药物 A 属于分类 X（药物→分类亚类）       | `instance_of` | 药物 A 写       | `一种{分类X}`               |
+| 章节 第一节 是 章节点的一部分           | `part_of` | 第一节写         | `{章名}的一部分`              |
+| 不良反应/机制/适应症 是 药物画像的一部分      | `part_of` | 内容节点写        | `{药物画像}的一部分`           |
+| 口诀节点 ↔ 药物/分类               | `part_of` | **口诀节点**写     | `{主知识名}记忆口诀`            |
+| 注意/提示节点 ↔ 药物                | `part_of` | **注意节点**写     | `{药物名}注意事项`             |
+| 对比表节点 ↔ 分类/节                | `part_of` | **对比表节点**写    | `{分类/节名}药物对比`           |
+| 药物 A 易混于药物 B（互斥）           | `disjoint_with` | **任一侧**写     | `与{药名}互斥`               |
+| 药物 A 等价于 药物 B（别名）          | `equivalent_to` | **任一侧**写     | `等价于{药名}`               |
 
 #### 5.15.3 `reason` 措辞规范
 
@@ -687,15 +891,15 @@ tags:
 
 ```yaml
 edges_out:
-  - target: class-amide
-    type: parent
-    reason: 属于酰胺类
+  - target: strict-amide
+    type: subclass_of
+    reason: 一种酰胺类中枢兴奋药
   - target: med-piracetam
-    type: support
+    type: part_of
     reason: 吡拉西坦记忆口诀
   - target: med-oxiracetam
-    type: contrast
-    reason: 易混于吡拉西坦（都是酰胺类促智药）
+    type: disjoint_with
+    reason: 与吡拉西坦互斥（同为酰胺类但不可同用）
 ```
 
 **反模式**：
@@ -704,23 +908,23 @@ edges_out:
 edges_out:
   # ❌ 父节点写一堆子节点——耦合、不可扩展
   - target: med-piracetam
-    type: parent
+    type: subclass_of
     reason: 属于本分类
   - target: med-aniracetam
-    type: parent
+    type: subclass_of
     reason: 属于本分类
 
 # ❌ 辅助方反向——新增口诀时需改药物
 # ❌ reason 空泛
   - target: med-piracetam
-    type: support
+    type: part_of
     reason: 相关
 ```
 
 #### 5.15.4 占位边禁止
 
-- ❌ **不得**为"看起来完整"就建占位边（如 `link → adr-unknown` 占位未知 ADR）。
-- ❌ **不得**为尚未确认的关系预先建边（如用户只说"可能与 X 相互作用"就建 `link → X`）——遇到不确定的，明确告知用户"该关系需要确认，是否建边"。
+- ❌ **不得**为"看起来完整"就建占位边（如 `subclass_of → adr-unknown` 占位未知 ADR）。
+- ❌ **不得**为尚未确认的关系预先建边（如用户只说"可能与 X 相互作用"就建 `instance_of → X`）——遇到不确定的，明确告知用户"该关系需要确认，是否建边"。
 - ✅ **占位边**只能在 §5.14 重写场景下临时使用，且必须用 `placeholder: true` 标记 + 汇报里单独列出。
 
 #### 5.15.5 汇报约定（edges_out 部分）
@@ -739,8 +943,8 @@ edges_out:
 | 问自己                                                | 答案                                              |
 | -------------------------------------------------- | ----------------------------------------------- |
 | 这条边写完后，**新增一个新子节点 / 辅助节点时**，是否需要回到这条边的发起方文件里改 `edges_out`？ | **不需要** → 写法正确；需要 → 方向反了或位置写错              |
-| 这条边的 `edges_out` 写在**level 较小 / 业务提供方**那一侧的 md 文件里吗？ | 是 → 正确；否 → 改为业务主动方那一侧                          |
-| 我要用 `parent` 还是 `support`？                        | `parent` = 层级归属（level 大→level 小）；`support` = 辅助学习 |
+| 这条边的 `edges_out` 写在**子类 / 局部 / 业务提供方**那一侧的 md 文件里吗？ | 是 → 正确；否 → 改为子类/局部那一侧                          |
+| 我要用 `subclass_of` 还是 `part_of`？                   | `subclass_of` = 种类归属；`part_of` = 局部-整体 |
 | reason 是否包含具体对象？                                   | 是 → 正确；否 → 补具体名词                                |
 | reason 是否和用户原话差距过大？                                | 差距过大 → 汇报里告知用户"措辞偏离了原意"                     |
 
@@ -752,11 +956,11 @@ edges_out:
 
 | 提交类型        | 内容                    | 示例                                                    |
 | ----------- | --------------------- | ----------------------------------------------------- |
-| 边类型迁移       | 旧 12 种 → 新 6 种批量转换    | `refactor(content): 第一章边类型迁移 isa→parent, treats→link` |
+| 边类型迁移       | 旧 6 种 → 新 5 种批量转换    | `refactor(content): 第一章边类型迁移 parent→subclass_of, support→part_of` |
 | essence 重分类 | section/concept → 新类型 | `refactor(content): 41 个 section 节点重分类`               |
 | level 赋值    | 批量添加 level 字段         | `chore(content): 全仓 level 字段批量赋值`                     |
 | 内容合并        | 扩伞形正文 + 删 concept     | `refactor(content): 第六节 6 个零入度节点合并`                   |
-| 骨架边补齐       | 仅新增 parent/branch 边   | `chore(content): 药一第一篇补齐骨架边`                          |
+| 骨架边补齐       | 仅新增 subclass_of / part_of 边   | `chore(content): 药一第一篇补齐骨架边`                          |
 
 ***
 
@@ -780,10 +984,9 @@ ADR-0001（`isa` 统一子→父方向）的核心原则**仍然有效**，但�
 
 | ADR-0001 规则             | 新版对应                                 | 状态      |
 | ----------------------- | ------------------------------------ | ------- |
-| 层级关系用 `isa`，子→父方向       | 层级关系用 `parent`，子→父方向                 | ✅ 保留，改名 |
-| `has` 仅用于物理组成           | `branch` 用于分支展开（父→子）                 | ✅ 保留，改名 |
-| 禁止双向书写同一关系              | 禁止 A→B 和 B→A 同时有 `parent` 或 `branch` | ✅ 保留    |
-| 非 book 节点建议至少 1 条 `isa` | 非 book 节点建议至少 1 条 `parent`           | ✅ 保留，改名 |
+| 层级关系子→父方向               | 层级关系子→父方向（`subclass_of` / `part_of` / `instance_of`） | ✅ 保留，改名 |
+| 禁止双向书写同一关系              | 禁止 A→B 和 B→A 同时有同类边            | ✅ 保留    |
+| 非 book 节点建议至少 1 条边      | 非 book 节点建议至少 1 条边              | ✅ 保留    |
 
 ADR-0001 文档保持归档状态，不再修改。本文件取代其在日常操作中的指导作用。
 
@@ -861,5 +1064,5 @@ ADR-0001 文档保持归档状态，不再修改。本文件取代其在日常�
 1. **无冗余空模块**：不建"分类与代表药品"和"临床用药评价"空模块。层级链直接章→节→分类→药物。
 2. **临床内容在 summary.full**：药理/适应症/禁忌/相互作用全部写入 summary.full 的【标签】格式文本。
 3. **口诀与药物同级**：口诀 level=4，与药物同级（不是更深层级），因为口诀是药物的平行学习辅助，不是层级子分类。
-4. **口诀的 `support` 边由口诀节点发起**（不是由药物节点发起）：口诀节点在自己的 md 文件里写 `edges_out: - target: med-betahistine, type: support`。理由：新增一个口诀时只需新增口诀 md，不必回去修改药物节点的 `edges_out`。这与 §5.15 的"自管 `edges_out`"原则一致。
+4. **口诀与主知识用 `part_of` 边**（不是由药物节点发起）：口诀节点在自己的 md 文件里写 `edges_out: - target: med-betahistine, type: part_of`。理由：新增一个口诀时只需新增口诀 md，不必回去修改药物节点的 `edges_out`。这与 §5.15 的"自管 `edges_out`"原则一致。
 

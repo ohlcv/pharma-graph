@@ -1,6 +1,6 @@
 // src/core/edge-types.ts
 // Single source of truth for the edge-type vocabulary.
-// 6 种边类型，对应纸质思维导图的 6 种关系家族。
+// 5 种 OWL/RDF 风格边类型，对应知识图谱的 5 种关系家族。
 // 具体药学语义（治疗/导致/抑制...）放进 reason，不再各占一个 type。
 
 /**
@@ -8,15 +8,13 @@
  * legend grid and the mobile chip list.
  */
 export const EDGE_TYPES = [
-  // 结构关系
-  'parent',     // 层级归属：子→父，纸质思维导图的树结构
-  'branch',     // 分支展开：纸图中的分支结构
-  // 知识关系
-  'link',       // 明确关系：由 reason 承载具体药学语义（治疗/导致/抑制...）
-  'relate',     // 一般关联：弱联系，兜底
-  // 辅助关系
-  'support',    // 学习辅助：主知识→口诀/总结/表格/注意
-  'contrast',   // 对比区分：横向比较
+  // 类-类 / 个体-类 / 局部-整体
+  'subclass_of',  // 是一种（类-类）：子类→父类
+  'part_of',      // 是一部分（局部-整体）：局部→整体
+  'instance_of',  // 是实例（个体-类）：实例→类别
+  // 对称关系
+  'disjoint_with', // 互斥（对称）：A↔B
+  'equivalent_to', // 等价（对称）：A↔B
 ] as const;
 
 export type EdgeType = (typeof EDGE_TYPES)[number];
@@ -25,7 +23,7 @@ export type EdgeType = (typeof EDGE_TYPES)[number];
  * The fallback edge type applied when a parsed edges_out entry omits
  * `type` or supplies an empty value.
  */
-export const DEFAULT_EDGE_TYPE: EdgeType = 'link';
+export const DEFAULT_EDGE_TYPE: EdgeType = 'instance_of';
 
 /**
  * Type guard for incoming edge-type strings (e.g. from YAML).

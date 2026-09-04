@@ -74,29 +74,29 @@ data:
 
 ### 当前标准本质类型
 
-| `essence`        | 中文含义        | 建议形状              | 使用范围                     |
-| ---------------- | ----------- | ----------------- | ------------------------ |
-| `module`         | 结构模块/入口     | `round-rectangle` | 篇、章、节、主题入口等结构节点          |
-| `classification` | 分类/分组标准     | `hexagon`         | 药物分类、亚类、分类依据、分组节点        |
-| `concept`        | 概念/术语       | `octagon`         | 教材定义明确、具有边界的知识概念         |
-| `medication`     | 具体药物/制剂     | `ellipse`         | 通用名、具体制剂、代表药物            |
-| `illness`        | 疾病/病理状态/综合征 | `diamond`         | 可被治疗、禁忌、导致或独立讨论的疾病/状态    |
-| `process`        | 机制/过程       | `star`            | 作用机制、体内过程、病理过程、流程        |
-| `notion`         | 学习性认知单元     | `tag`             | 经验性认识、临床提示、易混概念、经验归纳     |
+| `essence` | 中文含义 | 形状 | 使用范围 |
+| --- | --- | --- | --- |
+| `module` | 结构模块/入口 | 圆角矩形 | 篇、章、节、主题入口等结构节点 |
+| `strict-class` | 严格分类（细分类） | 五边形 | 按药理/化学严格标准划分的分类（亚类、分类依据、分组节点） |
+| `umbrella-class` | 伞形分类（粗分类） | 六边形 | 按临床用途、功能、机制、酶划分的聚类集合 |
+| `concept` | 概念/术语 | 正方形 | 教材定义明确、具有边界的知识概念 |
+| `medication` | 具体药物/制剂 | 椭圆 | 通用名、具体制剂、代表药物 |
+| `illness` | 疾病/病理状态/综合征 | 菱形 | 可被治疗、禁忌、导致或独立讨论的疾病/状态 |
+| `notion` | 学习性认知单元 | tag | 经验性认识、临床提示、易混概念、经验归纳 |
+| `mnemonic` | 记忆口诀 | vee | 口诀、首字母记忆、顺口溜、分类速记 |
 | `mnemonic`       | 记忆口诀        | `vee`             | 口诀、首字母记忆、顺口溜、分类速记        |
-| `summary`        | 总结/归纳       | `pentagon`        | 对多个节点进行收束、压缩、归纳的总结节点     |
+| `table` | 表格/对照表 | rectangle | 原纸图中需要作为独立知识载体展示的表格或对照结构 |
 | `table`          | 表格/对照表      | `rectangle`       | 原纸图中需要作为独立知识载体展示的表格或对照结构 |
-| `note`           | 注意/提示/笔记    | `round-tag`       | 【注意】、【提示】、易错提醒、补充说明      |
+| `note` | 注意/提示/笔记 | tag | 【注意】、【提示】、易错提醒、补充说明 |
 
 ### 形状使用原则
 
 1. **形状表达本质，不表达重要程度。**
 2. **形状表达本质，不表达教材章节级别。**
 3. `module` 统一承载篇、章、节等结构模块；具体层级交给 `level`。
-4. `classification` 统一承载“分类/亚类/分组”概念，不再为每一种分类形式设计不同形状。
+4. `strict-class` 承载按药理/化学严格标准划分的分类；`umbrella-class` 承载按临床用途、功能、机制、酶聚合的分类。
 5. `mnemonic`、`summary`、`table`、`note` 均允许成为独立节点，以完整还原纸质资料中的独立视觉对象。
-6. 原有 `route`、`substance` 等本质不再作为当前纸图迁移规范中的固定视觉类型；若未来纸质原稿反复出现具有独立视觉身份、且现有类型无法无歧义承载的对象，再单独增加本质类型。
-7. 不为了“凑满 Cytoscape 形状”而创建本质类型。**形状数量以纸质资料实际需要为准。**
+6. 不为了"凑满 Cytoscape 形状"而创建本质类型。**形状数量以纸质资料实际需要为准。**
 
 ***
 
@@ -167,7 +167,7 @@ level: 1
 
 ### `level` 与父子关系（边方向判定）
 
-> **`level` 是父 / 子判定的唯一依据。** `parent` 边永远由 `level` 数字大的子节点指向 `level` 数字小的父节点，**与 `essence`、`location` 无关**。
+> **`level` 决定边框色。** 边的类型用 `subclass_of` / `part_of` / `instance_of` / `disjoint_with` / `equivalent_to`，与 `essence`、`location` 无关。
 
 | 节点 A | 节点 B | 谁是父？ |
 | --- | --- | --- |
@@ -175,9 +175,9 @@ level: 1
 | `level: 4` 药物 | `level: 4` 口诀 | **平级**（同 level，无父子） |
 | `level: 5` 考点 | `level: 4` 药物 | 药物（level 小） |
 
-**平级关系**：同 `level` 的节点之间**不写 `parent` 边**，用 `contrast`（横向比较）或 `relate`（一般关联），或干脆不建边。
+**平级关系**：同 `level` 的节点之间**不写 `subclass_of` 边**，用 `disjoint_with`（互斥对比），或干脆不建边。
 
-**辅助关系**：口诀（mnemonic）→ 药物（medication）这类"主知识 ↔ 辅助节点"关系**不按 level 判定父子**——它是同 level 的辅助关系，由**辅助节点自身**的 `edges_out` 写 `support →` 主知识节点（参见 §7.5 与 §9.4）。
+**辅助关系**：口诀（mnemonic）→ 药物（medication）这类"主知识 ↔ 辅助节点"关系由**辅助节点自身**的 `edges_out` 写 `part_of →` 主知识节点（参见 §7.6）。
 
 ***
 
@@ -408,13 +408,13 @@ summary:
 
 # 六、edges\_out — 思维导图关系边
 
-当前正式使用 **6 种边类型**。
+当前正式使用 **5 种边类型**。
 
 原则：
 
 > **边类型少而稳定；具体语义放进** **`reason`。**
 >
-> **边方向由发起方决定**：每个节点的 `edges_out` 表达的是"我向外辐射的引用"。`parent` 由子节点（level 大）写、`support` 由辅助节点（mnemonic/note/table）写、`link` 由业务主动方写。详见 §7、§9.2、§9.4。
+> **边方向由发起方决定**：每个节点的 `edges_out` 表达的是"我向外辐射的引用"。`subclass_of`/`part_of`/`instance_of` 由子类/局部/实例写；辅助节点写 `part_of`；`disjoint_with`/`equivalent_to` 任意一侧。详见 §7、§9.2、§9.4。
 
 不再把 `treats`、`causes`、`activates`、`inhibits`、`interacts`、`contraindicates` 等全部作为独立 `type`。
 
@@ -423,7 +423,7 @@ summary:
 ```yaml
 edges_out:
   - target: 癫痫持续状态
-    type: link
+    type: instance_of
     reason: 治疗
 ```
 
@@ -438,16 +438,15 @@ edges_out:
 
 ***
 
-## 6.1 六种边总览
+## 6.1 五种边总览
 
-| `type`     | 中文   | 核心语义                     | 是否方向敏感   | 线型      | 建议颜色 |
-| ---------- | ---- | ------------------------ | -------- | ------- | ---- |
-| `parent`   | 层级归属 | A 是 B 的下级结构节点            | ✅ 数据上有方向 | **实线**  | 中性灰  |
-| `branch`   | 分支展开 | A 展开出 B / A 与 B 属于纸图分支结构 | 结构方向     | **实线**  | 蓝色   |
-| `link`     | 明确关系 | 存在明确知识关系，由 `reason` 说明   | ✅ 通常有方向  | **实线**  | 绿色   |
-| `relate`   | 一般关联 | 两节点需要放在一起理解，但没有更强关系      | ❌        | **点线**  | 灰紫   |
-| `support`  | 学习辅助 | 主知识与口诀/总结/表格/注意等辅助对象的关系  | ✅        | **虚线**  | 橙色   |
-| `contrast` | 对比区分 | 两节点用于比较、辨析、排除混淆          | ❌ / 双向   | **点划线** | 紫色   |
+| `type` | 中文 | 核心语义 | 方向规则 | 线型 | 颜色 |
+| --- | --- | --- | --- | --- | --- |
+| `subclass_of` | 是一种（类-类） | A 是 B 的一种子类，集合 A ⊂ 集合 B | **子类 → 父类** | 实线+三角箭头 | 蓝色 |
+| `part_of` | 是一部分（局部-整体） | A 是 B 的一个构件、片段、模块，A 不是 B 的一种 | **局部 → 整体** | 实线+三角箭头 | 绿色 |
+| `instance_of` | 是实例（个体-类） | A 是 B 的一个实例/代表药物 | **实例 → 类别** | 实线+三角箭头 | 橙色 |
+| `disjoint_with` | 互斥 | 两类互斥，不能同时属于 | **对称（A ↔ B，存一条即可）** | 点划线 | 紫色 |
+| `equivalent_to` | 等价 | 两名称语义完全相等 | **对称（A ↔ B，存一条即可）** | 点线 | 灰紫 |
 
 > **所有边不使用粗细表达语义差异。**
 >
@@ -457,62 +456,48 @@ edges_out:
 
 ***
 
-# 七、六种边的详细规范
+# 七、五种边的详细规范
 
-## 7.1 `parent` — 层级归属
+## 7.1 `subclass_of` — 类-类，A 是一种 B
 
 表达：
 
-> A 在纸质思维导图结构上属于 B 的下一级。
-
-例如：
-
-```text
-一级主题
-  └── 二级主题
-       └── 三级主题
-            └── 四级知识点
-```
+> A 是 B 这个大类里的小种类，**二者都是类**。集合视角：A 集合 ⊂ B 集合。
 
 数据方向统一：
 
 ```text
-子节点 → 父节点
+子类 → 父类
 ```
 
 例如：
 
 ```yaml
-- target: 镇静催眠药
-  type: parent
-  reason: 属于该分类
+- target: 苯二氮䓬类
+  type: subclass_of
+  reason: 一种苯二氮䓬
 ```
 
 ### 视觉
 
-- 颜色：中性灰
+- 颜色：蓝色
 
-- 线型：**实线**
+- 线型：**实线+三角箭头**
 
-- 箭头：默认**不显示箭头**，以树枝/层级连线视觉呈现
+- 关系标签：显示 `reason`
 
-- 关系标签：通常不显示；需要解释时可显示 `reason`
+### 适用场景
+
+- 严格分类 → 上级分类（药理亚类 → 药理大类）
+- 章节层级归属（如镇静催眠药 → 上级分类）
 
 ### 注意
 
-`parent` 只表示**纸图结构层级**，不表达：
-
-- 药物属于药物类别的药理学归类
-
-- 药物治疗疾病
-
-- 机制导致效应
-
-这些均应使用其他边。
+`subclass_of` 只用于**类-类**关系。药物→分类请用 `instance_of`。
 
 ***
 
-## 7.2 `branch` — 分支展开
+## 7.2 `part_of` — 局部-整体，A 是 B 的构件
 
 表达：
 
@@ -547,7 +532,7 @@ edges_out:
 
 ***
 
-## 7.3 `link` — 明确知识关系
+## 7.3 `instance_of` — 个体-类，A 是 B 的实例
 
 这是药学知识关系的主承载边。
 
@@ -574,20 +559,20 @@ edges_out:
 
 ```yaml
 - target: 癫痫持续状态
-  type: link
+  type: instance_of
   reason: 治疗
 
 - target: 嗜睡
-  type: link
-  reason: 导致
+  type: part_of
+  reason: 药物画像的一部分
 
 - target: GABA_A受体
-  type: link
-  reason: 作用于
+  type: instance_of
+  reason: 一种作用于GABA_A受体的药物
 
 - target: HLA-B*1502
-  type: link
-  reason: 前测
+  type: instance_of
+  reason: 用药前需检测
 ```
 
 ### 视觉
@@ -610,7 +595,7 @@ edges_out:
 
 ***
 
-## 7.4 `relate` — 一般关联
+## 7.4 `disjoint_with` — 互斥（对称）
 
 表达：
 
@@ -638,11 +623,11 @@ edges_out:
 
 `relate` 是**兜底关系**，但不能成为“懒得判断具体关系时什么都用”的万能边。
 
-凡是可以明确表达为 `parent / branch / link / support / contrast` 的，应优先使用具体关系。
+凡是可以明确表达为 `subclass_of / part_of / instance_of / disjoint_with / equivalent_to` 的，应优先使用具体关系。
 
 ***
 
-## 7.5 `support` — 学习辅助
+## 7.5 `equivalent_to` — 等价（对称）
 
 表达：
 
@@ -661,13 +646,13 @@ note       注意/提示
 
 ```yaml
 - target: 入扎焦氟双佐唑
-  type: support
+  type: part_of
   reason: 记忆口诀
 ```
 
 ```yaml
 - target: 镇静催眠药总结
-  type: support
+  type: part_of
   reason: 总结
 ```
 
@@ -697,7 +682,7 @@ note       注意/提示
 
 ***
 
-## 7.6 `contrast` — 对比区分
+## 7.6 辅助关系统一用 `part_of`
 
 表达：
 
@@ -769,7 +754,7 @@ contrast  ─ · ─ · ─ ·    紫色点划线 ↔   对比区分
 
 ```yaml
 - target: 三叉神经痛
-  type: link
+  type: instance_of
   reason: 治疗
 ```
 
@@ -784,7 +769,7 @@ contrast  ─ · ─ · ─ ·    紫色点划线 ↔   对比区分
 
 ```yaml
 - target: 入扎焦氟双佐唑
-  type: support
+  type: part_of
   reason: 记忆口诀
 ```
 
@@ -799,7 +784,7 @@ contrast  ─ · ─ · ─ ·    紫色点划线 ↔   对比区分
 
 # 九、层级与边的使用规则
 
-## 9.1 纸图层级优先使用 `parent`
+## 9.1 纸图层级优先使用 `subclass_of`/`part_of`
 
 对于真正的：
 
@@ -820,11 +805,11 @@ contrast  ─ · ─ · ─ ·    紫色点划线 ↔   对比区分
 level: 2
 edges_out:
   - target: 精神与中枢神经系统疾病用药
-    type: parent
-    reason: 属于上级主题
+    type: subclass_of
+    reason: 该类属于上级主题
 ```
 
-> `parent` 是唯一用于表达严格纸图层级归属的边。
+> `subclass_of` 和 `part_of` 是表达层级归属关系的边。
 
 ***
 
@@ -837,9 +822,9 @@ edges_out:
 # 父节点
 edges_out:
   - target: 子节点A
-    type: parent
+    type: subclass_of
   - target: 子节点B
-    type: parent
+    type: subclass_of
 ```
 
 而应由子节点声明：
@@ -849,15 +834,15 @@ edges_out:
 # 子节点
 edges_out:
   - target: 父节点
-    type: parent
+    type: subclass_of
     reason: 属于上级主题
 ```
 
 这样可以避免重复边和双向层级污染。
 
-> **铁律：边的方向是"子 → 父"，永远是子节点持有指向父节点的 `parent` 边，父节点永远不反向持有指向子节点的层级边。**
+> **铁律：边的方向是"子 → 父"，永远是子节点持有指向父节点的层级边，父节点永远不反向持有指向子节点的层级边。**
 >
-> 如果你发现某个节点的 `edges_out` 里写了 `type: parent`，那它必须是该边所指向目标的**下级**。
+> 如果你发现某个节点的 `edges_out` 里写了 `type: subclass_of`，那它必须是该边所指向目标的**下级**。
 
 ### 推广到所有边：每个节点自管自己的 `edges_out`
 
@@ -867,11 +852,11 @@ edges_out:
 
 | 关系类型 | `edges_out` 写在 |
 | --- | --- |
-| 父子层级（`parent`） | 子节点文件里（level 大） |
-| 辅助学习（`support`） | **辅助节点**文件里（口诀 / 注意 / 对比表） |
-| 药学关系（`link`） | **业务主动方**文件里（提供方 / 描述方） |
-| 横向对比（`contrast`） | **任一侧**（单边写即可，渲染端补双向视觉） |
-| 一般关联（`relate`） | **任一侧**（推荐 level 较大 / 信息提供方） |
+| 层级归属（`subclass_of` / `part_of` / `instance_of`） | 子节点文件里（子类/局部/实例那一侧） |
+| 辅助学习（用 `part_of`） | **辅助节点**文件里（口诀 / 注意 / 对比表） |
+| 药学关系（`subclass_of` / `instance_of`） | **业务主动方**文件里（提供方 / 描述方） |
+| 横向对比（`disjoint_with`） | **任一侧**（单边写即可，渲染端补双向视觉） |
+| 等价关系（`equivalent_to`） | **任一侧**（单边写即可） |
 
 详见 RULES §5.15 与本节 §9.4。
 
@@ -901,14 +886,14 @@ location:
 
 迁移纸图时最常见的错误是**边方向颠倒**——子节点持有指向父节点的边、辅助节点持有指向主知识的边。下面 4 个反例必须避免。
 
-### ❌ 反例 1：父节点反向持有 `parent` 边
+### ❌ 反例 1：父节点反向持有层级边
 
 ```yaml
-# 错误：父节点不该写指向子节点的 parent 边
+# 错误：父节点不该写指向子节点的层级边
 # 镇静催眠药.md
 edges_out:
   - target: 唑吡坦
-    type: parent
+    type: subclass_of
     reason: 下属药物
 ```
 
@@ -918,8 +903,8 @@ edges_out:
 # 正确：唑吡坦.md
 edges_out:
   - target: 镇静催眠药
-    type: parent
-    reason: 属于该主题
+    type: instance_of
+    reason: 属于该分类
 ```
 
 ### ❌ 反例 2：分类/药物节点把 `type: child` 当作 "child → parent"
@@ -932,7 +917,7 @@ edges_out:
     reason: 属于该主题
 ```
 
-层级归属永远是子节点持有 `type: parent` 指向父节点，**不存在 `type: child`**。
+层级归属永远是子节点持有 `type: subclass_of` 指向父节点，**不存在 `type: child`**。
 
 ### ❌ 反例 3：药物/分类节点反向持有 `support` 边指向口诀
 
@@ -941,7 +926,7 @@ edges_out:
 # 丁苯酞.md
 edges_out:
   - target: 丁苯酞口诀
-    type: support
+    type: part_of
     reason: 记忆口诀
 ```
 
@@ -951,7 +936,7 @@ edges_out:
 # 正确：丁苯酞口诀.md
 edges_out:
   - target: 丁苯酞
-    type: support
+    type: part_of
     reason: 丁苯酞口诀
 ```
 
@@ -961,7 +946,7 @@ edges_out:
 # 错误：口诀不是层级的下级，挂错地方会被画成药物的子节点
 edges_out:
   - target: 酰胺类中枢兴奋药
-    type: parent
+    type: subclass_of
     reason: 帮助记忆酰胺类
 ```
 
@@ -979,7 +964,7 @@ edges_out:
 >    - 单药口诀 → 该药物
 >    - 分类口诀 → 该分类
 >    - 总结/表格/注意 → 所属主知识
->    - 全部使用 `type: support`
+>    - 全部使用 `type: part_of`
 
 ***
 
@@ -1007,7 +992,7 @@ tier: drug
 ```yaml
 edges_out:
   - target: 镇静催眠药
-    type: support
+    type: part_of
     reason: 记忆口诀
 ```
 
@@ -1029,7 +1014,7 @@ edges_out:
 # 正确：口诀节点持有 support 边，指向被记忆的主知识
 edges_out:
   - target: 丁苯酞
-    type: support
+    type: part_of
     reason: 丁苯酞口诀
 ```
 
@@ -1040,7 +1025,7 @@ edges_out:
 # 这会让口诀被画成药物的下级节点，扭曲层级结构
 edges_out:
   - target: 丁苯酞口诀
-    type: support
+    type: part_of
     reason: 记忆口诀
 ```
 
@@ -1123,7 +1108,7 @@ tier: drug
 
 ```yaml
 - target: 苯二氮䓬类
-  type: support
+  type: part_of
   reason: 注意
 ```
 
@@ -1228,19 +1213,19 @@ data:
 
   edges_out:
     - target: 镇静催眠药
-      type: parent
+      type: subclass_of
       reason: 属于该主题下的具体药物
 
     - target: 失眠
-      type: link
+      type: instance_of
       reason: 治疗
 
     - target: 镇静催眠药选择总结
-      type: support
+      type: part_of
       reason: 纳入总结
 
     - target: 佐匹克隆
-      type: contrast
+      type: disjoint_with
       reason: 同类药物比较
 ```
 
@@ -1425,7 +1410,7 @@ data:
     full: XXX
   edges_out:
     - target: XXX
-      type: parent
+      type: subclass_of
       reason: 属于上级主题
 ```
 
