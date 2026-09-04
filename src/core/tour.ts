@@ -250,23 +250,32 @@ class TopoPrereqStrategy implements TourStrategyImpl {
     const noPrereq: string[] = [];
     inDegree.forEach((deg, id) => { if (deg === 0) noPrereq.push(id); });
 
-    // tier 顺序：低 tier 优先，保证基础概念早于服务/法规节点
-    const TIER_ORDER: Record<string, number> = {
-      basic: 0, drug: 1, disease: 2, management: 3, service: 4, legal: 5,
+    // essence 顺序：基础概念/分类早于具体药物，药物早于疾病/服务/总结
+    // 走「分类 → 概念 → 药物 → 疾病 → 口诀 → 总结」的自然学习顺序
+    const ESSENCE_ORDER: Record<string, number> = {
+      module: 0,
+      'umbrella-class': 1,
+      'strict-class': 2,
+      concept: 3,
+      notion: 4,
+      medication: 5,
+      illness: 6,
+      mnemonic: 7,
+      summary: 8,
     };
-    const getTierOrder = (id: string): number =>
-      TIER_ORDER[cy.getElementById(id).data('tier') as string] ?? 99;
+    const getEssenceOrder = (id: string): number =>
+      ESSENCE_ORDER[cy.getElementById(id).data('essence') as string] ?? 99;
 
-    // 比较函数：先按 tier，再按 location
+    // 比较函数：先按 essence，再按 location
     const nodeCompare = (a: string, b: string): number => {
-      const ta = getTierOrder(a), tb = getTierOrder(b);
+      const ta = getEssenceOrder(a), tb = getEssenceOrder(b);
       if (ta !== tb) return ta - tb;
       const la = getLocationKey(cy.getElementById(a));
       const lb = getLocationKey(cy.getElementById(b));
       return la < lb ? -1 : la > lb ? 1 : 0;
     };
 
-    // 初始无前置节点按 tier → location 排序，不再 shuffle
+    // 初始无前置节点按 essence → location 排序，不再 shuffle
     noPrereq.sort(nodeCompare);
 
     while (noPrereq.length > 0) {
@@ -276,7 +285,7 @@ class TopoPrereqStrategy implements TourStrategyImpl {
         const newDeg = (inDegree.get(dep) ?? 1) - 1;
         inDegree.set(dep, newDeg);
         if (newDeg === 0) {
-          // 动态插入：按 tier → location 找插入位置
+          // 动态插入：按 essence → location 找插入位置
           let inserted = false;
           for (let i = 0; i < noPrereq.length; i++) {
             if (nodeCompare(dep, noPrereq[i]) < 0) {
@@ -425,9 +434,9 @@ export class TourEngine {
 
   clearAllNodeInlineStyles(): void {
     // Clear inline overrides so the stylesheet's per-field border-color
-    // and per-tier background-color take over again. Setting to a
+    // and per-essence background-color take over again. Setting to a
     // "dimmed" border here would leave every node looking dimmed until
-    // the user clicks a field/tier legend to reset.
+    // the user clicks a field/essence legend to reset.
     this.cy.nodes().forEach((n: cytoscape.NodeSingular) => {
       n.style({ 'border-width': null, 'border-color': null });
     });
@@ -652,8 +661,9 @@ export class TourEngine {
         this.seqIndex++;
         if (!node.empty() && !node.hasClass('layer-parent')) {
           this.currentStep++;
-          const depth = 0;
-          this.highlightAndFocus(id, [id], depth, this.seq.length, this.seqIndex);
+          // Use the graph's real BFS depth (0=root/center, higher=outer layers).
+          const nodeDepth = (node.data('depth') as number) ?? 0;
+          this.highlightAndFocus(id, [id], nodeDepth, this.seq.length, this.seqIndex);
           if (this.maxDepth > 0 && this.seqIndex >= this.maxDepth) {
             this.stopped = true;
             this.onComplete?.('depth-reached');

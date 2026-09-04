@@ -341,7 +341,7 @@ function buildRulesTable(cy: cytoscape.Core): string {
   // Only show non-dimmed nodes — dimmed ones have their styles overridden
   // by the .dimmed rule (border → rgba(255,255,255,0.06), opacity → 0.1),
   // so reading their effective styles gives misleading "everything is white"
-  // results that don't reflect the field/tier mapping.
+  // results that don't reflect the essence mapping.
   const visible = cy.nodes().not('.layer-parent').filter((n: NodeSingular) => !n.hasClass('dimmed'));
   visible.forEach((n: NodeSingular) => {
     const t = n.data('essence') ?? '?';
@@ -350,8 +350,6 @@ function buildRulesTable(cy: cytoscape.Core): string {
     const bw = n.style('border-width') as string;
     const w = n.data('weight') ?? '?';
     const rw = n.renderedWidth().toFixed(1);
-    const field = n.data('field') ?? '?';
-    const tier = n.data('tier') ?? '?';
     const label = (n.data('label') || n.id()).slice(0, 12);
     const isSelected = n.hasClass('selected-node');
     rows.push(`<tr class="${isSelected ? 'dbg-rules-table__tr--active' : ''}">
@@ -360,8 +358,8 @@ function buildRulesTable(cy: cytoscape.Core): string {
       <td class="dbg-rules-table__td dbg-rules-table__td--shape">${shape}</td>
       <td class="dbg-rules-table__td dbg-rules-table__td--w">wt=${w} rw=${rw}</td>
       <td class="dbg-rules-table__td" style="font-size:9px">
-        <span title="field: ${field}">${bc}</span>
-        <div style="color:#64748b">f=${field} t=${tier} bw=${bw}</div>
+        <span title="border-color: ${bc}">${bc}</span>
+        <div style="color:#64748b">bc=${bc} bw=${bw}</div>
       </td>
     </tr>`);
   });
@@ -381,8 +379,6 @@ function nodeProps(node: NodeSingular): string {
   const rw = node.renderedWidth().toFixed(1);
   const rh = node.renderedHeight().toFixed(1);
   const essence = node.data('essence') ?? '?';
-  const field = node.data('field') ?? '?';
-  const tier = node.data('tier') ?? '?';
   const opacity = node.renderedStyle('opacity') as string;
   const classes = (node.classes() as string[]).join(' ');
 
@@ -402,7 +398,7 @@ function nodeProps(node: NodeSingular): string {
     classBadge('H', node.hasClass('highlighted')),
     classBadge('V', node.hasClass('hovered')),
     `</div>`,
-    `<div class="dbg-props-meta">essence=${essence} | field=${field} | tier=${tier} | opacity=${opacity}</div>`,
+    `<div class="dbg-props-meta">essence=${essence} | opacity=${opacity}</div>`,
     `<div class="dbg-props-classes">cls:[${classes || '∅'}]</div>`,
   ].join('');
 }
@@ -662,13 +658,9 @@ export function updateForensicPanel(renderer: Renderer): void {
   if (coverageEl) {
     const allNodes = cy.nodes().not('.layer-parent');
     const noEssence = allNodes.filter((n: NodeSingular) => !n.data('essence')).length;
-    const noField   = allNodes.filter((n: NodeSingular) => !n.data('field')).length;
-    const noTier    = allNodes.filter((n: NodeSingular) => !n.data('tier')).length;
     const total     = allNodes.length;
     const essenceWarn = noEssence > 0 ? `<span style="color:#f87171">⚠ essence 缺失: ${noEssence}/${total}</span>` : `<span style="color:#4ade80">✓ essence 全覆盖</span>`;
-    const fieldWarn   = noField   > 0 ? `<span style="color:#f87171">⚠ field 缺失: ${noField}/${total}</span>`   : `<span style="color:#4ade80">✓ field 全覆盖</span>`;
-    const tierWarn    = noTier    > 0 ? `<span style="color:#f87171">⚠ tier 缺失: ${noTier}/${total}</span>`    : `<span style="color:#4ade80">✓ tier 全覆盖</span>`;
-    coverageEl.innerHTML = `<div style="font-size:9px;line-height:1.8">${essenceWarn}<br>${fieldWarn}<br>${tierWarn}</div>`;
+    coverageEl.innerHTML = `<div style="font-size:9px;line-height:1.8">${essenceWarn}</div>`;
   }
 
   // ── Node panel diagnostics ─────────────────────────────────────────

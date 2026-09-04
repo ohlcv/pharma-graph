@@ -15,7 +15,6 @@ interface ParsedFM {
   id?: string;
   label?: string;
   essence?: string;
-  tier?: string;
   level?: string | number;
   summary?: { short?: string; full?: string };
   location?: Record<string, string>;

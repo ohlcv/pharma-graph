@@ -2,7 +2,7 @@
 // 扫描全部 content/.md 文件的 frontmatter，生成审核打分表 docs/frontmatter-audit.md
 //
 // 检测范围：
-//   1) 基础字段分（id/label/essence/field/tier/summary/edges_out/location）
+//   1) 基础字段分（id/label/essence/summary/edges_out/location）
 //   2) ADR-0001 关系方向合规（has 仅用于物理组成；层级关系一律用 isa 子→父）
 //   3) 双向 has/isa/relates 配对
 //   4) 非 book 节点缺少 isa 边（warning 级别）
@@ -34,8 +34,6 @@ const OUTPUT_FILE = path.resolve('docs/frontmatter-audit.md');
 // their old names so the scoring branches read naturally.
 import {
   VALID_ESSENCE,
-  VALID_FIELD,
-  VALID_TIER,
 } from "../src/parser/schema.js";
 
 const LOC_KEYS = ['book', 'part', 'chapter', 'section', 'point', 'item', 'subsection'] as const;
@@ -55,9 +53,6 @@ interface ParsedFM {
   label?: string;
   essence?: string;
   type?: string;
-  field?: string;
-  category?: string;
-  tier?: string;
   layer?: string;
   summary?: string | { short?: string; full?: string };
   location?: Record<string, string>;
@@ -111,9 +106,6 @@ function extractFrontmatter(content: string): ParsedFM {
     label: typeof fm['label'] === 'string' ? fm['label'] as string : undefined,
     essence: typeof fm['essence'] === 'string' ? fm['essence'] as string : undefined,
     type: typeof fm['type'] === 'string' ? fm['type'] as string : undefined,
-    field: typeof fm['field'] === 'string' ? fm['field'] as string : undefined,
-    category: typeof fm['category'] === 'string' ? fm['category'] as string : undefined,
-    tier: typeof fm['tier'] === 'string' ? fm['tier'] as string : undefined,
     layer: typeof fm['layer'] === 'string' ? fm['layer'] as string : undefined,
     summary: summaryStr,
     location: fm['location'] && typeof fm['location'] === 'object' && !Array.isArray(fm['location'])
@@ -129,7 +121,7 @@ function extractFrontmatter(content: string): ParsedFM {
 
 // ── 评分（基础字段分） ─────────────────────────────────────────────
 interface Score {
-  id: number; label: number; essence: number; field: number; tier: number;
+  id: number; label: number; essence: number;
   summary: number; edges_out: number; location: number; tags: number;
 }
 
@@ -144,16 +136,6 @@ function scoreField(fm: ParsedFM, field: keyof Score): number {
     const v = (fm.essence ?? fm.type ?? '').toLowerCase();
     if (!v) return 2;
     return VALID_ESSENCE.includes(v) ? 3 : 1;
-  }
-  if (field === 'field') {
-    const v = (fm.field ?? fm.category ?? '').toLowerCase();
-    if (!v) return 2;
-    return VALID_FIELD.includes(v) ? 3 : 2;
-  }
-  if (field === 'tier') {
-    const v = (fm.tier ?? fm.layer ?? '').toLowerCase();
-    if (!v) return 2;
-    return VALID_TIER.includes(v) ? 3 : 1;
   }
   if (field === 'summary') {
     if (!fm.summary) return 2;
@@ -176,8 +158,6 @@ function scoreAll(fm: ParsedFM): Score {
     id: scoreField(fm, 'id'),
     label: scoreField(fm, 'label'),
     essence: scoreField(fm, 'essence'),
-    field: scoreField(fm, 'field'),
-    tier: scoreField(fm, 'tier'),
     summary: scoreField(fm, 'summary'),
     edges_out: scoreField(fm, 'edges_out'),
     location: scoreField(fm, 'location'),
@@ -186,7 +166,7 @@ function scoreAll(fm: ParsedFM): Score {
 }
 
 function scoreTotal(scores: Score[]): number {
-  const keys: (keyof Score)[] = ['id', 'label', 'essence', 'field', 'tier', 'summary', 'edges_out', 'location'];
+  const keys: (keyof Score)[] = ['id', 'label', 'essence', 'summary', 'edges_out', 'location'];
   let correct = 0;
   let total = 0;
   for (const key of keys) {
@@ -372,7 +352,7 @@ async function main() {
       results.push({
         relPath: rel,
         fm,
-        score: { id: 1, label: 1, essence: 2, field: 2, tier: 2, summary: 2, edges_out: 2, location: 2, tags: 3 },
+        score: { id: 1, label: 1, essence: 2, summary: 2, edges_out: 2, location: 2, tags: 3 },
         baseIssues: ['❌ 无 frontmatter'],
         dirIssues: [],
         hasIsaOut: false,
@@ -388,12 +368,6 @@ async function main() {
     const essenceVal = fm.essence ?? fm.type ?? '';
     if (score.essence === 1) baseIssues.push(`❌ essence/type 错误：\`${essenceVal || 'N/A'}\``);
     if (score.essence === 2) baseIssues.push(`⚠️ essence/type 缺失`);
-    const fieldVal = fm.field ?? fm.category ?? '';
-    if (score.field === 1) baseIssues.push(`❌ field/category 值非法：\`${fieldVal}\``);
-    if (score.field === 2) baseIssues.push(`⚠️ field/category 缺失`);
-    const tierVal = fm.tier ?? fm.layer ?? '';
-    if (score.tier === 1) baseIssues.push(`❌ tier/layer 值非法：\`${tierVal}\``);
-    if (score.tier === 2) baseIssues.push(`⚠️ tier/layer 缺失`);
     if (score.summary === 2) baseIssues.push(`⚠️ summary 为空`);
     if (score.edges_out === 2) baseIssues.push(`⚠️ edges_out 为空`);
     if (score.location === 2) baseIssues.push(`⚠️ location 缺失`);
@@ -489,11 +463,11 @@ async function main() {
   let rowNo = 0;
   for (const [group, files] of groups) {
     md += `### ${group}\n\n`;
-    md += `| # | 文件 | id | essence | field | tier | summary | edges | 🔁 | 完成度 |\n`;
-    md += `|---|---|---|---|---|---|---|---|---|---|\n`;
+    md += `| # | 文件 | id | essence | summary | edges | 🔁 | 完成度 |\n`;
+    md += `|---|---|---|---|---|---|---|---|\n`;
     for (const r of files) {
       rowNo++;
-      const keys: (keyof Score)[] = ['id', 'label', 'essence', 'field', 'tier', 'summary', 'edges_out'];
+      const keys: (keyof Score)[] = ['id', 'label', 'essence', 'summary', 'edges_out'];
       const correct = keys.filter(k => r.score[k] === 3).length;
       const pct = Math.round((correct / keys.length) * 100);
       const idDisplay = r.score.id === 3
@@ -501,16 +475,10 @@ async function main() {
       const essenceVal = (r.fm.essence ?? r.fm.type ?? '—').toString();
       const essenceDisplay = r.score.essence === 3 ? `✅ ${essenceVal}` :
         r.score.essence === 2 ? `⚠️ —` : `❌ ${essenceVal}`;
-      const fieldVal = (r.fm.field ?? r.fm.category ?? '—').toString();
-      const fieldDisplay = r.score.field === 3 ? `✅ ${fieldVal}` :
-        r.score.field === 2 ? `⚠️ —` : `❌ ${fieldVal}`;
-      const tierVal = (r.fm.tier ?? r.fm.layer ?? '—').toString();
-      const tierDisplay = r.score.tier === 3 ? `✅ ${tierVal}` :
-        r.score.tier === 2 ? `⚠️ —` : `❌ ${tierVal}`;
       const sumDisplay = r.score.summary === 3 ? `✅` : `⚠️`;
       const edgeDisplay = r.score.edges_out === 3 ? `✅` : `⚠️`;
       const dirMark = r.dirIssues.length === 0 ? `-无` : `🔁×${r.dirIssues.length}`;
-      md += `| ${rowNo} | \`${r.relPath}\` | ${idDisplay} | ${essenceDisplay} | ${fieldDisplay} | ${tierDisplay} | ${sumDisplay} | ${edgeDisplay} | ${dirMark} | ${pct}% |\n`;
+      md += `| ${rowNo} | \`${r.relPath}\` | ${idDisplay} | ${essenceDisplay} | ${sumDisplay} | ${edgeDisplay} | ${dirMark} | ${pct}% |\n`;
     }
     md += `\n`;
   }

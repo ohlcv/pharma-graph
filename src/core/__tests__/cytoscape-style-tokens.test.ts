@@ -10,7 +10,7 @@
  * 测所有 EDGE_TYPE_STYLE 的 line-gradient-stop-colors 都能通过 — 不再回退到回滚方案.
  */
 import { describe, it, expect } from 'vitest';
-import { EDGE_TYPE_STYLE, NODE_TIER_STYLE } from '../config';
+import { EDGE_TYPE_STYLE, NODE_TYPE_COLOR } from '../config';
 
 const RGBA_RE = new RegExp(
   '^' +
@@ -45,13 +45,11 @@ describe('cytoscape stylesheet color tokens (split on whitespace)', () => {
     }
   });
 
-  it('NODE_TIER_STYLE — bgColor all parseable as hex', () => {
-    // halo/glow removed in Batch G (Batch A reintroduced underlay,
-    // Batch G removed it because cytoscape's underlay-shape only
-    // supports round-rectangle / ellipse and doesn't track the 8
-    // node essence shapes). bgColor is the only thing left.
-    for (const [tier, s] of Object.entries(NODE_TIER_STYLE)) {
-      expect(HEX_RE.test(s.bgColor), `NODE_TIER_STYLE[${tier}].bgColor "${s.bgColor}" must be hex`).toBe(true);
+  it('NODE_TYPE_COLOR — every essence produces a parseable hex fill', () => {
+    // 节点填充色由 essence 决定（取代已废弃的 NODE_TIER_STYLE）。
+    // bgColor 来自 NODE_TYPE_COLOR，必须是合法 hex 才能 cytoscape 渲染。
+    for (const [essence, color] of Object.entries(NODE_TYPE_COLOR)) {
+      expect(HEX_RE.test(color), `NODE_TYPE_COLOR[${essence}] "${color}" must be hex`).toBe(true);
     }
   });
 

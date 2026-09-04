@@ -11,6 +11,11 @@ export class HighlightEngine {
 
   constructor(private cy: cytoscape.Core) {}
 
+  /** Expose the cytoscape instance for callers that need raw selection. */
+  getCy(): cytoscape.Core {
+    return this.cy;
+  }
+
   highlightNode(nodeId: string): {
     prevNodeId: string | null;
     prevNodeName: string | null;
@@ -127,36 +132,13 @@ export class HighlightEngine {
     });
   }
 
-  highlightField(field: string): void {
+  highlightEssence(essence: string): void {
     this.cy.elements().removeClass(
       [CLASSES.DIMMED, CLASSES.HIGHLIGHTED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED_EDGE].join(' '),
     );
 
     this.cy.nodes().not(`.${CLASSES.LAYER_PARENT}`).forEach((n: cytoscape.NodeSingular) => {
-      if (n.data('field') === field) {
-        n.addClass(CLASSES.HIGHLIGHTED);
-      } else {
-        n.addClass(CLASSES.DIMMED);
-      }
-    });
-
-    this.cy.edges().not(`.${CLASSES.HIGHLIGHTED_EDGE}`).addClass(CLASSES.DIMMED);
-    this.cy.edges(`[source][target]`).forEach((e: cytoscape.EdgeSingular) => {
-      const src = e.source();
-      const tgt = e.target();
-      if (src.hasClass(CLASSES.HIGHLIGHTED) && tgt.hasClass(CLASSES.HIGHLIGHTED)) {
-        e.removeClass(CLASSES.DIMMED).addClass(CLASSES.HIGHLIGHTED_EDGE);
-      }
-    });
-  }
-
-  highlightTier(tier: string): void {
-    this.cy.elements().removeClass(
-      [CLASSES.DIMMED, CLASSES.HIGHLIGHTED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED_EDGE].join(' '),
-    );
-
-    this.cy.nodes().not(`.${CLASSES.LAYER_PARENT}`).forEach((n: cytoscape.NodeSingular) => {
-      if (n.data('tier') === tier) {
+      if (n.data('essence') === essence) {
         n.addClass(CLASSES.HIGHLIGHTED);
       } else {
         n.addClass(CLASSES.DIMMED);

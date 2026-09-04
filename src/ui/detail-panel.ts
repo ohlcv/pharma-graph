@@ -6,11 +6,9 @@ import { HighlightEngine } from './highlight-engine.js';
 import {
   NODE_TYPE_COLOR,
   ESSENCE_LABEL,
-  FIELD_COLOR,
-  FIELD_LABEL,
-  TIER_LABEL,
-  NODE_TIER_STYLE,
   EDGE_TYPE_LABEL,
+  LEVEL_LABEL,
+  LEVEL_BORDER_COLOR,
 } from '../core/config.js';
 import { DEFAULT_EDGE_TYPE, isEdgeType } from '../core/edge-types.js';
 import { uiState, registerPinToggle } from './state.js';
@@ -248,10 +246,9 @@ function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
   const color = essenceVal ? (NODE_TYPE_COLOR[essenceVal] ?? NODE_TYPE_COLOR.default) : '#94a3b8';
   const nodeName = (d.label as string) || (d.id as string);
   const essenceText = essenceVal ? (ESSENCE_LABEL[essenceVal] ?? essenceVal) : '—';
-  const fieldColor = d.field ? (FIELD_COLOR[d.field as string] ?? '#a78bfa') : '';
-  const fieldText = d.field ? (FIELD_LABEL[d.field as string] ?? (d.field as string)) : '';
-  const tierText = d.tier ? (TIER_LABEL[d.tier as string] ?? (d.tier as string)) : '';
-  const tierColor = d.tier ? (NODE_TIER_STYLE[d.tier as string]?.bgColor ?? '#fbbf24') : '';
+  const depthVal = typeof d.depth === 'number' ? d.depth : 0;
+  const depthLabel = LEVEL_LABEL[depthVal] ?? `${depthVal}级`;
+  const depthColor = LEVEL_BORDER_COLOR[depthVal] ?? '#94a3b8';
 
   let location = '';
   if (d.location) {
@@ -265,8 +262,7 @@ function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
   return `<div class="np-hero">
   <div class="np-hero__badges">
     <span class="np-badge np-badge--type" style="color:${color};border-color:${rgba(color, 0.4)};background:${rgba(color, 0.12)}">${escHtml(essenceText)}</span>
-    ${fieldText ? `<span class="np-badge np-badge--field" style="color:${fieldColor};border-color:${rgba(fieldColor, 0.4)};background:${rgba(fieldColor, 0.1)}">${escHtml(fieldText)}</span>` : ''}
-    ${tierText && tierColor ? `<span class="np-badge np-badge--tier" style="color:${tierColor};border-color:${rgba(tierColor, 0.4)};background:${rgba(tierColor, 0.12)}">${escHtml(tierText)}</span>` : ''}
+    <span class="np-badge np-badge--depth" style="color:${depthColor};border-color:${rgba(depthColor, 0.4)};background:${rgba(depthColor, 0.12)}">${escHtml(depthLabel)}</span>
   </div>
   <div class="np-hero__name">${escHtml(nodeName)}</div>
   ${location}

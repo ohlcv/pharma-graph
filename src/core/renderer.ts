@@ -11,10 +11,9 @@ import {
   NODE_TYPE_SHAPE,
   NODE_TYPE_COLOR,
   NODE_TYPE_COLOR_DARK,
-  FIELD_COLOR,
   EDGE_TYPE_STYLE,
-  NODE_TIER_STYLE,
-  LEVEL_BORDER_COLOR,
+  getDepthBorderColor,
+  getSubtreeBorderColor,
   LAYOUTS,
   LayoutConfig,
   DEFAULT_LAYOUT,
@@ -43,33 +42,36 @@ export const CLASSES = {
 
 // 视觉层级（从上到下依次展开）：
 //   ① 节点基础样式（默认椭圆、权重决定大小、文字底对齐）
-//   ② field → 边框色（学科归属）
-//   ③ essence → 形状（节点本质决定形状）
-//   ④ tier → 纯色填充（层次感，均匀覆盖整节点）
-//   ⑤ 边、选中/悬停等交互状态
+//   ② essence → 形状 + 填充色（节点本质；9 种颜色一一对应）
+//   ③ depth → 边框色（思维导图结构深度，0=中心节点）
+//   ④ 边、选中/悬停等交互状态
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const STYLESHEET: any[] = (() => {
-  // Default fill for nodes without an explicit tier. Halo/glow was
-  // removed in Batch G — cytoscape's underlay can only be ellipse or
-  // round-rectangle and looks inconsistent across node shapes.
-  const TIER_DEFAULT_FILL = '#f8fafc';
+const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) => any[] = (maxDepth, subtreeColorMap) => {
+  // Default fill when an essence has no explicit color mapping (safety net;
+  // every essence defined in config.ts has its own color, so this only fires
+  // for legacy/missing values). Halo/glow was removed in Batch G —
+  // cytoscape's underlay can only be ellipse or round-rectangle and looks
+  // inconsistent across node shapes.
+  const ESSENCE_DEFAULT_FILL = '#f8fafc';
 
-  // Essence 规则 — 仅形状（填充色由 tier 统一管理）
-  const nodeTypeRules = Object.entries(NODE_TYPE_SHAPE).map(([key, shape]) => {
-    return {
-      selector: `node[essence = "${key}"]`,
-      style: {
-        shape: shape as cytoscape.Css.NodeShape,
-      },
-    };
-  });
-
-  // Level 规则 — 边框色（思维导图结构级别 1-6）
-  const levelRules = Object.entries(LEVEL_BORDER_COLOR).map(([lvl, color]) => ({
-    selector: `node[level = ${lvl}]`,
-    style: { 'border-color': color, 'border-width': 2 },
+  // Essence 规则 — 形状 + 填充色（节点本质；9 种颜色一一对应）
+  const nodeTypeRules = Object.entries(NODE_TYPE_SHAPE).map(([key, shape]) => ({
+    selector: `node[essence = "${key}"]`,
+    style: {
+      shape: shape as cytoscape.Css.NodeShape,
+      'background-color': NODE_TYPE_COLOR[key] ?? ESSENCE_DEFAULT_FILL,
+    },
   }));
+
+  // Depth 规则 — 边框色（按图谱实际层数动态生成）
+  const depthRules = [];
+  for (let d = 0; d <= maxDepth; d++) {
+    depthRules.push({
+      selector: `node[depth = ${d}]`,
+      style: { 'border-color': getDepthBorderColor(d), 'border-width': 2 },
+    });
+  }
 
   // edge-type rules — 让边自带"源亮 → 目的暗"的渐变, 但 cytoscape 的
   // `line-gradient-stop-colors` 接受空格分隔的多颜色 token, 且
@@ -127,7 +129,7 @@ const STYLESHEET: any[] = (() => {
         // border-color + opacity for the visual emphasis instead.
         'border-width': 1.5,
         'border-color': '#475569',
-        'background-color': TIER_DEFAULT_FILL,
+        'background-color': ESSENCE_DEFAULT_FILL,
         'background-fill': 'solid',
         'background-blacken': 0,
         shape: 'ellipse',
@@ -142,17 +144,16 @@ const STYLESHEET: any[] = (() => {
         'transition-timing-function': 'ease-out',
       },
     },
-    // ② level 边框色 (思维导图结构级别 1-6)
-    ...levelRules,
-    // ③ essence 形状（节点本质决定形状）
-    ...nodeTypeRules,
-    // ④ tier 填充色 — halo 已移除 (Batch G), 形状各异的节点不强制套椭圆外圈
-    ...Object.entries(NODE_TIER_STYLE).map(([key, style]) => ({
-      selector: `node[tier = "${key}"]`,
-      style: {
-        'background-color': style.bgColor,
-      },
+    // ② depth 边框色（思维导图结构深度，0=中心节点）
+    ...depthRules,
+    // ②.b subtree 边框色（按分类子树统一色，优先于 depth 色）
+    // 一棵子树（其分类根及所有后代）共享一个色。每个分类根 id → 一个色。
+    ...Object.entries(subtreeColorMap).map(([rootId, color]) => ({
+      selector: `node[subtreeRoot = "${rootId}"]`,
+      style: { 'border-color': color },
     })),
+    // ③ essence 形状 + 填充色（节点本质决定）
+    ...nodeTypeRules,
     // 虚拟层父节点
     {
       selector: '.layer-parent',
@@ -297,7 +298,7 @@ const STYLESHEET: any[] = (() => {
       },
     },
   ];
-})();
+};
 
 // ── Options & Types ────────────────────────────────────────────────────────────
 
@@ -308,6 +309,8 @@ export interface RendererOptions {
   layoutConfigs?: Record<string, LayoutConfig>;
   minZoom?: number;
   maxZoom?: number;
+  /** Maximum depth in the graph; if omitted, depth rules cover 0–6 (legacy fallback). */
+  maxDepth?: number;
 }
 
 // ── Renderer ──────────────────────────────────────────────────────────────────
@@ -317,6 +320,8 @@ export class Renderer {
   private currentLayout = DEFAULT_LAYOUT;
   private layoutConfigs: Record<string, LayoutConfig>;
   private currentLayoutInstance: cytoscape.Layouts | null = null;
+  private maxDepth: number;
+  private subtreeColorMap: Record<string, string> = {};
 
   constructor(options: RendererOptions) {
     const {
@@ -326,7 +331,23 @@ export class Renderer {
       layoutConfigs = LAYOUTS,
       minZoom = 0.2,
       maxZoom = 4.0,
+      maxDepth = 6,
     } = options;
+    this.maxDepth = maxDepth;
+
+    // Build subtree color map: assign one color per distinct subtreeRoot found
+    // across all nodes. Order by first-seen so colors are deterministic.
+    const seenRoots = new Set<string>();
+    const orderedRoots: string[] = [];
+    for (const n of data.nodes) {
+      if (n.subtreeRoot && !seenRoots.has(n.subtreeRoot)) {
+        seenRoots.add(n.subtreeRoot);
+        orderedRoots.push(n.subtreeRoot);
+      }
+    }
+    orderedRoots.forEach((rootId, idx) => {
+      this.subtreeColorMap[rootId] = getSubtreeBorderColor(idx);
+    });
 
     this.layoutConfigs = layoutConfigs;
     this.currentLayout = layoutName;
@@ -341,7 +362,7 @@ export class Renderer {
     const cyOptions = {
       container,
       elements: this.buildElements(data),
-      style: STYLESHEET,
+      style: STYLESHEET(this.maxDepth, this.subtreeColorMap),
       layout: { name: 'preset' },
       // Cast through unknown because cytoscape's `CytoscapeOptions` type
       // omits the `renderer` field (it's only documented in their JS API).
@@ -458,9 +479,8 @@ export class Renderer {
           id: n.id,
           label: n.label || n.id,
           essence: n.essence || 'default',
-          field: n.field || '',
-          tier: n.tier,
-          level: n.level,
+          depth: n.depth,
+          subtreeRoot: n.subtreeRoot,
           shortSummary: n.shortSummary,
           fullSummary: n.fullSummary,
           summary: n.summary,

@@ -84,34 +84,6 @@
 | `mnemonic` | 记忆口诀 | vee | 口诀、首字母记忆、顺口溜、分类速记 |
 | `summary` | 总结/归纳 | 八边形 | 对多个节点进行收束、压缩、归纳的总结节点 |
 
-### level — 思维导图结构级别（决定边框色，来源：frontmatter.md §2.2）
-
-取值严格为 `1–6`，含义与教材目录完全独立：
-
-| level | 含义 | 典型节点 |
-| ----: | ---- | -------- |
-| `1` | 一级主节点 | 总主题、核心主题、一级大分支 |
-| `2` | 二级节点 | 一级主题下的主要分类/模块 |
-| `3` | 三级节点 | 二级节点展开出的知识分支 |
-| `4` | 四级节点 | 具体知识点、代表药物 |
-| `5` | 五级节点 | 考点维度、属性展开 |
-| `6` | 六级节点 | 最末级辅助：口诀、总结、注意、表格等 |
-
-> **父子判定规则**：`level` 数字大的节点是子节点。分类层级用 `subclass_of`；章节局部→整体用 `part_of`。
-
-### tier — 知识层级（决定填充色，来源：frontmatter.md §2.3）
-
-| tier | 中文 | 典型内容 | 填充色语义 |
-| ---- | ---- | -------- | ---------- |
-| `basic` | 基础层 | 生理、病理、基础药理机制、基础概念 | 基础色 |
-| `drug` | 药物层 | 具体药物、制剂、药物类别 | **淡蓝色** |
-| `disease` | 疾病层 | 疾病、诊断、症状综合征、病理状态 | **粉红色** |
-| `management` | 管理层 | 用药管理、合理用药、监护与决策 | 管理色 |
-| `service` | 服务层 | 药学服务流程、服务模块 | 服务色 |
-| `legal` | 法律层 | 法规、政策、伦理 | 法律色 |
-
-> **`level` 与 `tier` 必须正交**：level = 纸图结构位置，tier = 药学知识自然层级。两者互不影响，可以出现 `level: 3 + tier: drug`（如分类节点）或 `level: 4 + tier: disease`（如具体疾病节点）。
-
 ### edges_out.type — 边类型（决定边的颜色、虚实与方向）
 
 **只使用以下 5 种边类型**，不得自创其他 type：
@@ -212,46 +184,31 @@ edges_out:
 | 维度 | 字段 | 可视化作用 |
 | ---- | ---- | ---------- |
 | 形状 | `essence` | 节点形状 |
-| 边框色 | `level` | 思维导图结构级别 |
-| 填充色 | `tier` | 药学知识自然层级 |
+| 边框色 | `depth` | 思维导图深度（BFS 自动推导，0=中心） |
+| 填充色 | `essence` 推导 | 节点本质类型（9 色一一对应） |
 | 边样式 | `edges_out.type` | 边的颜色、虚实与方向 |
 
 ***
 
-## 四、level 赋值规则
+## 四、depth — BFS 自动推导（决定边框色）
 
-`level` 是新字段，决定节点边框色。按以下规则批量赋值：
+`depth` 是自动推导的思维导图深度，**不需要 frontmatter 字段**，由 build-graph 在图构建阶段通过 BFS 从根节点计算：
 
-### 4.1 按 location 层级赋值（默认规则）
+| depth | 含义 | 典型节点 |
+| ----: | ---- | -------- |
+| `0` | 中心节点（根入口） | 执业药师考试体系、药学专业知识一/二 |
+| `1` | 第一层子节点 | 篇入口、章入口 |
+| `2` | 第二层 | 节入口、伞形分类 |
+| `3` | 第三层 | 严格分类、具体药物/疾病 |
+| `4` | 第四层 | 口诀、总结、辅助认知节点 |
 
-| location 最深层级  | level | 典型节点             |
-| -------------- | ----- | ---------------- |
-| `book`         | 1     | 学科总入口（药学专业知识一/二） |
-| `part`         | 1     | 篇级入口             |
-| `chapter`      | 2     | 章级入口（第一章 XXX）    |
-| `section`      | 3     | 节级入口/伞形 module   |
-| `item`         | 4     | 具体药物、疾病、机制       |
-| 无 location 或更深 | 5-6   | 考点维度、口诀等辅助节点  |
+> **父子判定规则**：`depth` 数字大的节点是子节点（距离根更远）。分类层级用 `subclass_of`；章节局部→整体用 `part_of`。
 
-### 4.2 按 essence 微调（覆盖默认规则）
-
-| essence          | 默认 level | 说明                     |
-| ---------------- | -------- | ---------------------- |
-| `module`         | 2-3      | 章级=2，节级=3              |
-| `classification` | 3        | 分类节点一般在节级              |
-| `medication`     | 4        | 具体药物                   |
-| `illness`        | 4        | 具体疾病                   |
-| `process`        | 4        | 具体机制                   |
-| `concept`        | 4-5      | 核心概念=4，细分考点=5          |
-| `notion`         | 5        | 学习认知单元                 |
-| `mnemonic`       | 4-5      | 药物级口诀=4（与药物同级），模块级口诀=5 |
-| `summary`        | 5-6      | 模块总结=5，章级总结=6          |
-
-### 4.3 赋值优先级
-
-1. 有 `location` 的节点：按 §4.1 的 location 层级赋值。
-2. 无 `location` 但有 `essence` 的节点：按 §4.2 的 essence 默认赋值。
-3. 两者都有但矛盾的：以 §4.2 的 essence 为准（因为 location 是教材目录，level 是思维导图结构，两者不一定一致）。
+**BFS 推导逻辑**（build-graph.ts）：
+1. 找 `in_degree == 0` 的节点作为根节点，`depth = 0`
+2. 沿 `edges_out` 往外 BFS，每跳一步 `depth + 1`
+3. 每个节点只被访问一次，取最早到达的路径深度
+4. 未被任何边连接的孤立节点 `depth = 0`
 
 ***
 
@@ -539,7 +496,7 @@ tags:
 1. **扫 `summary`**：抽出所有 `**加粗**` 短语 / 专有名词 / 药理分类词。
 2. **按 §5.11.4.1 三铁律 + §5.11.4.2 药物规则** 过滤候选词。
 3. **语义去重**：同/近义词只保留先出现的。
-4. **硬约束再过滤**：不重复 essence/level/tier、不写本质词、不写整句。
+4. **硬约束再过滤**：不重复 essence/depth、不写本质词、不写整句。
 5. **兜底自取**（仅当前 4 步拿不到目标数量时）：基于 `summary` 上下文自取，必须向用户汇报"自取了哪些"。
 
 ##### 5.11.4.4 正 / 反模式
@@ -646,7 +603,7 @@ tags:
 | `data.label`             | **保留原值**（除非用户明确要求改名）；必须是**中文**                           |
 | `data.location`          | **可参考**（仅作为目录位置依据，不强制沿用）                             |
 | `data.essence`           | **不沿用**，按新资料重新判定                                     |
-| `data.level`             | **不沿用**，按 §4 重新赋值                                    |
+| `data.depth`           | **自动推导**，无需沿用                                    |
 | `data.tags`              | **不沿用**，按 §5.11.4 重新抽取                                 |
 | `data.edges_out`         | **重建**（按新资料重建，不保留旧边，除非用户明确指示）                       |
 | `summary.short`          | **不沿用旧文本**，按用户新资料重写                                  |
@@ -832,7 +789,6 @@ edges_out:
 | ----------- | --------------------- | ----------------------------------------------------- |
 | 边类型重构       | 批量转换旧边为新边类型    | `refactor(content): 第一章边类型重构` |
 | essence 重分类 | section/concept → 新类型 | `refactor(content): 41 个 section 节点重分类`               |
-| level 赋值    | 批量添加 level 字段         | `chore(content): 全仓 level 字段批量赋值`                     |
 | 内容合并        | 扩伞形正文 + 删 concept     | `refactor(content): 第六节 6 个零入度节点合并`                   |
 | 骨架边补齐       | 仅新增 subclass_of / part_of 边   | `chore(content): 药一第一篇补齐骨架边`                          |
 
@@ -843,36 +799,36 @@ edges_out:
 
 ### 10.1 节点构成
 
-| 类型     | essence          | level  | 数量     | 说明                  |
-| ------ | ---------------- | ------ | ------ | ------------------- |
-| 章级入口   | `module`         | 1      | 1      | 第一章 精神与中枢神经系统用药     |
-| 节级入口   | `module`         | 2      | 1      | 第四节 抗记忆障碍及改善神经功能药   |
-| 伞形分类   | `umbrella-class` | 3      | 3      | 酰胺类 / 胆碱酯酶抑制剂 / 其他  |
-| 代表药物   | `medication`     | 4      | 12     | 每个药物内置完整临床内容        |
-| 记忆口诀   | `mnemonic`       | 4      | 4      | 与药物同级，**口诀节点自身**用 `part_of` 边指向主知识（药物 / 伞形分类） |
-| **合计** |                  |        | **21** | 无冗余空模块              |
+| 类型     | essence          | depth | 数量     | 说明                  |
+| ------ | ---------------- | ----- | ------ | ------------------- |
+| 章级入口   | `module`         | D0-1  | 1      | 第一章 精神与中枢神经系统用药（深度视根节点位置）     |
+| 节级入口   | `module`         | D1-2  | 1      | 第四节 抗记忆障碍及改善神经功能药   |
+| 伞形分类   | `umbrella-class` | D2-3  | 3      | 酰胺类 / 胆碱酯酶抑制剂 / 其他  |
+| 代表药物   | `medication`     | D3-4  | 12     | 每个药物内置完整临床内容        |
+| 记忆口诀   | `mnemonic`       | D3-4  | 4      | 与药物同级，**口诀节点自身**用 `part_of` 边指向主知识（药物 / 伞形分类） |
+| **合计** |                  |       | **21** | 无冗余空模块              |
 
 ### 10.2 层级链
 
 ```
-第一章 (module, L1)
-  └─instance_of─ 第四节 (module, L2)
-      ├─subclass_of─ 酰胺类 (umbrella-class, L3)
-      │           ├─instance_of─ 吡拉西坦 (medication, L4)
-      │           ├─instance_of─ 茴拉西坦 (medication, L4)
-      │           └─instance_of─ 奥拉西坦 (medication, L4)
-      ├─subclass_of─ 乙酰胆碱酯酶抑制剂 (umbrella-class, L3)
-      │           ├─instance_of─ 多奈哌齐 (medication, L4)
-      │           ├─instance_of─ 加兰他敏 (medication, L4)
-      │           ├─instance_of─ 利斯的明 (medication, L4)
-      │           ├─instance_of─ 石杉碱甲 (medication, L4)
-      │           └─part_of─ 酰胺类分类口诀 (mnemonic, L4) ─part_of─ 乙酰胆碱酯酶抑制剂
-      └─subclass_of─ 其他改善脑功能药 (umbrella-class, L3)
-                  ├─instance_of─ 倍他司汀 (medication, L4) ←part_of─ 倍他司汀口诀 (mnemonic, L4)
-                  ├─instance_of─ 丁苯酞 (medication, L4) ←part_of─ 丁苯酞口诀 (mnemonic, L4)
-                  ├─instance_of─ 尼麦角林 (medication, L4) ←part_of─ 尼麦角林口诀 (mnemonic, L4)
-                  ├─instance_of─ 胞磷胆碱钠 (medication, L4)
-                  └─instance_of─ 长春西汀 (medication, L4)
+第一章 (module, D0-1)
+  └─instance_of─ 第四节 (module, D1-2)
+      ├─subclass_of─ 酰胺类 (umbrella-class, D2-3)
+      │           ├─instance_of─ 吡拉西坦 (medication, D3-4)
+      │           ├─instance_of─ 茴拉西坦 (medication, D3-4)
+      │           └─instance_of─ 奥拉西坦 (medication, D3-4)
+      ├─subclass_of─ 乙酰胆碱酯酶抑制剂 (umbrella-class, D2-3)
+      │           ├─instance_of─ 多奈哌齐 (medication, D3-4)
+      │           ├─instance_of─ 加兰他敏 (medication, D3-4)
+      │           ├─instance_of─ 利斯的明 (medication, D3-4)
+      │           ├─instance_of─ 石杉碱甲 (medication, D3-4)
+      │           └─part_of─ 酰胺类分类口诀 (mnemonic, D3-4) ─part_of─ 乙酰胆碱酯酶抑制剂
+      └─subclass_of─ 其他改善脑功能药 (umbrella-class, D2-3)
+                  ├─instance_of─ 倍他司汀 (medication, D3-4) ←part_of─ 倍他司汀口诀 (mnemonic, D3-4)
+                  ├─instance_of─ 丁苯酞 (medication, D3-4) ←part_of─ 丁苯酞口诀 (mnemonic, D3-4)
+                  ├─instance_of─ 尼麦角林 (medication, D3-4) ←part_of─ 尼麦角林口诀 (mnemonic, D3-4)
+                  ├─instance_of─ 胞磷胆碱钠 (medication, D3-4)
+                  └─instance_of─ 长春西汀 (medication, D3-4)
 ```
 
 > **ASCII 图的箭头方向**：层级归属（分类→上位分类、药物→分类）用 `─instance_of─`（分类间用 `─subclass_of─`）；辅助→主用 `─part_of─`（箭头朝左时用 `←part_of─`）。
@@ -904,6 +860,7 @@ edges_out:
 
 1. **无冗余空模块**：不建"分类与代表药品"和"临床用药评价"空模块。层级链直接章→节→分类→药物。
 2. **临床内容在 summary.full**：药理/适应症/禁忌/相互作用全部写入 summary.full 的【标签】格式文本。
-3. **口诀与药物同级**：口诀 level=4，与药物同级（不是更深层级），因为口诀是药物的平行学习辅助，不是层级子分类。
-4. **口诀与主知识用 `part_of` 边**（不是由药物节点发起）：口诀节点在自己的 md 文件里写 `edges_out: - target: med-betahistine, type: part_of`。理由：新增一个口诀时只需新增口诀 md，不必回去修改药物节点的 `edges_out`。这与 §5.15 的"自管 `edges_out`"原则一致。
+3. **口诀与主知识用 `part_of` 边**（不是由药物节点发起）：口诀节点在自己的 md 文件里写 `edges_out: - target: med-betahistine, type: part_of`。理由：新增一个口诀时只需新增口诀 md，不必回去修改药物节点的 `edges_out`。这与 §5.15 的"自管 `edges_out`"原则一致。
+
+> **关于 depth 自动推导**：因 depth 现在是 BFS 推导，连接方式（`part_of` vs `instance_of`）直接决定口诀与主知识的同层 / 父子关系。口诀用 `part_of` 指向药物 → 两者同 BFS 深度 → 视觉上同级，自然呈现"平行学习辅助"的关系。无需人工赋 level。
 

@@ -71,6 +71,7 @@ async function buildManifest(): Promise<void> {
         const rel = relative(contentRoot, abs).split(sep).join(posix.sep);
         entries.push({ rel, abs, depth, mtime: s.mtime });
       }
+      // 无后缀文件/目录（药事管理与法规 这类）被 content-loader 跳过，sitemap 也不收录
     }
   }
   await walk(contentRoot, 0);

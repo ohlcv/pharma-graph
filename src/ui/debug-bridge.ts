@@ -41,8 +41,6 @@ export function installDebugBridge(renderer: Renderer): void {
         id: n.id(),
         label: n.data('label'),
         essence: n.data('essence'),
-        field: n.data('field'),
-        tier: n.data('tier'),
         weight: n.data('weight'),
         shape: n.style('shape'),
         borderColor: n.style('border-color'),

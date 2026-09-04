@@ -36,12 +36,17 @@ export interface LegendAxisDescriptor {
   readonly mobileContainerId: string;
   /** CSS class applied to clickable rows. */
   readonly rowClass: string;
-  /** Data-attribute name holding the key — e.g. 'data-type', 'data-field'. */
+  /** Data-attribute name holding the key — e.g. 'data-type', 'data-depth', 'data-edge'. */
   readonly dataKey: string;
   /** Click handler dispatched with the row's key value. */
   readonly onClick: ClickHandler;
   /** Optional HTML class name applied to the row. */
   readonly rowExtraClass?: string;
+  /**
+   * Optional: only render labels whose key ≤ this value (numeric keys only).
+   * Enables depth legends to show only the levels that actually exist in the graph.
+   */
+  readonly maxKey?: number;
 }
 
 /** Tracks whether a container has had its click handler attached. */
@@ -113,14 +118,19 @@ export function buildLegend(cy: Core, descriptor: LegendAxisDescriptor): void {
   const mobile = document.getElementById(descriptor.mobileContainerId);
   if (!desktop && !mobile) return;
 
+  // Filter labels to the range that actually exists in the graph (maxKey).
+  const entries = Object.entries(descriptor.labels).filter(
+    ([k]) => descriptor.maxKey === undefined || Number(k) <= descriptor.maxKey,
+  );
+
   if (desktop && desktop.children.length === 0) {
-    desktop.innerHTML = Object.entries(descriptor.labels)
+    desktop.innerHTML = entries
       .map(([k, v]) => descriptor.desktopRow(k, v))
       .join('');
     Array.from(desktop.children).forEach((c) => decorateRowA11y(c as HTMLElement));
   }
   if (mobile && mobile.children.length === 0) {
-    mobile.innerHTML = Object.entries(descriptor.labels)
+    mobile.innerHTML = entries
       .map(([k, v]) => descriptor.mobileChip(k, v))
       .join('');
     Array.from(mobile.children).forEach((c) => decorateRowA11y(c as HTMLElement));

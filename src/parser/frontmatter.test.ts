@@ -12,8 +12,6 @@ describe('parseFrontmatter', () => {
 id: pharm-1
 label: 药剂学基础
 essence: discipline
-field: pharmacy
-tier: basic
 summary: 简介
 ---
 
@@ -25,8 +23,6 @@ summary: 简介
     expect(fm.id).toBe('pharm-1');
     expect(fm.label).toBe('药剂学基础');
     expect(fm.essence).toBe('discipline');
-    expect(fm.field).toBe('pharmacy');
-    expect(fm.tier).toBe('basic');
     expect(fm.summary).toBe('简介');
     expect(fm.body).toBe('正文段落 1。\n\n正文段落 2。');
     expect(fm.edges_out).toBeUndefined();
@@ -39,8 +35,6 @@ data:
   id: pharm-2
   label: 药理学
   essence: discipline
-  field: pharmacy
-  tier: core
   summary: 药理学介绍
   edges_out:
     - target: pharm-1

@@ -76,8 +76,6 @@
 /* ── Focus ring for keyboard-promoted divs (legend rows, chips) ──────────── */
 /* Use :focus-visible so mouse clicks don't show a ring, only Tab navigation. */
 .legend-row:focus-visible,
-.legend-field-row:focus-visible,
-.legend-tier-row:focus-visible,
 .legend-edge-row:focus-visible,
 .bs-chip:focus-visible {
   outline: none;
@@ -115,8 +113,6 @@
   /* Respect that the user still wants visible feedback: keep outlines, but
      remove the halo/glow which is itself a (subtle) motion driver. */
   .legend-row:focus-visible,
-  .legend-field-row:focus-visible,
-  .legend-tier-row:focus-visible,
   .legend-edge-row:focus-visible,
   .bs-chip:focus-visible {
     outline: 2px solid var(--accent);

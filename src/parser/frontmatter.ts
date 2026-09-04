@@ -2,7 +2,7 @@
 // Pure JS frontmatter parser, browser-compatible.
 //
 // Schema (new, post-migration):
-//   id, label, essence, field, tier, summary, location, tags, edges_out
+//   id, label, essence, summary, location, tags, edges_out
 //
 // Frontmatter may be either top-level keys or nested under a `data:` block
 // (the latter is what the migration script emits). Both shapes are accepted,
@@ -17,14 +17,8 @@ import { DEFAULT_EDGE_TYPE } from '../core/edge-types.js';
 export interface NodeMeta {
   id: string;
   label: string;
-  /** 节点本质（决定形状） */
+  /** 节点本质（决定形状 + 填充色，9 种 essence 9 种色） */
   essence?: string;
-  /** 学科领域 */
-  field?: string;
-  /** 自然分层（决定填充色） */
-  tier?: string;
-  /** 思维导图结构级别 1-6（决定边框色） */
-  level?: number;
   /** 简短摘要 */
   shortSummary?: string;
   /** 完整摘要 */
@@ -171,10 +165,6 @@ export function parseFrontmatterWithWarnings(
 
   const label = getField(fm, 'label') ?? basename(filePath);
   const essence = getField(fm, 'essence') ?? '';
-  const field   = getField(fm, 'field')   ?? '';
-  const tier    = getField(fm, 'tier');
-  const levelRaw = fm['level'];
-  const level = typeof levelRaw === 'number' ? levelRaw : undefined;
 
   const rawSummary = fm['summary'] as Record<string, unknown> | string | undefined;
   let shortSummary: string | undefined;
@@ -250,9 +240,6 @@ export function parseFrontmatterWithWarnings(
       id,
       label,
       essence,
-      field,
-      tier,
-      level,
       shortSummary,
       fullSummary,
       summary,

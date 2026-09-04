@@ -1,15 +1,25 @@
 // src/core/config.ts
-// 全局配置：节点 essence → 形状映射、level → 边框色、tier → 填充色、边类型 → 颜色/线型
+// 全局配置：节点 essence → 形状/填充色，level → 边框色，边类型 → 颜色/线型
 // 视觉配置的单一来源（Single Source of Truth）
 //
 // 视觉维度与知识语义一一对应：
 //
-//   Essence（本质）  → 形状            → 回答"这是什么"（药/病/概念/机制/口诀...）
+//   Essence（本质）  → 形状 + 填充色     → 回答"这是什么"（药/病/概念/机制/口诀...，9 种颜色一一对应）
 //   Level（层级）    → 边框色           → 回答"在纸图第几级"（1-6 级结构）
-//   Tier（层次）    → 填充色           → 回答"在药学知识哪一层"（基础→法规）
 //   EdgeType（边类型）→ 边颜色/线型      → 回答"和谁怎么连"（6 种关系家族）
 //
 // 禁止用字体、字号、字重、阴影、透明度、渐变、节点大小等额外视觉变量承载语义。
+//
+// 9 种 essence 填充色选择逻辑（柔和马卡龙 · 降饱和 + 提亮度，温柔不刺眼）：
+//   module         浅白  #fafafa — 中性骨架
+//   umbrella-class 柔黄  #fde68a — 粗分类
+//   strict-class   浅黄  #fef9c3 — 细分类
+//   medication     柔蓝  #93c5fd — 药物
+//   illness        柔红  #fca5a5 — 疾病
+//   notion         柔紫  #d8b4fe — 认知
+//   mnemonic       柔绿  #86efac — 口诀
+//   concept        柔青  #67e8f9 — 概念
+//   summary        柔粉  #f9a8d4 — 总结
 
 import cytoscape from 'cytoscape';
 import { EDGE_TYPES, type EdgeType } from './edge-types.js';
@@ -29,28 +39,28 @@ export const NODE_TYPE_SHAPE: Record<string, string> = {
 };
 
 export const NODE_TYPE_COLOR: Record<string, string> = {
-  module: '#67e8f9',               // 青色 — 结构模块
-  'strict-class': '#818cf8',       // 靛蓝 — 严格分类
-  'umbrella-class': '#a78bfa',     // 浅紫 — 伞形分类
-  concept: '#818cf8',              // 靛蓝 — 概念
-  medication: '#67e8f9',           // 青色 — 药物
-  illness: '#fca5a5',              // 浅红 — 疾病
-  notion: '#d1d5db',               // 淡灰 — 学习认知
-  mnemonic: '#fbbf24',             // 黄色 — 口诀
-  summary: '#fde68a',              // 浅黄 — 总结
+  module: '#fafafa',               // 浅白 — 结构模块骨架
+  'umbrella-class': '#fde68a',     // 柔黄 — 粗分类
+  'strict-class': '#fef9c3',       // 浅黄 — 细分类
+  concept: '#67e8f9',               // 柔青 — 概念/术语
+  medication: '#93c5fd',            // 柔蓝 — 具体药物
+  illness: '#fca5a5',              // 柔红 — 疾病/病理状态
+  notion: '#d8b4fe',               // 柔紫 — 学习认知单元
+  mnemonic: '#86efac',              // 柔绿 — 记忆口诀
+  summary: '#f9a8d4',              // 柔粉 — 总结/归纳
   default: '#94a3b8',
 };
 
 export const NODE_TYPE_COLOR_DARK: Record<string, string> = {
-  module: '#0891b2',
-  'strict-class': '#4f46e5',
-  'umbrella-class': '#7c3aed',
-  concept: '#4f46e5',
-  medication: '#0891b2',
-  illness: '#dc2626',
-  notion: '#94a3b8',
-  mnemonic: '#d97706',
-  summary: '#ca8a04',
+  module: '#e5e7eb',               // 浅白→更白
+  'umbrella-class': '#d97706',      // 柔黄→深黄
+  'strict-class': '#ca8a04',        // 浅黄→深黄
+  concept: '#0891b2',               // 柔青→深青
+  medication: '#2563eb',             // 柔蓝→深蓝
+  illness: '#dc2626',               // 柔红→深红
+  notion: '#9333ea',               // 柔紫→深紫
+  mnemonic: '#16a34a',             // 柔绿→深绿
+  summary: '#db2777',              // 柔粉→深粉
   default: '#64748b',
 };
 
@@ -68,18 +78,93 @@ export const ESSENCE_LABEL: Record<string, string> = {
   summary: '总结',
 };
 
-// ── Level → 边框色（思维导图结构级别 1-6）──────────────────────────────────────
+// ── Depth → 边框色（思维导图结构深度，0=中心节点）──────────────────────────────
+//
+// 中心节点 (depth = 0) 用专属金色作视觉锚；其他层按 HSL 色环等距取色，
+// 不依赖层数上限——图谱有几层就给几层自动分配饱和、明度区分明显的色。
 
-export const LEVEL_BORDER_COLOR: Record<number, string> = {
-  1: '#ef4444',   // 一级 — 红色
-  2: '#f97316',   // 二级 — 橙色
-  3: '#eab308',   // 三级 — 黄色
-  4: '#22c55e',   // 四级 — 绿色
-  5: '#06b6d4',   // 五级 — 青色
-  6: '#8b5cf6',   // 六级 — 紫色
-};
+/** 中心节点边框色（视觉锚，不参与光谱） */
+const CENTER_BORDER_COLOR = '#f59e0b';
+
+/** 光谱起点（depth=1 用 hue 0°/红色，往后步进 STEP_DEG） */
+const HUE_START_DEG = 0;
+const HUE_STEP_DEG = 37;
+
+/** 饱和/明度固定——只换色相，保证同层颜色一致、邻层区分明显 */
+const BORDER_SATURATION = 70;
+const BORDER_LIGHTNESS = 45;
+
+// ── Subtree → 边框色（分类子树着色，避开 depth 光谱的色相区间）────────────────
+//
+// 同一棵子树（一个分类根及其所有后代）共享一个色，子树之间色相 24° 步进。
+// 用不同的 hue 起点 + 不同 lightness / saturation，与 depth 色环区分开。
+//
+// 设计权衡：
+//   - depth 色环用 hue 0°→360° 顺时针步进 37°，纯度高
+//   - subtree 色环用 hue 200°→360°→200° 步进 24°，偏冷蓝紫青绿
+//   - 子树比 depth 更鲜亮（lightness 50 vs 45），更容易在密集区域辨识
+//   - 不依赖地图固定表，subtree 数量超出步进会自动循环
+
+/** Subtree 色起点（depth 起点是 0°，错开 200° 避免重叠） */
+const SUBTREE_HUE_START_DEG = 200;
+/** Subtree 色相步进（比 depth 小，使多棵子树之间也分布均匀） */
+const SUBTREE_HUE_STEP_DEG = 24;
+const SUBTREE_BORDER_SATURATION = 80;
+const SUBTREE_BORDER_LIGHTNESS = 50;
+
+/**
+ * 给定子树索引返回边框色。索引用分类根的访问顺序（0, 1, 2, ...）。
+ * 超过 360° 步进范围自动循环。
+ */
+export function getSubtreeBorderColor(index: number): string {
+  const hue = (SUBTREE_HUE_START_DEG + index * SUBTREE_HUE_STEP_DEG) % 360;
+  return hslToHex(hue, SUBTREE_BORDER_SATURATION, SUBTREE_BORDER_LIGHTNESS);
+}
+
+/**
+ * 给定 depth 返回边框色。
+ *   depth 0      → 金色（中心节点）
+ *   depth ≥ 1    → HSL 色环上等距取色（hue 0°/37°/74°/...）
+ *
+ * 任意深度都能拿到颜色，无需预先定义表。
+ */
+export function getDepthBorderColor(depth: number): string {
+  if (depth <= 0) return CENTER_BORDER_COLOR;
+  const hue = (HUE_START_DEG + (depth - 1) * HUE_STEP_DEG) % 360;
+  return hslToHex(hue, BORDER_SATURATION, BORDER_LIGHTNESS);
+}
+
+/** HSL → #RRGGBB（仅用于边框色——饱和/明度固定，转换是纯数学） */
+function hslToHex(h: number, s: number, l: number): string {
+  const sat = s / 100;
+  const light = l / 100;
+  const c = (1 - Math.abs(2 * light - 1)) * sat;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = light - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) { r = c; g = x; }
+  else if (h < 120) { r = x; g = c; }
+  else if (h < 180) { g = c; b = x; }
+  else if (h < 240) { g = x; b = c; }
+  else if (h < 300) { r = x; b = c; }
+  else { r = c; b = x; }
+  const toHex = (v: number) =>
+    Math.round((v + m) * 255).toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+/**
+ * 旧兼容：层级 0-6 的静态映射（供 legend / detail-panel 在不确定深度时 fallback）。
+ * 保留导出避免破坏现有导入，但新代码请用 getDepthBorderColor()。
+ */
+export const LEVEL_BORDER_COLOR: Record<number, string> = (() => {
+  const map: Record<number, string> = { 0: CENTER_BORDER_COLOR };
+  for (let d = 1; d <= 6; d++) map[d] = getDepthBorderColor(d);
+  return map;
+})();
 
 export const LEVEL_LABEL: Record<number, string> = {
+  0: '中心',
   1: '一级',
   2: '二级',
   3: '三级',
@@ -87,56 +172,6 @@ export const LEVEL_LABEL: Record<number, string> = {
   5: '五级',
   6: '六级',
 };
-
-// ── Field → 学科领域边框色 ───────────────────────────────────────────────────
-// field 回答"属于哪门学科"——边框色区分学科归属
-// 注意：level 也决定边框色，两者通过不同优先级叠加：
-//   level → border-color（主边框色）
-//   field → 保留用于详情面板/图例，不再直接覆盖边框色
-
-export const FIELD_COLOR: Record<string, string> = {
-  pharmaceutics: '#fb923c', // 橙 — 药剂学
-  pharmacokinetics: '#fbbf24', // 黄 — 药代动力学
-  medicinal_chemistry: '#34d399', // 绿 — 药物化学
-  pharmacology: '#a78bfa', // 紫 — 药理学
-  toxicology: '#7c3aed', // 深紫 — 毒理学
-  biopharmaceutics: '#fbbf24', // 黄 — 生物药剂学
-  clinical_pharmacy: '#94a3b8', // 灰蓝 — 临床药学
-  pharmacy_service: '#818cf8', // 靛蓝 — 药学服务
-};
-
-export const FIELD_LABEL: Record<string, string> = {
-  pharmaceutics: '药剂学',
-  pharmacokinetics: '药代动力学',
-  medicinal_chemistry: '药物化学',
-  pharmacology: '药理学',
-  toxicology: '毒理学',
-  biopharmaceutics: '生物药剂学',
-  clinical_pharmacy: '临床药学',
-  pharmacy_service: '药学服务',
-};
-
-// ── Tier → 填充色（知识层级）─────────────────────────────────────────────────
-// tier 回答"在药学知识世界哪一层"——填充色区分知识自然层级
-
-export const NODE_TIER_STYLE: Record<string, { bgColor: string }> = {
-  basic: { bgColor: '#cbd5e1' }, // 灰蓝 — 基础层
-  drug: { bgColor: '#93c5fd' }, // 浅蓝 — 药物层
-  disease: { bgColor: '#fca5a5' }, // 浅红 — 疾病层
-  management: { bgColor: '#fde68a' }, // 浅黄 — 管理层
-  service: { bgColor: '#6ee7b7' }, // 浅青 — 服务层
-  legal: { bgColor: '#d8b4fe' }, // 浅紫 — 法规层
-};
-
-export const TIER_LABEL: Record<string, string> = {
-  basic: '基础层',
-  drug: '药物层',
-  disease: '疾病层',
-  management: '管理层',
-  service: '服务层',
-  legal: '法规层',
-};
-
 // ── Edge type → visual style ────────────────────────────────────────────────
 // 5 种 OWL/RDF 风格边类型，每种对应一种关系家族。
 // 具体药学语义（治疗/导致/抑制...）放进 reason，不再各占一个 type。

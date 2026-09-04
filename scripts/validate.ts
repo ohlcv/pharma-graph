@@ -5,9 +5,6 @@ import { scanContentDir } from "../src/parser/content-manager.js";
 import { parseFrontmatterWithWarnings } from "../src/parser/frontmatter.js";
 import {
   isValidEssence,
-  isValidField,
-  isValidTier,
-  isValidLevel,
   isValidEdgeType,
 } from "../src/parser/schema.js";
 import path from "path";
@@ -62,7 +59,7 @@ export async function validate(): Promise<void> {
     // Surface parser-emitted warnings so the CLI output mirrors what the
     // browser sees (issue #14). The parser decides *structural* problems
     // (missing target, non-object edge); this script keeps *value-list*
-    // problems (essence/field/tier/edge-type not in the whitelist).
+    // problems (essence/field/edge-type not in the whitelist).
     for (const w of warnings) {
       errors.push({
         file: relPath,
@@ -81,36 +78,6 @@ export async function validate(): Promise<void> {
         file: relPath,
         field: 'essence',
         message: `essence 值 "${fm.essence}" 不在已知类型列表中`,
-        severity: 'warning',
-      });
-    }
-
-    // Validate field field
-    if (fm.field && !isValidField(fm.field)) {
-      errors.push({
-        file: relPath,
-        field: 'field',
-        message: `field 值 "${fm.field}" 不在已知类型列表中`,
-        severity: 'warning',
-      });
-    }
-
-    // Validate tier field
-    if (fm.tier && !isValidTier(fm.tier)) {
-      errors.push({
-        file: relPath,
-        field: 'tier',
-        message: `tier 值 "${fm.tier}" 不在已知层级列表中`,
-        severity: 'warning',
-      });
-    }
-
-    // Validate level field (must be 1-6)
-    if (fm.level !== undefined && !isValidLevel(fm.level)) {
-      errors.push({
-        file: relPath,
-        field: 'level',
-        message: `level 值 "${fm.level}" 不在有效范围 (1-6)`,
         severity: 'warning',
       });
     }

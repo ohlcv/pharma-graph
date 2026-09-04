@@ -15,9 +15,9 @@ export interface NodeData {
   id: string;
   label: string;
   essence?: string;  // 节点本质：module/strict-class/umbrella-class/concept/medication/illness/notion/mnemonic/summary/table/note
-  field?: string;   // 学科归属：pharmaceutics/pharmacology/medicinal_chemistry/...
-  tier?: string;    // 知识层次：basic/drug/disease/management/service/legal
-  level?: number;   // 思维导图结构级别 1-6（决定边框色）
+  depth?: number;   // 思维导图深度级别（从中心节点往下第 N 层，0=中心节点）
+  /** 节点所属的分类子树根 ID。若为空则该节点不属于任何 subtree（使用 depth 色）。 */
+  subtreeRoot?: string;
   /** 简短摘要 */
   shortSummary?: string;
   /** 完整摘要 */
