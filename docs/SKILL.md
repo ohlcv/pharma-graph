@@ -121,7 +121,8 @@ zip -r pharma-graph-$(date +%Y%m%d).zip . \
 | strict-class | 严格分类（细） | 化学/药理亚类（金制剂、磺胺类） |
 | umbrella-class | 伞形分类（粗） | 临床用途/机制聚类（免疫抑制剂、抗疟药） |
 | concept | 概念 | 定义明确的术语 |
-| medication | 药物 | 具体药名 |
+| medication | 重点药（详细讲解） | 教材有药理卡片的药物 |
+| drug | 普通药（仅提名） | 仅在文中提名的药物 |
 | illness | 疾病 | 可治疗/禁忌的疾病 |
 | notion | 经验认知 | 临床提示、易混点 |
 | mnemonic | 口诀 | 顺口溜 |

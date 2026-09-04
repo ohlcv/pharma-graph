@@ -10,10 +10,12 @@
 
 ## 〇、设计理念
 
-本项目采用 OWL/RDF 风格的 **5 种边关系类型** + **9 种节点本质** 的本体建模：
+本项目采用 OWL/RDF 风格的 **5 种边关系类型** + **10 种节点本质** 的本体建模：
 
-- **节点本质**：module / strict-class（五边形） / umbrella-class（六边形） / medication / illness / mnemonic / summary / notion / concept（正方形）
+- **节点本质**：module / strict-class（五边形） / umbrella-class（六边形） / medication（重点药） / drug（普通药） / illness / mnemonic / summary / notion / concept（正方形）
 - **边关系**：`subclass_of` / `part_of` / `instance_of` / `disjoint_with` / `equivalent_to`
+
+> **`medication` vs `drug`**：均为椭圆。`medication` = 教材中**详细讲解的药物**（有完整药理卡片），柔橙填充；`drug` = 教材中**仅提名的药物**（只点名、未详讲），柔蓝填充。区分依据是教材里这张药**是不是被"画像"过**。
 
 详细语义见下文「edges_out.type — 边类型」章节。
 
@@ -49,7 +51,8 @@
 | `sec-` | 节入口 | `module` | `sec-antigout-y2-02-03` |
 | `strict-` | 严格分类（细分类） | `strict-class` | `strict-benzo-y2-01-01` |
 | `umbrella-` | 伞形分类（粗分类） | `umbrella-class` | `umbrella-benzo-y2-01-01` |
-| `med-` | 药物节点 | `medication` | `med-diazepam-y2-01-01` |
+| `med-` | 重点药节点（详细讲解） | `medication` | `med-diazepam-y2-01-01` |
+| `drug-` | 普通药节点（仅提名） | `drug` | `drug-mention-y2-01-01` |
 | `memo-` | 口诀节点 | `mnemonic` | `memo-benzo-y2-01-01` |
 | `sum-` | 总结节点 | `summary` | `sum-benzo-y2-01` |
 | `conc-` | 概念节点 | `concept` | `conc-bioavailability-y1-04` |
@@ -78,7 +81,8 @@
 | `strict-class` | 严格分类（细分类） | 五边形 | 按药理/化学严格标准划分的分类（亚类、分类依据、分组节点） |
 | `umbrella-class` | 伞形分类（粗分类） | 六边形 | 按临床用途、功能、机制、酶划分的聚类集合 |
 | `concept` | 概念/术语 | 正方形 | 教材定义明确、具有边界的知识概念 |
-| `medication` | 具体药物/制剂 | 椭圆 | 通用名、具体制剂、代表药物 |
+| `medication` | 重点药（详细讲解） | 椭圆 | 教材中有完整药理卡片的药物：药理作用、机制、用法、不良反应等 |
+| `drug` | 普通药（仅提名） | 椭圆 | 教材中只点名提及、未详细讲解的药物 |
 | `illness` | 疾病/病理状态/综合征 | 菱形 | 可被治疗、禁忌、导致或独立讨论的疾病/状态 |
 | `notion` | 学习性认知单元 | tag | 经验性认识、临床提示、易混概念、经验归纳 |
 | `mnemonic` | 记忆口诀 | vee | 口诀、首字母记忆、顺口溜、分类速记 |
