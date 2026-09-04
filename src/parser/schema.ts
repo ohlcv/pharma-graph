@@ -15,6 +15,7 @@ export const VALID_ESSENCE: readonly string[] = [
   'umbrella-class',  // 伞形分类（粗分类）— hexagon
   'concept',         // 概念/术语 — rectangle（最接近正方形）
   'medication',      // 具体药物/制剂 — ellipse
+  'drug',            // 重点药物 — ellipse（更醒目柔橙色）
   'illness',         // 疾病/病理状态 — diamond
   'notion',          // 学习性认知单元 — tag
   'mnemonic',        // 记忆口诀 — vee

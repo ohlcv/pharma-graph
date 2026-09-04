@@ -32,6 +32,7 @@ export const NODE_TYPE_SHAPE: Record<string, string> = {
   'umbrella-class': 'hexagon',        // 伞形分类（粗分类）— 六边形
   concept: 'rectangle',               // 概念/术语 — 正方形（rectangle 是 cytoscape 中最接近正方形的形状）
   medication: 'ellipse',              // 具体药物/制剂 — 椭圆
+  drug: 'ellipse',                    // 重点药物 — 椭圆（与 medication 同形状，柔橙填充以示强调）
   illness: 'diamond',                 // 疾病/病理状态 — 菱形
   notion: 'tag',                      // 学习性认知单元 — 标签形
   mnemonic: 'vee',                    // 记忆口诀 — V形
@@ -44,6 +45,7 @@ export const NODE_TYPE_COLOR: Record<string, string> = {
   'strict-class': '#fef9c3',       // 浅黄 — 细分类
   concept: '#67e8f9',               // 柔青 — 概念/术语
   medication: '#93c5fd',            // 柔蓝 — 具体药物
+  drug: '#fb923c',                   // 柔橙 — 重点药物（与 summary 的柔粉 #f9a8d4 区分）
   illness: '#fca5a5',              // 柔红 — 疾病/病理状态
   notion: '#d8b4fe',               // 柔紫 — 学习认知单元
   mnemonic: '#86efac',              // 柔绿 — 记忆口诀
@@ -57,6 +59,7 @@ export const NODE_TYPE_COLOR_DARK: Record<string, string> = {
   'strict-class': '#ca8a04',        // 浅黄→深黄
   concept: '#0891b2',               // 柔青→深青
   medication: '#2563eb',             // 柔蓝→深蓝
+  drug: '#ea580c',                   // 柔橙→深橙
   illness: '#dc2626',               // 柔红→深红
   notion: '#9333ea',               // 柔紫→深紫
   mnemonic: '#16a34a',             // 柔绿→深绿
@@ -72,6 +75,7 @@ export const ESSENCE_LABEL: Record<string, string> = {
   'umbrella-class': '粗分类',
   concept: '概念',
   medication: '药物',
+  drug: '重点药',
   illness: '疾病',
   notion: '认知',
   mnemonic: '口诀',

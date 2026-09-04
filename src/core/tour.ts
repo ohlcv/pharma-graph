@@ -394,8 +394,8 @@ registerStrategy({
     const noPrereq: string[] = [];
     inDegree.forEach((deg, id) => { if (deg === 0) noPrereq.push(id); });
 
-    // essence 顺序：基础概念/分类早于具体药物，药物早于疾病/服务/总结
-    // 走「分类 → 概念 → 药物 → 疾病 → 口诀 → 总结」的自然学习顺序
+    // essence 顺序：基础概念/分类早于具体药物，重点药物跟随一般药物
+    // 走「分类 → 概念 → 药物 → 重点药 → 疾病 → 口诀 → 总结」的自然学习顺序
     const ESSENCE_ORDER: Record<string, number> = {
       module: 0,
       'umbrella-class': 1,
@@ -403,9 +403,10 @@ registerStrategy({
       concept: 3,
       notion: 4,
       medication: 5,
-      illness: 6,
-      mnemonic: 7,
-      summary: 8,
+      drug: 6,
+      illness: 7,
+      mnemonic: 8,
+      summary: 9,
     };
     const getEssenceOrder = (id: string): number =>
       ESSENCE_ORDER[cy.getElementById(id).data('essence') as string] ?? 99;

@@ -5,7 +5,7 @@ description: "将纸质思维导图照片（或扫描件）转录为符合药学
 # Pharma Mindmap Transcribe — 纸质思维导图 → 节点 md
 
 把纸质思维导图照片忠实转录为符合规范的独立节点 `.md` 文件。规范文档是权威来源，开始任何转录前必须读取：
-- `docs/frontmatter.md` — frontmatter 字段定义、9 种 essence（形状+颜色）、5 种边、视觉编码规范（权威）
+- `docs/frontmatter.md` — frontmatter 字段定义、10 种 essence（形状+颜色）、5 种边、视觉编码规范（权威）
 - `docs/RULES.md` — 节点构建规则：命名（含文件名 = label）、summary 填写（含 §10【标签】格式）、tags 抽取、边方向铁律、转录规则、口诀双轨
 
 > **本规范与 RULES.md 冲突时，以 RULES.md 为准**。RULES §10（新）和 §九（新）已包含本 SKILL 未列出的硬性规定。
