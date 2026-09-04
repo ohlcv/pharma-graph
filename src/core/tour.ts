@@ -55,6 +55,8 @@ export interface TourStrategyDef {
   id: string;
   label: string;
   buildSequence: (cy: cytoscape.Core) => string[];
+  /** 可选钩子集合；详见 StrategyHooks 注释。 */
+  hooks?: StrategyHooks;
 }
 
 /**
@@ -91,6 +93,16 @@ export interface StrategyHooks {
    * 目前只在渲染侧用，引擎本身是无状态的。
    */
   direction?: 'forward' | 'reverse';
+
+  /**
+   * 在 seq 走完后、引擎决定是否重启前调用。
+   * 返回 true（默认）走引擎内置的 3 次硬上限循环；
+   * 返回 false 表示该策略一次性跑完即可（如 topo-prereq 拓扑序，
+   * 第二次遍历和第一次完全一样，循环没意义）。
+   *
+   * 引擎 3 次硬上限始终生效，策略不能调大。
+   */
+  shouldRestart?: (ctx: { attemptCount: number; maxAttempts: number; cy: cytoscape.Core }) => boolean;
 }
 
 const _strategies: TourStrategyDef[] = [];
@@ -146,6 +158,47 @@ function buildLocationFallbackSeq(cy: cytoscape.Core, seen: ReadonlySet<string>)
     })
     .filter((n) => !seen.has(n.id()))
     .map((n) => n.id());
+}
+
+/**
+ * 序列归一化：保证 seq 非空 + 无重复 + 保留首次出现顺序。
+ *
+ * - 若 seq 为空 → fallback 到"全图节点打乱后"的 id 列表
+ * - 否则就只去重，不改顺序
+ *
+ * 用途：TourEngine 启动 / 重启时调用，避免三处各自手写 fallback + dedupe。
+ *
+ * @param cy  图实例
+ * @param seq 策略返回的原始序列
+ * @returns   归一化后的序列（保证非空、无重复、相对顺序不变）
+ */
+function normalizeSeq(cy: cytoscape.Core, seq: string[]): string[] {
+  let result = seq;
+  if (result.length === 0) {
+    const allNodes = cy.nodes().not('.layer-parent').toArray();
+    shuffleInPlace(allNodes);
+    result = allNodes.map((n) => n.id());
+  }
+  const seen = new Set<string>();
+  return result.filter((id) => (seen.has(id) ? false : (seen.add(id), true)));
+}
+
+/**
+ * 引擎硬上限：任何策略重启次数都不能超过这个值。
+ * `shouldRestart` 钩子可以让策略主动选择更早停止，但不能让策略调大上限。
+ */
+const MAX_RESTART_ATTEMPTS = 3;
+
+/**
+ * 调用策略的 `shouldRestart` 钩子（如果有），决定当前是否要再走一轮。
+ * 默认 true（沿用原行为：infinite mode 下一直循环到 3 次硬上限）。
+ */
+function strategyAllowsRestart(
+  strategy: TourStrategyDef,
+  attemptCount: number,
+  cy: cytoscape.Core,
+): boolean {
+  return strategy.hooks?.shouldRestart?.({ attemptCount, maxAttempts: MAX_RESTART_ATTEMPTS, cy }) ?? true;
 }
 
 function shuffleInPlace<T>(arr: T[]): void {
@@ -298,6 +351,11 @@ registerStrategy({
 registerStrategy({
   id: 'topo-prereq',
   label: '层级依赖（广度优先）',
+  // 拓扑序跑一次就完整覆盖全部节点，再循环一遍得到相同序列，毫无意义。
+  // 因此显式拒绝重启——引擎收到 false 后会立即以 'no-more-restarts' 收束。
+  hooks: {
+    shouldRestart: () => false,
+  },
   buildSequence(cy) {
     const nodes = cy.nodes().not('.layer-parent');
     const edges = cy.edges();
@@ -532,20 +590,13 @@ export class TourEngine {
     this._hooks = strategy as Partial<StrategyHooks>;
 
     // Build full sequence
-    this.seq = strategy.buildSequence(this.cy);
-    // If seq is empty (no roots found), fall back to all non-parent nodes shuffled
-    if (this.seq.length === 0) {
-      const allNodes = this.cy.nodes().not('.layer-parent').toArray();
-      shuffleInPlace(allNodes);
-      this.seq = allNodes.map((n) => n.id());
-    }
+    this.seq = normalizeSeq(this.cy, strategy.buildSequence(this.cy));
     // If a rootId was specified and not in seq, prepend it
     if (rootId && !this.seq.includes(rootId)) {
       this.seq = [rootId, ...this.seq.filter((id) => id !== rootId)];
     }
-    // Remove duplicates while preserving order
-    const seen = new Set<string>();
-    this.seq = this.seq.filter((id) => { if (seen.has(id)) return false; seen.add(id); return true; });
+    // normalizeSeq 已经做了 dedupe，这里再保险一道（rootId prepend 可能引入重复）
+    this.seq = normalizeSeq(this.cy, this.seq);
 
     this.seqIndex = 1; // seq[0] is visited below; visitNext should start from seq[1]
     this.currentStep = 1;
@@ -750,16 +801,12 @@ export class TourEngine {
         this._restartAttempts++;
         // 策略钩子：通知策略本次重启（策略可在这里记录日志或更新内部状态）
         this._hooks.onRestartAttempt?.(this._restartAttempts, this.cy);
-        if (this._restartAttempts < 3) {
+        if (
+          this._restartAttempts < MAX_RESTART_ATTEMPTS &&
+          strategyAllowsRestart(getStrategy(this.getStrategyId()), this._restartAttempts, this.cy)
+        ) {
           const strategy = getStrategy(this.getStrategyId());
-          this.seq = strategy.buildSequence(this.cy);
-          if (this.seq.length === 0) {
-            const allNodes = this.cy.nodes().not('.layer-parent').toArray();
-            shuffleInPlace(allNodes);
-            this.seq = allNodes.map((n) => n.id());
-          }
-          const seen = new Set<string>();
-          this.seq = this.seq.filter((id) => { if (seen.has(id)) return false; seen.add(id); return true; });
+          this.seq = normalizeSeq(this.cy, strategy.buildSequence(this.cy));
           this.seqIndex = 0;
           // 策略钩子：一轮遍历结束（即将开始新一轮）
           this._hooks.onCycleEnd?.(this.cy);
