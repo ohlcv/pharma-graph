@@ -199,6 +199,15 @@ function normalizeSeq(cy: cytoscape.Core, seq: string[]): string[] {
  */
 const MAX_RESTART_ATTEMPTS = 3;
 
+/** 默认漫游间隔（毫秒） */
+const DEFAULT_INTERVAL_MS = 3000;
+
+/** 无限漫游模式的 maxDepth 标记值（< 0 表示无限） */
+const INFINITE_DEPTH = -1;
+
+/** 安全循环上限，防止无限循环 */
+const LOOP_SAFETY_LIMIT = 20000;
+
 /**
  * 调用策略的 `shouldRestart` 钩子（如果有），决定当前是否要再走一轮。
  * 默认 true（沿用原行为：infinite mode 下一直循环到 3 次硬上限）。
@@ -218,53 +227,21 @@ function shuffleInPlace<T>(arr: T[]): void {
   }
 }
 
-function getLocationBook(node: cytoscape.NodeSingular): string {
+function getLocationField(node: cytoscape.NodeSingular, field: string): string {
   const loc = node.data('location');
   if (typeof loc === 'object' && loc !== null) {
-    return (loc as Record<string, unknown>)['book'] as string ?? '';
+    return (loc as Record<string, unknown>)[field] as string ?? '';
   }
   return '';
 }
 
-function getLocationChapter(node: cytoscape.NodeSingular): string {
-  const loc = node.data('location');
-  if (typeof loc === 'object' && loc !== null) {
-    return (loc as Record<string, unknown>)['chapter'] as string ?? '';
-  }
-  return '';
-}
-
-function getLocationPart(node: cytoscape.NodeSingular): string {
-  const loc = node.data('location');
-  if (typeof loc === 'object' && loc !== null) {
-    return (loc as Record<string, unknown>)['part'] as string ?? '';
-  }
-  return '';
-}
-
-function getLocationSection(node: cytoscape.NodeSingular): string {
-  const loc = node.data('location');
-  if (typeof loc === 'object' && loc !== null) {
-    return (loc as Record<string, unknown>)['section'] as string ?? '';
-  }
-  return '';
-}
-
-function getLocationSubsection(node: cytoscape.NodeSingular): string {
-  const loc = node.data('location');
-  if (typeof loc === 'object' && loc !== null) {
-    return (loc as Record<string, unknown>)['subsection'] as string ?? '';
-  }
-  return '';
-}
-
-function getLocationItem(node: cytoscape.NodeSingular): string {
-  const loc = node.data('location');
-  if (typeof loc === 'object' && loc !== null) {
-    return (loc as Record<string, unknown>)['item'] as string ?? '';
-  }
-  return '';
-}
+// 便捷包装器，保持 API 兼容性
+const getLocationBook      = (n: cytoscape.NodeSingular) => getLocationField(n, 'book');
+const getLocationChapter   = (n: cytoscape.NodeSingular) => getLocationField(n, 'chapter');
+const getLocationPart      = (n: cytoscape.NodeSingular) => getLocationField(n, 'part');
+const getLocationSection   = (n: cytoscape.NodeSingular) => getLocationField(n, 'section');
+const getLocationSubsection= (n: cytoscape.NodeSingular) => getLocationField(n, 'subsection');
+const getLocationItem      = (n: cytoscape.NodeSingular) => getLocationField(n, 'item');
 
 // 汉字数字转阿拉伯数字
 const CN_DIGIT_MAP: Record<string, number> = {
@@ -530,8 +507,8 @@ export const ALL_STRATEGIES: readonly TourStrategyDef[] = listStrategies();
 
 export class TourEngine {
   private cy: cytoscape.Core;
-  private interval = 3000;
-  private maxDepth = -1;
+  private interval = DEFAULT_INTERVAL_MS;
+  private maxDepth = INFINITE_DEPTH;
   private timer: ReturnType<typeof setTimeout> | undefined = undefined;
   private paused = false;
   private stopped = false;
@@ -583,8 +560,8 @@ export class TourEngine {
     this.stop();
     this.paused = false;
     this.stopped = false;
-    this.interval = options.interval ?? 3000;
-    this.maxDepth = options.maxDepth ?? -1;
+    this.interval = options.interval ?? DEFAULT_INTERVAL_MS;
+    this.maxDepth = options.maxDepth ?? INFINITE_DEPTH;
     this.onStep = options.onStep;
     this.onStepAfterCenter = options.onStepAfterCenter;
     this.onComplete = options.onComplete;
@@ -627,11 +604,13 @@ export class TourEngine {
     if (this.stopped) return;
     if (this.timer) { clearTimeout(this.timer); this.timer = undefined; }
     // Mark as paused so the animate-complete callback does NOT auto-schedule
-    const wasAlreadyPaused = this.paused;
+    // the next step. Emit onPause unconditionally so the controller's
+    // play/pause icon stays in sync across consecutive prev/next calls; the
+    // controller uses the engine's real paused state (not its own cached
+    // flag) to decide resume vs pause.
     this.paused = true;
     this.visitNext();
-    // If the tour was already running (not paused), notify UI of pause
-    if (!wasAlreadyPaused) this.onPause?.();
+    this.onPause?.();
   }
 
   /** Go to previous node in sequence */
@@ -639,14 +618,12 @@ export class TourEngine {
     if (this.stopped) return;
     if (this.timer) { clearTimeout(this.timer); this.timer = undefined; }
     if (this.seqIndex <= 0) return;
-    // Mark as paused so the animate-complete callback does NOT auto-schedule
-    const wasAlreadyPaused = this.paused;
+    // Same rationale as next(): always emit onPause.
     this.paused = true;
     this.seqIndex -= 2; // back up two: one to undo the last visitNext increment, one more to go back
     if (this.seqIndex < 0) this.seqIndex = 0;
     this.visitNext();
-    // If the tour was already running (not paused), notify UI of pause
-    if (!wasAlreadyPaused) this.onPause?.();
+    this.onPause?.();
   }
 
   pause(): void {
@@ -757,6 +734,9 @@ export class TourEngine {
         return `  ${String(i + 1).padStart(3)}. ${label}${loc ? `  [${loc}]` : ''}`;
       });
 
+      // 输出到控制台便于调试
+      console.log(`[Tour Preview] ${s.name} (${seq.length} nodes):`);
+      lines.forEach((line) => console.log(line));
     });
   }
 
@@ -785,7 +765,7 @@ export class TourEngine {
     let loopSafety = 0;
     while (true) {
       loopSafety++;
-      if (loopSafety > 20000) { this.stopped = true; return; }
+      if (loopSafety > LOOP_SAFETY_LIMIT) { this.stopped = true; return; }
       while (this.seqIndex < this.seq.length) {
         const id = this.seq[this.seqIndex];
         const node = this.cy.getElementById(id);

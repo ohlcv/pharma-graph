@@ -92,10 +92,17 @@ export class TourController {
 
   togglePause(): void {
     if (!this.engine) return;
-    if (this.paused) this.engine.resume();
-    else             this.engine.pause();
-    this.paused = !this.paused;
-    this.setRunningUI();
+    // Read the engine's real paused state rather than our cached flag.
+    // Previously we toggled `this.paused` based on its own previous value,
+    // which could desync from the engine if prev/next were invoked while
+    // paused (the engine's onPause was skipped on the 2nd call, leaving
+    // the controller stale). Reading `isPaused()` here keeps the source
+    // of truth on the engine — Bug: resume-after-paused-prev was a no-op.
+    if (this.engine.isPaused()) this.engine.resume();
+    else                        this.engine.pause();
+    // The engine fires onPause/onResume synchronously, which updates
+    // `this.paused` + setRunningUI() via onEnginePause/Resume. No need
+    // to mutate flags here.
   }
 
   /**

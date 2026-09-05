@@ -276,3 +276,45 @@ describe('TourEngine shouldRestart hook (issue #7)', () => {
     unregisterStrategy('test-no-restart');
   });
 });
+
+// ── Bug: prev()/next() must always emit onPause so the controller's play/pause
+// icon and togglePause() stay in sync even on consecutive calls while already
+// paused. Previously the second consecutive call skipped onPause because the
+// engine's internal `wasAlreadyPaused` short-circuited, leaving the
+// controller's `paused` flag stale and causing Space-bar resume to no-op.
+
+import { vi } from 'vitest';
+describe('TourEngine prev/next pause-emit contract', () => {
+  it('next() always fires onPause, even when already paused', () => {
+    const cy = makeCy();
+    const engine = new TourEngine(cy);
+    const onPause = vi.fn();
+    (engine as unknown as { onPause: () => void }).onPause = onPause;
+    (engine as unknown as { paused: boolean }).paused = false;
+    (engine as unknown as { seqIndex: number }).seqIndex = 0;
+    (engine as unknown as { seq: string[] }).seq = ['a', 'b'];
+    // First call while running (paused=false) — onPause fires once.
+    engine.next();
+    expect(onPause).toHaveBeenCalledTimes(1);
+    // Second call while still paused (no auto-reset) — onPause MUST fire
+    // again so the controller's play/pause icon stays accurate.
+    engine.next();
+    expect(onPause).toHaveBeenCalledTimes(2);
+    engine.stop();
+  });
+
+  it('prev() always fires onPause (when seqIndex > 0)', () => {
+    const cy = makeCy();
+    const engine = new TourEngine(cy);
+    const onPause = vi.fn();
+    (engine as unknown as { onPause: () => void }).onPause = onPause;
+    (engine as unknown as { paused: boolean }).paused = false;
+    (engine as unknown as { seqIndex: number }).seqIndex = 2;
+    (engine as unknown as { seq: string[] }).seq = ['a', 'b', 'c'];
+    engine.prev();
+    expect(onPause).toHaveBeenCalledTimes(1);
+    engine.prev();
+    expect(onPause).toHaveBeenCalledTimes(2);
+    engine.stop();
+  });
+});

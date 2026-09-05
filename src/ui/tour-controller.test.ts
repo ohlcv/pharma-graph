@@ -93,6 +93,7 @@ type PrivateControllerFields = {
   onEnginePause: () => void;
   onEngineResume: () => void;
   onTourKey: (e: KeyboardEvent) => void;
+  togglePause: () => void;
 };
 function poke(c: TourController): PrivateControllerFields {
   return c as unknown as PrivateControllerFields;
@@ -371,5 +372,46 @@ describe('TourController — keyboard shortcuts', () => {
     p.onTourKey(ev);
     expect(engine.pause).not.toHaveBeenCalled();
     expect(ev.defaultPrevented).toBe(false);
+  });
+
+  // ── Bug: togglePause must read engine.isPaused(), not its own stale flag ──
+
+  it('togglePause resumes when engine.isPaused() is true even if controller.paused is false (stale-state recovery)', () => {
+    // Simulates the desync path: user paused via prev/next while already
+    // paused, onPause was skipped → controller.paused stayed false but
+    // engine.paused is true. The previous togglePause read controller.paused
+    // and called engine.pause() — which short-circuited (already paused) so
+    // resume never happened. Now we read engine.isPaused().
+    const c = makeController();
+    const p = poke(c);
+    p.running = true;
+    p.paused = false; // stale — should be true but isn't
+    const engine = {
+      isRunning: () => false,
+      isPaused: () => true, // truth: engine IS paused
+      pause: vi.fn(),
+      resume: vi.fn(),
+    };
+    p.engine = engine as unknown as typeof p.engine;
+    p.togglePause();
+    expect(engine.resume).toHaveBeenCalled();
+    expect(engine.pause).not.toHaveBeenCalled();
+  });
+
+  it('togglePause pauses when engine.isPaused() is false even if controller.paused is true (stale-state recovery)', () => {
+    const c = makeController();
+    const p = poke(c);
+    p.running = true;
+    p.paused = true; // stale — engine is actually running
+    const engine = {
+      isRunning: () => true,
+      isPaused: () => false,
+      pause: vi.fn(),
+      resume: vi.fn(),
+    };
+    p.engine = engine as unknown as typeof p.engine;
+    p.togglePause();
+    expect(engine.pause).toHaveBeenCalled();
+    expect(engine.resume).not.toHaveBeenCalled();
   });
 });
