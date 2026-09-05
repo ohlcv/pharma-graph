@@ -19,6 +19,7 @@ import {
   EDGE_TYPE_LABEL,
 } from '../core/config.js';
 import { buildLegend } from './legend-factory.js';
+import { updateStats, syncBottomSheetStats } from './graph-stats.js';
 
 // ── Active filter state ────────────────────────────────────────────────────────
 
@@ -202,6 +203,8 @@ export function highlightEssenceFilter(essence: string, highlight: HighlightEngi
     // Toggle off: clear filter and reset all nodes
     clearAllFilters();
     highlight.reset();
+    updateStats(highlight.getCy());
+    syncBottomSheetStats(highlight.getCy());
     return;
   }
   
@@ -216,6 +219,9 @@ export function highlightEssenceFilter(essence: string, highlight: HighlightEngi
   staticEls('.bs-chip[data-type]').forEach((el) => {
     if (el.dataset.type === essence) el.classList.add('active');
   });
+
+  updateStats(highlight.getCy());
+  syncBottomSheetStats(highlight.getCy());
 }
 
 // Keep legacy name for action-handlers compatibility
@@ -226,6 +232,8 @@ export function highlightEdgeTypeFilter(edge: string, highlight: HighlightEngine
   if (activeEdgeFilter === edge) {
     clearAllFilters();
     highlight.reset();
+    updateStats(highlight.getCy());
+    syncBottomSheetStats(highlight.getCy());
     return;
   }
   clearAllFilters();
@@ -233,6 +241,8 @@ export function highlightEdgeTypeFilter(edge: string, highlight: HighlightEngine
   highlight.highlightEdgeType(edge);
   activateAxis('.legend-edge-row[data-edge]', 'data-edge', edge);
   activateAxis('.bs-chip[data-edge]', 'data-edge', edge);
+  updateStats(highlight.getCy());
+  syncBottomSheetStats(highlight.getCy());
 }
 
 function activateAxis(selector: string, attr: string, key: string): void {

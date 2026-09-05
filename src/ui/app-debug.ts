@@ -93,6 +93,8 @@ export function initDebugOverlay(renderer: Renderer): void {
     <div class="dbg-header" id="dbg-header" role="banner">
       <span class="dbg-header__title">🔬 节点取证</span>
       <span class="dbg-header__hint">点击任意节点自动更新</span>
+      <button type="button" class="dbg-header__copy" id="dbg-copy-btn"
+              aria-label="复制取证数据" title="复制全部数据">📋</button>
       <button type="button" class="dbg-header__close" id="dbg-close-btn"
               aria-label="关闭取证面板" title="关闭">×</button>
     </div>
@@ -220,6 +222,31 @@ export function initDebugOverlay(renderer: Renderer): void {
       closeForensicPanel();
     });
 
+  // ── Copy button — copies all forensic data to clipboard ──────────────
+  panel
+    .querySelector<HTMLButtonElement>('#dbg-copy-btn')
+    ?.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const data = collectForensicData(renderer);
+      try {
+        await navigator.clipboard.writeText(data);
+        const btn = e.currentTarget as HTMLButtonElement;
+        const orig = btn.textContent;
+        btn.textContent = '✓';
+        setTimeout(() => { btn.textContent = orig; }, 1200);
+      } catch {
+        // Fallback: select the text in a temp textarea
+        const ta = document.createElement('textarea');
+        ta.value = data;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+    });
+
   // ── Drag handler — header is the drag handle ────────────────────────
   // We listen on the header (which is wider than a 16px grip and
   // visually conveys "this moves") but exclude the close button so
@@ -273,6 +300,9 @@ function attachDragHandlers(panelEl: HTMLElement, handleEl: HTMLElement): void {
     // Only primary button — middle-click or right-click shouldn't drag.
     if (e.button !== 0) return;
     if (e.target instanceof HTMLElement && e.target.closest('#dbg-close-btn')) {
+      return;
+    }
+    if (e.target instanceof HTMLElement && e.target.closest('#dbg-copy-btn')) {
       return;
     }
     e.preventDefault();
@@ -668,6 +698,159 @@ export function updateForensicPanel(renderer: Renderer): void {
 
   _prevSelectedNodeId = null;
   _prevSelectedNodeName = null;
+}
+
+/** Collect all forensic data into a text string for clipboard. */
+function collectForensicData(renderer: Renderer): string {
+  const cy = renderer.getCy();
+  const lines: string[] = [];
+  const now = new Date().toLocaleString('zh-CN');
+  
+  lines.push('═══════════════════════════════════════');
+  lines.push('  🔬 节点取证报告');
+  lines.push(`  时间: ${now}`);
+  lines.push('═══════════════════════════════════════');
+  
+  // ── Graph stats ──────────────────────────────────────────────────
+  const allNodes = cy.nodes().not('.layer-parent');
+  const allEdges = cy.edges();
+  const selCount = cy.$(':selected').length;
+  const dimCount = cy.nodes('.dimmed').not('.layer-parent').length;
+  const snodeCount = cy.nodes('.selected-node').length;
+  const hlCount = cy.nodes('.highlighted').length;
+  
+  lines.push('\n【图谱状态】');
+  lines.push(`  节点总数: ${allNodes.length}`);
+  lines.push(`  边总数: ${allEdges.length}`);
+  lines.push(`  :selected: ${selCount}`);
+  lines.push(`  .dimmed: ${dimCount}`);
+  lines.push(`  .selected-node: ${snodeCount}`);
+  lines.push(`  .highlighted: ${hlCount}`);
+  
+  // ── Current node ────────────────────────────────────────────────
+  const snodeEls = cy.nodes('.selected-node');
+  const currentNodeId = snodeEls.length > 0 ? snodeEls[0].id() : null;
+  const currentNode = currentNodeId ? cy.getElementById(currentNodeId) : null;
+  
+  if (currentNode) {
+    lines.push('\n【当前节点】');
+    lines.push(`  ID: ${currentNode.id()}`);
+    lines.push(`  标签: ${currentNode.data('label') || '(无)'}`);
+    lines.push(`  形状: ${currentNode.style('shape')}`);
+    lines.push(`  边框色: ${currentNode.style('border-color')}`);
+    lines.push(`  边框宽: ${currentNode.style('border-width')}`);
+    lines.push(`  宽度: ${currentNode.style('width')}`);
+    lines.push(`  高度: ${currentNode.style('height')}`);
+    lines.push(`  essence: ${currentNode.data('essence') || '(无)'}`);
+    lines.push(`  depth: ${currentNode.data('depth')}`);
+    lines.push(`  subtreeRoot: ${currentNode.data('subtreeRoot') || '(无)'}`);
+    
+    // Neighbors and edges
+    const neighbors = currentNode.neighborhood('node').not('.layer-parent');
+    const connectedEdges = currentNode.connectedEdges();
+    lines.push(`  邻居数: ${neighbors.length}`);
+    lines.push('  邻居 IDs:');
+    neighbors.forEach((n: NodeSingular) => {
+      lines.push(`    - ${n.id()}`);
+    });
+    lines.push(`  连接的边: ${connectedEdges.length}`);
+    connectedEdges.forEach((e: cytoscape.EdgeSingular) => {
+      lines.push(`    - ${e.source().id()} → ${e.target().id()} [${e.data('edgeType')}]`);
+    });
+  } else {
+    lines.push('\n【当前节点】无 (.selected-node)');
+  }
+  
+  // ── All highlighted nodes ─────────────────────────────────────────
+  const allHighlighted = cy.nodes('.highlighted');
+  lines.push('\n【所有 .highlighted 节点】');
+  if (allHighlighted.length > 0) {
+    allHighlighted.forEach((n: NodeSingular) => {
+      lines.push(`  - ${n.id()}: ${n.data('label') || '(无)'}`);
+    });
+  } else {
+    lines.push('  (无)');
+  }
+  
+  // ── All selected-node ────────────────────────────────────────────
+  const allSelectedNode = cy.nodes('.selected-node');
+  lines.push('\n【所有 .selected-node 节点】');
+  if (allSelectedNode.length > 0) {
+    allSelectedNode.forEach((n: NodeSingular) => {
+      lines.push(`  - ${n.id()}: ${n.data('label') || '(无)'}`);
+    });
+  } else {
+    lines.push('  (无)');
+  }
+  
+  // ── Specific node check (for debugging mysterious highlights) ──────
+  const suspiciousNodes = [
+    'umbrella-firstgen-y2-01-02',
+  ];
+  // Also find nodes whose label contains "脑蛋白水解物"
+  const brainProteinNodes = cy.nodes().filter((n: NodeSingular) => {
+    const label = n.data('label') || '';
+    return label.includes('脑蛋白水解物');
+  });
+  if (brainProteinNodes.length > 0) {
+    brainProteinNodes.forEach((n: NodeSingular) => {
+      suspiciousNodes.push(n.id());
+    });
+  }
+  suspiciousNodes.forEach((checkId) => {
+    const checkNode = cy.getElementById(checkId);
+    lines.push(`\n【可疑节点检查: ${checkId}】`);
+    if (checkNode.empty()) {
+      lines.push('  节点不存在于图谱中');
+    } else {
+      lines.push(`  标签: ${checkNode.data('label') || '(无)'}`);
+      lines.push(`  .dimmed: ${checkNode.hasClass('dimmed')}`);
+      lines.push(`  .highlighted: ${checkNode.hasClass('highlighted')}`);
+      lines.push(`  .selected-node: ${checkNode.hasClass('selected-node')}`);
+      lines.push(`  所有class: [${checkNode.classNames().join(', ')}]`);
+      lines.push(`  opacity样式: ${checkNode.style('opacity')}`);
+      lines.push(`  border-width样式: ${checkNode.style('border-width')}`);
+      lines.push(`  border-color样式: ${checkNode.style('border-color')}`);
+    }
+  });
+  
+  // ── All non-dimmed nodes (catch-all) ─────────────────────────────
+  // This is the GROUND TRUTH for what should be visually "on" in the graph.
+  // Any node NOT dimmed will be rendered with its normal styles, regardless
+  // of whether it has .highlighted or .selected-node classes.
+  const allNonDimmed = allNodes.not('.dimmed');
+  lines.push('\n【所有非 .dimmed 节点（视觉真相）】');
+  if (allNonDimmed.length > 0) {
+    allNonDimmed.forEach((n: NodeSingular) => {
+      const classes = n.classNames().filter((c: string) => c !== 'dimmed').join(',') || '∅';
+      lines.push(`  - ${n.id()}: ${n.data('label') || '(无)'} [${classes}]`);
+    });
+  } else {
+    lines.push('  (无)');
+  }
+  
+  // ── Pipeline integrity ───────────────────────────────────────────
+  const orphanNodes = allNodes.filter((n: NodeSingular) => n.degree(false) === 0);
+  const badEdges = allEdges.filter((e: cytoscape.EdgeSingular) => {
+    const s = e.source();
+    const t = e.target();
+    return s.empty() || t.empty() || s.hasClass('layer-parent') || t.hasClass('layer-parent');
+  });
+  
+  lines.push('\n【数据完整性】');
+  lines.push(`  孤立节点: ${orphanNodes.length}`);
+  lines.push(`  异常边: ${badEdges.length}`);
+  
+  if (orphanNodes.length > 0) {
+    lines.push('  孤立节点 IDs:');
+    orphanNodes.slice(0, 20).forEach((n: NodeSingular) => {
+      lines.push(`    - ${n.id()}`);
+    });
+    if (orphanNodes.length > 20) lines.push(`    ... 还有 ${orphanNodes.length - 20} 个`);
+  }
+  
+  lines.push('\n═══════════════════════════════════════');
+  return lines.join('\n');
 }
 
 export function runDebugUpdate(renderer: Renderer, highlight: HighlightEngine): void {

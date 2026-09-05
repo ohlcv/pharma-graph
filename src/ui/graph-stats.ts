@@ -82,6 +82,7 @@ function doUpdateStats(cy: Core): void {
     setStat('stat-nodes', String(nodes.length));
     setStat('stat-edges', String(cy.edges().length));
     setStat('stat-selected', String(cy.$(':selected').length));
+    setStat('stat-highlighted', String(cy.nodes('.highlighted').not('.layer-parent').length));
     const el = document.getElementById('stat-layout');
     if (el) el.textContent = getCurrentLayout().toUpperCase();
 
@@ -104,6 +105,7 @@ export function syncBottomSheetStats(cy: Core): void {
     setStat('bs-stat-nodes', String(cy.nodes().not('.layer-parent').length));
     setStat('bs-stat-edges', String(cy.edges().length));
     setStat('bs-stat-selected', String(cy.$(':selected').length));
+    setStat('bs-stat-highlighted', String(cy.nodes('.highlighted').not('.layer-parent').length));
     const el = document.getElementById('bs-stat-layout');
     if (el) el.textContent = getCurrentLayout().toUpperCase();
     _sheetStatsDebounce = null;

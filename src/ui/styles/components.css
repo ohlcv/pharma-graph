@@ -532,13 +532,14 @@
   border: 1px solid rgba(255,255,255,0.15);
 }
 
-.stat-list { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
-.stat-card  { background: rgba(255,255,255,0.025); border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; }
-.stat-card__label { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
-.stat-card__value { font-size: 1.1rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; font-family: 'SF Mono', 'Fira Code', monospace; letter-spacing: -0.03em; line-height: 1; }
+.stat-list { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.stat-card  { background: rgba(255,255,255,0.025); border: 1px solid var(--border); border-radius: 9px; padding: 6px 8px; display: flex; flex-direction: column; gap: 3px; }
+.stat-card__label { font-size: 0.55rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.stat-card__value { font-size: 0.95rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; font-family: 'SF Mono', 'Fira Code', monospace; letter-spacing: -0.03em; line-height: 1; }
 .stat-card__value--accent { color: var(--accent); }
 .stat-card__value--cyan   { color: var(--accent2); }
 .stat-card__value--amber  { color: var(--yellow); }
+.stat-card__value--green  { color: var(--green); }
 
 .shape-filter-list { display: flex; flex-direction: column; gap: 3px; }
 .shape-filter-item { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; transition: background 0.12s, border-color 0.12s; user-select: none; }
@@ -943,6 +944,7 @@
 .bs-stat__val--accent { color: var(--accent); }
 .bs-stat__val--cyan   { color: var(--accent2); }
 .bs-stat__val--amber  { color: var(--yellow); }
+.bs-stat__val--green  { color: var(--green); }
 .bs-stat__label { font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
 
 .bs-section + .bs-section { margin-top: 6px; }

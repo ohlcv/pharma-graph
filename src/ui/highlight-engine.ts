@@ -69,17 +69,6 @@ export class HighlightEngine {
 
     node.addClass(CLASSES.SELECTED_NODE);
     node.select();
-    
-    // DEBUG: Log neighborhood info
-    const neighbors = node.neighborhood('node').not(`.${CLASSES.LAYER_PARENT}`);
-    const neighborsIds = neighbors.map((n: cytoscape.NodeSingular) => n.id());
-    const connectedEdges = node.connectedEdges().map((e: cytoscape.EdgeSingular) => `${e.source().id()} -> ${e.target().id()}`);
-    console.log('[DEBUG highlightNode]', {
-      nodeId,
-      neighbors: neighborsIds,
-      connectedEdges,
-    });
-    
     node.neighborhood('node').not(`.${CLASSES.LAYER_PARENT}`).addClass(CLASSES.HIGHLIGHTED);
     node.connectedEdges().addClass(CLASSES.HIGHLIGHTED_EDGE);
 
