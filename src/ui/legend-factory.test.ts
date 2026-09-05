@@ -47,7 +47,7 @@ describe('attachDelegated keyboard navigation', () => {
   it('Enter activates the focused row (existing behavior, regression)', () => {
     const a = makeRow('a');
     makeContainer([a]);
-    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick);
+    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick, onCycle);
     a.focus();
     fireKey(a, 'Enter');
     expect(onClick).toHaveBeenCalledWith('a', null);
@@ -90,61 +90,12 @@ describe('attachDelegated keyboard navigation', () => {
     expect(ev.defaultPrevented).toBe(true);
   });
 
-  it('onCycle is preferred over the focus-move fallback when both are set', () => {
-    const a = makeRow('a');
-    const b = makeRow('b');
-    makeContainer([a, b]);
-    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick, onCycle);
-    a.focus();
-    fireKey(a, 'ArrowDown');
-    // onCycle called, focus NOT moved to b
-    expect(onCycle).toHaveBeenCalled();
-    expect(document.activeElement).toBe(a);
-  });
-
-  // ── ArrowUp/Down fallback (no onCycle) ────────────────────────────────────
-
-  it('ArrowDown without onCycle moves focus to next row and activates it', () => {
-    const a = makeRow('a');
-    const b = makeRow('b');
-    const c = makeRow('c');
-    makeContainer([a, b, c]);
-    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick);
-    a.focus();
-    fireKey(a, 'ArrowDown');
-    expect(document.activeElement).toBe(b);
-    expect(onClick).toHaveBeenCalledWith('b', null);
-  });
-
-  it('ArrowUp without onCycle moves focus to prev row and activates it', () => {
-    const a = makeRow('a');
-    const b = makeRow('b');
-    const c = makeRow('c');
-    makeContainer([a, b, c]);
-    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick);
-    c.focus();
-    fireKey(c, 'ArrowUp');
-    expect(document.activeElement).toBe(b);
-    expect(onClick).toHaveBeenCalledWith('b', null);
-  });
-
-  it('ArrowDown on last row clamps (no wrap, no extra activate)', () => {
-    const a = makeRow('a');
-    const b = makeRow('b');
-    makeContainer([a, b]);
-    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick);
-    b.focus();
-    fireKey(b, 'ArrowDown');
-    expect(document.activeElement).toBe(b);
-    expect(onClick).not.toHaveBeenCalled();
-  });
-
   // ── Dataset prefix regression ─────────────────────────────────────────────
 
   it('dataKey prefix is stripped (regression for dataset lookup)', () => {
     const a = makeRow('xyz');
     makeContainer([a]);
-    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick);
+    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick, onCycle);
     a.focus();
     fireKey(a, 'Enter');
     expect(onClick).toHaveBeenCalledWith('xyz', null);

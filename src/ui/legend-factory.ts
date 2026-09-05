@@ -46,7 +46,7 @@ export interface LegendAxisDescriptor {
    * row's key and the direction (`+1` for ArrowDown, `-1` for ArrowUp).
    * When omitted, ArrowUp/Down falls back to moving focus to prev/next row.
    */
-  readonly onCycle?: (key: string, delta: -1 | 1, highlight: HighlightEngine) => void;
+  readonly onCycle: (key: string, delta: -1 | 1, highlight: HighlightEngine) => void;
   /** Optional HTML class name applied to the row. */
   readonly rowExtraClass?: string;
   /**
@@ -81,7 +81,7 @@ export function attachDelegated(
   selector: string,
   dataKey: string,
   onClick: ClickHandler,
-  onCycle?: (key: string, delta: -1 | 1, highlight: HighlightEngine) => void,
+  onCycle: (key: string, delta: -1 | 1, highlight: HighlightEngine) => void,
 ): void {
   const host = container as Delegated;
   if (host.__legendDelegated) return;
@@ -115,26 +115,7 @@ export function attachDelegated(
     const key = current.dataset[dsKey] ?? '';
     if (!key) return;
     e.preventDefault();
-    if (onCycle) {
-      // Cycle within the row's highlighted set (e.g. next/prev node of the
-      // same essence). Fallback path below still runs if onCycle is a no-op.
-      onCycle(key, e.key === 'ArrowDown' ? 1 : -1, uiState.highlight!);
-      return;
-    }
-    // Fallback: no onCycle provided → move focus to prev/next legend row and
-    // activate it. Stops at the edges (no wrap).
-    const allRows = Array.from(container.querySelectorAll<HTMLElement>(selector));
-    const idx = allRows.indexOf(current);
-    if (idx < 0) return;
-    const nextIdx = e.key === 'ArrowDown'
-      ? Math.min(idx + 1, allRows.length - 1)
-      : Math.max(idx - 1, 0);
-    if (nextIdx === idx) return;
-    const nextRow = allRows[nextIdx];
-    const nextKey = nextRow.dataset[dsKey] ?? '';
-    if (!nextKey) return;
-    nextRow.focus();
-    onClick(nextKey, uiState.highlight!);
+    onCycle(key, e.key === 'ArrowDown' ? 1 : -1, uiState.highlight!);
   });
 }
 
