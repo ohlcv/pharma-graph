@@ -69,7 +69,7 @@ function decorateRowA11y(row: HTMLElement): void {
   observer.observe(row, { attributes: true, attributeFilter: ['class'] });
 }
 
-function attachDelegated(
+export function attachDelegated(
   container: HTMLElement,
   selector: string,
   dataKey: string,
@@ -77,11 +77,14 @@ function attachDelegated(
 ): void {
   const host = container as Delegated;
   if (host.__legendDelegated) return;
+  // The descriptor's `dataKey` carries the `data-` prefix (e.g. "data-type").
+  // `dataset` strips that prefix, so we always index it with the bare name.
+  const dsKey = dataKey.replace(/^data-/, '');
   host.__legendDelegated = true;
   container.addEventListener('click', (e) => {
     const row = (e.target as HTMLElement).closest<HTMLElement>(selector);
     if (!row) return;
-    const key = row.dataset[dataKey] ?? '';
+    const key = row.dataset[dsKey] ?? '';
     if (!key) return;
     onClick(key, uiState.highlight!);
   });
@@ -89,13 +92,35 @@ function attachDelegated(
   // Skip if the user is typing in an inner editable element (none today, but
   // future-proof — legend rows don't host inputs).
   container.addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter' && e.key !== ' ') return;
-    const row = (e.target as HTMLElement).closest<HTMLElement>(selector);
-    if (!row) return;
-    const key = row.dataset[dataKey] ?? '';
-    if (!key) return;
-    e.preventDefault();
-    onClick(key, uiState.highlight!);
+    if (e.key === 'Enter' || e.key === ' ') {
+      const row = (e.target as HTMLElement).closest<HTMLElement>(selector);
+      if (!row) return;
+      const key = row.dataset[dsKey] ?? '';
+      if (!key) return;
+      e.preventDefault();
+      onClick(key, uiState.highlight!);
+      return;
+    }
+    // ArrowUp/Down: move focus to the prev/next row AND activate it
+    // (matches click behavior — the bug being fixed). Without this, the
+    // browser scrolls the legend container instead of cycling nodes.
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      const current = (e.target as HTMLElement).closest<HTMLElement>(selector);
+      if (!current) return;
+      e.preventDefault();
+      const allRows = Array.from(container.querySelectorAll<HTMLElement>(selector));
+      const idx = allRows.indexOf(current);
+      if (idx < 0) return;
+      const nextIdx = e.key === 'ArrowDown'
+        ? Math.min(idx + 1, allRows.length - 1)
+        : Math.max(idx - 1, 0);
+      if (nextIdx === idx) return; // already at edge
+      const nextRow = allRows[nextIdx];
+      const nextKey = nextRow.dataset[dsKey] ?? '';
+      if (!nextKey) return;
+      nextRow.focus();
+      onClick(nextKey, uiState.highlight!);
+    }
   });
 }
 
