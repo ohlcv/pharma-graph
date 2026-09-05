@@ -1,13 +1,10 @@
 /**
  * @vitest-environment jsdom
  */
-// Tests for the legend keyboard-navigation behavior added to fix the bug where
-// pressing ArrowUp/Down inside a focused legend row scrolled the legend panel
-// instead of cycling through to the next/previous node.
-//
-// We exercise `attachDelegated` directly (it is module-internal but exporting
-// it is cheap and worth it for testability) — `buildLegend` also calls it,
-// so end-to-end coverage flows from here.
+// Tests for the legend keyboard-navigation behavior. When a legend row has
+// focus, ArrowUp/Down should be routed to the descriptor's `onCycle` handler
+// (which cycles through the row's highlighted node set). When `onCycle` is
+// not provided, the legacy fallback moves focus to the previous/next row.
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { attachDelegated } from './legend-factory.js';
@@ -28,16 +25,24 @@ function makeContainer(rows: HTMLElement[]): HTMLElement {
 }
 
 function fireKey(target: HTMLElement, key: string): void {
-  target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+  target.dispatchEvent(new KeyboardEvent('keydown', {
+    key,
+    bubbles: true,
+    cancelable: true,
+  }));
 }
 
 describe('attachDelegated keyboard navigation', () => {
   let onClick: ReturnType<typeof vi.fn>;
+  let onCycle: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     document.body.innerHTML = '';
     onClick = vi.fn();
+    onCycle = vi.fn();
   });
+
+  // ── Enter / Space ─────────────────────────────────────────────────────────
 
   it('Enter activates the focused row (existing behavior, regression)', () => {
     const a = makeRow('a');
@@ -48,80 +53,95 @@ describe('attachDelegated keyboard navigation', () => {
     expect(onClick).toHaveBeenCalledWith('a', null);
   });
 
-  it('ArrowDown moves focus to next row AND activates it', () => {
+  // ── ArrowUp/Down with onCycle ─────────────────────────────────────────────
+
+  it('ArrowDown calls onCycle with delta=+1 and does NOT move focus', () => {
     const a = makeRow('a');
     const b = makeRow('b');
-    const c = makeRow('c');
-    makeContainer([a, b, c]);
-    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick);
-
+    makeContainer([a, b]);
+    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick, onCycle);
     a.focus();
+
+    const before = document.activeElement;
     fireKey(a, 'ArrowDown');
 
-    expect(document.activeElement).toBe(b);
-    expect(onClick).toHaveBeenCalledTimes(1);
-    expect(onClick).toHaveBeenCalledWith('b', null);
+    expect(onCycle).toHaveBeenCalledTimes(1);
+    expect(onCycle).toHaveBeenCalledWith('a', 1, null);
+    // Focus stays on the legend row — we are cycling NODES, not legend rows.
+    expect(document.activeElement).toBe(before);
   });
 
-  it('ArrowUp moves focus to previous row AND activates it', () => {
+  it('ArrowUp calls onCycle with delta=-1', () => {
     const a = makeRow('a');
-    const b = makeRow('b');
-    const c = makeRow('c');
-    makeContainer([a, b, c]);
-    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick);
-
-    c.focus();
-    fireKey(c, 'ArrowUp');
-
-    expect(document.activeElement).toBe(b);
-    expect(onClick).toHaveBeenCalledWith('b', null);
-  });
-
-  it('ArrowDown on last row is clamped (no wrap, no extra activate)', () => {
-    const a = makeRow('a');
-    const b = makeRow('b');
-    makeContainer([a, b]);
-    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick);
-
-    b.focus();
-    fireKey(b, 'ArrowDown');
-
-    expect(document.activeElement).toBe(b);
-    expect(onClick).not.toHaveBeenCalled();
-  });
-
-  it('ArrowUp on first row is clamped (no wrap, no extra activate)', () => {
-    const a = makeRow('a');
-    const b = makeRow('b');
-    makeContainer([a, b]);
-    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick);
-
+    makeContainer([a]);
+    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick, onCycle);
     a.focus();
     fireKey(a, 'ArrowUp');
-
-    expect(document.activeElement).toBe(a);
-    expect(onClick).not.toHaveBeenCalled();
+    expect(onCycle).toHaveBeenCalledWith('a', -1, null);
   });
 
   it('preventDefault is called so the legend container does not scroll', () => {
     const a = makeRow('a');
-    const b = makeRow('b');
-    makeContainer([a, b]);
-    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick);
-
+    makeContainer([a]);
+    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick, onCycle);
     a.focus();
     const ev = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true });
     a.dispatchEvent(ev);
-
     expect(ev.defaultPrevented).toBe(true);
   });
 
-  it('dataKey with prefix is correctly stripped (regression for dataset lookup)', () => {
-    // Confirms we index dataset with the un-prefixed name; otherwise the
-    // click handler that Enter/Space also exercises would silently fail.
-    // (Before this fix, the original code did `row.dataset[dataKey]` which
-    // returns undefined for "data-type" — Enter worked only because the
-    // browser also fired a click event.)
+  it('onCycle is preferred over the focus-move fallback when both are set', () => {
+    const a = makeRow('a');
+    const b = makeRow('b');
+    makeContainer([a, b]);
+    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick, onCycle);
+    a.focus();
+    fireKey(a, 'ArrowDown');
+    // onCycle called, focus NOT moved to b
+    expect(onCycle).toHaveBeenCalled();
+    expect(document.activeElement).toBe(a);
+  });
+
+  // ── ArrowUp/Down fallback (no onCycle) ────────────────────────────────────
+
+  it('ArrowDown without onCycle moves focus to next row and activates it', () => {
+    const a = makeRow('a');
+    const b = makeRow('b');
+    const c = makeRow('c');
+    makeContainer([a, b, c]);
+    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick);
+    a.focus();
+    fireKey(a, 'ArrowDown');
+    expect(document.activeElement).toBe(b);
+    expect(onClick).toHaveBeenCalledWith('b', null);
+  });
+
+  it('ArrowUp without onCycle moves focus to prev row and activates it', () => {
+    const a = makeRow('a');
+    const b = makeRow('b');
+    const c = makeRow('c');
+    makeContainer([a, b, c]);
+    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick);
+    c.focus();
+    fireKey(c, 'ArrowUp');
+    expect(document.activeElement).toBe(b);
+    expect(onClick).toHaveBeenCalledWith('b', null);
+  });
+
+  it('ArrowDown on last row clamps (no wrap, no extra activate)', () => {
+    const a = makeRow('a');
+    const b = makeRow('b');
+    makeContainer([a, b]);
+    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick);
+    b.focus();
+    fireKey(b, 'ArrowDown');
+    expect(document.activeElement).toBe(b);
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  // ── Dataset prefix regression ─────────────────────────────────────────────
+
+  it('dataKey prefix is stripped (regression for dataset lookup)', () => {
     const a = makeRow('xyz');
     makeContainer([a]);
     attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick);

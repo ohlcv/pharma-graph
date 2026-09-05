@@ -40,6 +40,13 @@ export interface LegendAxisDescriptor {
   readonly dataKey: string;
   /** Click handler dispatched with the row's key value. */
   readonly onClick: ClickHandler;
+  /**
+   * Optional: ArrowUp/Down handler — cycles through nodes within the row's
+   * highlighted set instead of moving focus to a sibling row. Receives the
+   * row's key and the direction (`+1` for ArrowDown, `-1` for ArrowUp).
+   * When omitted, ArrowUp/Down falls back to moving focus to prev/next row.
+   */
+  readonly onCycle?: (key: string, delta: -1 | 1, highlight: HighlightEngine) => void;
   /** Optional HTML class name applied to the row. */
   readonly rowExtraClass?: string;
   /**
@@ -74,6 +81,7 @@ export function attachDelegated(
   selector: string,
   dataKey: string,
   onClick: ClickHandler,
+  onCycle?: (key: string, delta: -1 | 1, highlight: HighlightEngine) => void,
 ): void {
   const host = container as Delegated;
   if (host.__legendDelegated) return;
@@ -101,26 +109,32 @@ export function attachDelegated(
       onClick(key, uiState.highlight!);
       return;
     }
-    // ArrowUp/Down: move focus to the prev/next row AND activate it
-    // (matches click behavior — the bug being fixed). Without this, the
-    // browser scrolls the legend container instead of cycling nodes.
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      const current = (e.target as HTMLElement).closest<HTMLElement>(selector);
-      if (!current) return;
-      e.preventDefault();
-      const allRows = Array.from(container.querySelectorAll<HTMLElement>(selector));
-      const idx = allRows.indexOf(current);
-      if (idx < 0) return;
-      const nextIdx = e.key === 'ArrowDown'
-        ? Math.min(idx + 1, allRows.length - 1)
-        : Math.max(idx - 1, 0);
-      if (nextIdx === idx) return; // already at edge
-      const nextRow = allRows[nextIdx];
-      const nextKey = nextRow.dataset[dsKey] ?? '';
-      if (!nextKey) return;
-      nextRow.focus();
-      onClick(nextKey, uiState.highlight!);
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    const current = (e.target as HTMLElement).closest<HTMLElement>(selector);
+    if (!current) return;
+    const key = current.dataset[dsKey] ?? '';
+    if (!key) return;
+    e.preventDefault();
+    if (onCycle) {
+      // Cycle within the row's highlighted set (e.g. next/prev node of the
+      // same essence). Fallback path below still runs if onCycle is a no-op.
+      onCycle(key, e.key === 'ArrowDown' ? 1 : -1, uiState.highlight!);
+      return;
     }
+    // Fallback: no onCycle provided → move focus to prev/next legend row and
+    // activate it. Stops at the edges (no wrap).
+    const allRows = Array.from(container.querySelectorAll<HTMLElement>(selector));
+    const idx = allRows.indexOf(current);
+    if (idx < 0) return;
+    const nextIdx = e.key === 'ArrowDown'
+      ? Math.min(idx + 1, allRows.length - 1)
+      : Math.max(idx - 1, 0);
+    if (nextIdx === idx) return;
+    const nextRow = allRows[nextIdx];
+    const nextKey = nextRow.dataset[dsKey] ?? '';
+    if (!nextKey) return;
+    nextRow.focus();
+    onClick(nextKey, uiState.highlight!);
   });
 }
 
@@ -162,10 +176,22 @@ export function buildLegend(cy: Core, descriptor: LegendAxisDescriptor): void {
   }
 
   if (desktop) {
-    attachDelegated(desktop, `.${descriptor.rowClass}[${descriptor.dataKey}]`, descriptor.dataKey.replace('data-', ''), descriptor.onClick);
+    attachDelegated(
+      desktop,
+      `.${descriptor.rowClass}[${descriptor.dataKey}]`,
+      descriptor.dataKey.replace('data-', ''),
+      descriptor.onClick,
+      descriptor.onCycle,
+    );
   }
   if (mobile) {
-    attachDelegated(mobile, `.bs-chip[${descriptor.dataKey}]`, descriptor.dataKey.replace('data-', ''), descriptor.onClick);
+    attachDelegated(
+      mobile,
+      `.bs-chip[${descriptor.dataKey}]`,
+      descriptor.dataKey.replace('data-', ''),
+      descriptor.onClick,
+      descriptor.onCycle,
+    );
   }
 
   for (const key of Object.keys(descriptor.labels)) {

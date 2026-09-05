@@ -73,11 +73,28 @@ export function populateEssenceLegend(cy: Core): void {
     dataKey: 'data-type',
     desktopRow: (k, label) => `<div class="legend-row" data-type="${k}">${makeEssenceSwatch(k, NODE_TYPE_SHAPE_MAP[k] ?? 'rectangle')}<span class="legend-row__label">${label}</span><span class="legend-row__count" id="legend-essence-count-${k}"></span></div>`,
     mobileChip: (k, label) => `<div class="bs-chip" data-type="${k}">${makeEssenceSwatch(k, NODE_TYPE_SHAPE_MAP[k] ?? 'rectangle')}<span>${label}</span><span class="bs-chip__count" id="bs-essence-count-${k}"></span></div>`,
-    onClick: (key, highlight) => highlightShape(key, highlight),
+    onClick: (key, highlight) => highlightEssenceLegend(key, highlight),
+    onCycle: (_key, delta, highlight) => { cycleHighlightedNodes(delta, highlight); },
   });
 }
 
-// ── Edge legend (边类型) ──────────────────────────────────────────────────────
+export function highlightEssenceLegend(essence: string, highlight: HighlightEngine): void {
+  if (activeShapeFilter === essence) {
+    clearAllFilters();
+    highlight.reset();
+    return;
+  }
+  clearAllFilters();
+  activeShapeFilter = essence;
+  highlight.highlightEssence(essence);
+
+  staticEls('.legend-row[data-type]').forEach((el) => {
+    if (el.dataset.type === essence) el.classList.add('active');
+  });
+  staticEls('.bs-chip[data-type]').forEach((el) => {
+    if (el.dataset.type === essence) el.classList.add('active');
+  });
+}
 
 function dashAttr(lineStyle: string): string {
   if (lineStyle === 'dashed') return 'stroke-dasharray="5 3"';
@@ -123,7 +140,62 @@ export function populateEdgeLegend(cy: Core): void {
       return `<div class="bs-chip" data-edge="${k}"><svg width="24" height="10" viewBox="0 0 24 10" style="flex-shrink:0"><line x1="2" y1="5" x2="22" y2="5" stroke="${style.color}" stroke-width="2" ${dashAttr(style.lineStyle)}/>${arrowSvg(style, 22)}</svg><span>${label}</span><span class="bs-chip__count" id="bs-edge-count-${k}"></span></div>`;
     },
     onClick: (key, highlight) => highlightEdgeTypeFilter(key, highlight),
+    onCycle: (_key, delta, highlight) => { cycleHighlightedNodes(delta, highlight); },
   });
+}
+
+// ── Cycle helpers (keyboard ↑/↓ within an active legend filter) ────────────────
+
+/**
+ * Cycle through the nodes currently highlighted by `legendRowKey`. Used by
+ * ArrowUp/Down handlers in attachDelegated so pressing ↑/↓ while focused on
+ * a legend row walks the *nodes* the filter exposes, not the legend rows
+ * themselves. Returns true if focus changed.
+ *
+ * - If a node is already selected among the highlighted set, ArrowDown moves
+ *   to the next one (wrapping); ArrowUp moves to the previous one (wrapping).
+ * - If nothing is selected, ArrowDown picks the first, ArrowUp the last.
+ * - If the set is empty (filter not active), the keypress is a no-op (but
+ *   still swallows the default scroll behaviour upstream).
+ */
+export function cycleHighlightedNodes(
+  delta: -1 | 1,
+  highlight: HighlightEngine,
+): boolean {
+  const cy = highlight.getCy();
+  const LAYER_PARENT = 'layer-parent';
+  const HIGHLIGHTED = 'highlighted';
+  const SETTLED_NODE = 'selected-node';
+
+  const set = cy.nodes(`.${HIGHLIGHTED}`).not(`.${LAYER_PARENT}`);
+  if (set.length === 0) return false;
+
+  const ids = set.map((n) => n.id());
+  const currentIdx = ids.findIndex((id) => cy.getElementById(id).hasClass(SETTLED_NODE));
+  let nextIdx: number;
+  if (currentIdx < 0) {
+    nextIdx = delta > 0 ? 0 : ids.length - 1;
+  } else {
+    nextIdx = (currentIdx + delta + ids.length) % ids.length;
+  }
+  if (nextIdx === currentIdx) return false;
+
+  const target = cy.getElementById(ids[nextIdx]);
+
+  // Apply only the per-node visual change. We deliberately do NOT call
+  // focusOnNode() here because that would tear down the legend filter's
+  // `.highlighted` set and replace it with the target's neighbourhood.
+  cy.elements().unselect();
+  cy.nodes(`.${SETTLED_NODE}`).removeClass(SETTLED_NODE);
+  target.addClass(SETTLED_NODE);
+  target.select();
+  cy.stop().animate({
+    center: { eles: target },
+    zoom: 1.5,
+    duration: 400,
+    easing: 'ease-out-cubic',
+  });
+  return true;
 }
 
 // ── Filter highlight handlers ──────────────────────────────────────────────────
