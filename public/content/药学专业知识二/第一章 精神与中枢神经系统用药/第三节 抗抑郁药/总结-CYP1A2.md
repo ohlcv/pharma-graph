@@ -2,7 +2,7 @@
 data:
   id: notion-cyp1a2-y2-01-03
   label: 总结-CYP1A2
-  essence: notion
+  essence: summary
   location:
     book: 药学专业知识二
     chapter: 精神与中枢神经系统用药
