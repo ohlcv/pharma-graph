@@ -192,15 +192,22 @@ export function cycleHighlightedNodes(
  * Highlight nodes by essence type (for legend clicks).
  * @deprecated Use highlightEssence instead - kept for API compatibility with action-handlers.
  */
-export function highlightShape(essence: string, highlight: HighlightEngine): void {
+/**
+ * Highlight nodes by essence type from the legend click.
+ * Note: Despite the name, this function uses essence-based matching (not shape),
+ * because multiple essences (medication/drug) share the same shape (ellipse).
+ */
+export function highlightEssenceFilter(essence: string, highlight: HighlightEngine): void {
   if (activeShapeFilter === essence) {
+    // Toggle off: clear filter and reset all nodes
     clearAllFilters();
     highlight.reset();
     return;
   }
+  
+  // Set new filter
   clearAllFilters();
   activeShapeFilter = essence;
-  // Use highlightEssence for accurate essence-based filtering
   highlight.highlightEssence(essence);
 
   staticEls('.legend-row[data-type]').forEach((el) => {
@@ -210,6 +217,10 @@ export function highlightShape(essence: string, highlight: HighlightEngine): voi
     if (el.dataset.type === essence) el.classList.add('active');
   });
 }
+
+// Keep legacy name for action-handlers compatibility
+const highlightShape = highlightEssenceFilter;
+export { highlightShape };
 
 export function highlightEdgeTypeFilter(edge: string, highlight: HighlightEngine): void {
   if (activeEdgeFilter === edge) {

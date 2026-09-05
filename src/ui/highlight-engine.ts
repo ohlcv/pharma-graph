@@ -16,16 +16,45 @@ export class HighlightEngine {
     return this.cy;
   }
 
+  // ── Private helpers: extract common patterns ──────────────────────────────────
+
+  /** Clear all highlighting classes and selections. */
+  private resetClasses(): void {
+    this.cy.elements().removeClass(
+      [CLASSES.DIMMED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED, CLASSES.HIGHLIGHTED_EDGE].join(' '),
+    );
+    this.cy.elements().unselect();
+  }
+
+  /** Dim edges that are not connected to any highlighted node. */
+  private dimUnhighlightedEdges(): void {
+    this.cy.edges().not(`.${CLASSES.HIGHLIGHTED_EDGE}`).addClass(CLASSES.DIMMED);
+    this.cy.edges(`[source][target]`).forEach((e: cytoscape.EdgeSingular) => {
+      const src = e.source();
+      const tgt = e.target();
+      if (src.hasClass(CLASSES.HIGHLIGHTED) && tgt.hasClass(CLASSES.HIGHLIGHTED)) {
+        e.removeClass(CLASSES.DIMMED).addClass(CLASSES.HIGHLIGHTED_EDGE);
+      }
+    });
+  }
+
+  /** Dim all nodes that are not highlighted. */
+  private dimUnhighlightedNodes(): void {
+    this.cy.nodes()
+      .not(`.${CLASSES.LAYER_PARENT}`)
+      .not(`.${CLASSES.SELECTED_NODE}`)
+      .not(`.${CLASSES.HIGHLIGHTED}`)
+      .addClass(CLASSES.DIMMED);
+  }
+
+  // ── Public highlight methods ─────────────────────────────────────────────────
+
   highlightNode(nodeId: string): {
     prevNodeId: string | null;
     prevNodeName: string | null;
   } {
     const prev = this.getSelectedNodeInfo();
-
-    this.cy.elements().removeClass(
-      [CLASSES.DIMMED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED, CLASSES.HIGHLIGHTED_EDGE].join(' '),
-    );
-    this.cy.elements().unselect();
+    this.resetClasses();
 
     const node = this.cy.getElementById(nodeId);
     if (node.empty()) return prev;
@@ -40,12 +69,22 @@ export class HighlightEngine {
 
     node.addClass(CLASSES.SELECTED_NODE);
     node.select();
+    
+    // DEBUG: Log neighborhood info
+    const neighbors = node.neighborhood('node').not(`.${CLASSES.LAYER_PARENT}`);
+    const neighborsIds = neighbors.map((n: cytoscape.NodeSingular) => n.id());
+    const connectedEdges = node.connectedEdges().map((e: cytoscape.EdgeSingular) => `${e.source().id()} -> ${e.target().id()}`);
+    console.log('[DEBUG highlightNode]', {
+      nodeId,
+      neighbors: neighborsIds,
+      connectedEdges,
+    });
+    
     node.neighborhood('node').not(`.${CLASSES.LAYER_PARENT}`).addClass(CLASSES.HIGHLIGHTED);
     node.connectedEdges().addClass(CLASSES.HIGHLIGHTED_EDGE);
 
-    this.cy.nodes().not(`.${CLASSES.LAYER_PARENT}`).not(`.${CLASSES.SELECTED_NODE}`).not(`.${CLASSES.HIGHLIGHTED}`).addClass(CLASSES.DIMMED);
-    // Also dim edges that are not connected to the selected node.
-    this.cy.edges().not(`.${CLASSES.HIGHLIGHTED_EDGE}`).addClass(CLASSES.DIMMED);
+    this.dimUnhighlightedNodes();
+    this.dimUnhighlightedEdges();
 
     return prev;
   }
@@ -59,10 +98,7 @@ export class HighlightEngine {
 
   highlightSearch(query: string): string[] {
     const results: string[] = [];
-    this.cy.elements().removeClass(
-      [CLASSES.DIMMED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED, CLASSES.HIGHLIGHTED_EDGE].join(' '),
-    );
-    this.cy.elements().unselect();
+    this.resetClasses();
 
     if (!query.trim()) return results;
 
@@ -79,22 +115,13 @@ export class HighlightEngine {
       }
     });
 
-    this.cy.edges().not(`.${CLASSES.HIGHLIGHTED_EDGE}`).addClass(CLASSES.DIMMED);
-    this.cy.edges(`[source][target]`).forEach((e: cytoscape.EdgeSingular) => {
-      const src = e.source();
-      const tgt = e.target();
-      if (src.hasClass(CLASSES.HIGHLIGHTED) && tgt.hasClass(CLASSES.HIGHLIGHTED)) {
-        e.removeClass(CLASSES.DIMMED).addClass(CLASSES.HIGHLIGHTED_EDGE);
-      }
-    });
+    this.dimUnhighlightedEdges();
 
     return results;
   }
 
   highlightShape(shape: string): void {
-    this.cy.elements().removeClass(
-      [CLASSES.DIMMED, CLASSES.HIGHLIGHTED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED_EDGE].join(' '),
-    );
+    this.resetClasses();
 
     // shape here is the Cytoscape shape name (ellipse, octagon …) that maps to
     // an essence key via NODE_TYPE_SHAPE_MAP.  We match against n.data('essence')
@@ -102,8 +129,9 @@ export class HighlightEngine {
     // (and therefore inheriting the default 'ellipse') are still correctly
     // filtered by their essence attribute — which is what the legend counts use.
     // 反查表：cytoscape shape → essence
+    // 注意：ellipse 对应两种 essence（重点药/普通药），无法用形状区分，需用 fill 颜色区分
     const essenceMap: Record<string, string> = {
-      ellipse:           'medication',
+      ellipse:           'medication',  // 重点药（普通药也用 ellipse，见下）
       octagon:           'summary',
       diamond:           'illness',
       rectangle:         'concept',
@@ -111,6 +139,7 @@ export class HighlightEngine {
       hexagon:           'umbrella-class',   // 六边形 — 伞形分类
       'round-rectangle': 'module',
       tag:               'notion',
+      vee:               'mnemonic',         // V形 — 口诀
     };
     const essence = essenceMap[shape] ?? null;
 
@@ -122,20 +151,11 @@ export class HighlightEngine {
       }
     });
 
-    this.cy.edges().not(`.${CLASSES.HIGHLIGHTED_EDGE}`).addClass(CLASSES.DIMMED);
-    this.cy.edges(`[source][target]`).forEach((e: cytoscape.EdgeSingular) => {
-      const src = e.source();
-      const tgt = e.target();
-      if (src.hasClass(CLASSES.HIGHLIGHTED) && tgt.hasClass(CLASSES.HIGHLIGHTED)) {
-        e.removeClass(CLASSES.DIMMED).addClass(CLASSES.HIGHLIGHTED_EDGE);
-      }
-    });
+    this.dimUnhighlightedEdges();
   }
 
   highlightEssence(essence: string): void {
-    this.cy.elements().removeClass(
-      [CLASSES.DIMMED, CLASSES.HIGHLIGHTED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED_EDGE].join(' '),
-    );
+    this.resetClasses();
 
     this.cy.nodes().not(`.${CLASSES.LAYER_PARENT}`).forEach((n: cytoscape.NodeSingular) => {
       if (n.data('essence') === essence) {
@@ -145,20 +165,11 @@ export class HighlightEngine {
       }
     });
 
-    this.cy.edges().not(`.${CLASSES.HIGHLIGHTED_EDGE}`).addClass(CLASSES.DIMMED);
-    this.cy.edges(`[source][target]`).forEach((e: cytoscape.EdgeSingular) => {
-      const src = e.source();
-      const tgt = e.target();
-      if (src.hasClass(CLASSES.HIGHLIGHTED) && tgt.hasClass(CLASSES.HIGHLIGHTED)) {
-        e.removeClass(CLASSES.DIMMED).addClass(CLASSES.HIGHLIGHTED_EDGE);
-      }
-    });
+    this.dimUnhighlightedEdges();
   }
 
   highlightEdgeType(edgeType: string): void {
-    this.cy.elements().removeClass(
-      [CLASSES.DIMMED, CLASSES.HIGHLIGHTED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED_EDGE].join(' '),
-    );
+    this.resetClasses();
 
     const matchingEdges = this.cy.edges(`[edgeType = "${edgeType}"]`);
     if (matchingEdges.length === 0) {
@@ -189,9 +200,7 @@ export class HighlightEngine {
   }
 
   reset(): void {
-    this.cy.elements().removeClass(
-      [CLASSES.DIMMED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED, CLASSES.HIGHLIGHTED_EDGE].join(' '),
-    );
+    this.resetClasses();
     // Clear any inline border styles set by highlightNode() (border-width,
     // border-color were set via style() to override CSS for selected nodes).
     // Without this, the inline style persists after reset() and blocks
@@ -199,7 +208,6 @@ export class HighlightEngine {
     this.cy.nodes().forEach((n: cytoscape.NodeSingular) => {
       n.style({ 'border-width': null, 'border-color': null });
     });
-    this.cy.elements().unselect();
   }
 
   clearAllNodeInlineStyles(): void {
