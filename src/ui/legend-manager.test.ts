@@ -5,10 +5,11 @@
 // handler that ArrowUp/Down wires up to cycle through the currently highlighted
 // node set within an active legend filter.
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import cytoscape from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
 import { cycleHighlightedNodes } from './legend-manager.js';
+import { uiState } from './state.js';
 import { CLASSES } from '../core/renderer.js';
 
 function makeGraph() {
@@ -111,5 +112,54 @@ describe('cycleHighlightedNodes', () => {
     const changed = cycleHighlightedNodes(1, highlight);
     expect(changed).toBe(true);
     expect(cy.$id('n1').hasClass(CLASSES.SELECTED_NODE)).toBe(true);
+  });
+
+  // ── Detail panel sync (Bug 2: cycling did not update the panel) ──────────
+
+  it('ArrowDown calls detailPanel.show with the new node id', () => {
+    const show = vi.fn();
+    const original = uiState.detailPanel;
+    // Cast through unknown: the real DetailPanel has more methods, but
+    // cycleHighlightedNodes only calls .show() on it.
+    uiState.detailPanel = { show } as unknown as typeof uiState.detailPanel;
+
+    try {
+      cy.getElementById('n1').addClass(CLASSES.HIGHLIGHTED);
+      cy.getElementById('n2').addClass(CLASSES.HIGHLIGHTED);
+      cycleHighlightedNodes(1, highlight);
+      expect(show).toHaveBeenCalledWith('n1');
+    } finally {
+      uiState.detailPanel = original;
+    }
+  });
+
+  it('detailPanel.show is called even when cycling to a different node', () => {
+    const show = vi.fn();
+    const original = uiState.detailPanel;
+    uiState.detailPanel = { show } as unknown as typeof uiState.detailPanel;
+
+    try {
+      cy.getElementById('n1').addClass(CLASSES.HIGHLIGHTED);
+      cy.getElementById('n2').addClass(CLASSES.HIGHLIGHTED);
+      cy.getElementById('n3').addClass(CLASSES.HIGHLIGHTED);
+      cy.$id('n2').addClass(CLASSES.SELECTED_NODE);
+      cy.$id('n2').select();
+      cycleHighlightedNodes(1, highlight);
+      expect(show).toHaveBeenCalledWith('n3');
+    } finally {
+      uiState.detailPanel = original;
+    }
+  });
+
+  it('does not throw when detailPanel is null (e.g. uninitialized)', () => {
+    const original = uiState.detailPanel;
+    uiState.detailPanel = null;
+    try {
+      cy.getElementById('n1').addClass(CLASSES.HIGHLIGHTED);
+      cy.getElementById('n2').addClass(CLASSES.HIGHLIGHTED);
+      expect(() => cycleHighlightedNodes(1, highlight)).not.toThrow();
+    } finally {
+      uiState.detailPanel = original;
+    }
   });
 });

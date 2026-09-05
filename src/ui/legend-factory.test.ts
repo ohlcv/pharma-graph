@@ -8,6 +8,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { attachDelegated } from './legend-factory.js';
+import { uiState } from './state.js';
 
 function makeRow(key: string): HTMLElement {
   const row = document.createElement('div');
@@ -44,13 +45,111 @@ describe('attachDelegated keyboard navigation', () => {
 
   // ── Enter / Space ─────────────────────────────────────────────────────────
 
-  it('Enter activates the focused row (existing behavior, regression)', () => {
+  it('Enter does NOT re-fire onClick (would toggle the filter off)', () => {
+    // Regression: previously Enter ran the click handler, which when the
+    // filter was already active called clearAllFilters() — so pressing
+    // Enter on the focused legend row wiped the highlight the user just
+    // asked for. Enter must be a no-op for the filter; it should open
+    // detail-panel.show() for the currently selected node instead.
     const a = makeRow('a');
     makeContainer([a]);
     attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick, onCycle);
     a.focus();
     fireKey(a, 'Enter');
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('Space does NOT re-fire onClick (same as Enter)', () => {
+    const a = makeRow('a');
+    makeContainer([a]);
+    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick, onCycle);
+    a.focus();
+    fireKey(a, ' ');
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('Enter calls detailPanel.show with the currently selected node id', () => {
+    // Stub uiState.highlight.getCy() to return a fake cy whose .nodes()
+    // returns a cytoscape-style collection with one selected node, and
+    // stub uiState.detailPanel.show as a spy. This proves the Enter handler
+    // opens the panel instead of toggling the filter — Bug 1.
+    // The fake collection is array-like: `length` and indexed `[i]` give
+    // back nodes whose `.id()` returns the node id (matching cy semantics).
+    const fakeNode = { id: () => 'selected-1' };
+    const fakeCollection = [fakeNode];
+    fakeCollection.length = 1;
+    const show = vi.fn();
+    const fakeHighlight = { getCy: () => ({ nodes: () => fakeCollection }) } as never;
+    const fakePanel = { show } as never;
+    const savedH = uiState.highlight;
+    const savedP = uiState.detailPanel;
+    uiState.highlight = fakeHighlight;
+    uiState.detailPanel = fakePanel as never;
+
+    try {
+      const a = makeRow('a');
+      makeContainer([a]);
+      attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick, onCycle);
+      a.focus();
+      fireKey(a, 'Enter');
+      expect(show).toHaveBeenCalledWith('selected-1');
+      expect(onClick).not.toHaveBeenCalled(); // filter must NOT be toggled
+    } finally {
+      uiState.highlight = savedH;
+      uiState.detailPanel = savedP;
+    }
+  });
+
+  it('Enter is a no-op when no node is selected (no filter toggle)', () => {
+    const show = vi.fn();
+    const fakeCollection: unknown[] = [];
+    fakeCollection.length = 0;
+    const fakeHighlight = { getCy: () => ({ nodes: () => fakeCollection }) } as never;
+    const savedH = uiState.highlight;
+    const savedP = uiState.detailPanel;
+    uiState.highlight = fakeHighlight;
+    uiState.detailPanel = { show } as never;
+
+    try {
+      const a = makeRow('a');
+      makeContainer([a]);
+      attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick, onCycle);
+      a.focus();
+      fireKey(a, 'Enter');
+      expect(show).not.toHaveBeenCalled();
+      expect(onClick).not.toHaveBeenCalled();
+    } finally {
+      uiState.highlight = savedH;
+      uiState.detailPanel = savedP;
+    }
+  });
+
+  it('Enter preventDefault is called so the page does not scroll', () => {
+    const a = makeRow('a');
+    makeContainer([a]);
+    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick, onCycle);
+    a.focus();
+    const ev = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    a.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(true);
+  });
+
+  // ── Click still works (regression — Enter change must not break click) ──
+
+  it('Click still routes through onClick with the row key', () => {
+    const a = makeRow('a');
+    makeContainer([a]);
+    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick, onCycle);
+    a.click();
     expect(onClick).toHaveBeenCalledWith('a', null);
+  });
+
+  it('dataKey prefix is stripped for Click lookups (regression for dataset lookup)', () => {
+    const a = makeRow('xyz');
+    makeContainer([a]);
+    attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick, onCycle);
+    a.click();
+    expect(onClick).toHaveBeenCalledWith('xyz', null);
   });
 
   // ── ArrowUp/Down with onCycle ─────────────────────────────────────────────
@@ -92,12 +191,18 @@ describe('attachDelegated keyboard navigation', () => {
 
   // ── Dataset prefix regression ─────────────────────────────────────────────
 
-  it('dataKey prefix is stripped (regression for dataset lookup)', () => {
-    const a = makeRow('xyz');
+  it('ArrowDown on a row with mixed-content key reads it correctly via dataset', () => {
+    // Regression: previously `row.dataset['data-type']` returned undefined
+    // for keys with the `data-` prefix. Click + Enter worked around this
+    // (Enter fired click too, click uses dataset too — actually dataset
+    // with prefix returns undefined here too; click worked only by accident
+    // via bare attribute access). ArrowDown has no click fallback so it
+    // needs the dsKey fix.
+    const a = makeRow('weird-key_123');
     makeContainer([a]);
     attachDelegated(a.parentElement!, '.legend-row[data-type]', 'data-type', onClick, onCycle);
     a.focus();
-    fireKey(a, 'Enter');
-    expect(onClick).toHaveBeenCalledWith('xyz', null);
+    fireKey(a, 'ArrowDown');
+    expect(onCycle).toHaveBeenCalledWith('weird-key_123', 1, null);
   });
 });

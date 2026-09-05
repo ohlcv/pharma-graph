@@ -9,6 +9,7 @@
 import type { Core } from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
 import { staticEls } from './dom-cache.js';
+import { uiState } from './state.js';
 import {
   SHAPE_LABEL,
   ESSENCE_LABEL,
@@ -73,26 +74,8 @@ export function populateEssenceLegend(cy: Core): void {
     dataKey: 'data-type',
     desktopRow: (k, label) => `<div class="legend-row" data-type="${k}">${makeEssenceSwatch(k, NODE_TYPE_SHAPE_MAP[k] ?? 'rectangle')}<span class="legend-row__label">${label}</span><span class="legend-row__count" id="legend-essence-count-${k}"></span></div>`,
     mobileChip: (k, label) => `<div class="bs-chip" data-type="${k}">${makeEssenceSwatch(k, NODE_TYPE_SHAPE_MAP[k] ?? 'rectangle')}<span>${label}</span><span class="bs-chip__count" id="bs-essence-count-${k}"></span></div>`,
-    onClick: (key, highlight) => highlightEssenceLegend(key, highlight),
+    onClick: (key, highlight) => highlightShape(key, highlight),
     onCycle: (_key, delta, highlight) => { cycleHighlightedNodes(delta, highlight); },
-  });
-}
-
-export function highlightEssenceLegend(essence: string, highlight: HighlightEngine): void {
-  if (activeShapeFilter === essence) {
-    clearAllFilters();
-    highlight.reset();
-    return;
-  }
-  clearAllFilters();
-  activeShapeFilter = essence;
-  highlight.highlightEssence(essence);
-
-  staticEls('.legend-row[data-type]').forEach((el) => {
-    if (el.dataset.type === essence) el.classList.add('active');
-  });
-  staticEls('.bs-chip[data-type]').forEach((el) => {
-    if (el.dataset.type === essence) el.classList.add('active');
   });
 }
 
@@ -195,11 +178,20 @@ export function cycleHighlightedNodes(
     duration: 400,
     easing: 'ease-out-cubic',
   });
+
+  // Keep the detail panel in sync with the cycled node. cy.select() doesn't
+  // fire 'tap node', so the graph-events handler that normally calls
+  // detailPanel.show() never runs here.
+  uiState.detailPanel?.show(target.id());
   return true;
 }
 
 // ── Filter highlight handlers ──────────────────────────────────────────────────
 
+/**
+ * Highlight nodes by essence type (for legend clicks).
+ * @deprecated Use highlightEssence instead - kept for API compatibility with action-handlers.
+ */
 export function highlightShape(essence: string, highlight: HighlightEngine): void {
   if (activeShapeFilter === essence) {
     clearAllFilters();
@@ -208,19 +200,14 @@ export function highlightShape(essence: string, highlight: HighlightEngine): voi
   }
   clearAllFilters();
   activeShapeFilter = essence;
-  const shape = NODE_TYPE_SHAPE_MAP[essence] ?? essence;
-  highlight.highlightShape(shape);
+  // Use highlightEssence for accurate essence-based filtering
+  highlight.highlightEssence(essence);
 
   staticEls('.legend-row[data-type]').forEach((el) => {
     if (el.dataset.type === essence) el.classList.add('active');
   });
   staticEls('.bs-chip[data-type]').forEach((el) => {
     if (el.dataset.type === essence) el.classList.add('active');
-  });
-  staticEls('.shape-filter-item').forEach((el) => {
-    const label = el.querySelector('.shape-filter-item__label')?.textContent ?? '';
-    const shapeName = Object.entries(SHAPE_LABEL).find(([, v]) => v === label)?.[0] ?? label;
-    if (shapeName === essence || label.toLowerCase().includes(essence)) el.classList.add('active');
   });
 }
 

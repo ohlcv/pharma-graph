@@ -103,10 +103,11 @@ export function attachDelegated(
     if (e.key === 'Enter' || e.key === ' ') {
       const row = (e.target as HTMLElement).closest<HTMLElement>(selector);
       if (!row) return;
-      const key = row.dataset[dsKey] ?? '';
-      if (!key) return;
       e.preventDefault();
-      onClick(key, uiState.highlight!);
+      // Enter on a focused legend row should NOT toggle the filter (that
+      // would cancel an active highlight). Instead, open the currently
+      // selected node's detail panel if one is in the highlighted set.
+      openSelectedNodeDetail();
       return;
     }
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
@@ -117,6 +118,20 @@ export function attachDelegated(
     e.preventDefault();
     onCycle(key, e.key === 'ArrowDown' ? 1 : -1, uiState.highlight!);
   });
+}
+
+/**
+ * Open the currently-selected node's detail panel, if any.
+ * Used by Enter/Space on a legend row. Does nothing when nothing is
+ * selected, so pressing Enter repeatedly never tears down an active filter.
+ */
+function openSelectedNodeDetail(): void {
+  const cy = uiState.highlight?.getCy();
+  const panel = uiState.detailPanel;
+  if (!cy || !panel) return;
+  const selected = cy.nodes('.selected-node');
+  if (selected.length === 0) return;
+  panel.show(selected[0].id());
 }
 
 function updateCount(
