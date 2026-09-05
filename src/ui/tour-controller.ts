@@ -81,6 +81,8 @@ export class TourController {
       strategy: uiState.tour.strategy,
       onStep:           (info) => this.onStep(info),
       onStepAfterCenter:(info) => { this.detailPanel.show(info.nodeId); },
+      onPause:          () => this.onEnginePause(),
+      onResume:         () => this.onEngineResume(),
       onComplete:       (reason) => this.onComplete(reason),
     });
     this.running = true;
@@ -194,6 +196,48 @@ export class TourController {
         case 'toggle-strategy': this.toggleStrategy(); break;
       }
     });
+
+    // Keyboard shortcuts for the active tour. Bound on document so the
+    // shortcut works regardless of where focus lives, with the standard
+    // "skip if the user is typing" guard.
+    document.addEventListener('keydown', (e) => this.onTourKey(e));
+  }
+
+  /**
+   * Tour keyboard shortcuts:
+   *   Space       → toggle pause/resume (only while a tour is running)
+   *   ArrowUp     → previous step (only while running)
+   *   ArrowDown   → next step     (only while running)
+   * Ignored when focus is in an editable element so search inputs / sliders
+   * (which already use Space) are not hijacked.
+   */
+  private onTourKey(e: KeyboardEvent): void {
+    if (!this.running && !this.paused) return;
+    const t = e.target as HTMLElement | null;
+    if (t && this.isEditable(t)) return;
+
+    if (e.key === ' ' || e.code === 'Space') {
+      e.preventDefault();
+      this.togglePause();
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      this.prev();
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      this.next();
+      return;
+    }
+  }
+
+  private isEditable(el: HTMLElement): boolean {
+    if (el.isContentEditable) return true;
+    const tag = el.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    return false;
   }
 
   private bindSliders(): void {
@@ -396,6 +440,26 @@ export class TourController {
   }
 
   // ── Engine callbacks ───────────────────────────────────────────────────────
+
+  /**
+   * Engine entered paused state (either via pause(), or implicitly because
+   * prev()/next() backs off the auto-schedule). Sync controller flags and
+   * flip the play/pause icon CSS so the toolbar button reflects reality —
+   * previously the controller's `paused` flag stayed `false` here because
+   * prev/next only flipped the engine's internal `paused`, leaving the
+   * play/pause icon out of sync.
+   */
+  private onEnginePause(): void {
+    this.paused = true;
+    this.running = true;
+    this.setRunningUI();
+  }
+
+  private onEngineResume(): void {
+    this.paused = false;
+    this.running = true;
+    this.setRunningUI();
+  }
 
   private onStep(info: TourStepInfo): void {
     this.running = true;

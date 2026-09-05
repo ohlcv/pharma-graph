@@ -58,6 +58,17 @@ function setupDom() {
   }
 }
 
+// Per-test cleanup: mount() registers keydown + click listeners on
+// `document`. Without cleanup, listeners from earlier tests still fire on
+// later tests' keydowns — Bug: a fake engine from one test that lacks
+// prev/next would throw when invoked by a later test's keydown event.
+// jsdom doesn't expose a removeAllListeners, so we register each
+// listener through a wrapper that exposes an unbind. The wrapper is
+// invoked after each test.
+//
+// We do this by NOT calling mount() in tests; instead we only invoke the
+// `bindActions()` side-effect via a helper that returns an unbind fn.
+// The keyboard shortcut logic lives in onTourKey — we drive it directly.
 function makeController(): TourController {
   const cy = cytoscape({ headless: true, styleEnabled: false });
   cy.add({ group: 'nodes', data: { id: 'a', label: 'A' } });
@@ -75,10 +86,13 @@ function makeController(): TourController {
  * at compile time rather than as silently-skipped tests.
  */
 type PrivateControllerFields = {
-  engine: Pick<TourEngine, 'start' | 'isRunning' | 'isPaused' | 'stop'> | null;
+  engine: Pick<TourEngine, 'start' | 'isRunning' | 'isPaused' | 'stop' | 'pause' | 'resume' | 'prev' | 'next'> | null;
   running: boolean;
   paused: boolean;
   onComplete: (reason: 'depth-reached' | 'no-more-restarts' | 'no-root') => void;
+  onEnginePause: () => void;
+  onEngineResume: () => void;
+  onTourKey: (e: KeyboardEvent) => void;
 };
 function poke(c: TourController): PrivateControllerFields {
   return c as unknown as PrivateControllerFields;
@@ -100,6 +114,10 @@ function captureOnComplete(controller: TourController) {
     isRunning: () => false,
     isPaused: () => false,
     stop: () => {},
+    pause: () => {},
+    resume: () => {},
+    prev: () => {},
+    next: () => {},
   };
   // Inject the fake engine by reaching into the controller's private
   // `engine` slot — see `poke()` for why this is type-safe at compile
@@ -196,5 +214,162 @@ describe('TourController.onComplete — issue #16 reason branching', () => {
     // name stays at its prior value. We just assert onComplete finishes
     // cleanly and resets the running flag.
     expect(p.running).toBe(false);
+  });
+});
+
+// ── Bug: prev()/next() flipped engine paused but controller UI was stale ────
+//
+// When prev()/next() fired, the engine paused itself and invoked onPause —
+// but the controller never received onPause, so documentElement's
+// tour-state--* class never changed. Play/pause icon stayed on "play" while
+// the engine was paused. Fix: wire onPause/onResume callbacks into the
+// engine when starting, and have them sync controller state + UI class.
+
+describe('TourController — icon sync after prev()/next()', () => {
+  beforeEach(setupDom);
+
+  it('onEnginePause sets paused=true and writes tour-state--paused', () => {
+    const c = makeController();
+    const p = poke(c);
+    p.running = true;
+    p.paused = false;
+    document.documentElement.classList.add('tour-state--running');
+    p.onEnginePause();
+    expect(p.paused).toBe(true);
+    expect(p.running).toBe(true);
+    expect(document.documentElement.classList.contains('tour-state--paused')).toBe(true);
+    expect(document.documentElement.classList.contains('tour-state--running')).toBe(false);
+  });
+
+  it('onEngineResume clears paused and writes tour-state--running', () => {
+    const c = makeController();
+    const p = poke(c);
+    p.running = true;
+    p.paused = true;
+    document.documentElement.classList.add('tour-state--paused');
+    p.onEngineResume();
+    expect(p.paused).toBe(false);
+    expect(p.running).toBe(true);
+    expect(document.documentElement.classList.contains('tour-state--running')).toBe(true);
+    expect(document.documentElement.classList.contains('tour-state--paused')).toBe(false);
+  });
+});
+
+// ── Keyboard shortcuts: Space = pause, ArrowUp/Down = prev/next ─────────────
+
+describe('TourController — keyboard shortcuts', () => {
+  beforeEach(setupDom);
+
+  function fireKey(key: string, code?: string): KeyboardEvent {
+    return new KeyboardEvent('keydown', { key, code, bubbles: true, cancelable: true });
+  }
+
+  it('Space toggles pause while running', () => {
+    const c = makeController();
+    const p = poke(c);
+    p.running = true;
+    p.paused = false;
+    const engine = {
+      isRunning: () => true,
+      isPaused: () => false,
+      pause: vi.fn(),
+      resume: vi.fn(),
+    };
+    p.engine = engine as unknown as typeof p.engine;
+    const ev = fireKey(' ', 'Space');
+    p.onTourKey(ev);
+    expect(engine.pause).toHaveBeenCalled();
+    expect(ev.defaultPrevented).toBe(true);
+  });
+
+  it('Space resumes while paused', () => {
+    const c = makeController();
+    const p = poke(c);
+    p.running = true;
+    p.paused = true;
+    const engine = {
+      isRunning: () => false,
+      isPaused: () => true,
+      pause: vi.fn(),
+      resume: vi.fn(),
+    };
+    p.engine = engine as unknown as typeof p.engine;
+    p.onTourKey(fireKey(' ', 'Space'));
+    expect(engine.resume).toHaveBeenCalled();
+  });
+
+  it('ArrowUp calls prev while running', () => {
+    const c = makeController();
+    const p = poke(c);
+    p.running = true;
+    p.paused = false;
+    const engine = {
+      isRunning: () => true,
+      isPaused: () => false,
+      prev: vi.fn(),
+      next: vi.fn(),
+    };
+    p.engine = engine as unknown as typeof p.engine;
+    p.onTourKey(fireKey('ArrowUp'));
+    expect(engine.prev).toHaveBeenCalled();
+  });
+
+  it('ArrowDown calls next while running', () => {
+    const c = makeController();
+    const p = poke(c);
+    p.running = true;
+    p.paused = false;
+    const engine = {
+      isRunning: () => true,
+      isPaused: () => false,
+      prev: vi.fn(),
+      next: vi.fn(),
+    };
+    p.engine = engine as unknown as typeof p.engine;
+    p.onTourKey(fireKey('ArrowDown'));
+    expect(engine.next).toHaveBeenCalled();
+  });
+
+  it('keyboard shortcuts are inert when no tour is active', () => {
+    const c = makeController();
+    const p = poke(c);
+    p.running = false;
+    p.paused = false;
+    const engine = {
+      isRunning: () => false,
+      isPaused: () => false,
+      pause: vi.fn(),
+      resume: vi.fn(),
+      prev: vi.fn(),
+      next: vi.fn(),
+    };
+    p.engine = engine as unknown as typeof p.engine;
+    p.onTourKey(fireKey(' '));
+    p.onTourKey(fireKey('ArrowUp'));
+    p.onTourKey(fireKey('ArrowDown'));
+    expect(engine.pause).not.toHaveBeenCalled();
+    expect(engine.prev).not.toHaveBeenCalled();
+    expect(engine.next).not.toHaveBeenCalled();
+  });
+
+  it('Space inside an <input> is NOT hijacked by the tour shortcut', () => {
+    const c = makeController();
+    const p = poke(c);
+    p.running = true;
+    p.paused = false;
+    const engine = {
+      isRunning: () => true,
+      isPaused: () => false,
+      pause: vi.fn(),
+      resume: vi.fn(),
+    };
+    p.engine = engine as unknown as typeof p.engine;
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    const ev = fireKey(' ', 'Space');
+    Object.defineProperty(ev, 'target', { value: input, configurable: true });
+    p.onTourKey(ev);
+    expect(engine.pause).not.toHaveBeenCalled();
+    expect(ev.defaultPrevented).toBe(false);
   });
 });
