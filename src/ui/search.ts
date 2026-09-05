@@ -16,6 +16,7 @@
 import cytoscape from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
 import { forEachStatic } from './dom-cache.js';
+import { clearAllFilters } from './legend-manager.js';
 import { focusOnNode } from './focus-node.js';
 
 export class Search {
@@ -42,6 +43,9 @@ export class Search {
    * Returns the ordered list of matching node IDs.
    */
   search(query: string): string[] {
+    // Clear any active legend filter so the search results aren't
+    // contaminated by a previously active shape/edge filter.
+    clearAllFilters();
     this.results = this.highlight.highlightSearch(query);
     this._activeIndex = -1;
     this._hasNavigated = false;
@@ -106,6 +110,7 @@ export class Search {
     this.results = [];
     this._activeIndex = -1;
     this._hasNavigated = false;
+    clearAllFilters();
     forEachStatic((el) => el.classList.remove('active'), '.legend-row', '.bs-chip');
     this.highlight.reset();
     this.announce('搜索已清除');

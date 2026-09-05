@@ -33,7 +33,7 @@ export function clearShapeFilter(): void {
   activeShapeFilter = null;
 }
 
-function clearAllFilters(): void {
+export function clearAllFilters(): void {
   activeShapeFilter = null;
   activeEdgeFilter = null;
   staticEls(

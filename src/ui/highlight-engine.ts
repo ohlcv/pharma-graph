@@ -192,6 +192,13 @@ export class HighlightEngine {
     this.cy.elements().removeClass(
       [CLASSES.DIMMED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED, CLASSES.HIGHLIGHTED_EDGE].join(' '),
     );
+    // Clear any inline border styles set by highlightNode() (border-width,
+    // border-color were set via style() to override CSS for selected nodes).
+    // Without this, the inline style persists after reset() and blocks
+    // CSS-based dimming/highlighting from taking effect.
+    this.cy.nodes().forEach((n: cytoscape.NodeSingular) => {
+      n.style({ 'border-width': null, 'border-color': null });
+    });
     this.cy.elements().unselect();
   }
 
