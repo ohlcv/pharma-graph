@@ -5,8 +5,8 @@ data:
   essence: strict-class
   location:
     book: 药学专业知识二
-    chapter: 精神与中枢神经系统用药
-    section: 抗癫痫发作药物
+    chapter: 第一章 精神与中枢神经系统用药
+    section: 第二节 抗癫痫发作药物
   tags:
     - NMDA受体
     - 谷氨酸受体

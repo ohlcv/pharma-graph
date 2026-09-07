@@ -5,8 +5,8 @@ data:
   essence: mnemonic
   location:
     book: 药学专业知识二
-    chapter: 解热、镇痛、抗炎、抗风湿及抗痛风药
-    section: 解热、镇痛、抗炎药
+    chapter: 第二章 解热、镇痛、抗炎、抗风湿及抗痛风药
+    section: 第一节 解热、镇痛、抗炎药
   tags:
     - 选择性COX-2抑制剂
   summary:

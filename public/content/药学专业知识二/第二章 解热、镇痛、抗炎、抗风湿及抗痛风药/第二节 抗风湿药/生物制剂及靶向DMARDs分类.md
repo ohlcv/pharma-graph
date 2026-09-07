@@ -5,8 +5,8 @@ data:
   essence: umbrella-class
   location:
     book: 药学专业知识二
-    chapter: 解热、镇痛、抗炎、抗风湿及抗痛风药
-    section: 抗风湿药
+    chapter: 第二章 解热、镇痛、抗炎、抗风湿及抗痛风药
+    section: 第二节 抗风湿药
   tags:
     - 生物制剂
     - 靶向改善病情的抗风湿药
