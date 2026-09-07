@@ -25,6 +25,8 @@ export interface DebugBridge {
   overlay: () => void;
   node: (id: string) => Record<string, unknown> | string;
   selected: () => Array<{ id: string; label: string; dimmed: boolean }>;
+  /** 预览漫游顺序。控制台调用：_dbg.previewSequence() / _dbg.previewSequence('has-dfs') */
+  previewSequence: (strategyId?: string) => void;
 }
 
 export function installDebugBridge(renderer: Renderer): void {
@@ -56,6 +58,12 @@ export function installDebugBridge(renderer: Renderer): void {
         label: n.data('label'),
         dimmed: n.hasClass('dimmed'),
       }));
+    },
+    previewSequence: (strategyId?: string) => {
+      import('../core/tour.js').then(({ TourEngine }) => {
+        const temp = new TourEngine(cy);
+        temp.previewSequence(strategyId as 'has-dfs' | 'topo-prereq' | undefined);
+      });
     },
   };
 

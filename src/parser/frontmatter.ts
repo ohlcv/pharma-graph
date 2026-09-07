@@ -9,7 +9,7 @@
 // but `data.data.id` would mean a nested-block user error — we resolve it
 // safely by treating the nested map as the source of truth when present.
 
-import { parse as yamlParse } from 'yaml';
+import { parse as yamlParse, stringify as yamlStringify } from 'yaml';
 import { DEFAULT_EDGE_TYPE } from '../core/edge-types.js';
 
 // --- frontmatter 字段类型 ---
@@ -293,4 +293,38 @@ function describe(v: unknown): string {
   if (v === null) return 'null';
   if (Array.isArray(v)) return 'array';
   return typeof v;
+}
+
+// ── Serialisation ─────────────────────────────────────────────────────────────
+
+/** 序列化 ParsedFrontmatter + 正文，回写到 .md 文件的格式。 */
+export function stringifyFrontmatter(
+  fm: ParsedFrontmatter,
+  body: string,
+): string {
+  const top: Record<string, unknown> = {};
+
+  if (fm.id)              top['id']     = fm.id;
+  if (fm.label)           top['label']  = fm.label;
+  if (fm.essence)         top['essence'] = fm.essence;
+  if (fm.shortSummary || fm.fullSummary) {
+    top['summary'] = fm.shortSummary ?? fm.fullSummary;
+  }
+  if (fm.edges_out?.length) top['edges_out'] = fm.edges_out;
+  if (fm.tags?.length)      top['tags']      = fm.tags;
+
+  if (fm.location) {
+    const loc: Record<string, unknown> = {};
+    if (fm.location.book)       loc['book']       = fm.location.book;
+    if (fm.location.part)        loc['part']        = fm.location.part;
+    if (fm.location.chapter)     loc['chapter']     = fm.location.chapter;
+    if (fm.location.section)    loc['section']    = fm.location.section;
+    if (fm.location.point)      loc['point']      = fm.location.point;
+    if (fm.location.item)       loc['item']       = fm.location.item;
+    if (fm.location.subsection) loc['subsection'] = fm.location.subsection;
+    if (Object.keys(loc).length > 0) top['location'] = loc;
+  }
+
+  const yamlStr = yamlStringify(top, { indent: 2, lineWidth: 0 });
+  return `---\n${yamlStr}---\n${body}`;
 }

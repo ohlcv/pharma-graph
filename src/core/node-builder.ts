@@ -1,10 +1,11 @@
 // src/core/node-builder.ts
-// Node CLI entry — loads frontmatter from disk, derives NodeLocation from
-// the file path, and produces NodeData via the shared buildGraph helper.
+// Node CLI entry — loads frontmatter from disk and produces NodeData via
+// the shared buildGraph helper.  Location is read entirely from frontmatter
+// (location.book / chapter / section / item …).  No path inference.
 
 import fs from 'fs/promises';
 import { parseFrontmatter, parseFrontmatterWithWarnings } from '../parser/frontmatter.js';
-import { NodeData, NodeLocation } from './graph.js';
+import { NodeData } from './graph.js';
 import { buildGraph } from './build-graph.js';
 import type { ParsedFrontmatter, ParseWarning } from '../parser/frontmatter.js';
 
@@ -46,29 +47,8 @@ export async function loadAllFrontmatterWithWarnings(
 }
 
 /**
- * Convert an absolute path to a NodeLocation object based on the content/
- * subdirectory layout:
- *   content/<book>/<part?>/<chapter?>/<section?>/<subsection?>/<item?>
- */
-function toLocation(filePath: string): NodeLocation {
-  const parts = filePath.split(/[/\\]/);
-  const idx = parts.findIndex((p) => p === 'content');
-  if (idx === -1) return {};
-  const slice = parts.slice(idx + 1);
-  return {
-    book:      slice[0] ?? undefined,
-    part:      slice[1] ?? undefined,
-    chapter:   slice[2] ?? undefined,
-    section:   slice[3] ?? undefined,
-    subsection: slice[4] ?? undefined,
-    item:      slice[5] ?? undefined,
-  };
-}
-
-/**
- * Inject the file-derived location into every node, then delegate to buildGraph.
- * location lives outside frontmatter, so it has to be threaded in here rather
- * than inside the shared builder.
+ * Build NodeData array.  location comes exclusively from frontmatter —
+ * see {@link stringifyFrontmatter} for the migration that populated it.
  */
 export async function buildNodes(filePaths: string[]): Promise<NodeData[]> {
   const frontmatters = await loadAllFrontmatter(filePaths);
@@ -78,7 +58,11 @@ export async function buildNodes(filePaths: string[]): Promise<NodeData[]> {
     const fm = frontmatters.get(fp);
     if (fm?.id) pathById.set(fm.id, fp);
   }
-  return nodes.map((n) => ({ ...n, location: toLocation(pathById.get(n.id) ?? '') }));
+  return nodes.map((n) => {
+    const fm = frontmatters.get(pathById.get(n.id) ?? '');
+    // location 完全来自 frontmatter，不依赖文件路径
+    return { ...n, location: fm?.location };
+  });
 }
 
 /**

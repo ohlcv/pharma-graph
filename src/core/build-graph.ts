@@ -256,6 +256,7 @@ export function buildGraph(
       // never silently lose the file context.
       sourcePath: fp.startsWith('../../content/') ? fp.slice('../../content/'.length) : fp,
       weight: degree[fm.id] ?? 1,
+      edges_out: fm.edges_out ?? [],
     });
   }
 

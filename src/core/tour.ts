@@ -288,7 +288,7 @@ export function extractSectionNumber(section: string): number {
 
 // Full location sort key: book > part/chapter > section > subsection > item
 // book级总入口（无chapter也无part）用 chapterNum='000'，排在该 book 的最前面。
-function getLocationKey(node: cytoscape.NodeSingular): string {
+export function getLocationKey(node: cytoscape.NodeSingular): string {
   const book       = getLocationBook(node);
   const chapter    = getLocationChapter(node);
   const part       = getLocationPart(node);
@@ -326,10 +326,239 @@ registerStrategy({
   id: 'has-dfs',
   label: '教材顺序（深度优先）',
   buildSequence(cy) {
-    // 直接按 location 字段全局排序：book > part > chapter > section > subsection > item
-    // 这比 has 边 DFS 更可靠——location 已完整编码教材层级，DFS 反而因边覆盖不均引入乱序。
-    // 内部用 seen 做去重（第一次访问全图时 seen 必为空）。
-    return buildLocationFallbackSeq(cy, new Set());
+    // 书籍优先级：y2(药二)→y3(药综)→y1(药一)→y4(法规)
+    // key 兼容正则捕获的 'y2'/'2' 两种格式
+    const BOOK_ORDER: Record<string, number> = { 'y2': 0, '2': 0, 'y3': 1, '3': 1, 'y1': 2, '1': 2, 'y4': 3, '4': 3 };
+    // bookOrder: 兼容 book-y4（末尾无 dash）和 sec-gcs-y2-08-02（末尾有 dash）
+    const getBookOrder = (node: cytoscape.NodeSingular): number => {
+      const id = node.id();
+      const m = id.match(/-y(\d)(?:-|$)/);
+      return m ? (BOOK_ORDER[m[1]] ?? 99) : 99;
+    };
+
+    const nodes = cy.nodes().not('.layer-parent').toArray();
+
+    // umbrella / module 定义
+    const isUmbrella = (e: string) => e.startsWith('umbrella') || e === 'module';
+
+    // 建立 parentMap[childId] = parentId（通过 subclass_of / instance_of 边）
+    const parentMap = new Map<string, string>();
+    for (const n of nodes) {
+      const edges_out = n.data('edges_out') as Array<Record<string, string>> | undefined;
+      if (!edges_out) continue;
+      for (const edge of edges_out) {
+        if (edge.type === 'subclass_of' || edge.type === 'instance_of') {
+          parentMap.set(n.id(), edge.target);
+          break;
+        }
+      }
+    }
+
+    // children[parentId] = [所有子节点，按 location key 排序]
+    // parentMap 用 subclass_of/instance_of（单父，OWL 语义），children 额外纳入 part_of（多父）
+    // —— part_of 一个节点可以挂在多个父下（口诀同时挂在药物 A 和伞 B 下），
+    //    多父是 part_of 的天然语义；visited 在 DFS 层防重，不会重复 push。
+    const children = new Map<string, cytoscape.NodeSingular[]>();
+    for (const n of nodes) {
+      const parent = parentMap.get(n.id());
+      // 无论有没有子类/实例父，part_of 边都额外建一遍关系
+      const edges_out = n.data('edges_out') as Array<Record<string, string>> | undefined;
+      const partOfTargets = (edges_out ?? [])
+        .filter((e) => e.type === 'part_of')
+        .map((e) => e.target);
+      if (parent) {
+        if (!children.has(parent)) children.set(parent, []);
+        children.get(parent)!.push(n);
+      }
+      for (const partOf of partOfTargets) {
+        // 同一个父不要重复 push（part_of 自身可能有重复条目）
+        if (partOf === parent) continue;
+        if (!children.has(partOf)) children.set(partOf, []);
+        children.get(partOf)!.push(n);
+      }
+    }
+    for (const [, arr] of children) {
+      arr.sort((a, b) => {
+        const la = getLocationKey(a), lb = getLocationKey(b);
+        return la < lb ? -1 : la > lb ? 1 : 0;
+      });
+    }
+
+    // TYPE_ORDER：umbrella-class → strict → drug → med → memo → notion
+    // 注意：umbrella-class 必须在这里，否则不会递归其子节点
+    const TYPE_ORDER = ['umbrella-class', 'strict', 'drug', 'med', 'memo', 'notion'];
+
+    // 收集 umbrella 树中所有节点（umbrella 自身 + 所有子孙）
+    const umbrellaTreeNodes = new Set<string>();
+    const collectTree = (parentId: string) => {
+      umbrellaTreeNodes.add(parentId);
+      for (const k of children.get(parentId) ?? []) collectTree(k.id());
+    };
+
+    // 每次调用 sort 时重置，避免 HMR/多次调用时累加
+    const result: string[] = [];
+    const visited = new Set<string>();
+
+    // DFS：type-order 顺序遍历子节点；visited 防重；递归所有子节点以确保伞树完整遍历
+    const dfsChildren = (parentId: string) => {
+      for (const type of TYPE_ORDER) {
+        const kids = (children.get(parentId) ?? []).filter(
+          (k) => (k.data('essence') as string)?.startsWith(type),
+        );
+        for (const k of kids) {
+          if (!visited.has(k.id())) {
+            visited.add(k.id());
+            result.push(k.id());
+          }
+          dfsChildren(k.id());
+        }
+      }
+      // 其他所有类型（非上述 TYPE_ORDER）
+      for (const k of (children.get(parentId) ?? []).filter(
+        (k) => !TYPE_ORDER.some((t) => (k.data('essence') as string)?.startsWith(t)),
+      )) {
+        if (!visited.has(k.id())) {
+          visited.add(k.id());
+          result.push(k.id());
+        }
+        dfsChildren(k.id());
+      }
+    };
+
+    // ── 第一步：按教材顺序遍历 umbrella 树 ────────────────────────────────
+    // 1. 所有 umbrella 节点（已加入 umbrellaTreeNodes）
+    const allUmbrellas = nodes.filter((n) => isUmbrella((n.data('essence') as string) ?? ''));
+    for (const u of allUmbrellas) collectTree(u.id());
+
+    // 2. umbrella 排序：
+    //   - module 节点（书籍/章/节）→ 先按 book 顺序，再按 location key
+    //   - umbrella 节点 → 直接按 location key
+    const sortedUmbrellas = allUmbrellas.sort((a, b) => {
+      const aIsModule = (a.data('essence') as string) === 'module';
+      const bIsModule = (b.data('essence') as string) === 'module';
+      if (aIsModule && !bIsModule) return -1;
+      if (!aIsModule && bIsModule) return 1;
+      // 同类型：module 用 book 顺序，umbrella 用 location key
+      if (aIsModule) {
+        const ba = getBookOrder(a), bb = getBookOrder(b);
+        if (ba !== bb) return ba - bb;
+      }
+      const la = getLocationKey(a), lb = getLocationKey(b);
+      return la < lb ? -1 : la > lb ? 1 : 0;
+    });
+
+    for (const umbrella of sortedUmbrellas) {
+      if (visited.has(umbrella.id())) continue;
+      visited.add(umbrella.id());
+      result.push(umbrella.id());
+      dfsChildren(umbrella.id());
+    }
+
+    // ── 第二步：收集 umbrella 树中没出现过的节点 ─────────────────────────
+    // umbrellaTreeNodes 已经包含 umbrella 自身 + 所有子孙（含 part_of 边）
+    // inTree 仅用 umbrella DFS 的 visited 结果，不混入 standalone DFS 的内容
+    const inTree = new Set<string>();
+    for (const umbrella of sortedUmbrellas) {
+      inTree.add(umbrella.id());
+      const dfsVisit = (parentId: string) => {
+        for (const k of children.get(parentId) ?? []) {
+          if (!inTree.has(k.id())) { inTree.add(k.id()); dfsVisit(k.id()); }
+        }
+      };
+      dfsVisit(umbrella.id());
+    }
+
+    const standalone: cytoscape.NodeSingular[] = [];
+    for (const n of nodes) {
+      if (inTree.has(n.id())) continue;
+      // 跳过 layer-parent（已在 .not('.layer-parent') 过滤）
+      standalone.push(n);
+    }
+
+    // standalone 节点包括：口诀(mnemonic)、总结(summary)、概念(concept)、笔记(notion)
+    // 以及 umbrella 树中漏掉的 strict-class 节点
+
+    // ── 建立 standalone 子节点 map ───────────────────────────────────────
+    const standaloneChildren = new Map<string, cytoscape.NodeSingular[]>();
+    // 从所有 nodes 中，对 parentMap 里没有的节点建立独立子节点关系
+    for (const n of nodes) {
+      if (inTree.has(n.id())) continue; // 已在 umbrella 树中
+      const parent = parentMap.get(n.id());
+      if (!parent) continue; // 无父节点，跳过
+      if (!standaloneChildren.has(parent)) standaloneChildren.set(parent, []);
+      standaloneChildren.get(parent)!.push(n);
+    }
+    // 按 location key 排序 standalone 子节点
+    for (const [, arr] of standaloneChildren) {
+      arr.sort((a, b) => {
+        const la = getLocationKey(a), lb = getLocationKey(b);
+        return la < lb ? -1 : la > lb ? 1 : 0;
+      });
+    }
+
+    // TYPE_ORDER（standalone DFS）：concept → memo → notion → sum → strict
+    const STANDALONE_TYPE_ORDER = ['concept', 'memo', 'notion', 'sum', 'strict'];
+
+    // 收集 standalone 的根节点（parentMap 中 key 但不在 standaloneChildren 的 parent 里）
+    const standaloneRoots = standaloneChildren.size > 0
+      ? [...standaloneChildren.keys()].filter((pid) => {
+          // pid 是 parent，找出它自己是不是 standalone 根（parentMap 里它的 parent 不在 standaloneChildren 中）
+          const pp = parentMap.get(pid);
+          return !pp || !standaloneChildren.has(pp);
+        }).map((pid) => cy.nodes(`#${pid}`).first())
+      : [];
+
+    // 其实更简单：直接取所有 standalone 节点，按 book+location 排序，第一个就是"根"
+    standalone.sort((a, b) => {
+      const ba = getBookOrder(a), bb = getBookOrder(b);
+      if (ba !== bb) return ba - bb;
+      const la = getLocationKey(a), lb = getLocationKey(b);
+      return la < lb ? -1 : la > lb ? 1 : 0;
+    });
+
+    // 从 standalone 根 DFS，按类型顺序
+    const dfsStandalone = (parentId: string) => {
+      for (const type of STANDALONE_TYPE_ORDER) {
+        const kids = (standaloneChildren.get(parentId) ?? []).filter(
+          (k) => (k.data('essence') as string)?.startsWith(type),
+        );
+        for (const k of kids) {
+          if (!visited.has(k.id())) {
+            visited.add(k.id());
+            result.push(k.id());
+          }
+          dfsStandalone(k.id());
+        }
+      }
+      // 其他类型（drug/med/umbrella-class 等，但这些理论上不应出现在 standalone 中）
+      for (const k of (standaloneChildren.get(parentId) ?? []).filter(
+        (k) => !STANDALONE_TYPE_ORDER.some((t) => (k.data('essence') as string)?.startsWith(t)),
+      )) {
+        if (!visited.has(k.id())) {
+          visited.add(k.id());
+          result.push(k.id());
+        }
+      }
+    };
+
+    // 从每个 standalone 根节点 DFS
+    for (const root of standaloneRoots) {
+      if (!visited.has(root.id())) {
+        visited.add(root.id());
+        result.push(root.id());
+        dfsStandalone(root.id());
+      }
+    }
+
+    // 对于没有任何 standalone 子节点的 standalone 节点，直接追加
+    for (const n of standalone) {
+      if (!visited.has(n.id())) {
+        visited.add(n.id());
+        result.push(n.id());
+      }
+    }
+
+    return result;
   },
 });
 
@@ -479,6 +708,16 @@ registerStrategy({
       }
 
       if (bestPos >= 0) {
+        // 跳过 umbrella 节点：umbrella 是 section 的入口，不应被 standalone 节点打断
+        // 如果 bestPos 命中了一个 umbrella，就找下一个非 umbrella 的位置
+        if (seq[bestPos]?.includes('umbrella')) {
+          for (let j = bestPos + 1; j < seq.length; j++) {
+            if (!seq[j]?.includes('umbrella')) {
+              bestPos = j;
+              break;
+            }
+          }
+        }
         insertions.push({ pos: bestPos, id: uid });
       } else {
         toAppend.push(uid);

@@ -498,6 +498,7 @@ export class Renderer {
           tags: n.tags ?? [],
           body: n.body,
           weight: n.weight ?? 60,
+          edges_out: n.edges_out ?? [],
           color: n.essence
             ? (NODE_TYPE_COLOR[n.essence] ?? NODE_TYPE_COLOR.default)
             : NODE_TYPE_COLOR.default,

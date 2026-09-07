@@ -30,6 +30,11 @@ export interface NodeData {
    *  Used by the detail panel to resolve relative image references against
    *  `/content/<dir>/`. Empty string when the source is unknown (CLI tools). */
   sourcePath?: string;
+  /** Raw outgoing edges as declared in the source frontmatter, e.g.
+   *  `[{ id, type, target, reason }]`. Preserved so traversal code (tour
+   *  builder, debug panels) can reason about parent/child semantics
+   *  without having to reverse-walk cytoscape's edge store. */
+  edges_out?: Array<{ id?: string; type: string; target: string; reason?: string }>;
 }
 
 export interface EdgeData {

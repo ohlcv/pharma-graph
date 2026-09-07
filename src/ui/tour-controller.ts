@@ -21,7 +21,7 @@
 //   complete (engine callback) → idle, then auto-hide after 2s
 
 import cytoscape from 'cytoscape';
-import { TourEngine, TourStrategy, TourStepInfo } from '../core/tour.js';
+import { TourEngine, TourStrategy, TourStepInfo, getLocationKey } from '../core/tour.js';
 import { Renderer } from '../core/renderer.js';
 import { DetailPanel } from './detail-panel.js';
 import { uiState, registerTourBarToggle } from './state.js';
@@ -85,6 +85,7 @@ export class TourController {
       onResume:         () => this.onEngineResume(),
       onComplete:       (reason) => this.onComplete(reason),
     });
+    console.log('[DEBUG start] maxDepth=', this.currentMaxDepth(), 'interval=', this.currentInterval());
     this.running = true;
     this.paused = false;
     this.setRunningUI();
@@ -133,6 +134,21 @@ export class TourController {
     if (!this.engine) return;
     this.engine.next();
     this.detailPanel.close();
+  }
+
+  /** 调试用：预览指定策略（或全部策略）的漫游序列。控制台调用：
+   *   _dbg.previewSequence()              // 两种策略都打印
+   *   _dbg.previewSequence('has-dfs')     // 只看教材顺序
+   *   _dbg.previewSequence('topo-prereq') // 只看依赖顺序
+   */
+  previewSequence(strategyId?: string): void {
+    if (!this.engine) {
+      // 引擎未启动时也能预览——从图上重建一个临时引擎
+      const temp = new TourEngine(this.cy);
+      temp.previewSequence(strategyId as TourStrategy | undefined);
+      return;
+    }
+    this.engine.previewSequence(strategyId as TourStrategy | undefined);
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -469,6 +485,10 @@ export class TourController {
   }
 
   private onStep(info: TourStepInfo): void {
+    if (!this.cy) return;
+    const loc = this.cy.getElementById(info.nodeId).data('location') as Record<string, string> | null;
+    const key = loc ? getLocationKey(this.cy.getElementById(info.nodeId) as cytoscape.NodeSingular) : '(no location)';
+    console.log(`[Tour step ${info.currentStep}/${info.totalToExplore}]  ${info.nodeId}  key=[${key}]${loc ? `  item=${loc['item']} section=${loc['section']}` : ''}`);
     this.running = true;
     this.paused = false;
     // Push to history
