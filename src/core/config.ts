@@ -56,8 +56,10 @@ export const STROKE_CONFIG: Record<StrokeType, {
 }> = {
   auto:     { color: 'inherit', lineStyle: 'solid', description: 'subtreeRoot 色（无则走 fill fallback）' },
   fallback: { color: 'inherit', lineStyle: 'solid', description: 'fill 兜底边框色（FILL_BORDER_HINTS[fill]）' },
-  flow:     { color: '#3b82f6', lineStyle: 'solid', effect: 'flow', description: 'subtreeRoot 色 + 流光动画（重点药/分类）' },
-  glow:     { color: '#3b82f6', lineStyle: 'solid', effect: 'glow', description: 'subtreeRoot 色 + 光晕效果（跨节总结）' },
+  flow:     { color: '#60a5fa', lineStyle: 'dashed', effect: 'flow',
+    description: 'subtreeRoot 色 + 三层 ghost 呼吸光晕 + dashed 流光动画' },
+  glow:     { color: '#818cf8', lineStyle: 'solid', effect: 'glow',
+    description: 'subtreeRoot 色 + outline 近边光圈 + 三层 ghost 模糊光晕 + 呼吸脉冲动画' },
 };
 
 // ── Fill → 形状 + 背景色配置 ────────────────────────────────────────────────

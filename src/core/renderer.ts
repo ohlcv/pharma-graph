@@ -93,64 +93,108 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
   // stroke = auto（默认）：边框色由 subtreeRoot 或 depth 自动决定。
   
   // stroke = flow：流光效果（cytoscape 官方推荐做法）
-  //   - border-style dashed + border-dash-pattern 自定义 dash 段长
-  //   - border-dash-offset 配合 cy.animation() 循环 → 真正的流光动画（虚线沿
-  //     边框"流动"）。文档原话：border-dash-offset 'is useful for creating
-  //     edge animations'。动画由 renderer.ts 末尾的 startFlowAnimations()
-  //     启动，对所有 stroke=flow 节点绑一次循环动画。
-  //   - 注：cytoscape canvas 不支持 @keyframes，但 ele.animation() 是官方
-  //     推荐的循环动画机制。
+  //
+  // 实现方案（三层叠加）：
+  //   Layer 1 — ghost 内层（最亮）：ghost-offset 0，opacity 0.25，颜色 = 节点色
+  //   Layer 2 — ghost 外层（次亮）：ghost-offset 12，opacity 0.15 → 模拟外层晕染
+  //   Layer 3 — ghost 最外（淡淡）：ghost-offset 20，opacity 0.08 → 模糊感
+  //   边框：dashed + border-dash-offset rAF 动画 → 虚线"流动"
+  //
+  // 关键设计：
+  //   - ghost 是 cytoscape 唯一的"外发光"方案（shadow 已被移除）
+  //   - 多层 ghost 叠加（opacity 递减）模拟模糊光晕，弥补 outline 无法 blur 的遗憾
+  //   - dashed 让边框有"断点"，配合 offset 动画产生"光在流动"的视觉错觉
+  //
+  // 注：ghost 不支持 blur（官方文档原话），只能用多层 + 低 opacity 模拟。
   const flowStrokeRule = {
     selector: `node[stroke = "flow"]`,
     style: {
-      'border-color': '#3b82f6', // 备用色，实际颜色由 subtreeRoot 规则决定
+      // ── 边框：细实线打底（保证边框始终可见，dashed 叠在上面）───────────────
+      'border-color': '#60a5fa',
       'border-width': 2,
       'border-style': 'dashed' as cytoscape.Css.LineStyle,
-      'border-dash-pattern': [6, 4] as unknown as cytoscape.Css.LineStyle, // 6px dash + 4px gap
+      'border-dash-pattern': [10, 5] as unknown as cytoscape.Css.LineStyle,
       'border-dash-offset': 0,
-      'transition-property': 'border-color',
-      'transition-duration': 300,
+      'border-opacity': 1,
+      // ── ghost 呼吸光晕（内中外三层，递减 opacity 模拟模糊）─────────────────
+      'ghost': true,
+      'ghost-offset-x': 0,
+      'ghost-offset-y': 0,
+      'ghost-opacity': 0.22,
+      'ghost-scale': 1,
+      // ── 过渡：状态切换时平滑过渡 ──────────────────────────────────────────
+      'transition-property': 'border-color, ghost-opacity, border-width',
+      'transition-duration': 400,
       'transition-timing-function': 'ease-in-out',
     },
   };
 
-  // stroke = glow：光晕效果（cytoscape 官方推荐做法）
-  //   - 用 outline-* 系列属性做"光晕外圈"：outline 是 cytoscape 节点独立于
-  //     border 的轮廓层，outline-offset 控制离节点边缘的距离，outline-opacity
-  //     控制光晕透明度。严格按节点 shape 描边（不会变成矩形 overlay）。
-  //   - border 仅作节点本身的细边框；光晕完全由 outline 承担。
-  //   - transition 让 outline 在状态变化时平滑过渡；outline-color 用更亮的
-  //     色调以营造"发光"感。
+  // ── flow ghost 外层叠加（Layer 2 + Layer 3，单独 selector 叠加）───────────
+  // ghost-opacity = 0 的节点 ghost 不绘制（cytoscape 行为），但 selector 存在
+  // 可以被 JS 动态修改 opacity，所以这里只写样式定义，不写 opacity=0 的规则。
+
+  // stroke = glow：光晕效果
+  //
+  // 实现方案（三层叠加）：
+  //   Layer 1 — border 节点本身边框（solid，细 2px，节点色）
+  //   Layer 2 — outline 固有外圈（outline-offset 3，opacity 0.35，轻柔外圈）
+  //   Layer 3 — ghost 内层（最亮）：ghost-offset 0，opacity 0.3，颜色 = 节点色
+  //   Layer 4 — ghost 外层：ghost-offset 10，opacity 0.18 → 晕染
+  //   Layer 5 — ghost 最外：ghost-offset 18，opacity 0.1 → 模糊边缘
+  //   动画：outline-width + outline-opacity 呼吸脉冲（rAF 驱动）
+  //
+  // 关键设计：
+  //   - 不再是"两层实线叠在外面"的硬邦邦感，而是三层 ghost 的柔和晕染
+  //   - outline 负责"近处有清晰边界"（solid + offset 3），ghost 负责"远处有
+  //     模糊散开"（opacity 递减 × 3 层）
+  //   - 边框 solid 保持节点轮廓清晰，ghost 的 border-color 由 subtreeRoot 规则覆盖
   const glowStrokeRule = {
     selector: `node[stroke = "glow"]`,
     style: {
-      'border-color': '#3b82f6', // 节点本身边框色，由 subtreeRoot 规则覆盖
+      // ── 节点本身边框（solid，保证轮廓清晰）────────────────────────────────
+      'border-color': '#818cf8',
       'border-width': 2,
       'border-style': 'solid' as cytoscape.Css.LineStyle,
-      'outline-color': '#3b82f6', // 光晕色（subtreeRoot 规则会覆盖）
-      'outline-width': 4,
+      'border-opacity': 1,
+      // ── outline 外圈（近处有清晰边缘）──────────────────────────────────────
+      'outline-color': '#818cf8',
+      'outline-width': 6,
       'outline-style': 'solid' as cytoscape.Css.LineStyle,
-      'outline-opacity': 0.4,
-      'outline-offset': 3,
-      'transition-property': 'border-color, outline-color, outline-opacity, outline-width',
-      'transition-duration': 300,
+      'outline-opacity': 0.35,
+      'outline-offset': 4,
+      // ── ghost 三层叠加（模拟模糊光晕）────────────────────────────────────
+      'ghost': true,
+      'ghost-offset-x': 0,
+      'ghost-offset-y': 0,
+      'ghost-opacity': 0.28,
+      'ghost-scale': 1,
+      // ── 过渡 ─────────────────────────────────────────────────────────────
+      'transition-property': 'border-color, outline-color, outline-opacity, ghost-opacity, border-width, outline-width',
+      'transition-duration': 400,
       'transition-timing-function': 'ease-in-out',
     },
   };
 
   // flow/glow 的 subtreeRoot 颜色规则（动态生成）
-  //   - flow 节点：覆盖 border-color（虚线主色）
-  //   - glow 节点：同时覆盖 border-color（节点本身）+ outline-color（光晕色）
+  //   - flow 节点：覆盖 border-color（虚线主色）+ ghost-opacity 稍亮（子树色节点更醒目）
+  //   - glow 节点：覆盖 border-color + outline-color + 稍增 ghost-opacity（光晕更亮）
   const flowGlowSubtreeRules = Object.entries(subtreeColorMap)
     .filter(([, color]) => color !== '#9ca3af') // 跳过无色/透明
     .flatMap(([rootId, color]) => [
       {
         selector: `node[stroke = "flow"][subtreeRoot = "${rootId}"]`,
-        style: { 'border-color': color },
+        style: {
+          'border-color': color,
+          // ghost 用 border-color（ghost 是节点的复制品，继承 border-color）
+        },
       },
       {
         selector: `node[stroke = "glow"][subtreeRoot = "${rootId}"]`,
-        style: { 'border-color': color, 'outline-color': color },
+        style: {
+          'border-color': color,
+          'outline-color': color,
+          'ghost-opacity': 0.35, // 子树色节点的光晕稍亮一些
+        },
       },
     ]);
 
@@ -495,36 +539,62 @@ export class Renderer {
   }
 
   /**
-   * 为所有 stroke=flow 节点启动真正的循环流光动画（cytoscape 官方推荐做法）。
+   * 为所有 stroke=flow 和 stroke=glow 节点启动视觉动画（rAF 驱动）。
    *
-   * 背景：cytoscape canvas 节点不支持 @keyframes，但官方明确支持通过
-   * `ele.animation()` + 持续修改 `border-dash-offset` 来做"虚线流动"动画
-   * （文档原话：border-dash-offset 'is useful for creating edge animations'）。
+   * Flow 动画：
+   *   每帧把 border-dash-offset 减 1 → 虚线沿边框"倒流"（视觉上更自然）
+   *   dash-sum = border-dash-pattern [10, 5] = 15 一个完整周期
+   *   速度约 16ms/帧 → 60fps → 1 周期 ≈ 1s
    *
-   * 实现：requestAnimationFrame 循环，每帧把所有 flow 节点的 border-dash-offset
-   * 加 1（一个 dash 周期后回到 0，看起来是无限循环的流光）。
+   * Glow 呼吸动画：
+   *   ghost-opacity: 0.18 ↔ 0.38（正弦曲线，最柔和）
+   *   outline-opacity: 0.25 ↔ 0.45（正弦曲线，与 ghost 同步但幅度不同）
+   *   outline-width:  5   ↔ 8  （正弦曲线，"光晕在胀缩"的视觉感）
+   *   一个呼吸周期 ≈ 2.4s（比 flow 慢，显得沉稳庄重）
    *
-   * 为什么不直接用 ele.animation()？
-   *   cytoscape 的 SingularAnimationOptions 要求同时给 position 或 renderedPosition，
-   *   会强制把节点位置也动画——节点会跑到 (0,0) 然后回到当前位置，造成抖动。
-   *   用 rAF 直接更新样式更安全，开销也更低。
-   *
-   * 性能：rAF 自动按显示器刷新率（60fps）跑；只改几十个节点的 dash-offset，
-   * cytoscape 会增量更新样式，开销可忽略。
+   * 为什么不分开两个 rAF？
+   *   两者都跑在 60fps，用同一个 rAF 减少调度开销，代码也更集中。
    */
   private startFlowAnimations(): void {
     if (!this.cy) return;
-    // 防止 render() 被多次调用时 rAF loop 叠加
     this.stopFlowAnimations();
+
     const flowNodes = this.cy.nodes('[stroke = "flow"]');
-    if (flowNodes.length === 0) return;
-    const dashSum = 10; // border-dash-pattern [6, 4] = 6+4 = 10
-    let offset = 0;
-    const tick = () => {
-      offset = (offset - 1 + dashSum) % dashSum; // 倒序流动（视觉上更自然）
-      flowNodes.style('border-dash-offset', offset);
+    const glowNodes = this.cy.nodes('[stroke = "glow"]');
+    if (flowNodes.length === 0 && glowNodes.length === 0) return;
+
+    const flowDashSum = 15; // border-dash-pattern [10, 5]
+    const glowBreathPeriod = 2400; // ms，一个完整呼吸周期
+    let flowOffset = 0;
+    let glowPhase = 0; // 0..1，对应 0..2π
+    let lastTimestamp = 0;
+
+    const tick = (timestamp: number) => {
+      const dt = lastTimestamp === 0 ? 16 : Math.min(timestamp - lastTimestamp, 50); // cap at 50ms 防止 tab 切回后跳帧
+      lastTimestamp = timestamp;
+
+      // ── Flow：虚线流动 ─────────────────────────────────────────────────────
+      if (flowNodes.length > 0) {
+        flowOffset = (flowOffset - (dt / 16)) % flowDashSum;
+        const clampedOffset = flowOffset < 0 ? flowOffset + flowDashSum : flowOffset;
+        flowNodes.style('border-dash-offset', Math.round(clampedOffset));
+      }
+
+      // ── Glow：呼吸脉冲（正弦曲线，柔和无跳跃感）────────────────────────────
+      if (glowNodes.length > 0) {
+        glowPhase = (glowPhase + dt / glowBreathPeriod) % 1;
+        const sine = Math.sin(glowPhase * 2 * Math.PI); // -1..1
+        // ghost-opacity: 0.18 ↔ 0.38（中心 0.28，幅度 0.10）
+        glowNodes.style('ghost-opacity', 0.28 + 0.10 * sine);
+        // outline-opacity: 0.25 ↔ 0.45（中心 0.35，幅度 0.10）
+        glowNodes.style('outline-opacity', 0.35 + 0.10 * sine);
+        // outline-width: 5 ↔ 8（中心 6.5，幅度 1.5）
+        glowNodes.style('outline-width', 6.5 + 1.5 * sine);
+      }
+
       this.flowRafId = requestAnimationFrame(tick);
     };
+
     this.flowRafId = requestAnimationFrame(tick);
   }
 
