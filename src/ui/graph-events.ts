@@ -90,6 +90,9 @@ export function initGraphEvents(deps: GraphEventDeps): void {
 
   cy.on('tap', 'edge', (evt) => {
     deps.highlight.highlightEdgeOnly(evt.target.id());
+    // 选中边的源节点对应的详情面板（与节点点击行为一致）
+    // const srcId = evt.target.source().id();
+    // deps.detailPanel.show(srcId);
     const edge = evt.target;
     const src = edge.source().renderedPosition();
     const tgt = edge.target().renderedPosition();
@@ -135,7 +138,8 @@ export function initGraphEvents(deps: GraphEventDeps): void {
     const node = evt.target;
     if (node.hasClass('dimmed') || node.hasClass('highlighted')) return;
     node.removeClass('hovered');
-    cy.edges().removeClass('tour-path-preview');
+    // 只清除当前节点的关联边上的 tour 预览，而非全图所有边
+    node.connectedEdges().removeClass('tour-path-preview');
   });
 
   cy.on('grab', 'node', () => {
