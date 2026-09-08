@@ -381,8 +381,8 @@ registerStrategy({
       });
     }
 
-    // FILL_ORDER：fill 值遍历顺序：structure → classification → biomolecule → feature → drug → disease → mnemonic → concept → summary
-    const FILL_ORDER = ['cls-structure', 'cls-classification', 'cls-biomolecule', 'cls-feature', 'cls-drug', 'cls-disease', 'cls-mnemonic', 'cls-concept', 'cls-summary'];
+    // FILL_ORDER：fill 值遍历顺序：structure → classification → biomolecule → feature → drug → disease → adverse → mnemonic → concept → summary
+    const FILL_ORDER = ['cls-structure', 'cls-classification', 'cls-biomolecule', 'cls-feature', 'cls-drug', 'cls-disease', 'cls-adverse', 'cls-mnemonic', 'cls-concept', 'cls-summary'];
 
     // 收集所有 structure 节点（树根/入口）
     const allStructures = nodes.filter((n) => (n.data('fill') as string) === 'cls-structure');
@@ -502,7 +502,7 @@ registerStrategy({
     const noPrereq: string[] = [];
     inDegree.forEach((deg, id) => { if (deg === 0) noPrereq.push(id); });
 
-    // FILL_ORDER：fill 值顺序：structure → classification → biomolecule → feature → drug → disease → mnemonic → concept → summary
+    // FILL_ORDER：fill 值顺序：structure → classification → biomolecule → feature → drug → disease → adverse → mnemonic → concept → summary
     const FILL_ORDER: Record<string, number> = {
       'cls-structure': 0,
       'cls-classification': 1,
@@ -510,9 +510,10 @@ registerStrategy({
       'cls-feature': 3,
       'cls-drug': 4,
       'cls-disease': 5,
-      'cls-mnemonic': 6,
-      'cls-concept': 7,
-      'cls-summary': 8,
+      'cls-adverse': 6,
+      'cls-mnemonic': 7,
+      'cls-concept': 8,
+      'cls-summary': 9,
     };
     const getFillOrder = (id: string): number =>
       FILL_ORDER[cy.getElementById(id).data('fill') as string] ?? 99;
