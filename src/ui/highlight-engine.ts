@@ -109,57 +109,8 @@ export class HighlightEngine {
     return results;
   }
 
-  highlightShape(shape: string): void {
-    this.resetClasses();
-
-    // shape here is the Cytoscape shape name (ellipse, octagon …) that maps to
-    // an essence key via NODE_TYPE_SHAPE_MAP.  We match against n.data('essence')
-    // rather than n.style('shape') so that nodes with no explicit shape style
-    // (and therefore inheriting the default 'ellipse') are still correctly
-    // filtered by their essence attribute — which is what the legend counts use.
-    // 反查表：cytoscape shape → essence
-    // 注意：ellipse 对应两种 essence（重点药/普通药），无法用形状区分，需用 fill 颜色区分
-    const essenceMap: Record<string, string> = {
-      ellipse:           'medication',  // 重点药（普通药也用 ellipse，见下）
-      octagon:           'summary',
-      diamond:           'illness',
-      rectangle:         'concept',
-      pentagon:          'strict-class',     // 五边形 — 严格分类
-      hexagon:           'umbrella-class',   // 六边形 — 伞形分类
-      'round-rectangle': 'module',
-      tag:               'notion',
-      vee:               'mnemonic',         // V形 — 口诀
-    };
-    const essence = essenceMap[shape] ?? null;
-
-    this.cy.nodes().not(`.${CLASSES.LAYER_PARENT}`).forEach((n: cytoscape.NodeSingular) => {
-      if (essence !== null && n.data('essence') === essence) {
-        n.addClass(CLASSES.HIGHLIGHTED);
-      } else {
-        n.addClass(CLASSES.DIMMED);
-      }
-    });
-
-    this.dimUnhighlightedEdges();
-  }
-
-  highlightEssence(essence: string): void {
-    this.resetClasses();
-
-    this.cy.nodes().not(`.${CLASSES.LAYER_PARENT}`).forEach((n: cytoscape.NodeSingular) => {
-      if (n.data('essence') === essence) {
-        n.addClass(CLASSES.HIGHLIGHTED);
-      } else {
-        n.addClass(CLASSES.DIMMED);
-      }
-    });
-
-    this.dimUnhighlightedEdges();
-  }
-
   /**
    * Highlight nodes by their `fill` value (领域顶层类), e.g. `cls-drug`, `cls-feature`.
-   * This is the primary filter for the essence legend under the new OWL2 spec.
    */
   highlightFill(fill: string): void {
     this.resetClasses();

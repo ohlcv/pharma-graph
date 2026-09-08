@@ -10,7 +10,7 @@
  * 测所有 EDGE_TYPE_STYLE 的 line-gradient-stop-colors 都能通过 — 不再回退到回滚方案.
  */
 import { describe, it, expect } from 'vitest';
-import { EDGE_TYPE_STYLE, NODE_TYPE_COLOR } from '../config';
+import { EDGE_TYPE_STYLE, FILL_CONFIG } from '../config';
 
 const RGBA_RE = new RegExp(
   '^' +
@@ -45,11 +45,10 @@ describe('cytoscape stylesheet color tokens (split on whitespace)', () => {
     }
   });
 
-  it('NODE_TYPE_COLOR — every essence produces a parseable hex fill', () => {
-    // 节点填充色由 essence 决定（取代已废弃的 NODE_TIER_STYLE）。
-    // bgColor 来自 NODE_TYPE_COLOR，必须是合法 hex 才能 cytoscape 渲染。
-    for (const [essence, color] of Object.entries(NODE_TYPE_COLOR)) {
-      expect(HEX_RE.test(color), `NODE_TYPE_COLOR[${essence}] "${color}" must be hex`).toBe(true);
+  it('FILL_CONFIG — every fill produces a parseable hex background', () => {
+    // 节点填充色由 fill 决定，background 必须是合法 hex 才能 cytoscape 渲染。
+    for (const [fill, cfg] of Object.entries(FILL_CONFIG)) {
+      expect(HEX_RE.test(cfg.background), `FILL_CONFIG[${fill}].background "${cfg.background}" must be hex`).toBe(true);
     }
   });
 

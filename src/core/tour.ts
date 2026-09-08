@@ -338,9 +338,6 @@ registerStrategy({
 
     const nodes = cy.nodes().not('.layer-parent').toArray();
 
-    // umbrella / module 定义
-    const isUmbrella = (e: string) => e.startsWith('umbrella') || e === 'module';
-
     // 建立 parentMap[childId] = parentId（通过 subclass_of / instance_of 边）
     const parentMap = new Map<string, string>();
     for (const n of nodes) {
@@ -384,14 +381,12 @@ registerStrategy({
       });
     }
 
-    // TYPE_ORDER：umbrella-class → strict → drug → med → memo → notion
-    // 注意：umbrella-class 必须在这里，否则不会递归其子节点
-    const TYPE_ORDER = ['umbrella-class', 'strict', 'drug', 'med', 'memo', 'notion'];
+    // FILL_ORDER：fill 值遍历顺序：structure → classification → biomolecule → feature → drug → disease → mnemonic → concept → summary
+    const FILL_ORDER = ['cls-structure', 'cls-classification', 'cls-biomolecule', 'cls-feature', 'cls-drug', 'cls-disease', 'cls-mnemonic', 'cls-concept', 'cls-summary'];
 
-    // 收集 umbrella 树中所有节点（umbrella 自身 + 所有子孙）
-    const umbrellaTreeNodes = new Set<string>();
+    // 收集所有 structure 节点（树根/入口）
+    const allStructures = nodes.filter((n) => (n.data('fill') as string) === 'cls-structure');
     const collectTree = (parentId: string) => {
-      umbrellaTreeNodes.add(parentId);
       for (const k of children.get(parentId) ?? []) collectTree(k.id());
     };
 
@@ -399,11 +394,11 @@ registerStrategy({
     const result: string[] = [];
     const visited = new Set<string>();
 
-    // DFS：type-order 顺序遍历子节点；visited 防重；递归所有子节点以确保伞树完整遍历
+    // DFS：fill-order 顺序遍历子节点；visited 防重；递归所有子节点以确保树完整遍历
     const dfsChildren = (parentId: string) => {
-      for (const type of TYPE_ORDER) {
+      for (const fill of FILL_ORDER) {
         const kids = (children.get(parentId) ?? []).filter(
-          (k) => (k.data('essence') as string)?.startsWith(type),
+          (k) => (k.data('fill') as string) === fill,
         );
         for (const k of kids) {
           if (!visited.has(k.id())) {
@@ -413,9 +408,9 @@ registerStrategy({
           dfsChildren(k.id());
         }
       }
-      // 其他所有类型（非上述 TYPE_ORDER）
+      // 其他所有类型（非上述 FILL_ORDER）
       for (const k of (children.get(parentId) ?? []).filter(
-        (k) => !TYPE_ORDER.some((t) => (k.data('essence') as string)?.startsWith(t)),
+        (k) => !FILL_ORDER.includes((k.data('fill') as string) ?? ''),
       )) {
         if (!visited.has(k.id())) {
           visited.add(k.id());
@@ -425,133 +420,40 @@ registerStrategy({
       }
     };
 
-    // ── 第一步：按教材顺序遍历 umbrella 树 ────────────────────────────────
-    // 1. 所有 umbrella 节点（已加入 umbrellaTreeNodes）
-    const allUmbrellas = nodes.filter((n) => isUmbrella((n.data('essence') as string) ?? ''));
-    for (const u of allUmbrellas) collectTree(u.id());
+    // ── 第一步：structure 节点作为根入口 ────────────────────────────────
+    // 1. 所有 structure 节点（cls-structure = 书籍/章/节入口）
+    for (const s of allStructures) collectTree(s.id());
 
-    // 2. umbrella 排序：
-    //   - module 节点（书籍/章/节）→ 先按 book 顺序，再按 location key
-    //   - umbrella 节点 → 直接按 location key
-    const sortedUmbrellas = allUmbrellas.sort((a, b) => {
-      const aIsModule = (a.data('essence') as string) === 'module';
-      const bIsModule = (b.data('essence') as string) === 'module';
-      if (aIsModule && !bIsModule) return -1;
-      if (!aIsModule && bIsModule) return 1;
-      // 同类型：module 用 book 顺序，umbrella 用 location key
-      if (aIsModule) {
-        const ba = getBookOrder(a), bb = getBookOrder(b);
-        if (ba !== bb) return ba - bb;
-      }
-      const la = getLocationKey(a), lb = getLocationKey(b);
-      return la < lb ? -1 : la > lb ? 1 : 0;
-    });
-
-    for (const umbrella of sortedUmbrellas) {
-      if (visited.has(umbrella.id())) continue;
-      visited.add(umbrella.id());
-      result.push(umbrella.id());
-      dfsChildren(umbrella.id());
-    }
-
-    // ── 第二步：收集 umbrella 树中没出现过的节点 ─────────────────────────
-    // umbrellaTreeNodes 已经包含 umbrella 自身 + 所有子孙（含 part_of 边）
-    // inTree 仅用 umbrella DFS 的 visited 结果，不混入 standalone DFS 的内容
-    const inTree = new Set<string>();
-    for (const umbrella of sortedUmbrellas) {
-      inTree.add(umbrella.id());
-      const dfsVisit = (parentId: string) => {
-        for (const k of children.get(parentId) ?? []) {
-          if (!inTree.has(k.id())) { inTree.add(k.id()); dfsVisit(k.id()); }
-        }
-      };
-      dfsVisit(umbrella.id());
-    }
-
-    const standalone: cytoscape.NodeSingular[] = [];
-    for (const n of nodes) {
-      if (inTree.has(n.id())) continue;
-      // 跳过 layer-parent（已在 .not('.layer-parent') 过滤）
-      standalone.push(n);
-    }
-
-    // standalone 节点包括：口诀(mnemonic)、总结(summary)、概念(concept)、笔记(notion)
-    // 以及 umbrella 树中漏掉的 strict-class 节点
-
-    // ── 建立 standalone 子节点 map ───────────────────────────────────────
-    const standaloneChildren = new Map<string, cytoscape.NodeSingular[]>();
-    // 从所有 nodes 中，对 parentMap 里没有的节点建立独立子节点关系
-    for (const n of nodes) {
-      if (inTree.has(n.id())) continue; // 已在 umbrella 树中
-      const parent = parentMap.get(n.id());
-      if (!parent) continue; // 无父节点，跳过
-      if (!standaloneChildren.has(parent)) standaloneChildren.set(parent, []);
-      standaloneChildren.get(parent)!.push(n);
-    }
-    // 按 location key 排序 standalone 子节点
-    for (const [, arr] of standaloneChildren) {
-      arr.sort((a, b) => {
-        const la = getLocationKey(a), lb = getLocationKey(b);
-        return la < lb ? -1 : la > lb ? 1 : 0;
-      });
-    }
-
-    // TYPE_ORDER（standalone DFS）：concept → memo → notion → sum → strict
-    const STANDALONE_TYPE_ORDER = ['concept', 'memo', 'notion', 'sum', 'strict'];
-
-    // 收集 standalone 的根节点（parentMap 中 key 但不在 standaloneChildren 的 parent 里）
-    const standaloneRoots = standaloneChildren.size > 0
-      ? [...standaloneChildren.keys()].filter((pid) => {
-          // pid 是 parent，找出它自己是不是 standalone 根（parentMap 里它的 parent 不在 standaloneChildren 中）
-          const pp = parentMap.get(pid);
-          return !pp || !standaloneChildren.has(pp);
-        }).map((pid) => cy.nodes(`#${pid}`).first())
-      : [];
-
-    // 其实更简单：直接取所有 standalone 节点，按 book+location 排序，第一个就是"根"
-    standalone.sort((a, b) => {
+    // 2. structure 排序：
+    //   - 先按 book 顺序，再按 location key
+    const sortedStructures = allStructures.sort((a, b) => {
       const ba = getBookOrder(a), bb = getBookOrder(b);
       if (ba !== bb) return ba - bb;
       const la = getLocationKey(a), lb = getLocationKey(b);
       return la < lb ? -1 : la > lb ? 1 : 0;
     });
 
-    // 从 standalone 根 DFS，按类型顺序
-    const dfsStandalone = (parentId: string) => {
-      for (const type of STANDALONE_TYPE_ORDER) {
-        const kids = (standaloneChildren.get(parentId) ?? []).filter(
-          (k) => (k.data('essence') as string)?.startsWith(type),
-        );
-        for (const k of kids) {
-          if (!visited.has(k.id())) {
-            visited.add(k.id());
-            result.push(k.id());
-          }
-          dfsStandalone(k.id());
-        }
-      }
-      // 其他类型（drug/med/umbrella-class 等，但这些理论上不应出现在 standalone 中）
-      for (const k of (standaloneChildren.get(parentId) ?? []).filter(
-        (k) => !STANDALONE_TYPE_ORDER.some((t) => (k.data('essence') as string)?.startsWith(t)),
-      )) {
-        if (!visited.has(k.id())) {
-          visited.add(k.id());
-          result.push(k.id());
-        }
-      }
-    };
-
-    // 从每个 standalone 根节点 DFS
-    for (const root of standaloneRoots) {
-      if (!visited.has(root.id())) {
-        visited.add(root.id());
-        result.push(root.id());
-        dfsStandalone(root.id());
-      }
+    for (const structure of sortedStructures) {
+      if (visited.has(structure.id())) continue;
+      visited.add(structure.id());
+      result.push(structure.id());
+      dfsChildren(structure.id());
     }
 
-    // 对于没有任何 standalone 子节点的 standalone 节点，直接追加
-    for (const n of standalone) {
+    // ── 第二步：收集未出现在树中的节点（按 fill 顺序追加）───────────────────────
+    // visited 已由第一步（structure DFS）填充，包含所有树中节点
+    // 剩余节点（游离节点）按 fill 顺序 + location 追加
+    const remaining = nodes.filter((n) => !visited.has(n.id()));
+    // 按 FILL_ORDER 分类排序剩余节点
+    const sortedRemaining = [...remaining].sort((a, b) => {
+      const fa = FILL_ORDER.indexOf((a.data('fill') as string) ?? '');
+      const fb = FILL_ORDER.indexOf((b.data('fill') as string) ?? '');
+      if (fa !== fb) return fa - fb;
+      const la = getLocationKey(a), lb = getLocationKey(b);
+      return la < lb ? -1 : la > lb ? 1 : 0;
+    });
+
+    for (const n of sortedRemaining) {
       if (!visited.has(n.id())) {
         visited.add(n.id());
         result.push(n.id());
@@ -600,33 +502,31 @@ registerStrategy({
     const noPrereq: string[] = [];
     inDegree.forEach((deg, id) => { if (deg === 0) noPrereq.push(id); });
 
-    // essence 顺序：基础概念/分类早于药物，重点药跟随普通药
-    // 走「分类 → 概念 → 普通药 → 重点药 → 疾病 → 口诀 → 总结」的自然学习顺序
-    const ESSENCE_ORDER: Record<string, number> = {
-      module: 0,
-      'umbrella-class': 1,
-      'strict-class': 2,
-      concept: 3,
-      notion: 4,
-      drug: 5,
-      medication: 6,
-      illness: 7,
-      mnemonic: 8,
-      summary: 9,
+    // FILL_ORDER：fill 值顺序：structure → classification → biomolecule → feature → drug → disease → mnemonic → concept → summary
+    const FILL_ORDER: Record<string, number> = {
+      'cls-structure': 0,
+      'cls-classification': 1,
+      'cls-biomolecule': 2,
+      'cls-feature': 3,
+      'cls-drug': 4,
+      'cls-disease': 5,
+      'cls-mnemonic': 6,
+      'cls-concept': 7,
+      'cls-summary': 8,
     };
-    const getEssenceOrder = (id: string): number =>
-      ESSENCE_ORDER[cy.getElementById(id).data('essence') as string] ?? 99;
+    const getFillOrder = (id: string): number =>
+      FILL_ORDER[cy.getElementById(id).data('fill') as string] ?? 99;
 
-    // 比较函数：先按 essence，再按 location
+    // 比较函数：先按 fill，再按 location
     const nodeCompare = (a: string, b: string): number => {
-      const ta = getEssenceOrder(a), tb = getEssenceOrder(b);
+      const ta = getFillOrder(a), tb = getFillOrder(b);
       if (ta !== tb) return ta - tb;
       const la = getLocationKey(cy.getElementById(a));
       const lb = getLocationKey(cy.getElementById(b));
       return la < lb ? -1 : la > lb ? 1 : 0;
     };
 
-    // 初始无前置节点按 essence → location 排序，不再 shuffle
+    // 初始无前置节点按 fill → location 排序，不再 shuffle
     noPrereq.sort(nodeCompare);
 
     while (noPrereq.length > 0) {
@@ -636,7 +536,7 @@ registerStrategy({
         const newDeg = (inDegree.get(dep) ?? 1) - 1;
         inDegree.set(dep, newDeg);
         if (newDeg === 0) {
-          // 动态插入：按 essence → location 找插入位置
+          // 动态插入：按 fill → location 找插入位置
           let inserted = false;
           for (let i = 0; i < noPrereq.length; i++) {
             if (nodeCompare(dep, noPrereq[i]) < 0) {
@@ -708,11 +608,11 @@ registerStrategy({
       }
 
       if (bestPos >= 0) {
-        // 跳过 umbrella 节点：umbrella 是 section 的入口，不应被 standalone 节点打断
-        // 如果 bestPos 命中了一个 umbrella，就找下一个非 umbrella 的位置
-        if (seq[bestPos]?.includes('umbrella')) {
+        // 跳过 classification 节点：粗/细分类是 section 的入口，不应被其他节点打断
+        // 如果 bestPos 命中了一个 classification，就找下一个非 classification 的位置
+        if (seq[bestPos]?.includes('classification')) {
           for (let j = bestPos + 1; j < seq.length; j++) {
-            if (!seq[j]?.includes('umbrella')) {
+            if (!seq[j]?.includes('classification')) {
               bestPos = j;
               break;
             }
@@ -787,9 +687,9 @@ export class TourEngine {
 
   clearAllNodeInlineStyles(): void {
     // Clear inline overrides so the stylesheet's per-field border-color
-    // and per-essence background-color take over again. Setting to a
+    // and per-fill background-color take over again. Setting to a
     // "dimmed" border here would leave every node looking dimmed until
-    // the user clicks a field/essence legend to reset.
+    // the user clicks a fill legend to reset.
     this.cy.nodes().forEach((n: cytoscape.NodeSingular) => {
       n.style({ 'border-width': null, 'border-color': null });
     });

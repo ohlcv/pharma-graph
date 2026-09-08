@@ -170,7 +170,7 @@ export function initDebugOverlay(renderer: Renderer): void {
 
     <!-- 样式规则对照表 -->
     <div class="dbg-section">
-      <div class="dbg-section__label">essence → shape 对照</div>
+      <div class="dbg-section__label">fill → 形状对照</div>
       <div class="dbg-rules-table" id="dbg-rules-table"></div>
     </div>
 
@@ -371,11 +371,10 @@ function buildRulesTable(cy: cytoscape.Core): string {
   // Only show non-dimmed nodes — dimmed ones have their styles overridden
   // by the .dimmed rule (border → rgba(255,255,255,0.06), opacity → 0.1),
   // so reading their effective styles gives misleading "everything is white"
-  // results that don't reflect the essence mapping.
+  // results that don't reflect the fill mapping.
   const visible = cy.nodes().not('.layer-parent').filter((n: NodeSingular) => !n.hasClass('dimmed'));
   visible.forEach((n: NodeSingular) => {
     const fill = n.data('fill') ?? '?';
-    const essence = n.data('essence') ?? '?';
     const shape = n.style('shape') as string;
     const bc = n.style('border-color') as string;
     const bw = n.style('border-width') as string;
@@ -387,7 +386,6 @@ function buildRulesTable(cy: cytoscape.Core): string {
       <td class="dbg-rules-table__td">${label}</td>
       <td class="dbg-rules-table__td dbg-rules-table__td--type">${fill}</td>
       <td class="dbg-rules-table__td dbg-rules-table__td--shape">${shape}</td>
-      <td class="dbg-rules-table__td dbg-rules-table__td--shape">${essence}</td>
       <td class="dbg-rules-table__td dbg-rules-table__td--w">wt=${w} rw=${rw}</td>
       <td class="dbg-rules-table__td" style="font-size:9px">
         <span title="border-color: ${bc}">${bc}</span>
@@ -396,7 +394,7 @@ function buildRulesTable(cy: cytoscape.Core): string {
     </tr>`);
   });
   return `<table class="dbg-rules-table__table">
-    <thead><tr><th>节点</th><th>type</th><th>shape</th><th>weight</th><th>border-color</th></tr></thead>
+    <thead><tr><th>节点</th><th>fill</th><th>shape</th><th>weight</th><th>border-color</th></tr></thead>
     <tbody>${rows.join('')}</tbody>
   </table>
   <div class="dbg-rules-table__count">显示 ${rows.length} 个非 dimmed 节点（dimmed 节点的样式被 .dimmed 规则覆盖，读出来的值不真实）</div>`;
@@ -411,7 +409,6 @@ function nodeProps(node: NodeSingular): string {
   const rw = node.renderedWidth().toFixed(1);
   const rh = node.renderedHeight().toFixed(1);
   const fill = node.data('fill') ?? '?';
-  const essence = node.data('essence') ?? '?';
   const opacity = node.renderedStyle('opacity') as string;
   const classes = (node.classes() as string[]).join(' ');
 
@@ -431,7 +428,7 @@ function nodeProps(node: NodeSingular): string {
     classBadge('H', node.hasClass('highlighted')),
     classBadge('V', node.hasClass('hovered')),
     `</div>`,
-    `<div class="dbg-props-meta">fill=${fill} | essence=${essence} | opacity=${opacity}</div>`,
+    `<div class="dbg-props-meta">fill=${fill} | opacity=${opacity}</div>`,
     `<div class="dbg-props-classes">cls:[${classes || '∅'}]</div>`,
   ].join('');
 }
@@ -746,7 +743,7 @@ function collectForensicData(renderer: Renderer): string {
     lines.push(`  边框宽: ${currentNode.style('border-width')}`);
     lines.push(`  宽度: ${currentNode.style('width')}`);
     lines.push(`  高度: ${currentNode.style('height')}`);
-    lines.push(`  essence: ${currentNode.data('essence') || '(无)'}`);
+    lines.push(`  fill: ${currentNode.data('fill') || '(无)'}`);
     lines.push(`  depth: ${currentNode.data('depth')}`);
     lines.push(`  subtreeRoot: ${currentNode.data('subtreeRoot') || '(无)'}`);
     

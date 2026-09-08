@@ -45,7 +45,7 @@ describe('buildGraph', () => {
         {
           id: 'a',
           label: 'A',
-          essence: 'concept',
+          fill: 'cls-concept',
           summary: 'A 简介',
           tags: ['x'],
           body: 'body of A',
@@ -57,7 +57,7 @@ describe('buildGraph', () => {
     expect(r.nodes[0]).toMatchObject({
       id: 'a',
       label: 'A',
-      essence: 'concept',
+      fill: 'cls-concept',
       summary: 'A 简介',
       tags: ['x'],
       body: 'body of A',

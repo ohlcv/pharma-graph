@@ -19,7 +19,7 @@ export type ClickHandler = (key: string, highlight: HighlightEngine) => void;
 export interface LegendAxisDescriptor {
   /** Which container (desktop row / mobile chip) holds counts. */
   readonly labels: Record<string, string>;
-  /** Cytoscape selector used to count members — e.g. `[essence = "${key}"]`. */
+  /** Cytoscape selector used to count members — e.g. `[fill = "${key}"]`. */
   readonly countSelector: string;
   /** Cypress selector that yields the elements to count (cy.nodes() / cy.edges()). */
   readonly countScope: 'nodes' | 'edges';

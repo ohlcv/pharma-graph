@@ -4,9 +4,7 @@
 import cytoscape from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
 import {
-  NODE_TYPE_COLOR,
   FILL_CONFIG,
-  ESSENCE_LABEL,
   EDGE_TYPE_LABEL,
   LEVEL_LABEL,
   getNeutralBorderColor,
@@ -244,15 +242,13 @@ function rgba(hex: string, alpha: number): string {
 // ── Build helpers ─────────────────────────────────────────────────────────────
 
 function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
-  // fill 是新规范，essence 是旧规范兼容字段。优先取 fill，没有则降级到 essence。
-  const fillVal = (d.fill as string) || (d.essence as string) || '';
+  const fillVal = (d.fill as string) || '';
   const color = fillVal
-    ? (FILL_CONFIG[fillVal]?.background ?? NODE_TYPE_COLOR[fillVal] ?? NODE_TYPE_COLOR.default)
+    ? (FILL_CONFIG[fillVal]?.background ?? '#94a3b8')
     : '#94a3b8';
   const nodeName = (d.label as string) || (d.id as string);
-  // 优先用 FILL_CONFIG（fill label），降级到 ESSENCE_LABEL（旧 essence label）
-  const essenceText = fillVal
-    ? (FILL_CONFIG[fillVal]?.label ?? ESSENCE_LABEL[fillVal] ?? fillVal)
+  const fillText = fillVal
+    ? (FILL_CONFIG[fillVal]?.label ?? fillVal)
     : '—';
   const depthVal = typeof d.depth === 'number' ? d.depth : 0;
   const depthLabel = LEVEL_LABEL[depthVal] ?? `${depthVal}级`;
@@ -283,7 +279,7 @@ function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
 
   return `<div class="np-hero">
   <div class="np-hero__badges">
-    <span class="np-badge np-badge--type" style="color:${color};border-color:${rgba(color, 0.4)};background:${rgba(color, 0.12)}">${escHtml(essenceText)}</span>
+    <span class="np-badge np-badge--type" style="color:${color};border-color:${rgba(color, 0.4)};background:${rgba(color, 0.12)}">${escHtml(fillText)}</span>
     <span class="np-badge np-badge--depth" style="color:${depthColor};border-color:${rgba(depthColor, 0.4)};background:${rgba(depthColor, 0.12)}">${escHtml(depthLabel)}</span>
   </div>
   ${tagsHtml ? `<div class="np-hero__tags">${tagsHtml}</div>` : ''}

@@ -7,8 +7,6 @@
 //   shape（几何形状）   → 显式填写时覆盖 fill 的默认形状
 //   stroke（边框样式）  → 显式填写时覆盖 fill 的默认边框
 //   subtreeRoot        → 自动计算的分类归属色（fallback）
-//
-// 兼容旧字段：essence → fill（前端自动映射）
 
 import cytoscape from 'cytoscape';
 import { EDGE_TYPES, type EdgeType } from './edge-types.js';
@@ -65,17 +63,6 @@ export const STROKE_CONFIG: Record<StrokeType, {
 // ── Fill → 形状 + 背景色配置 ────────────────────────────────────────────────
 //
 // fill 是领域顶层类 IRI，决定节点的默认形状和背景色。
-// 新 fill 值与旧 essence 值的映射关系：
-//   cls-structure    → module
-//   cls-classification → strict-class / umbrella-class
-//   cls-drug         → medication / drug
-//   cls-disease      → illness
-//   cls-feature      → notion（部分）
-//   cls-adverse      → notion（部分）
-//   cls-concept      → concept
-//   cls-summary      → summary
-//   cls-mnemonic     → mnemonic
-//   cls-biomolecule  → (预留)
 //
 // ── fill 配置 ────────────────────────────────────────────────────────────────
 //
@@ -205,87 +192,6 @@ export const FILL_CONFIG: Record<string, {
     label: '口诀',
     description: '记忆口诀/顺口溜',
   },
-};
-
-// ── 旧字段兼容：essence → fill 映射表 ──────────────────────────────────────
-// 保留向后兼容，新的 fill 配置优先
-
-export const ESSENCE_TO_FILL: Record<string, string> = {
-  module: 'cls-structure',
-  'strict-class': 'cls-classification',
-  'umbrella-class': 'cls-classification',
-  concept: 'cls-concept',
-  medication: 'cls-drug',
-  drug: 'cls-drug',
-  illness: 'cls-disease',
-  notion: 'cls-feature',   // notion 映射到 feature（部分 notion 是不良反应，用 cls-adverse）
-  mnemonic: 'cls-mnemonic',
-  summary: 'cls-summary',
-  table: 'cls-summary',
-  note: 'cls-feature',
-  // 预留
-  'cls-disease': 'cls-disease',
-  'cls-biomolecule': 'cls-biomolecule',
-};
-
-// ── 旧字段兼容：essence → 形状/颜色（保留给 renderer.ts 使用）────────────────
-
-/** @deprecated 使用 FILL_CONFIG 代替 */
-export const NODE_TYPE_SHAPE: Record<string, string> = {
-  module: 'round-rectangle',
-  'strict-class': 'pentagon',
-  'umbrella-class': 'hexagon',
-  concept: 'rectangle',
-  medication: 'ellipse',
-  drug: 'ellipse',
-  illness: 'diamond',
-  notion: 'tag',
-  mnemonic: 'vee',
-  summary: 'octagon',
-};
-
-/** @deprecated 使用 FILL_CONFIG['cls-drug'].background 代替 */
-export const NODE_TYPE_COLOR: Record<string, string> = {
-  module: '#fafafa',
-  'umbrella-class': '#fde68a',
-  'strict-class': '#fef9c3',
-  concept: '#67e8f9',
-  medication: '#fb923c',
-  drug: '#7dd3fc',
-  illness: '#fca5a5',
-  notion: '#d8b4fe',
-  mnemonic: '#86efac',
-  summary: '#f9a8d4',
-  default: '#94a3b8',
-};
-
-/** @deprecated 使用 FILL_CONFIG['cls-drug'].backgroundDark 代替 */
-export const NODE_TYPE_COLOR_DARK: Record<string, string> = {
-  module: '#e5e7eb',
-  'umbrella-class': '#d97706',
-  'strict-class': '#ca8a04',
-  concept: '#0891b2',
-  medication: '#ea580c',
-  drug: '#0284c7',
-  illness: '#dc2626',
-  notion: '#9333ea',
-  mnemonic: '#16a34a',
-  summary: '#db2777',
-  default: '#64748b',
-};
-
-/** @deprecated 使用 FILL_CONFIG 代替 */
-export const ESSENCE_LABEL: Record<string, string> = {
-  module: '模块',
-  'strict-class': '细分类',
-  'umbrella-class': '粗分类',
-  concept: '概念',
-  medication: '重点药',
-  drug: '普通药',
-  illness: '疾病',
-  notion: '认知',
-  mnemonic: '口诀',
-  summary: '总结',
 };
 
 // ── 边框色计算函数 ───────────────────────────────────────────────────────────

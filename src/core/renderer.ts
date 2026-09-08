@@ -8,9 +8,6 @@ import dagre from 'cytoscape-dagre';
 import euler from 'cytoscape-euler';
 import { GraphData } from './graph.js';
 import {
-  NODE_TYPE_SHAPE,
-  NODE_TYPE_COLOR,
-  NODE_TYPE_COLOR_DARK,
   EDGE_TYPE_STYLE,
   getSubtreeBorderColor,
   LAYOUTS,
@@ -74,27 +71,14 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
   // for legacy/missing values).
   const FILL_DEFAULT = '#f8fafc';
 
-  // ── Fill 规则 — 形状 + 背景色 + 默认边框色 ─────────────────────────────────
-  // fill 是领域顶层类，决定默认形状、背景色、边框色（配置中心）。
-  // 显式填写 shape → shapeOverrideRules 覆盖默认形状（最高优先级）。
-  // 显式填写 stroke → flow/glow 规则覆盖默认边框（次高优先级）。
-  // 兼容旧字段：使用 essence 映射到 fill。
-  // fill 规则：只管 shape + background（边框交给 stroke 方案管）
+  // ── Fill 规则 — 形状 + 背景色 ───────────────────────────────────────────────
+  // fill 是领域顶层类，决定默认形状、背景色。
   const fillRules = Object.entries(FILL_CONFIG).map(([fill, cfg]) => ({
     selector: `node[fill = "${fill}"]`,
     style: {
       shape: cfg.shape as cytoscape.Css.NodeShape,
       'background-color': cfg.background,
       'border-width': 2,
-    },
-  }));
-
-  // ── 旧 essence 规则（向后兼容）──────────────────────────────────────────────
-  const essenceRules = Object.entries(NODE_TYPE_SHAPE).map(([key, shape]) => ({
-    selector: `node[essence = "${key}"]`,
-    style: {
-      shape: shape as cytoscape.Css.NodeShape,
-      'background-color': NODE_TYPE_COLOR[key] ?? FILL_DEFAULT,
     },
   }));
 
@@ -230,11 +214,9 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         'transition-timing-function': 'ease-out',
       },
     },
-    // ② fill 形状 + 背景色（新字段）
+    // ② fill 形状 + 背景色
     ...fillRules,
-    // ②.b 旧 essence 规则（向后兼容）
-    ...essenceRules,
-    // ②.c shape (OWL2 实体类型) 规则：显式填写时覆盖 fill 的默认形状（最高优先级）
+    // ②.b shape (OWL2 实体类型) 规则：显式填写时覆盖 fill 的默认形状（最高优先级）
     ...shapeOwlRules,
     // ③ stroke 边框色
     flowStrokeRule,
@@ -583,13 +565,10 @@ export class Renderer {
           data: {
             id: n.id,
             label: n.label || n.id,
-            // 新字段（基于 OWL2）
+            // 语义层（基于 OWL2）
             fill: n.fill,
-            // stroke 字段：填的是 effectiveStroke（含 fill 兜底），保证 Cytoscape 选择器链路完整
             stroke: effectiveStroke,
             shape: n.shape,
-            // 旧字段（兼容）
-            essence: n.essence || 'default',
             depth: n.depth,
             subtreeRoot: n.subtreeRoot,
             shortSummary: n.shortSummary,
@@ -600,17 +579,9 @@ export class Renderer {
             body: n.body,
             weight: n.weight ?? 60,
             edges_out: n.edges_out ?? [],
-            // 颜色（兼容旧逻辑）
-            color: n.fill
-              ? (FILL_CONFIG[n.fill]?.background ?? NODE_TYPE_COLOR.default)
-              : (n.essence
-                ? (NODE_TYPE_COLOR[n.essence] ?? NODE_TYPE_COLOR.default)
-                : NODE_TYPE_COLOR.default),
-            colorDark: n.fill
-              ? (FILL_CONFIG[n.fill]?.backgroundDark ?? NODE_TYPE_COLOR_DARK.default)
-              : (n.essence
-                ? (NODE_TYPE_COLOR_DARK[n.essence] ?? NODE_TYPE_COLOR_DARK.default)
-                : NODE_TYPE_COLOR_DARK.default),
+            // 颜色（基于 FILL_CONFIG）
+            color: FILL_CONFIG[n.fill ?? '']?.background ?? FILL_CONFIG['']?.background ?? '#f9fafb',
+            colorDark: FILL_CONFIG[n.fill ?? '']?.backgroundDark ?? FILL_CONFIG['']?.backgroundDark ?? '#94a3b8',
           },
           classes: classes.join(' ') || undefined,
         };
