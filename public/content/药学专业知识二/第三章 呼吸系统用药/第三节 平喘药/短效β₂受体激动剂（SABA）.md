@@ -10,7 +10,7 @@ data:
     item: 短效β₂受体激动剂（SABA）
   tags:
     - 短效β₂受体激动剂（SABA）
-    - SABA
+    - 激动β₂受体
     - 特布他林
     - 沙丁胺醇
   summary:

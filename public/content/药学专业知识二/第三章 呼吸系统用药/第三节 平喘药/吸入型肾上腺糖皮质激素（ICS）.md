@@ -10,7 +10,7 @@ data:
     item: 吸入型肾上腺糖皮质激素（ICS）
   tags:
     - 吸入型肾上腺糖皮质激素（ICS）
-    - ICS
+    - 抗炎
     - 布地奈德
     - 氟替卡松
   summary:

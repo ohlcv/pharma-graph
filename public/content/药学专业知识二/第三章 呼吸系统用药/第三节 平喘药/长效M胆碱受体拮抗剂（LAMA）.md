@@ -10,7 +10,7 @@ data:
     item: 长效M胆碱受体拮抗剂（LAMA）
   tags:
     - 长效M胆碱受体拮抗剂（LAMA）
-    - LAMA
+    - 拮抗M胆碱受体
     - 噻托溴铵
     - 格隆溴铵
   summary:

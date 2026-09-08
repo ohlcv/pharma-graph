@@ -9,7 +9,7 @@ data:
     section: 第三节 抗抑郁药
   tags:
     - 5-HT及去甲肾上腺素再摄取抑制剂(SNRI)
-    - SNRI
+    - 抑制5-HT和NE再摄取
     - 文拉法辛
     - 度洛西汀
   summary:
