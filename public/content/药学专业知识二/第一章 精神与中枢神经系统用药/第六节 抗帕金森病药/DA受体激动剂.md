@@ -15,10 +15,10 @@ data:
     - 普拉克索
   summary:
     short: 直接激动多巴胺受体发挥作用，分为**麦角类**和**非麦角类**。
-    full: |-
-      【分类】麦角类（溴隐亭、培高利特）、非麦角类（普拉克索、罗匹尼罗、吡贝地尔、罗替戈汀、阿扑吗啡）。
+    full: 【分类】麦角类（溴隐亭、培高利特）、非麦角类（普拉克索、罗匹尼罗、吡贝地尔、罗替戈汀、阿扑吗啡）。
   edges_out:
     - target: umbrella-dopaminergic-y2-01-06
       type: subclass_of
       reason: 一种拟多巴胺药
+  fill: cls-classification
 ---

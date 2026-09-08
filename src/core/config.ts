@@ -120,7 +120,7 @@ export const FILL_CONFIG: Record<string, {
     shape: 'ellipse',
     background: '#dbeafe',         // 柔天空蓝
     backgroundDark: '#bfdbfe',
-    defaultStroke: 'flow',
+    defaultStroke: 'auto',
     label: '药物',
     description: '具体药物（重点+普通）',
   },
@@ -180,7 +180,7 @@ export const FILL_CONFIG: Record<string, {
     shape: 'bottom-round-rectangle',
     background: '#fef9c3',         // 柔麦穗黄
     backgroundDark: '#fef08a',
-    defaultStroke: 'glow',
+    defaultStroke: 'auto',
     label: '总结',
     description: '节内总结/跨节大总结/表格',
   },

@@ -13,10 +13,10 @@ data:
     - 地西泮
   summary:
     short: 通过**激动GABAA受体**增强抑制性传递的机制，代表药为**苯二氮䓬类**（氯硝西泮、地西泮、劳拉西泮、咪达唑仑、氯巴占、加奈索酮等）。
-    full: |-
-      【代表药】苯二氮䓬类药物，如氯硝西泮、地西泮、劳拉西泮、咪达唑仑、氯巴占、加奈索酮等。
+    full: 【代表药】苯二氮䓬类药物，如氯硝西泮、地西泮、劳拉西泮、咪达唑仑、氯巴占、加奈索酮等。
   edges_out:
     - target: umbrella-mech-inhibit-y2-01-02
       type: subclass_of
       reason: 一种增强抑制性机制
+  fill: cls-classification
 ---

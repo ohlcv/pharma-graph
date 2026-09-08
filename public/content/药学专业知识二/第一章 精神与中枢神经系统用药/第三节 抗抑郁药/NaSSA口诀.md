@@ -19,4 +19,5 @@ data:
     - target: strict-nassa-y2-01-03
       type: part_of
       reason: 帮助记忆NaSSA类药物
+  fill: cls-mnemonic
 ---

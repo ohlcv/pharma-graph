@@ -22,4 +22,5 @@ data:
     - target: sec-antidepressant-y2-01-03
       type: subclass_of
       reason: 一种抗抑郁药作用机制
+  fill: cls-classification
 ---

@@ -19,4 +19,5 @@ data:
     - target: strict-gabaa-y2-01-02
       type: part_of
       reason: 帮助记忆激动GABAA受体
+  fill: cls-mnemonic
 ---

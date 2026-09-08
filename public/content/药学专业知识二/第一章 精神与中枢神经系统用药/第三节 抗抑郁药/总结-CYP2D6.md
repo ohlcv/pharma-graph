@@ -21,4 +21,5 @@ data:
     - target: sec-antidepressant-y2-01-03
       type: part_of
       reason: 第三节的表格总结
+  fill: cls-summary
 ---

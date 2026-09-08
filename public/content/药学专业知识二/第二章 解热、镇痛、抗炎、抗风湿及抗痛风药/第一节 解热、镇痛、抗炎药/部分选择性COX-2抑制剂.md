@@ -13,10 +13,10 @@ data:
     - 尼美舒利
   summary:
     short: "**部分选择性COX-2抑制剂**，代表药有**美洛昔康**、**尼美舒利**。"
-    full: |-
-      【代表药】美洛昔康、尼美舒利。
+    full: 【代表药】美洛昔康、尼美舒利。
   edges_out:
     - target: umbrella-selective-cox2-y2-01-01
       type: subclass_of
       reason: 一种选择性COX-2抑制剂
+  fill: cls-classification
 ---

@@ -26,23 +26,25 @@ description: "将纸质思维导图照片（或扫描件）转录为符合药学
 
 **`id` = 前缀-节点英文名-书简写-章号-节号**
 
-| 前缀 | 节点类型 | fill | 示例 |
-|---|---|---|---|
-| `bk-` | 书/篇级入口 | cls-structure | `bk-y2` |
-| `ch-` | 章入口 | cls-structure | `ch-cns-y2-01` |
-| `sec-` | 节入口 | cls-structure | `sec-sedative-y2-01-01` |
-| `cls-` | 分类节点 | cls-classification | `cls-benzodiazepine-y2-01-01` |
-| `med-` | 重点药 | cls-drug | `med-diazepam-y2-01-01` |
-| `drug-` | 普通药 | cls-drug | `drug-trizolam-y2-01-01` |
-| `ill-` | 疾病 | cls-disease | `ill-insomnia-y2-01-01` |
-| `bio-` | 生物实体 | cls-biomolecule | `bio-cyp3a4-y2-01` |
-| `feat-` | 作用特点/评价 | cls-feature | `feat-barbiturate-feature-y2-01-01` |
-| `adr-` | 不良反应/禁忌 | cls-adverse | `adr-barbiturate-y2-01-01` |
-| `cpt-` | 抽象概念/总论 | cls-concept | `cpt-liver-enzyme-y2-01` |
-| `meta-` | 总结 | cls-summary | `meta-cyp1a2-summary-y2-01` |
-| `mem-` | 口诀 | cls-mnemonic | `mem-barbiturate-y2-01-01` |
+> **前缀基于 fill 分类设计**，每个前缀对应一个 fill 值，语义一致。
 
-章节后缀：`y1`=药一、`y2`=药二、`y3`=药综、`y4`=法规，格式 `{书简写}-{章号}-{节号}`。
+| 前缀 | fill | 节点类型 | 示例 |
+|---|---|---|---|
+| `sec-` | `cls-structure` | 组织结构（书/篇/章/节入口） | `sec-sedative-y2-01-01` |
+| `cls-` | `cls-classification` | 药物分类 | `cls-benzodiazepine-y2-01-01` |
+| `med-` | `cls-drug` | **重点药**（有完整药理卡片，stroke: flow） | `med-diazepam-y2-01-01`、`med-zolpidem-y2-01-01` |
+| `drug-` | `cls-drug` | **普通药**（仅提名，stroke: auto） | `drug-trizolam-y2-01-01` |
+| `disease-` | `cls-disease` | 疾病/症状 | `disease-insomnia-y2-01-01` |
+| `bio-` | `cls-biomolecule` | 生物实体（靶点/受体/酶） | `bio-gabaa-y2-01-01`、`bio-cyp3a4-y2-01` |
+| `feat-` | `cls-feature` | 作用特点/临床评价/选药原则 | `feat-barbiturate-y2-01-01` |
+| `adr-` | `cls-adverse` | 不良反应/禁忌/毒性 | `adr-barbiturate-y2-01-01` |
+| `concept-` | `cls-concept` | 抽象概念/总论/术语 | `concept-bioavailability-y1-04` |
+| `sum-` | `cls-summary` | 总结/表格 | `sum-barbiturate-y2-01` |
+| `mem-` | `cls-mnemonic` | 口诀 | `mem-barbiturate-y2-01-01` |
+
+> **重点药 vs 普通药判定**：纸质版中该药物有独立框且框内有正文内容 → 重点药（`med-`，stroke: flow）；仅提名无独立画像 → 普通药（`drug-`，stroke: auto），普通药写入分类 `full【代表药】`，不单独建节点。
+
+**章节后缀**：`y1`=药一、`y2`=药二、`y3`=药综、`y4`=法规，格式 `{书简写}-{章号}-{节号}`。
 
 ### 1.3 summary.full 禁止 AI 自动填充
 

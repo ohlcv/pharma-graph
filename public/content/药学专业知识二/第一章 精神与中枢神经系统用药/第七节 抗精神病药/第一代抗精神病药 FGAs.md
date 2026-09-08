@@ -26,4 +26,5 @@ data:
     - target: sec-antipsychotic-y2-01-07
       type: subclass_of
       reason: 一种抗精神病药分类
+  fill: cls-classification
 ---

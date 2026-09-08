@@ -28,4 +28,5 @@ data:
     - target: sec-nsaid-y2-02-01
       type: part_of
       reason: 第一节的一部分
+  fill: cls-feature
 ---

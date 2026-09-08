@@ -22,4 +22,5 @@ data:
     - target: umbrella-mech-5ht-ne-y2-01-03
       type: subclass_of
       reason: 一种抑制5-HT和NE再摄取机制
+  fill: cls-classification
 ---

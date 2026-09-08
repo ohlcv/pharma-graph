@@ -19,4 +19,5 @@ data:
     - target: strict-nri-y2-01-03
       type: part_of
       reason: 帮助记忆NRI类药物
+  fill: cls-mnemonic
 ---

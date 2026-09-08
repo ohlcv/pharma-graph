@@ -20,4 +20,5 @@ data:
     - target: umbrella-dopaminergic-y2-01-06
       type: subclass_of
       reason: 一种拟多巴胺药
+  fill: cls-classification
 ---

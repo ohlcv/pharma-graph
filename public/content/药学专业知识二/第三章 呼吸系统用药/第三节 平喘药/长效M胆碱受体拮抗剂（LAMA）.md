@@ -22,4 +22,5 @@ data:
     - target: strict-m-anticholinergic-y2-03-03
       type: subclass_of
       reason: M胆碱受体拮抗剂的一种
+  fill: cls-classification
 ---

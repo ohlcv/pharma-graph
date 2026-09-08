@@ -17,4 +17,5 @@ data:
     - target: umbrella-bdmard-y2-02-02
       type: subclass_of
       reason: 一种生物制剂及靶向改善病情的抗风湿药
+  fill: cls-classification
 ---

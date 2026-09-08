@@ -21,4 +21,5 @@ data:
     - target: strict-nmda-y2-01-02
       type: part_of
       reason: 帮助记忆抑制NMDA型谷氨酸受体
+  fill: cls-mnemonic
 ---

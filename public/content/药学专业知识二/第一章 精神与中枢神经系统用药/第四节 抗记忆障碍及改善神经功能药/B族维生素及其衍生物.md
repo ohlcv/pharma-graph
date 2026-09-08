@@ -17,6 +17,5 @@ data:
     - target: umbrella-brain-y2-01-04
       type: subclass_of
       reason: 属于其他改善脑功能药（伞形分类）
+  fill: cls-classification
 ---
-
-# B 族维生素及其衍生物

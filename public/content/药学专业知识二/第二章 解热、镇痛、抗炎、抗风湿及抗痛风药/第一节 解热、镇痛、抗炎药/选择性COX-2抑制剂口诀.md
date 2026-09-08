@@ -15,4 +15,5 @@ data:
     - target: umbrella-selective-cox2-y2-01-01
       type: part_of
       reason: 帮助记忆选择性COX-2抑制剂
+  fill: cls-mnemonic
 ---

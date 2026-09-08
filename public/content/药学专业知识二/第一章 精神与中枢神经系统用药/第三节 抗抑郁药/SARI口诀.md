@@ -19,4 +19,5 @@ data:
     - target: strict-sari-y2-01-03
       type: part_of
       reason: 帮助记忆SARI类药物
+  fill: cls-mnemonic
 ---

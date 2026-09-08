@@ -16,4 +16,5 @@ data:
     - target: umbrella-tnf-y2-02-02
       type: part_of
       reason: 帮助记忆TNF-α抑制剂
+  fill: cls-mnemonic
 ---

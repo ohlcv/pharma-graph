@@ -20,4 +20,5 @@ data:
     - target: strict-antiinflammatory-immunomodulatory-y2-03-03
       type: subclass_of
       reason: 一种抗炎、免疫调节药
+  fill: cls-classification
 ---

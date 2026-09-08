@@ -22,4 +22,5 @@ data:
     - target: strict-beta2-agonist-y2-03-03
       type: subclass_of
       reason: β₂受体激动剂的一种
+  fill: cls-classification
 ---

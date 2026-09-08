@@ -11,5 +11,5 @@ data:
     - target: ch-oncology-y2-10
       type: part_of
       reason: 属于该章
+  fill: cls-structure
 ---
-

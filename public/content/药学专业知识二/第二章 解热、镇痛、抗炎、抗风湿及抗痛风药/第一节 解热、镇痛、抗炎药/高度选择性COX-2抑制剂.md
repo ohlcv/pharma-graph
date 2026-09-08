@@ -14,10 +14,10 @@ data:
     - 依托考昔
   summary:
     short: "**高度选择性COX-2抑制剂**，代表药有**塞来昔布**、帕瑞昔布、艾瑞昔布、伐地昔布、依托考昔。"
-    full: |-
-      【代表药】塞来昔布、帕瑞昔布、艾瑞昔布、伐地昔布、依托考昔。
+    full: 【代表药】塞来昔布、帕瑞昔布、艾瑞昔布、伐地昔布、依托考昔。
   edges_out:
     - target: umbrella-selective-cox2-y2-01-01
       type: subclass_of
       reason: 一种选择性COX-2抑制剂
+  fill: cls-classification
 ---

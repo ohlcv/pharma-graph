@@ -22,4 +22,5 @@ data:
     - target: sec-nsaid-y2-02-01
       type: subclass_of
       reason: 一种解热镇痛抗炎药分类
+  fill: cls-classification
 ---

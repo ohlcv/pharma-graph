@@ -20,4 +20,5 @@ data:
     - target: umbrella-mech-5ht-y2-01-03
       type: subclass_of
       reason: 一种抑制5-HT再摄取机制
+  fill: cls-classification
 ---

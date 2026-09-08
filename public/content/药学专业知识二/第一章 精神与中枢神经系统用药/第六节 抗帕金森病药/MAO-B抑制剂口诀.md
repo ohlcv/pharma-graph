@@ -21,4 +21,5 @@ data:
     - target: strict-maob-y2-01-06
       type: part_of
       reason: 帮助记忆MAO-B抑制剂
+  fill: cls-mnemonic
 ---

@@ -19,4 +19,5 @@ data:
     - target: umbrella-mech-excite-y2-01-02
       type: subclass_of
       reason: 一种抑制兴奋性机制
+  fill: cls-classification
 ---

@@ -16,4 +16,5 @@ data:
     - target: umbrella-csdmard-y2-02-02
       type: subclass_of
       reason: 一种传统合成改善病情的抗风湿药
+  fill: cls-classification
 ---

@@ -20,4 +20,5 @@ data:
     - target: umbrella-mech-release-y2-01-03
       type: subclass_of
       reason: 一种增加NE、5-HT释放机制
+  fill: cls-classification
 ---

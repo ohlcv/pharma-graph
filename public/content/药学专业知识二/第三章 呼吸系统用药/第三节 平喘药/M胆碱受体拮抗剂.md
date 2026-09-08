@@ -23,4 +23,5 @@ data:
     - target: strict-bronchodilator-y2-03-03
       type: subclass_of
       reason: 一种扩张支气管药
+  fill: cls-classification
 ---

@@ -12,10 +12,10 @@ data:
     - 阿立哌唑
   summary:
     short: 第二代抗精神病药，代表药为**阿立哌唑**。
-    full: |-
-      【代表药】阿立哌唑。
+    full: 【代表药】阿立哌唑。
   edges_out:
     - target: umbrella-sgas-y2-01-07
       type: subclass_of
       reason: 一种第二代抗精神病药
+  fill: cls-classification
 ---

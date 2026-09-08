@@ -17,4 +17,5 @@ data:
     - target: sec-antirheumatic-y2-02-02
       type: subclass_of
       reason: 属于第二节抗风湿药的一类
+  fill: cls-classification
 ---
