@@ -266,7 +266,6 @@ export function parseFrontmatterWithWarnings(
             part: getField(location, 'part'),
             chapter: getField(location, 'chapter'),
             section: getField(location, 'section'),
-            point: getField(location, 'point'),
             item: getField(location, 'item'),
             subsection: getField(location, 'subsection'),
           }
@@ -338,7 +337,6 @@ export function stringifyFrontmatter(
     if (fm.location.part)        loc['part']        = fm.location.part;
     if (fm.location.chapter)     loc['chapter']     = fm.location.chapter;
     if (fm.location.section)    loc['section']    = fm.location.section;
-    if (fm.location.point)      loc['point']      = fm.location.point;
     if (fm.location.item)       loc['item']       = fm.location.item;
     if (fm.location.subsection) loc['subsection'] = fm.location.subsection;
     if (Object.keys(loc).length > 0) top['location'] = loc;

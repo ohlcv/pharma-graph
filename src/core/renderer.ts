@@ -92,38 +92,42 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
   // stroke 显式声明时覆盖 fill/subtreeRoot 的默认边框色。
   // stroke = auto（默认）：边框色由 subtreeRoot 或 depth 自动决定。
   
-  // stroke = flow：流光效果（cytoscape 官方推荐做法）
+  // stroke = flow：流光效果
   //
-  // 实现方案（三层叠加）：
-  //   Layer 1 — ghost 内层（最亮）：ghost-offset 0，opacity 0.25，颜色 = 节点色
-  //   Layer 2 — ghost 外层（次亮）：ghost-offset 12，opacity 0.15 → 模拟外层晕染
-  //   Layer 3 — ghost 最外（淡淡）：ghost-offset 20，opacity 0.08 → 模糊感
-  //   边框：dashed + border-dash-offset rAF 动画 → 虚线"流动"
+  // 实现方案（与 glow 完全对称，仅 outline 动画方式不同）：
+  //   Layer 1 — border 节点本身边框（solid，细 2px，节点色）
+  //   Layer 2 — outline dashed 虚线外圈（outline-offset 4，dashed 流动）
+  //   Layer 3 — ghost 内层（最亮）：ghost-offset 0，opacity 0.3
+  //   Layer 4 — ghost 外层：ghost-offset 10，opacity 0.18
+  //   Layer 5 — ghost 最外：ghost-offset 18，opacity 0.1
+  //   动画：outline border-dash-offset rAF 驱动 → 虚线"流动"
   //
   // 关键设计：
-  //   - ghost 是 cytoscape 唯一的"外发光"方案（shadow 已被移除）
-  //   - 多层 ghost 叠加（opacity 递减）模拟模糊光晕，弥补 outline 无法 blur 的遗憾
-  //   - dashed 让边框有"断点"，配合 offset 动画产生"光在流动"的视觉错觉
-  //
-  // 注：ghost 不支持 blur（官方文档原话），只能用多层 + 低 opacity 模拟。
+  //   - 原 border 保持 solid 2px，节点轮廓始终清晰可见（不动原边框）
+  //   - outline 负责外围视觉效果：dashed 流动 = "流光"，solid 呼吸 = "光晕"
+  //   - ghost 三层叠加与 glow 完全相同，模糊边缘保持一致
   const flowStrokeRule = {
     selector: `node[stroke = "flow"]`,
     style: {
-      // ── 边框：细实线打底（保证边框始终可见，dashed 叠在上面）───────────────
+      // ── 节点本身边框（solid，保证轮廓清晰）────────────────────────────────
       'border-color': '#60a5fa',
       'border-width': 2,
-      'border-style': 'dashed' as cytoscape.Css.LineStyle,
-      'border-dash-pattern': [10, 5] as unknown as cytoscape.Css.LineStyle,
-      'border-dash-offset': 0,
+      'border-style': 'solid' as cytoscape.Css.LineStyle,
       'border-opacity': 1,
-      // ── ghost 呼吸光晕（内中外三层，递减 opacity 模拟模糊）─────────────────
+      // ── outline dashed 外圈（流光动画由 rAF 驱动）───────────────────────────
+      'outline-color': '#60a5fa',
+      'outline-width': 6,
+      'outline-style': 'dashed' as cytoscape.Css.LineStyle,
+      'outline-opacity': 0.4,
+      'outline-offset': 4,
+      // ── ghost 三层叠加（与 glow 完全对称）───────────────────────────────────
       'ghost': true,
       'ghost-offset-x': 0,
       'ghost-offset-y': 0,
-      'ghost-opacity': 0.22,
+      'ghost-opacity': 0.28,
       'ghost-scale': 1,
-      // ── 过渡：状态切换时平滑过渡 ──────────────────────────────────────────
-      'transition-property': 'border-color, ghost-opacity, border-width',
+      // ── 过渡 ─────────────────────────────────────────────────────────────
+      'transition-property': 'border-color, outline-color, outline-opacity, ghost-opacity, border-width, outline-width',
       'transition-duration': 400,
       'transition-timing-function': 'ease-in-out',
     },
@@ -135,19 +139,18 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
 
   // stroke = glow：光晕效果
   //
-  // 实现方案（三层叠加）：
+  // 实现方案（与 flow 完全对称，仅 outline 动画方式不同）：
   //   Layer 1 — border 节点本身边框（solid，细 2px，节点色）
-  //   Layer 2 — outline 固有外圈（outline-offset 3，opacity 0.35，轻柔外圈）
-  //   Layer 3 — ghost 内层（最亮）：ghost-offset 0，opacity 0.3，颜色 = 节点色
-  //   Layer 4 — ghost 外层：ghost-offset 10，opacity 0.18 → 晕染
-  //   Layer 5 — ghost 最外：ghost-offset 18，opacity 0.1 → 模糊边缘
+  //   Layer 2 — outline solid 外圈（outline-offset 4，呼吸脉冲动画）
+  //   Layer 3 — ghost 内层（最亮）：ghost-offset 0，opacity 0.3
+  //   Layer 4 — ghost 外层：ghost-offset 10，opacity 0.18
+  //   Layer 5 — ghost 最外：ghost-offset 18，opacity 0.1
   //   动画：outline-width + outline-opacity 呼吸脉冲（rAF 驱动）
   //
   // 关键设计：
-  //   - 不再是"两层实线叠在外面"的硬邦邦感，而是三层 ghost 的柔和晕染
-  //   - outline 负责"近处有清晰边界"（solid + offset 3），ghost 负责"远处有
-  //     模糊散开"（opacity 递减 × 3 层）
-  //   - 边框 solid 保持节点轮廓清晰，ghost 的 border-color 由 subtreeRoot 规则覆盖
+  //   - 原 border 保持 solid 2px，节点轮廓始终清晰可见
+  //   - outline 负责外围视觉效果：solid 呼吸 = "光晕"，dashed 流动 = "流光"
+  //   - ghost 三层叠加与 flow 完全对称，模糊边缘保持一致
   const glowStrokeRule = {
     selector: `node[stroke = "glow"]`,
     style: {
@@ -176,7 +179,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
   };
 
   // flow/glow 的 subtreeRoot 颜色规则（动态生成）
-  //   - flow 节点：覆盖 border-color（虚线主色）+ ghost-opacity 稍亮（子树色节点更醒目）
+  //   - flow 节点：覆盖 border-color + outline-color（外围 dashed 流动）
   //   - glow 节点：覆盖 border-color + outline-color + 稍增 ghost-opacity（光晕更亮）
   const flowGlowSubtreeRules = Object.entries(subtreeColorMap)
     .filter(([, color]) => color !== '#9ca3af') // 跳过无色/透明
@@ -185,7 +188,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         selector: `node[stroke = "flow"][subtreeRoot = "${rootId}"]`,
         style: {
           'border-color': color,
-          // ghost 用 border-color（ghost 是节点的复制品，继承 border-color）
+          'outline-color': color,
         },
       },
       {
@@ -254,6 +257,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
 
   return [
     // ① 节点基础样式
+    //   border 完全由 fill/stroke 规则接管（不再在基础样式里写死 border-width/color）
     {
       selector: 'node',
       style: {
@@ -271,7 +275,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         'text-background-color': 'rgba(15,17,23,0.82)',
         'text-background-shape': 'roundrectangle',
         'text-background-padding': '3px',
-        'border-width': 1.5,
+        'border-width': 1,
         'border-color': '#475569',
         'background-color': FILL_DEFAULT,
         'background-fill': 'solid',
@@ -541,12 +545,12 @@ export class Renderer {
   /**
    * 为所有 stroke=flow 和 stroke=glow 节点启动视觉动画（rAF 驱动）。
    *
-   * Flow 动画：
-   *   每帧把 border-dash-offset 减 1 → 虚线沿边框"倒流"（视觉上更自然）
-   *   dash-sum = border-dash-pattern [10, 5] = 15 一个完整周期
+   * Flow 流光动画（outline dashed）：
+   *   每帧把 outline-border-dash-offset 减 1 → 虚线在外围"倒流"
+   *   outline-dash-pattern [10, 5] → dash-sum = 15 一个完整周期
    *   速度约 16ms/帧 → 60fps → 1 周期 ≈ 1s
    *
-   * Glow 呼吸动画：
+   * Glow 呼吸动画（outline solid）：
    *   ghost-opacity: 0.18 ↔ 0.38（正弦曲线，最柔和）
    *   outline-opacity: 0.25 ↔ 0.45（正弦曲线，与 ghost 同步但幅度不同）
    *   outline-width:  5   ↔ 8  （正弦曲线，"光晕在胀缩"的视觉感）
@@ -573,11 +577,11 @@ export class Renderer {
       const dt = lastTimestamp === 0 ? 16 : Math.min(timestamp - lastTimestamp, 50); // cap at 50ms 防止 tab 切回后跳帧
       lastTimestamp = timestamp;
 
-      // ── Flow：虚线流动 ─────────────────────────────────────────────────────
+      // ── Flow：outline dashed 虚线流动（外围流光，不动原 border）──────────────
       if (flowNodes.length > 0) {
         flowOffset = (flowOffset - (dt / 16)) % flowDashSum;
         const clampedOffset = flowOffset < 0 ? flowOffset + flowDashSum : flowOffset;
-        flowNodes.style('border-dash-offset', Math.round(clampedOffset));
+        flowNodes.style('outline-border-dash-offset', Math.round(clampedOffset));
       }
 
       // ── Glow：呼吸脉冲（正弦曲线，柔和无跳跃感）────────────────────────────
