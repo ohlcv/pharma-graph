@@ -1,952 +1,397 @@
-# frontmatter.md
+# 通用知识图谱节点规范（基于 OWL2）
 
-> 本规范用于将**纸质思维导图完整、稳定地迁移为电子节点图**。
->
-> 核心原则：**不追求把所有药学关系都拆成独立类型，而优先忠实还原纸质资料中的“节点—层级—分支—关系—学习辅助”结构。**
->
-> 当前图谱仅使用两个可视化语义维度，加一个定位维度：
->
-> 1. `essence` → 节点形状 + 填充色
-> 2. `edges_out.type` → 边的颜色、虚实与方向样式
-> 3. `location` → 教材目录定位（仅用于详情展示，不参与图形编码）
->
-> **禁止用字体、字号、字重、阴影、透明度、渐变、节点大小等额外视觉变量承载新的语义。**
+> 本规范为**通用设计文档**，不绑定任何学科。药学、数学、政治等领域的具体映射规则与渲染参数在各领域 RULES.md 中定义。
+> 以下示例以药学领域举例，仅为说明用法。
 
-***
+---
 
-## 一、Frontmatter 标准结构
+## 一、设计原则
+
+### 1.1 语义层与渲染层分离
+
+```
+fill（领域顶层类）──→ 提供默认外观（几何形状 / 背景色 / 默认边框色）
+shape（显式填写）──→ 覆盖 fill 的默认几何形状
+stroke（显式填写）─→ 覆盖 fill 的默认边框
+```
+
+- **fill 是配置中心**：每个领域顶层类在 RULES 中定义完整的默认外观
+- **shape / stroke 可选**：不填或缺省值时，使用 fill 的默认配置
+- **显式填写时覆盖**：shape 和 stroke 互不影响（同级），各自独立覆盖 fill 的默认外观
+
+### 1.2 严格基于 OWL2
+
+| 本规范字段 | OWL2 对应 | 说明 |
+|---|---|---|
+| `fill` | Direct Class Assertion（领域顶层类） | 个体归属的上层类 IRI |
+| `shape` | OWL2 实体类型枚举值（class/named_individual/...） | 显式填写时按 SHAPE_BY_OWL2 查表得 Cytoscape 形状 |
+| `stroke` | 自定义 AnnotationProperty `style` | OWL2 合法扩展，组合值 |
+| `edges_out.type` | OWL2 Axiom | 6 种公理 |
+
+> OWL2 允许自定义 AnnotationProperty，`style` 是本图谱定义的注释属性（组合值），属于 OWL2 标准扩展机制，非造词。
+> `shape` 填的是 OWL2 实体类型（如 `named_individual`），渲染时按 [RULES §三 SHAPE_BY_OWL2](./RULES.md) 映射到具体 Cytoscape 形状（ellipse / diamond / hexagon 等）。`fill: cls-drug` 隐含语义"named_individual 类的药物实例"，因此多数情况不填 shape、用 fill 的默认椭圆即可。
+
+---
+
+## 二、标准结构（字段平铺，无 data 包装）
 
 ```yaml
-data:
-  id: 唯一标识
-  label: 显示名称
-  essence: 节点本质
+---
+id: string                  # 必填，唯一标识（IRI 片段），英文/拉丁文
+label: string               # 必填，显示名称（rdfs:label），中文
 
-  location:
-    book: 根文件名
-    part: 篇
-    chapter: 章
-    section: 节
-    subsection: 子节
-    item: 具体知识点
+# === 语义层（严格 OWL2）===
+shape: auto | class | named_individual | object_property | data_property | annotation_property
+# 可选，缺省 auto。auto 时由 fill 的默认配置决定几何形状。
+# 显式填写时填 OWL2 实体类型，对应固定几何形状（round-rectangle / ellipse / hexagon / rectangle / tag）。
+# 显式填写时覆盖 fill 的默认形状（最高优先级）。
+# 完整 OWL2 → 几何形状映射见 RULES §二 + SHAPE_BY_OWL2。
 
-  tags:
-    - XXX
+fill: string                # 可选，领域顶层 Class IRI（如 cls-drug / cls-disease）
+# 缺省时不写节点（节点归入通用类），具体 fill 值见 RULES §二。
+# 决定背景色 + 默认几何形状 + 默认边框色，并在 RULES 中定义该类的完整默认外观。
 
-  summary:
-    short: 一句话定义
-    full: 详细解释
+stroke: auto | fallback | flow | glow
+# 可选，缺省由 fill 的 defaultStroke 决定（见 RULES §3.4）。
+# auto  → 先查 subtreeRoot，没子树时降级到 fill 兜底边框色（FILL_BORDER_HINTS[fill]）
+# fallback → 永远按 fill 兜底边框色着色（跳过 subtreeRoot）
+# flow  → 高亮彩色流光边框（重点药/分类）
+# glow  → 高亮多层光晕边框（跨节总结）
+# 完整 stroke 链路见 RULES §4.1。
 
-  edges_out:
-    - target: 对方节点 id
-      type: 关系类型
-      reason: 关系具体含义
-```
+# === 定位与内容 ===
+location:                   # 教材/资料定位（不参与图形编码）
+  book: string              # 必填
+  chapter: string           # 必填
+  section: string           # 可选
+  item: string              # 可选，节内排序/子项
 
-### 字段总览
+tags: string[]              # 检索关键词（rdfs:seeAlso）
 
-| 字段          | 类型            |        必填 | 可视化作用       | 核心含义             |
-| ----------- | ------------- | --------: | ----------- | ---------------- |
-| `id`        | `string`      |         ✅ | 无           | 节点唯一标识           |
-| `label`     | `string`      |         ✅ | 节点文字        | 节点显示名称           |
-| `essence`   | `enum`        |         ✅ | **形状+填充色** | 节点本质/对象类型 + 派生视觉颜色 |
-| `location`  | `object`      |         ✅ | **不参与图形编码** | 教材目录定位，仅用于节点详情展示 |
-| `tags`      | `string[]`    |        可选 | 无           | 检索关键词及补充属性       |
-| `summary`   | `object`      |        推荐 | 无           | 节点详情中的定义和解释      |
-| `edges_out` | `object[]`    | ✅（根节点可为空） | **边样式**     | 与其他节点的显式关系       |
-
-***
-
-# 二、视觉语义维度
-
-## 2.1 essence — 节点本质（决定形状）
-
-`essence` 只回答一个问题：
-
-> **“这个方框在知识体系里到底是什么？”**
-
-形状必须具有稳定语义。同一种本质永远使用同一种形状，不允许因为内容重要程度、章节位置或个人喜好随意换形状。
-
-### 当前标准本质类型
-
-| `essence` | 中文含义 | 形状 | 使用范围 |
-| --- | --- | --- | --- |
-| `module` | 结构模块/入口 | 圆角矩形 | 篇、章、节、主题入口等结构节点 |
-| `strict-class` | 严格分类（细分类） | 五边形 | 按药理/化学严格标准划分的分类（亚类、分类依据、分组节点） |
-| `umbrella-class` | 伞形分类（粗分类） | 六边形 | 按临床用途、功能、机制、酶划分的聚类集合 |
-| `concept` | 概念/术语 | 正方形 | 教材定义明确、具有边界的知识概念 |
-| `medication` | 重点药（详细讲解的制剂） | 椭圆 | 教材中详细介绍的药理卡片：药理作用、机制、用法、不良反应等 |
-| `drug` | 普通药（仅提名的药） | 椭圆 | 教材中只点名提及、未详细讲解的药物 |
-| `illness` | 疾病/病理状态/综合征 | 菱形 | 可被治疗、禁忌、导致或独立讨论的疾病/状态 |
-| `notion` | 学习性认知单元 | tag | 经验性认识、临床提示、易混概念、经验归纳 |
-| `mnemonic` | 记忆口诀 | vee | 口诀、首字母记忆、顺口溜、分类速记 |
-
-### 10 种 essence 颜色映射（一对一、有意义）
-
-| essence | 含义 | 主色（浅） | 暗色 | 选用逻辑 |
-| --- | --- | --- | --- | --- |
-| `module` | 结构模块/入口 | 青蓝 `#67e8f9` | `#0891b2` | 路径色 |
-| `strict-class` | 严格药理分类（细） | 紫色 `#a78bfa` | `#7c3aed` | 同色系明暗区分 |
-| `umbrella-class` | 伞形分类（粗） | 深紫 `#c084fc` | `#9333ea` | 同色系明暗区分 |
-| `concept` | 概念/术语 | 靛蓝 `#818cf8` | `#4f46e5` | 蓝紫中性色，独立 |
-| `medication` | 重点药（详细讲解） | 柔橙 `#fb923c` | `#ea580c` | 暖橙醒目标记（与柔粉 `summary` 区分） |
-| `drug` | 普通药（仅提名） | 柔蓝 `#7dd3fc` | `#0284c7` | 中性浅蓝，不抢重点药的视觉权重 |
-| `illness` | 疾病/病理状态 | 粉红 `#fb7185` | `#e11d48` | 红系警示色 |
-| `notion` | 学习性认知 | 淡灰 `#cbd5e1` | `#64748b` | 中性弱化 |
-| `mnemonic` | 记忆口诀 | 琥珀 `#fbbf24` | `#d97706` | 高亮提醒 |
-| `summary` | 总结/归纳 | 薄荷绿 `#86efac` | `#16a34a` | 完结/收束语义 |
-
-**核心原则**：
-
-1. **颜色互不相同**：10 种 essence 10 种色，绝不复用
-2. **颜色有意义**：能直觉联想到该 essence 的语义
-3. **填充色不得承担"重点/难点/掌握状态"等其他含义**
-
-### 形状使用原则
-
-1. **形状表达本质，不表达重要程度。**
-2. **形状表达本质，不表达教材章节级别。**
-3. `module` 统一承载篇、章、节等结构模块。
-4. `strict-class` 承载按药理/化学严格标准划分的分类；`umbrella-class` 承载按临床用途、功能、机制、酶聚合的分类。
-5. `mnemonic` 均允许成为独立节点，以完整还原纸质资料中的独立视觉对象。
-6. 不为了"凑满 Cytoscape 形状"而创建本质类型。**形状数量以纸质资料实际需要为准。**
-
-***
-
-## 2.2 视觉维度组合的完整含义
-
-一个节点最终由以下属性共同决定其视觉身份（**无 level、无 tier**）：
-
-```text
-                 节点
-                  │
-      ┌──────────┼──────────┐
-      ↓          ↓
-   essence    edges_out.type
-      │          │
-  形状+填充色   边的视觉类型
-```
-
-> **注意**：`essence` 同时决定**形状**（本质）和**填充色**（视觉区分）。
-
-例如：
-
-```yaml
-essence: medication
-```
-
-***
-
-# 三、location — 教材位置
-
-`location` **保留原字段结构，不参与三个视觉维度的计算。**
-
-它只回答：
-
-> **“这个节点在原教材/资料中来自哪里？”**
-
-### 标准结构
-
-```yaml
-location:
-  book: 药学专业知识二
-  part: 某篇
-  chapter: 某章
-  section: 某节
-  subsection: 某子节
-  item: 某具体知识点
-```
-
-### 字段规则
-
-| 字段           | 类型       | 是否必填 | 含义       |
-| ------------ | -------- | ---: | -------- |
-| `book`       | `string` |    ✅ | 根文件名/教材名 |
-| `part`       | `string` |   可选 | 篇        |
-| `chapter`    | `string` |    ✅ | 章        |
-| `section`    | `string` |   可选 | 节        |
-| `subsection` | `string` |   可选 | 子节       |
-| `item`       | `string`    |   可选 | 具体知识点（module 节入口可省略，其余节点须提供） |
-
-### 保留规则
-
-1. `location` 原则上维持教材真实目录结构。
-2. **知识节点**的 `label` 不附带“第几章/第几节”等目录序号；**结构节点（节入口）**的 `label` 可包含序号（如「第三节 平喘药」），与纸质图/教材目录一致。
-3. 目录序号只出现在 `location` 对应值或节点详情中。
-4. `section == chapter` 时可删除重复的 `section`。
-5. `subsection == section` 时可删除重复的 `subsection`。
-6. 不为了让 `location` 与纸图层级一致而修改教材位置。
-7. `item` 用于同一节内多个节点的排序 tiebreaker（如药品名"三唑仑"）。**模块节点（篇、章、节入口）可省略 `item`**；其余节点新增时必须显式提供。
-8. **`location`** **不决定** **`essence`，也不直接决定边类型。**
-9. 节点详情面板可以完整展示 `location`，但主思维导图默认不把它展开为额外视觉编码。
-
-### 最重要的结构原则
-
-> **思维导图结构 ≠ 教材目录结构。**
-
-例如：
-
-```yaml
-label: 首选药物
-location:
-  book: 药学专业知识二
-  chapter: 精神与中枢神经系统疾病用药
-  section: 镇静催眠药
-```
-
-这个节点在教材里属于“镇静催眠药”，但在纸质思维导图中可能作为另一个大分支下的三级节点。两者可以同时成立，互不冲突。
-
-***
-
-# 四、tags — 标签
-
-`tags` 用于补充节点检索信息，不承担三个视觉维度的语义。
-
-```yaml
-tags:
-  - 口服
-  - 老年人
-  - 肝损伤
-  - 药物监测
-```
-
-### 类型
-
-```text
-string[]
-```
-
-### 规则
-
-1. 标签必须是有检索价值的关键词。
-2. **优先复用 `summary.short` / `summary.full` 里已有的关键词**——不要自作主张另造同义/近义词（参见 §四 与 RULES §5.11.4）。
-3. **不写语义重复的标签**：同一节点下不允许同时存在 `口诀` 与 `记忆口诀`、`禁忌` 与 `禁用`、`适应症` 与 `适用症` 等同/近义形式。先出现则保留先出现的。
-4. 不把 `essence` 的枚举值重复写入 `tags`。
-5. 不把“药物/疾病/概念”等节点本质重复写成标签。
-6. 不把整个句子放进 `tags`。
-7. 疾病如果已经建立独立 `illness` 节点，仍允许在相关药物节点保留疾病名标签，作为检索索引。
-
-### Tags 应包含的内容（按节点类型）
-
-> 关键词抽取来源：summary.short / summary.full 中加粗的词。药物节点须同时包含分类和作用，分类可不止一个。
-
-| 节点类型 | 必须包含 | 可选包含 | 说明 |
-|---|---|---|---|
-| **药物节点**（drug / medication） | 药品名 + 作用 tag（适应症） | 分类 tag（代际分类、化学分类）、作用机制 tag、ADR tag（最多3个） | 作用 tag 必填，如 `解热镇痛`、`降压`；代际分类如 `第一代抗癫痫药`、`第二代抗癫痫药` 有则保留；化学分类有则保留，如 `H₁受体拮抗剂`、`亚氨基芪类`；作用机制有则保留，如 `电压门控钠通道`；ADR 必须标注为 `ADR：XXX` 格式，最多保留 3 个 |
-| **模块节点**（module） | — | — | 一般不单独建 tags |
-| **粗分类节点**（umbrella-class） | 自身 label | 子分类名、重点代表药 | — |
-| **细分类节点**（strict-class） | 自身 label | 机制/分类依据、重点代表药 | — |
-| **口诀节点**（mnemonic） | `口诀` | 药品名/分类名 | label 改为口诀内容本身 |
-| **其他节点** | 分类/作用/适应症等核心关键词 | — | 视节点内容决定 |
-
-### 抽取流程
-
-从 `summary.short` / `summary.full` 中抽取标注了 `**关键词**` 的内容作为 tag 候选词。其余流程与约束见 RULES §5.11.4。
-
-***
-
-# 五、summary — 节点详情摘要
-
-```yaml
 summary:
-  short: 一句话定义
-  full: 详细解释
-```
+  short: string             # 一句话定义，关键词用 **加粗**
+  full: string              # 详细解释，用 | block scalar，【标签】分段
 
-## `short`
-
-- 类型：`string`
-- 用于悬停/快速查看
-- 必须是完整陈述句
-- 不写“本章/本节/本文”等元话语
-
-## `full`
-
-- 类型：`string`
-- 用于节点详情弹窗
-- 可补充背景、意义、临床价值及关键关系
-- 不要求与正文完全重复
-
-> `summary` 是**节点详情内容**，不参与形状、填充色或边类型计算。
->
-> **红线（见 RULES §5.8）**：`summary.full` 必须由用户手动提供，禁止 AI 自动填充；用户未提供 `full` 时不写入该字段（不写占位符）。
-
-***
-
-# 六、edges\_out — 思维导图关系边
-
-当前正式使用 **5 种边类型**。
-
-原则：
-
-> **边类型少而稳定；具体语义放进** **`reason`。**
->
-> **边方向由发起方决定**：每个节点的 `edges_out` 表达的是"我向外辐射的引用"。`subclass_of`/`part_of`/`instance_of` 由子类/局部/实例写；辅助节点写 `part_of`；`disjoint_with`/`equivalent_to` 任意一侧。详见 §7、§9.2、§9.4。
-
-不再把 `treats`、`causes`、`activates`、`inhibits`、`interacts`、`contraindicates` 等全部作为独立 `type`。
-
-示例：
-
-```yaml
+# === 边（OWL2 公理）===
 edges_out:
-  - target: 癫痫持续状态
-    type: instance_of
-    reason: 治疗
+  - target: string          # 对方节点 id
+    type: subclass_of | instance_of | part_of | disjoint_with | equivalent_to | same_individual
+    reason: string          # 关系具体语义注释
+---
 ```
 
-而不是：
+---
+
+## 三、字段说明
+
+### 3.1 id / label
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `id` | string | ✅ | 唯一标识，英文/拉丁文，格式 `{前缀}-{英文名}-{书简写}{章}-{节}` |
+| `label` | string | ✅ | 显示名称，中文；文件名 = label |
+
+### 3.2 shape — OWL2 实体类型（覆盖 fill 的默认形状）
+
+> **每个 OWL2 实体类型对应一个固定的 Cytoscape 几何形状**（一对一映射，见 [RULES.md §二](./RULES.md)）。
+> **留空时使用 fill 的默认形状**——可访问 FILL_CONFIG 中的扩展形状（vee / tag / barrel 等）。
+
+| 值 | OWL2 原名 | 含义 | 几何形状 | 药学范畴 |
+|---|---|---|---|---|
+| `class` | owl:Class | 概念集合/类型 | round-rectangle（圆角矩形） | 药物分类、章/节、疾病分类 |
+| `named_individual` | owl:NamedIndividual | 具体实例 | ellipse（椭圆） | 具体药物、具体疾病、靶点、酶 |
+| `object_property` | owl:ObjectProperty | 个体间关系（实体化时） | hexagon（六边形） | 治疗、导致、抑制、代谢 |
+| `data_property` | owl:DatatypeProperty | 个体→数值的属性 | rectangle（矩形） | 半衰期、剂量、生物利用度 |
+| `annotation_property` | owl:AnnotationProperty | 注释/元数据 | tag（标签形） | 定义、概念、口诀、总结 |
+| `auto` | — | 由 fill 决定 | — | 缺省值 |
+
+**覆盖规则**：
+- 显式填写 `shape` → 使用映射表的固定形状，**覆盖** fill 的默认形状
+- 留空或填 `auto` → 使用 fill 的默认形状（可为 vee / tag / barrel 等 FILL_CONFIG 扩展形状）
+
+**用法示例**：
 
 ```yaml
-- target: 癫痫持续状态
-  type: treats
+# 例 1：默认情况（推荐）—— 不填 shape，用 fill 的扩展形状
+fill: cls-mnemonic     # → V 形（vee）+ 浅橙背景
+# 留空 shape → 节点是 V 形
+
+# 例 2：覆盖 fill —— 想让口诀用普通椭圆
+fill: cls-mnemonic
+shape: named_individual  # → 椭圆（覆盖 vee）
+
+# 例 3：关系实体化 —— "治疗" 边转成节点
+fill: cls-feature
+shape: object_property   # → 六边形（强制显式指定）
 ```
 
-这样既能保留“治疗”这个具体语义，又能显著减少边类型数量。
+### 3.3 fill — 领域顶层 Class IRI
 
-***
+- 类型：`string`，值为领域顶层类的 id
+- 缺省：**省略**（节点归入通用类，不写也合法）
+- 作用：
+  1. 决定节点**背景色**
+  2. 在 RULES 中定义该类的**默认 shape（几何形状）**
+  3. 在 RULES 中定义该类的**默认边框色和边框效果**
+- 具体领域顶层类（如 `cls-drug` / `cls-disease` / `cls-math-concept`）在各领域 RULES 中定义
 
-## 6.1 五种边总览
+### 3.4 stroke — 边框样式（可选）
 
-| `type` | 中文 | 核心语义 | 方向规则 | 线型 | 颜色 |
-| --- | --- | --- | --- | --- | --- |
-| `subclass_of` | 是一种（类-类） | A 是 B 的一种子类，集合 A ⊂ 集合 B | **子类 → 父类** | 实线+三角箭头 | 蓝色 |
-| `part_of` | 是一部分（局部-整体） | A 是 B 的一个构件、片段、模块，A 不是 B 的一种 | **局部 → 整体** | 实线+三角箭头 | 绿色 |
-| `instance_of` | 是实例（个体-类） | A 是 B 的一个实例/代表药物 | **实例 → 类别** | 实线+三角箭头 | 橙色 |
-| `disjoint_with` | 互斥 | 两类互斥，不能同时属于 | **对称（A ↔ B，存一条即可）** | 点划线 | 紫色 |
-| `equivalent_to` | 等价 | 两名称语义完全相等 | **对称（A ↔ B，存一条即可）** | 点线 | 灰紫 |
+stroke 是自定义 AnnotationProperty `style` 的简写，值为组合枚举，完整定义边框色 + 效果。
+**完整 stroke 链路以 [RULES §4.1](./RULES.md) 为准**（本节仅速查）。
 
-> **所有边不使用粗细表达语义差异。**
->
-> **所有边不使用渐变色。**
->
-> 同一种边始终保持同一种颜色和线型。
+| 值 | 边框色 | 线型 | 效果 | 适用场景 |
+|---|---|---|---|---|
+| `auto`（如显式填写） | subtreeRoot 色 或 FILL_BORDER_HINTS[fill] | 实线 | — | 跟子树走 |
+| `fallback` | FILL_BORDER_HINTS[fill]（不查 subtreeRoot） | 实线 | — | 按 fill 自身颜色着色的节点 |
+| `flow` | subtreeRoot 色 | 实线 | **彩色流光** | 重点药、重点分类 |
+| `glow` | subtreeRoot 色 | 实线 | **多层光晕** | 跨节大总结 |
+| *不填* | 由 `FILL_CONFIG[fill].defaultStroke` 决定（再走 1~4） | — | — | 多数节点的推荐写法 |
 
-***
+> 边框宽度固定 2px，不参与区分。
 
-# 七、五种边的详细规范
+### 3.5 location — 教材定位
 
-## 7.1 `subclass_of` — 类-类，A 是一种 B
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `book` | string | ✅ | 根文件名/教材名 |
+| `chapter` | string | ✅ | 章 |
+| `section` | string | 可选 | 节 |
+| `item` | string | 可选 | 节内排序/子项 |
 
-表达：
+> location 不参与图形编码，仅用于节点详情展示。
 
-> A 是 B 这个大类里的小种类，**二者都是类**。集合视角：A 集合 ⊂ B 集合。
+### 3.6 tags — 检索关键词
 
-数据方向统一：
+- 类型：`string[]`
+- 从 summary 加粗词抽取，语义去重
+- 用于检索和筛选
 
-```text
-子类 → 父类
+### 3.7 summary — 节点详情
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `short` | string | 一句话定义，关键词用 `**加粗**` |
+| `full` | string | 详细解释，用 `\|` block scalar 保留换行，【标签】分段 |
+
+**full 标签**（按需使用）：`【药理作用】` `【适应症】` `【不良反应】` `【禁忌】` `【相互作用】` `【药代动力学】` `【临床应用注意】` `【作用机制】` `【代表药】` `【口诀】`
+
+> 无用户资料时 `full` 留空，不 AI 自动填充。
+
+### 3.8 edges_out — OWL2 公理（6 种）
+
+| type | OWL2 对应 | 语义 | 方向规则 |
+|---|---|---|---|
+| `subclass_of` | SubClassOf | 类→父类（是一种） | 子类→父类 |
+| `instance_of` | ClassAssertion | 个体→类（是一个） | 个体→类 |
+| `part_of` | TransitiveObjectProperty | 局部→整体（组成） | 局部→整体 |
+| `disjoint_with` | DisjointClasses | 互斥 | 对称 |
+| `equivalent_to` | EquivalentClasses | 类等价 | 对称 |
+| `same_individual` | SameIndividual | 个体同一/别名 | 对称 |
+
+> `part_of` 是声明为 Transitive 的 ObjectProperty，属于 OWL2 标准用法。
+> 口诀→主知识、总结→主章节等"辅助节点→主知识"也使用 `part_of`。
+
+---
+
+## 四、边框色计算优先级
+
+> **本节是速查版，权威定义在 [RULES.md §4.1](./RULES.md)**（含 fallback / FILL_BORDER_HINTS[fill] / defaultStroke 兜底链路）。
+
+边框色由两层叠加决定：
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  边框色 = 基础层（subtreeRoot 或 fill 兜底）                  │
+│         + 强调层（stroke 显式：flow/glow 的彩色特效）         │
+│                                                              │
+│  基础层（自动计算）        强调层（显式声明）                 │
+│  ─────────────────        ─────────────────                   │
+│  告诉用户"属于哪个分类"    告诉用户"有多重要"                 │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-例如：
+### 4.1 stroke 链路速查
+
+完整 6 步链路（优先级从高到低）：
+
+1. 用户填 `stroke: flow` / `stroke: glow` → subtreeRoot 色 + 对应特效
+2. 用户填 `stroke: fallback` → 直接用 `FILL_BORDER_HINTS[fill]`，**跳过 subtreeRoot**
+3. 用户填 `stroke: auto` + 有 subtreeRoot → subtreeRoot 色
+4. 用户填 `stroke: auto` + 无 subtreeRoot → `FILL_BORDER_HINTS[fill]`（fill 兜底边框色）
+5. 用户不填 stroke → `FILL_CONFIG[fill].defaultStroke`（按 fill 类型可能是 auto/flow/glow/fallback，再走 1~4）
+6. 节点连 fill 都没填 → `FILL_BORDER_DEFAULT`（中性灰）
+
+### 4.2 auto vs fallback
+
+- `auto`：先查 subtreeRoot，有就用子树色（保持同子树视觉统一）；无才用 fill 兜底
+- `fallback`：**永远**按 fill 兜底色着色，subtreeRoot 完全不参与（适合没有子树归属感的节点）
+
+### 4.3 subtreeRoot 自动色
+
+- **有 subtreeRoot** → 按 subtreeRoot id hash 分配稳定色（15 色循环）
+- **无 subtreeRoot** 且 stroke=auto → 走 4.1 第 4 步的 `FILL_BORDER_HINTS[fill]`（不是 depth 灰阶——以 RULES 为准）
+
+### 4.4 融合设计示例
 
 ```yaml
-- target: 苯二氮䓬类
-  type: subclass_of
-  reason: 一种苯二氮䓬
+# 示例 1：重点药 + 分类归属色（stroke 覆盖）
+fill: cls-drug
+stroke: flow        # → 蓝色流光边框（stroke 显式，subtreeRoot 色被覆盖）
+
+# 示例 2：普通药（用 fill 兜底边框色，不跟子树走）
+fill: cls-drug
+stroke: fallback    # → 浅蓝边框，按 fill 自身颜色着色
+
+# 示例 3：默认（不填 stroke，用 fill 的 defaultStroke）
+fill: cls-drug       # 默认 stroke=flow（cls-drug 默认），效果同示例 1
 ```
 
-### 视觉
+---
 
-- 颜色：蓝色
+## 五、完整示例（药学举例，本规范通用）
 
-- 线型：**实线+三角箭头**
-
-- 关系标签：显示 `reason`
-
-### 适用场景
-
-- 严格分类 → 上级分类（药理亚类 → 药理大类）
-- 章节层级归属（如镇静催眠药 → 上级分类）
-
-### 注意
-
-`subclass_of` 只用于**类-类**关系。药物→分类请用 `instance_of`。
-
-***
-
-## 7.2 `part_of` — 局部-整体，A 是 B 的构件
-
-表达：
-
-> A 是 B 内部的一个构件、片段、模块；A **不是** B 的一种，即 A 不是 B 的子类。
-
-数据方向统一：
-
-```text
-局部 → 整体
-```
-
-例如：
+### 示例 1：普通药（全部 auto，由 fill 决定）
 
 ```yaml
-- target: 药物画像
-  type: part_of
-  reason: 不良反应是药物画像的一部分
-```
+---
+id: drug-trizolam-y2-01-01
+label: 三唑仑
+fill: cls-drug
 
-```yaml
-- target: 镇静催眠药
-  type: part_of
-  reason: 包括入睡困难、焦虑型失眠、维持睡眠三个细分
-```
-
-### 视觉
-
-- 颜色：绿色（`#22c55e`）
-
-- 线型：**实线 + 三角箭头**
-
-- `reason`：可写"包括"、"展开为"、"分为"、"由…组成"等
-
-### 注意
-
-`part_of` 与 `subclass_of` **互斥**：
-
-- A **是一种** B → `subclass_of`
-- A 是 B **的一部分** / 构件 → `part_of`
-
-口子诀 → 主知识、口总结 → 主章节等"辅助节点指向主知识"也使用 `part_of`（详见 §7.6）。
-
-***
-
-## 7.3 `instance_of` — 个体-类，A 是 B 的实例
-
-这是药学知识关系的主承载边。
-
-不再继续细分成十几种边，而通过 `reason` 表达具体关系。
-
-### 常用 `reason`
-
-```text
-治疗
-导致
-作用于
-激动
-抑制
-代谢
-相互作用
-禁忌
-前测
-特点
-适用于
-代表
-```
-
-例如：
-
-```yaml
-- target: 癫痫持续状态
-  type: instance_of
-  reason: 治疗
-
-- target: 嗜睡
-  type: instance_of
-  reason: 一种典型不良反应
-
-- target: GABA_A受体
-  type: instance_of
-  reason: 一种作用于GABA_A受体的药物
-
-- target: HLA-B*1502
-  type: instance_of
-  reason: 用药前需检测
-```
-
-### 视觉
-
-- 颜色：橙色（`#f97316`）
-
-- 线型：**实线 + 三角箭头**
-
-- `reason`：作为边标签，在 hover / 点击时显示
-
-### 为什么不用 `treats / causes / activates ...`
-
-这些具体词仍然保留在 `reason`，但不再把每个具体动词都升级成新的可视边类型。
-
-这样：
-
-> **type 负责“关系家族”；reason 负责“具体关系”。**
-
-***
-
-## 7.4 `disjoint_with` — 互斥（对称）
-
-表达：
-
-> A 与 B **不可同时成立**，两者互为对立、排斥、互斥关系（药理上不能合并使用或概念上互不相容）。
-
-典型情况：
-
-```text
-PPI ↔ P-CAB                       抑酸机制不同类
-短效苯二氮䓬 ↔ 长效苯二氮䓬       作用时长分组互斥
-阿托品 ↔ 毛果芸香碱              药理作用相反
-兴奋 ↔ 抑制                      概念上互斥
-```
-
-数据方向：**对称关系（A ↔ B）**，存一条即可，渲染时自动双向。
-
-```yaml
-# 任意一侧写即可
-- target: 短效苯二氮䓬
-  type: disjoint_with
-  reason: 作用时长不同
-```
-
-### 视觉
-
-- 颜色：紫色（`#a855f7`）
-
-- 线型：**虚线（dashed）+ 三角箭头**
-
-- 箭头：双向（对称）
-
-- `reason`：可写"互斥"、"对立"、"不同时使用"等
-
-### 使用限制
-
-- `disjoint_with` **不**是"弱关联"或"任意对比"的兜底关系。
-- 凡是可归入 `subclass_of / part_of / instance_of` 的，应优先使用具体关系。
-- 仅在 A 与 B **明确互斥**（药理相反 / 分组互斥 / 不能并存）时使用。
-
-***
-
-## 7.5 `equivalent_to` — 等价（对称）
-
-表达：
-
-> A 与 B **语义完全相等**，是同一事物的不同命名 / 别名 / 异名 / 译名。
-
-典型情况：
-
-```text
-苯二氮䓬类 ↔ 苯二氮䓬               译名一致
-HMG-CoA还原酶抑制剂 ↔ 他汀类         别名 ↔ 学名
-西医 ↔ 现代医学                    同一体系别名
-```
-
-数据方向：**对称关系（A ↔ B）**，存一条即可，渲染时自动双向。
-
-```yaml
-# 任一侧写一条
-- target: 苯二氮䓬
-  type: equivalent_to
-  reason: 同物异名
-```
-
-### 视觉
-
-- 颜色：灰紫色（`#a78bfa`）
-
-- 线型：**点线（dotted）+ 三角箭头**
-
-- 箭头：双向（对称）
-
-- `reason`：可写"等价"、"别名"、"译名一致"、"同物异名"等
-
-### 使用限制
-
-- `equivalent_to` **不等于** "相似"、接近、近似、类似的归类——那应该用 `subclass_of` 或 `instance_of + reason`。
-- 仅在 A 与 B **完全相等**（同一事物）时使用。
-
-***
-
-## 7.6 `part_of` 用于"辅助节点 → 主知识"
-
-辅助节点（`mnemonic` 口诀、`summary` 总结）的 `edges_out` 也用 `part_of` 指向它们所要解释/记忆/辅助的主知识节点。
-
-```yaml
-# 正确：丁苯酞口诀.md
-edges_out:
-  - target: 丁苯酞
-    type: part_of
-    reason: 帮助记忆丁苯酞
-```
-
-```yaml
-# 正确：酰胺类口诀.md
-edges_out:
-  - target: 酰胺类中枢兴奋药
-    type: part_of
-    reason: 帮助记忆酰胺类
-```
-
-```yaml
-# 正确：某节总结.md
-edges_out:
-  - target: 第四节 抗记忆障碍及改善神经功能药
-    type: part_of
-    reason: 总结本节
-```
-
-### 方向规则（必须遵守）
-
-- **辅助节点自身**的 `edges_out` 写 `part_of` 主知识节点，**不能反过来**。
-- 这样新增口诀/总结/表格节点时，只需新建该辅助节点的 md，不必回头改主知识节点。
-- 反向（主知识持有 → 辅助节点）会使辅助节点被画成主知识的下级，破坏形状语义。
-
-### 与 `part_of` 主体用法不冲突
-
-"局部→整体"和"辅助→主知识"虽然都用 `part_of`，但本质都是"非独立构件归属"，复用同一边类型避免新增语义。可在 `reason` 中明确区分用途：
-
-```yaml
-reason: 药物画像的一部分       # 局部构件
-reason: 帮助记忆酰胺类          # 辅助记忆
-reason: 总结本节               # 辅助总结
-```
-
-
-***
-
-# 八、边的视觉规范汇总
-
-```text
-subclass_of    ──────►  蓝色实线 + 三角箭头   类-类（子类→父类）
-part_of        ──────►  绿色实线 + 三角箭头   局部-整体 / 辅助节点→主知识
-instance_of    ──────►  橙色实线 + 三角箭头   个体-类（实例→类别）
-disjoint_with  ─ ─ ─►  紫色虚线 + 三角箭头   互斥（对称，双向）
-equivalent_to  · · · ►  灰紫点线 + 三角箭头   等价（对称，双向）
-```
-
-颜色（与代码 `EDGE_TYPE_STYLE` 保持一致）：
-
-| type | CSS | 用途 |
-| --- | --- | --- |
-| `subclass_of` | `#3b82f6` | 蓝色实线 |
-| `part_of` | `#22c55e` | 绿色实线 |
-| `instance_of` | `#f97316` | 橙色实线 |
-| `disjoint_with` | `#a855f7` | 紫色虚线（dashed） |
-| `equivalent_to` | `#a78bfa` | 灰紫点线（dotted） |
-
-### 强制限制
-
-- ❌ 不用线宽区分重要程度
-
-- ❌ 不用线宽区分关系强弱
-
-- ❌ 不使用渐变色
-
-- ❌ 不使用透明度区分关系
-
-- ❌ 不使用发光/阴影区分关系
-
-- ❌ 不再为每个具体药学动词建立一个新的 `edge.type`
-
-### `reason` 的职责
-
-> **`type`** **决定边是什么“家族”；`reason`** **决定用户看到的具体中文关系。**
-
-例如：
-
-```yaml
-- target: 三叉神经痛
-  type: instance_of
-  reason: 治疗
-```
-
-前端显示：
-
-```text
-[绿色实线箭头]
-        治疗
-```
-
-而：
-
-```yaml
-- target: 入扎焦氟双佐唑
-  type: part_of
-  reason: 记忆口诀
-```
-
-前端显示：
-
-```text
-[橙色虚线箭头]
-        记忆口诀
-```
-
-***
-
-# 九、层级与边的使用规则
-
-## 9.1 纸图层级优先使用 `subclass_of`/`part_of`
-
-对于真正的：
-
-```text
-一级 → 二级 → 三级 → 四级 → 五级 → 六级
-```
-
-统一使用：
-
-```text
-子 → 父
-```
-
-例如：
-
-```yaml
-# “镇静催眠药”节点
-edges_out:
-  - target: 精神与中枢神经系统疾病用药
-    type: subclass_of
-    reason: 该类属于上级主题
-```
-
-> `subclass_of` 和 `part_of` 是表达层级归属关系的边。
-
-***
-
-## 9.2 不要求父节点反向枚举所有子节点
-
-不要写：
-
-```yaml
-# 错误
-# 父节点
-edges_out:
-  - target: 子节点A
-    type: subclass_of
-  - target: 子节点B
-    type: subclass_of
-```
-
-而应由子节点声明：
-
-```yaml
-# 正确
-# 子节点
-edges_out:
-  - target: 父节点
-    type: subclass_of
-    reason: 属于上级主题
-```
-
-这样可以避免重复边和双向层级污染。
-
-> **铁律：边的方向是"子 → 父"，永远是子节点持有指向父节点的层级边，父节点永远不反向持有指向子节点的层级边。**
->
-> 如果你发现某个节点的 `edges_out` 里写了 `type: subclass_of`，那它必须是该边所指向目标的**下级**。
-
-### 推广到所有边：每个节点自管自己的 `edges_out`
-
-> **通用规则**：所有 `edges_out` 都表示"这个节点向外辐射的引用关系"，**每个节点自己决定自己往外指哪些边**。
->
-> 新增任何节点时，**只需要修改该节点自己的 md 文件**——不必回去修改任何其他节点（包括父节点、辅助对象、对比对象）的 `edges_out`。
-
-| 关系类型 | `edges_out` 写在 |
-| --- | --- |
-| 层级归属（`subclass_of` / `part_of` / `instance_of`） | 子节点文件里（子类/局部/实例那一侧） |
-| 辅助学习（用 `part_of`） | **辅助节点**文件里（口诀 / 注意 / 对比表） |
-| 药学关系（`subclass_of` / `instance_of`） | **业务主动方**文件里（提供方 / 描述方） |
-| 横向对比（`disjoint_with`） | **任一侧**（单边写即可，渲染端补双向视觉） |
-| 等价关系（`equivalent_to`） | **任一侧**（单边写即可） |
-
-详见 RULES §5.15 与本节 §9.4。
-
-***
-
-## 9.3 `location` 不参与层级边生成
-
-即使：
-
-```yaml
 location:
-  chapter: 精神与中枢神经系统疾病用药
-  section: 镇静催眠药
-```
+  book: 药学专业知识二
+  chapter: 第一章 精神与中枢神经系统用药
+  section: 第一节 镇静催眠药
+  item: 苯二氮䓬类
 
-也不意味着程序应该自动根据 `location` 生成 `subclass_of`。
+tags: [三唑仑, 苯二氮䓬类, 短效]
 
-因为：
+summary:
+  short: "**苯二氮䓬类短效**镇静催眠药。"
+  full:
 
-> **教材目录只是来源坐标，纸图结构才是真正的思维导图结构。**
-
-如果纸图中确实存在"镇静催眠药 → 第一章"的层级关系，应由节点显式写 `subclass_of`（且层级在纸质图中允许）。
-
-***
-
-## 9.4 边方向易错点汇总
-
-迁移纸图时最常见的错误是**边方向颠倒**——子节点持有指向父节点的边、辅助节点持有指向主知识的边。下面 4 个反例必须避免。
-
-### ❌ 反例 1：父节点反向持有层级边
-
-```yaml
-# 错误：父节点不该写指向子节点的层级边
-# 镇静催眠药.md
 edges_out:
-  - target: 唑吡坦
-    type: subclass_of
-    reason: 下属药物
-```
-
-应改为由子节点声明：
-
-```yaml
-# 正确：唑吡坦.md
-edges_out:
-  - target: 镇静催眠药
+  - target: cls-benzodiazepine-y2-01-01
     type: instance_of
-    reason: 属于该分类
+    reason: 属于苯二氮䓬类
+---
 ```
 
-### ❌ 反例 2：把 `type: child` 当作 "child → parent"
+渲染（由 cls-drug 默认配置）：圆形 + 浅蓝背景 + 灰色细实线边框。
+
+### 示例 2：重点药（stroke 覆盖 fill 默认）
 
 ```yaml
-# 错误：child 不是合法 type，"我是 child" 是没意义的
+---
+id: med-diazepam-y2-01-01
+label: 地西泮
+fill: cls-drug
+stroke: flow
+
+location:
+  book: 药学专业知识二
+  chapter: 第一章 精神与中枢神经系统用药
+  section: 第一节 镇静催眠药
+  item: 苯二氮䓬类
+
+tags: [地西泮, 苯二氮䓬类, 抗焦虑, 镇静催眠]
+
+summary:
+  short: "**苯二氮䓬类长效代表药**；适应证包括**抗焦虑、镇静催眠、抗癫痫抗惊厥**；**妊娠妇女和新生儿禁用**。"
+  full: |
+    【药理作用】抗焦虑、镇静催眠、抗癫痫、抗惊厥、肌肉松弛。
+    【适应症】①抗焦虑、镇静催眠、抗癫痫和抗惊厥；②治疗惊恐发作；③手术麻醉前给药。
+    【禁忌】妊娠妇女、新生儿禁用。
+
 edges_out:
-  - target: 镇静催眠药
-    type: child
-    reason: 属于该主题
+  - target: cls-benzodiazepine-y2-01-01
+    type: instance_of
+    reason: 属于苯二氮䓬类
+---
 ```
 
-层级归属永远使用 `type: subclass_of`（类-类）或 `type: instance_of`（个体-类），**不存在 `type: child`**。
+渲染：圆形 + 浅蓝背景 + **蓝色流光彩色边框**（stroke 覆盖 fill 默认的灰色边框）。
 
-### ❌ 反例 3：药物/分类节点反向持有辅助边指向口诀
+### 示例 3：不良反应
 
 ```yaml
-# 错误：主知识不该主动连向口诀，这会把口诀画成下级
-# 丁苯酞.md
+---
+id: adr-barbiturate-y2-01-01
+label: 巴比妥类典型不良反应
+fill: cls-adverse
+# stroke: auto（默认）→ subtreeRoot 色或 depth 灰阶
+
+location:
+  book: 药学专业知识二
+  chapter: 第一章 精神与中枢神经系统用药
+  section: 第一节 镇静催眠药
+  item: 巴比妥类
+
+tags: [巴比妥类, 不良反应, 宿醉现象, 依赖性]
+
+summary:
+  short: "**过敏**（剥脱性皮疹）；常见**宿醉现象**；长期应用产生**依赖性和戒断综合征**。"
+  full: |
+    【典型不良反应】(1)过敏：剥脱性皮疹、史蒂文斯-约翰逊综合征；(2)常见"宿醉"现象：嗜睡、步履蹒跚、肌无力；(3)长期应用可发生药物依赖性、戒断综合征。
+
 edges_out:
-  - target: 丁苯酞口诀
+  - target: cls-barbiturate-y2-01-01
     type: part_of
-    reason: 记忆口诀
+    reason: 巴比妥类的临床用药评价
+---
 ```
 
-应由口诀节点持有 `part_of` 边指向主知识：
+渲染：六边形 + 浅橙背景 + **subtreeRoot 色边框**（stroke: auto）。
+
+### 示例 4：跨节大总结（glow 效果）
 
 ```yaml
-# 正确：丁苯酞口诀.md
+---
+id: meta-cyp1a2-summary-y2-01
+label: 总结-CYP1A2
+fill: cls-summary
+stroke: glow
+
+location:
+  book: 药学专业知识二
+  chapter: 第一章 精神与中枢神经系统用药
+
+tags: [CYP1A2, 肝药酶, 总结, 药物相互作用]
+
+summary:
+  short: "CYP1A2 **底物、抑制剂、诱导剂**汇总表。"
+  full: |
+    【底物】茶碱、咖啡因、氯氮平、奥氮平...
+    【抑制剂】氟伏沙明、环丙沙星...
+    【诱导剂】吸烟、奥美拉唑...
+
 edges_out:
-  - target: 丁苯酞
+  - target: ch-cns-y2-01
     type: part_of
-    reason: 帮助记忆丁苯酞
+    reason: 跨节总结
+---
 ```
 
-### ❌ 反例 4：口诀节点使用 `subclass_of` 挂在分类下
+渲染：圆角矩形 + 浅金背景 + **蓝色多层光晕边框**。
 
-```yaml
-# 错误：口诀不是分类，挂在分类下会被画成该分类的子节点
-edges_out:
-  - target: 酰胺类中枢兴奋药
-    type: subclass_of
-    reason: 帮助记忆酰胺类
-```
+---
 
-口诀是**辅助节点**，与主知识是**辅助关系**而非**层级关系**，必须用 `part_of`，不能用 `subclass_of` / `instance_of`。
+## 六、文件名与 id 命名
 
-### ✅ 一句话判断法
+- **文件名** = `label`（中文），如 `地西泮.md`、`苯二氮䓬类.md`
+- **id** = 英文/拉丁文，格式 `{前缀}-{英文名}-{书简写}{章}-{节}`
 
-> **写一条 `edges_out` 之前，先问自己两个问题：**
->
-> 1. **我是谁的"下级 / 被记忆对象 / 被帮助者"吗？**
->    - 是分类或子分类 → `subclass_of`（子类 → 父类）
->    - 是药物 / 制剂 / 疾病 / 概念等实例 → `instance_of`
->    - 是某个整体的局部构件 → `part_of`
->    - 不确定 → 优先 `instance_of`
->
-> 2. **如果我是一个口诀 / 总结 / 表格 / 注意节点，我应当指向谁？**
->    - 单药口诀 → 该药物
->    - 分类口诀 → 该分类
->    - 总结 / 表格 / 注意 → 所属主知识
->    - 全部使用 `type: part_of`
-***
+| 节点类型 | 前缀 | 示例 |
+|---|---|---|
+| 结构入口（class, cls-structure） | `sec` / `ch` / `bk` | `sec-sedative-y2-01-01` |
+| 分类（class, cls-classification） | `cls` | `cls-benzodiazepine-y2-01-01` |
+| 药物（named_individual, cls-drug） | `med`（重点）/ `drug`（普通） | `med-diazepam-y2-01-01` |
+| 疾病（named_individual, cls-disease） | `ill` | `ill-insomnia-y2-01-01` |
+| 作用特点/评价（annotation_property, cls-feature） | `feat` | `feat-barbiturate-feature-y2-01-01` |
+| 不良反应（annotation_property, cls-adverse） | `adr` | `adr-barbiturate-y2-01-01` |
+| 概念（annotation_property, cls-concept） | `cpt` | `cpt-liver-enzyme-y2-01-01` |
+| 总结（annotation_property, cls-summary） | `meta` | `meta-cyp1a2-summary-y2-01` |
+| 口诀（annotation_property, cls-mnemonic） | `mem` | `mem-barbiturate-y2-01-01` |
 
-# 十、口诀、总结、表格、注意节点
-
-这些节点现在允许作为独立 `.md` 节点。
-
-## 10.1 口诀
-
-```yaml
-essence: mnemonic
-```
-
-例如：
-
-```yaml
-label: 入扎焦氟双佐唑
-essence: mnemonic
-```
-
-其与知识节点的关系：
-
-```yaml
-edges_out:
-  - target: 镇静催眠药
-    type: part_of
-    reason: 记忆口诀
-```
-
-### 规则
-
-- 口诀是独立节点，允许被多处引用。
-
-- 口诀节点不是药物，不使用 `medication`。
-
-- 口诀节点不是普通概念，不使用 `concept`。
-
-- 口诀节点不得成为分类节点的层级父节点。
-
-### 口诀边的方向：口诀 → 主知识
-
-口诀是**辅助节点**，必须由**口诀节点自己**声明指向它所辅助的**主知识节点**：
-
-```yaml
-# 正确：口诀节点持有 part_of 边，指向被记忆的主知识
-edges_out:
-  - target: 丁苯酞
-    type: part_of
-    reason: 帮助记忆丁苯酞
-```
-
-而**不是**：
-
-```yaml
-# 错误：药物节点反向持有 part_of 边指向口诀
-# 这会让口诀被画成药物的下级节点，扭曲层级结构
-edges_out:
-  - target: 丁苯酞口诀
-    type: part_of
-    reason: 记忆口诀
-```
-
-### 口诀指向谁：单药口诀 vs 分类口诀
-
-| 口诀类型     | 示例                          | 应指向                          |
-| -------- | --------------------------- | ---------------------------- |
-| **单药口诀** | "丁苯酞，枸循环，抗血栓，就是怕芹菜" | **该药物本身**（如 `med-butyphthalide`） |
-| **分类口诀** | "多加点利是吧，胆子真大"（记 4 个代表药） | **该分类本身**（如 `class-achei`）     |
-
-判断标准：
-
-> **口诀内容记住的是哪个层级的知识，就指向哪个层级。**
->
-> - "怕芹菜"是丁苯酞的禁忌 → 指向丁苯酞药物节点
-> - "多加点利是吧"是把 4 个代表药编成一句 → 指向分类节点
-
-***
-
-## 10.2 总结
-
-```yaml
-essence: summary
-```
-
-例如：
-
-```yaml
-label: 镇静催眠药选择总结
-essence: summary
-```
-
-可以由多个知识节点用 `part_of` 指向同一总结节点，表示：
-
-> 多个零散知识 → 一个压缩总结。
-
-如果纸图明确表现为“多个节点共同汇聚到总结”，应保留这种多入边结构。
-
-***
+> 前缀仅为约定，不参与图形编码；核心是 id 唯一且英文。
