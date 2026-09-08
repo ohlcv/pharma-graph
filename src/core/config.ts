@@ -10,19 +10,7 @@
 
 import cytoscape from 'cytoscape';
 import { EDGE_TYPES, type EdgeType } from './edge-types.js';
-
-// ── 类型别名（与 graph.ts 同步）─────────────────────────────────────────────
-export type StrokeType = 'auto' | 'flow' | 'glow' | 'fallback';
-
-/** OWL2 实体类型枚举（shape 取值）
- *  每个类型对应一个固定的 Cytoscape 几何形状（见 SHAPE_BY_OWL2） */
-export type ShapeType =
-  | 'auto'
-  | 'class'
-  | 'named_individual'
-  | 'object_property'
-  | 'data_property'
-  | 'annotation_property';
+import type { StrokeType, ShapeType } from './graph.js';
 
 // ── Shape (OWL2 实体类型) → Cytoscape 几何形状 ───────────────────────────────
 //

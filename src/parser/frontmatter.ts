@@ -18,7 +18,7 @@
 
 import { parse as yamlParse, stringify as yamlStringify } from 'yaml';
 import { DEFAULT_EDGE_TYPE } from '../core/edge-types.js';
-import type { StrokeType, ShapeType } from '../core/graph.js';
+import type { StrokeType, ShapeType, NodeLocation } from '../core/graph.js';
 
 // --- frontmatter 字段类型 ---
 
@@ -30,7 +30,7 @@ export interface NodeMeta {
   /** 领域顶层类 IRI（如 cls-drug, cls-classification, cls-adverse 等）*/
   fill?: string;
 
-  /** 边框样式：auto | flow | glow（显式填写时覆盖 fill 的默认边框）*/
+  /** 边框样式：auto | flow | glow | fallback（显式填写时覆盖 fill 的默认边框）*/
   stroke?: StrokeType;
 
   /** OWL2 实体类型（显式填写时覆盖 fill 的默认形状）。
@@ -43,15 +43,7 @@ export interface NodeMeta {
   fullSummary?: string;
   /** 派生字段：优先 shortSummary，否则 fullSummary */
   summary?: string;
-  location?: {
-    book?: string;
-    part?: string;
-    chapter?: string;
-    section?: string;
-    point?: string;
-    item?: string;
-    subsection?: string;
-  };
+  location?: NodeLocation;
 }
 
 export interface EdgeDef {

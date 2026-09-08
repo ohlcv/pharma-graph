@@ -9,7 +9,7 @@
 // ── 类型定义 ────────────────────────────────────────────────────────────────
 
 /** 边框样式枚举（stroke 取值） */
-export type StrokeType = 'auto' | 'flow' | 'glow';
+export type StrokeType = 'auto' | 'flow' | 'glow' | 'fallback';
 
 /** OWL2 实体类型枚举（shape 取值）
  *  每个类型对应一个固定的 Cytoscape 几何形状（见 SHAPE_BY_OWL2）
