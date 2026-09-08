@@ -1,7 +1,7 @@
 ---
 data:
   id: memo-nri-y2-01-03
-  label: NRI口诀
+  label: 去瑞士买波西尼。
   essence: mnemonic
   location:
     book: 药学专业知识二

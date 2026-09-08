@@ -1,7 +1,7 @@
 ---
 data:
   id: memo-sari-y2-01-03
-  label: SARI口诀
+  label: 五姐取钱。
   essence: mnemonic
   location:
     book: 药学专业知识二

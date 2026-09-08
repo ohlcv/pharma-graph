@@ -1,7 +1,7 @@
 ---
 data:
   id: memo-nassa-y2-01-03
-  label: NaSSA口诀
+  label: 有米蛋，能释放。
   essence: mnemonic
   location:
     book: 药学专业知识二

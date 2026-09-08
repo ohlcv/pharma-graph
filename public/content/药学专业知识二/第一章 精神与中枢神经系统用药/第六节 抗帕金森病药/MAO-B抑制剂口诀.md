@@ -1,7 +1,7 @@
 ---
 data:
   id: memo-maob-y2-01-06
-  label: MAO-B抑制剂口诀
+  label: 单相思兰。
   essence: mnemonic
   location:
     book: 药学专业知识二

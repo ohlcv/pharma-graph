@@ -1,7 +1,7 @@
 ---
 data:
   id: memo-snri-y2-01-03
-  label: SNRI口诀
+  label: 我去法国度假。
   essence: mnemonic
   location:
     book: 药学专业知识二

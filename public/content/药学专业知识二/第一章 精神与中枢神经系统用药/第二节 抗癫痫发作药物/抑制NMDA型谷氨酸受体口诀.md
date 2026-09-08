@@ -1,7 +1,7 @@
 ---
 data:
   id: memo-nmda-y2-01-02
-  label: 抑制NMDA型谷氨酸受体口诀
+  label: 恩托尔巴比。
   essence: mnemonic
   location:
     book: 药学专业知识二

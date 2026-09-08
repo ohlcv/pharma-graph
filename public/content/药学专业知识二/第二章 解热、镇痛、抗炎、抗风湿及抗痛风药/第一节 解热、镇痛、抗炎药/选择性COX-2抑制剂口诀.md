@@ -1,7 +1,7 @@
 ---
 data:
   id: memo-selective-cox2-y2-01-01
-  label: 选择性COX-2抑制剂口诀
+  label: 选择西部来考察，美洛尼美要记下。
   essence: mnemonic
   location:
     book: 药学专业知识二

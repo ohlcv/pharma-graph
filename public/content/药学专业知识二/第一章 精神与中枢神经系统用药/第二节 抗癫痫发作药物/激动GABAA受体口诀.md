@@ -1,7 +1,7 @@
 ---
 data:
   id: memo-gabaa-y2-01-02
-  label: 激动GABAA受体口诀
+  label: 芭比索药苯二寿。
   essence: mnemonic
   location:
     book: 药学专业知识二

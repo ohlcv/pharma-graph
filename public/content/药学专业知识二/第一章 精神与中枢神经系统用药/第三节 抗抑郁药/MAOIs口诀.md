@@ -1,7 +1,7 @@
 ---
 data:
   id: memo-maoi-y2-01-03
-  label: MAOIs口诀
+  label: 担心宝贝安全。
   essence: mnemonic
   location:
     book: 药学专业知识二
