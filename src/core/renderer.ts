@@ -40,9 +40,6 @@ export const CLASSES = {
   DRAGGING_SIMPLIFIED: 'dragging-simplified',
   TOUR_PATH_PREVIEW: 'tour-path-preview',
   LAYER_PARENT: 'layer-parent',
-  // stroke 特效类
-  FLOW_BORDER: 'flow-border',
-  GLOW_BORDER: 'glow-border',
 } as const;
 
 // Ripple colors — single source of truth; both graph-events.ts and
@@ -95,23 +92,41 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
   // stroke 显式声明时覆盖 fill/subtreeRoot 的默认边框色。
   // stroke = auto（默认）：边框色由 subtreeRoot 或 depth 自动决定。
   
-  // stroke = flow：subtreeRoot 色 + 流光边框类
+  // stroke = flow：流光效果
+  //   - 虚线边框 + 加粗 → 视觉上像"流动"
+  //   - overlay-color 高饱和色 + overlay-opacity 0.5 → 边框外层光晕
+  //   - transition-property 让 color 在状态变化时平滑过渡
   const flowStrokeRule = {
     selector: `node[stroke = "flow"]`,
     style: {
       'border-color': '#3b82f6', // 备用色，实际颜色由 subtreeRoot 规则决定
-      'border-width': 2,
-      'border-style': 'solid' as cytoscape.Css.LineStyle,
+      'border-width': 3,
+      'border-style': 'dashed' as cytoscape.Css.LineStyle,
+      'overlay-color': '#3b82f6',
+      'overlay-padding': 2,
+      'overlay-opacity': 0.5,
+      'transition-property': 'border-color, overlay-color, overlay-opacity, border-width',
+      'transition-duration': 300,
+      'transition-timing-function': 'ease-in-out',
     },
   };
 
-  // stroke = glow：subtreeRoot 色 + 光晕边框类
+  // stroke = glow：光晕效果
+  //   - 实线边框 + 加粗 → 醒目
+  //   - overlay-padding 更大 → 多层光晕外圈
+  //   - overlay-opacity 0.7 → 更强的光晕
   const glowStrokeRule = {
     selector: `node[stroke = "glow"]`,
     style: {
       'border-color': '#3b82f6', // 备用色，实际颜色由 subtreeRoot 规则决定
-      'border-width': 2,
+      'border-width': 3,
       'border-style': 'solid' as cytoscape.Css.LineStyle,
+      'overlay-color': '#3b82f6',
+      'overlay-padding': 4,
+      'overlay-opacity': 0.7,
+      'transition-property': 'border-color, overlay-color, overlay-opacity, border-width',
+      'transition-duration': 300,
+      'transition-timing-function': 'ease-in-out',
     },
   };
 
@@ -121,11 +136,11 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
     .flatMap(([rootId, color]) => [
       {
         selector: `node[stroke = "flow"][subtreeRoot = "${rootId}"]`,
-        style: { 'border-color': color },
+        style: { 'border-color': color, 'overlay-color': color },
       },
       {
         selector: `node[stroke = "glow"][subtreeRoot = "${rootId}"]`,
-        style: { 'border-color': color },
+        style: { 'border-color': color, 'overlay-color': color },
       },
     ]);
 
@@ -267,22 +282,10 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
     },
     // 边类型样式
     ...edgeTypeRules,
-    // ── stroke 特效类 ───────────────────────────────────────────────────────
-    // flow-border：流光动画
-    {
-      selector: '.flow-border',
-      style: {
-        // 流光效果通过 CSS 动画实现，这里设置基础样式
-        'border-width': 2,
-      },
-    },
-    // glow-border：光晕效果
-    {
-      selector: '.glow-border',
-      style: {
-        'border-width': 2,
-      },
-    },
+    // 注：流光/光晕的视觉效果由主 stroke 规则（stroke="flow"/"glow"）直接控制：
+    //   - border-width 3 + dashed (flow) / solid (glow) 区分重点
+    //   - overlay-color + overlay-opacity 模拟光晕外圈
+    //   - transition-property 让状态变化时平滑过渡
     // ── 交互状态 ─────────────────────────────────────────────────────────────
     {
       selector: '.dimmed',
@@ -556,10 +559,9 @@ export class Renderer {
           ?? (n.fill && FILL_CONFIG[n.fill]?.defaultStroke)
           ?? 'auto';
 
-        // flow/glow 特效需要添加 CSS 类（按 effectiveStroke 判断，包含 fill 兜底）
-        const classes = [];
-        if (effectiveStroke === 'flow') classes.push(CLASSES.FLOW_BORDER);
-        if (effectiveStroke === 'glow') classes.push(CLASSES.GLOW_BORDER);
+        // 注：原代码在这里 push `flow-border`/`glow-border` class，但 cytoscape stylesheet
+        // 中已用 stroke="flow"/"glow" 主规则直接控制流光/光晕的 border / overlay 属性，
+        // class 已是冗余占位（仅设 border-width: 2），所以这里不再加 class。
 
         return {
           data: {
@@ -583,7 +585,6 @@ export class Renderer {
             color: FILL_CONFIG[n.fill ?? '']?.background ?? FILL_CONFIG['']?.background ?? '#f9fafb',
             colorDark: FILL_CONFIG[n.fill ?? '']?.backgroundDark ?? FILL_CONFIG['']?.backgroundDark ?? '#94a3b8',
           },
-          classes: classes.join(' ') || undefined,
         };
       }),
       ...data.edges
