@@ -68,6 +68,7 @@
 | `strict-` | 严格分类（细分类） | `strict-class` | 五边形 | `strict-benzo-y2-01-01` |
 | `umbrella-` | 伞形分类（粗分类） | `umbrella-class` | 六边形 | `umbrella-benzo-y2-01-01` |
 | `med-` | 药物节点 | `medication` | 椭圆 | `med-diazepam-y2-01-01` |
+| `drug-` | 普通药节点（仅提名） | `drug` | 椭圆 | `drug-mention-y2-01-01` |
 | `memo-` | 口诀节点 | `mnemonic` | vee | `memo-benzo-y2-01-01` |
 | `sum-` | 总结节点 | `summary` | 八边形 | `sum-benzo-y2-01` |
 | `conc-` | 概念节点 | `concept` | 正方形 | `conc-bioavailability-y1-04` |
@@ -754,6 +755,10 @@ const filteredTags = rawTags?.filter(
 2. ❌ 只在主知识节点 `summary` 里写口诀，没建独立 `mnemonic` 节点——图谱里没有这条口诀的边。
 3. ❌ 把药物口诀写到分类节点的 `summary` 里（口诀归属错位）。
 
+### 5.13 对比表格节点归属
+
+表格类辅助节点（对比表）独立成节点时，挂接父节点按下表：
+
 | 表格所在位置                  | 父节点                        |
 | ----------------------- | -------------------------- |
 | **章节级**对比表（多个分类下的药物横向比较） | **节节点**（如"第四节 抗记忆障碍及改善神经功能药"） |
@@ -1147,7 +1152,7 @@ summary:
 
 第一章第四节「抗记忆障碍及改善神经功能药」是新规范的第一个完整落地样板。后续章节照此模式执行。
 
-### 10.1 节点构成
+### 11.1 节点构成
 
 | 类型     | essence          | depth | 数量     | 说明                  |
 | ------ | ---------------- | ----- | ------ | ------------------- |
@@ -1158,11 +1163,11 @@ summary:
 | 记忆口诀   | `mnemonic`       | D3-4  | 4      | 与药物同级，**口诀节点自身**用 `part_of` 边指向主知识（药物 / 伞形分类） |
 | **合计** |                  |       | **21** | 无冗余空模块              |
 
-### 10.2 层级链
+### 11.2 层级链
 
 ```
 第一章 (module, D0-1)
-  └─instance_of─ 第四节 (module, D1-2)
+  └─part_of─ 第四节 (module, D1-2)
       ├─subclass_of─ 酰胺类 (umbrella-class, D2-3)
       │           ├─instance_of─ 吡拉西坦 (medication, D3-4)
       │           ├─instance_of─ 茴拉西坦 (medication, D3-4)
@@ -1181,7 +1186,7 @@ summary:
                   └─instance_of─ 长春西汀 (medication, D3-4)
 ```
 
-> **ASCII 图的箭头方向**：层级归属（分类→上位分类、药物→分类）用 `─instance_of─`（分类间用 `─subclass_of─`）；辅助→主用 `─part_of─`（箭头朝左时用 `←part_of─`）。
+> **ASCII 图的箭头方向**：药物→分类用 `─instance_of─`；分类→节、细分类→粗分类用 `─subclass_of─`；节→章、辅助→主用 `─part_of─`（箭头朝左时用 `←part_of─`）。
 >
 > 实际 md 文件里，`edges_out` 永远写在**发起方**那一侧：
 > - `instance_of` / `subclass_of` 写在**子节点**（medication / umbrella-class / strict-class / section / chapter / book）文件里。
@@ -1189,24 +1194,21 @@ summary:
 >
 > 详见 §5.15。
 
-### 10.3 边类型使用
-
-整个样板仅使用 3 种边类型：
-
-
-### 10.3 边类型使用
+### 11.3 边类型使用
 
 整个样板仅使用 3 种边类型：
 
 | 边类型 | 发起方（写在谁的文件里） | 数量 | 说明 |
 | --- | --- | --- | --- |
-| `instance_of` | **子节点**（medication / umbrella-class / section / chapter / book） | 20 条（每个非根节点 1 条） | 层级归属：药物→分类、分类→节、节→章、章→书 |
-| `subclass_of` | **严格分类节点**（strict-class） | — | 严格药理分类细分时使用 |
-| `part_of` | **辅助节点**（mnemonic 口诀） | 4 条（每个口诀 1 条 `part_of→` 主知识） | 口诀→主知识、总结→节 |
+| `instance_of` | **药物节点**（medication / drug） | 12 条（每个药物 1 条） | 层级归属：药物→分类 |
+| `subclass_of` | **分类节点**（umbrella-class / strict-class） | 6 条（每分类 1 条） | 层级归属：分类→节、细分类→粗分类 |
+| `part_of` | **节入口** + **辅助节点**（mnemonic） | 1 + 4 条 | 节→章（一部分）；口诀→主知识 |
+
+> 节→章用 `part_of`（不是 `instance_of`），与 §5.15.2 决策表一致；章→书同理。
 
 不使用 `link`/`relate`/`branch`/`contrast` — 临床关系全部在 `summary.full` 文本中。
 
-### 10.4 关键设计决策
+### 11.4 关键设计决策
 
 1. **无冗余空模块**：不建"分类与代表药品"和"临床用药评价"空模块。层级链直接章→节→分类→药物。
 2. **临床内容在 summary.full**：药理/适应症/禁忌/相互作用全部写入 summary.full 的【标签】格式文本。

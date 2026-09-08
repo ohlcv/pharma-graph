@@ -61,7 +61,7 @@ description: "将纸质思维导图照片（或扫描件）转录为符合药学
   - 药物：`别嘌醇.md`、`苯溴马隆.md`
   - 分类：`促进尿酸排泄药.md`、`糖皮质激素.md`（同标签的多分类都用全中文 label）
   - 章节入口：`第三节 抗痛风药.md`
-  - 口诀：`促进尿酸排泄药口诀.md`
+  - 口诀：`多加点利是吧，胆子真大.md`（label 直接写口诀内容，见「关键决策速查 → 口诀节点 label 规范」）
 - 每个节点一个文件，frontmatter 含 `id/label/essence/location/tags/summary/edges_out`（见 references）。
 - **不建冗余空模块**（如「分类与代表药品」这种纯视觉分区 wrapper），四大类直接挂节入口。
 - 口诀节点（口诀）建独立 md，同时按双轨制写入主知识节点 `summary.short` 末尾。
@@ -77,9 +77,11 @@ description: "将纸质思维导图照片（或扫描件）转录为符合药学
 - **文件名 = `data.label`**（中文）；**`data.id`** 是英文 ID 形式。两者分工，不可混用。
 - **summary.full 用了 `|` block scalar**（跨行时），且每段以 `【标签】` 起头。
 - 边方向铁律：子→父（subclass_of）、局部→整体（part_of）、实例→类别（instance_of）、口诀→主知识（part_of）；父节点不反向枚举子节点。
-- tags 从 summary 加粗词抽取、语义去重、不写 essence 枚举值；
-  - **药品节点**：tags 必须包含药品名 + 分类 tag + 作用 tag
-  - **分类节点**：tags 必须包含分类名 + 下属具体药品名
+- tags 从 summary 加粗词抽取、语义去重、不写 essence 枚举值（详见「tags 规范速查」）：
+  - **药品节点**（drug / medication）：tags 必须包含药品名 + 分类 tag + 作用 tag
+  - **模块节点**（module）：一般不单独建 tags
+  - **粗分类节点**（umbrella-class）：自身 label + 子分类名 + 每子类 1 个重点代表药
+  - **细分类节点**（strict-class）：自身 label + 子分类名（如有）+ 重点代表药（普通药不标记）
   - **口诀节点**：label 改为口诀内容，tags 包含 `口诀` + 药品名/分类名
 - 命名前缀与 essence 匹配；所有 `edges_out.target` 存在（或为预期骨架边）。
 
@@ -89,32 +91,26 @@ description: "将纸质思维导图照片（或扫描件）转录为符合药学
 
 ### Step 7 — 打包 zip 一键交付
 
-**所有节点交付完毕后（用户确认全部 OK 且不再追加），把全仓打包成一个 zip，让用户下载即用。**
+**所有节点交付完毕后（用户确认全部 OK 且不再追加），把该节节点目录打包成一个 zip，让用户下载即用。**
 
-#### 打包范围（按重要性）
-- 必含：`public/content/`（全部节点 md）、`docs/`（规范文档）
-- 必含：`package.json` + `package-lock.json`（依赖锁）
-- 必含：`scripts/`、`vite.config.ts`、`tsconfig*.json`（项目脚手架）
-- 必含：`README.md`（运行说明）
-- 排除：`node_modules/`、`.git/`、`dist/`、`.vite/`、`coverage/`、`.DS_Store`、`*.log`
+#### 打包范围
+- 该节目录下**全部节点 `.md`**（如 `第三节 平喘药/` 下的 58 个 md）
+- zip 与目录同级，命名 `{节名}.zip`
 
-#### 打包命令（macOS / Linux）
+#### 打包命令
 ```bash
-zip -r pharma-graph-$(date +%Y%m%d).zip . \
-  -x 'node_modules/*' '.git/*' 'dist/*' '.vite/*' \
-     'coverage/*' '.DS_Store' '*.log'
+zip -r "第三节 平喘药.zip" "第三节 平喘药/"
 ```
 
 #### 交付清单
 汇报中一并附上：
-- zip 文件名 + 大小（如 `pharma-graph-20260904.zip · 1.2 MB`）
-- zip 内文件总数 + 节点 md 总数（用 `unzip -l` 或 `zipinfo` 提取）
-- 用户 3 步上手：`unzip` → `npm install` → `npm run dev`
+- zip 文件名 + 节点总数（用 `unzip -l` 反查文件数）
+- 节点结构摘要（节入口 → 分类 → 药物/口诀/总结 的层级树）
 - 已知未完成项 / 留空项（如某些节点 full 未填，等用户提供资料后再补）
 
 #### 注意
-- zip **不入 git**（`.gitignore` 已默认排除 `*.zip`）；仓库交付物是 git 历史本身，zip 只是快照
 - **不要在 Step 7 之前打包**——中途反复打包浪费磁盘；只在用户说「全部好了 / 打包 / 交付」这类收尾信号时触发
+- 每节独立交付一个 zip；多节完成时也可按用户要求合并
 ## 关键决策速查
 
 ### essence 判定（决定形状+颜色）
@@ -149,23 +145,15 @@ zip -r pharma-graph-$(date +%Y%m%d).zip . \
 ### tags 规范速查
 | 节点类型 | tags 必须包含 | 示例 |
 | --- | --- | --- |
-| 药品节点 | 药品名 + 分类 tag + 作用 tag | `氨溴索, 黏痰溶解剂` |
-| 分类节点 | 分类名 + 下属具体药品名 | `黏痰溶解剂, 溴己新, 氨溴索, 乙酰半胱氨酸...` |
+| 药品节点（drug / medication） | 药品名 + 分类 tag + 作用 tag | `氨溴索, 黏痰溶解剂, 祛痰` |
+| 模块节点（module） | 一般不单独建 tags | 节入口无 tags |
+| 粗分类节点（umbrella-class） | 自身 label + 子分类名 + 每子类 1 个重点代表药 | `扩张支气管, β₂受体激动剂, M胆碱受体拮抗剂, 黄嘌呤类药物, 沙丁胺醇, 异丙托溴铵, 茶碱` |
+| 细分类节点（strict-class） | 自身 label + 子分类名（如有）+ 重点代表药（普通药不标记） | `β₂受体激动剂, SABA, LABA, 沙丁胺醇, 特布他林` |
 | 口诀节点 | `口诀` + 药品名/分类名 | `口诀, 乙酰半胱氨酸`（label 改为口诀内容） |
 
-**口诀节点 label 规范**：
-```yaml
-# 错误 label（太长，UI 展示不好看）
-label: 半胱氨酸真优秀，祛痰解毒666，酸性环境完蛋咯，抗生素类不同用，巯基怕氧避金属，溃疡哮喘要慎用
+> 分类 tags 核心原则：**必须包含自身 label**、**必须包含子分类名**（SAMA/LAMA/SABA/LABA/ICS/LTRA 等）、**仅标记重点药（普通药不标记）**。详见 RULES §5.11.4.6。
 
-# 正确 label（超过 40 字符应换行）
-label: |
-  半胱氨酸真优秀，祛痰解毒666，
-  酸性环境完蛋咯，抗生素类不同用，
-  巯基怕氧避金属，溃疡哮喘要慎用
-```
-
-> **注意**：label 长度建议控制在 **40 字符以内**，超过时使用 YAML `|` block scalar 换行。换行位置在句号/逗号/分号后，保持语义完整。
+**口诀节点 label 规范**：label 直接写口诀内容本身（如 `半胱氨酸真优秀，祛痰解毒666，酸性环境完蛋咯，抗生素类不同用，巯基怕氧避金属，溃疡哮喘要慎用`），不用"XX口诀"式命名。
 
 > **注意**：UI 显示时会自动过滤重复标签（与 label 相同的 tag、口诀节点的 `口诀` tag），但 MD 文档内 tags 保持完整。
 
@@ -184,5 +172,5 @@ label: |
 
 1. 重新解析每个 md 的 YAML frontmatter（确保 `summary.full` 的 `\n` 没被折叠）
 2. 检查文件名 = `data.label`
-3. 检查所有 `edges_out.target` 存在且对应文件可找到（sitemap.xml 已由 `vite.config.ts` 自动维护，无需手动同步）
+3. 检查所有 `edges_out.target` 存在且对应节点 md 可找到（节入口指向章级 `ch-` id 时，确认章节点已建或为预期骨架边）
 4. 用 `unzip -l pharma-graph-*.zip` 反查 zip 内容是否完整
