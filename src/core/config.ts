@@ -538,9 +538,9 @@ export const LAYOUTS: Record<string, LayoutConfig> = {
     ],
     cytoscape: {
       name: 'euler',
-      animate: true,
+      animate: 'end',
       animationDuration: 600,
-      fit: true,
+      fit: false,
       padding: 30,
       randomize: true,
       springCoeff: 0.0002,

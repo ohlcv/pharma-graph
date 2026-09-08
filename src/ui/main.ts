@@ -167,6 +167,21 @@ async function boot(): Promise<void> {
       // where it's coupled to the grab/free/dragfree event bindings.
     });
 
+    // 初始缩放：只显示节点和边的关系结构，不求看清全貌或节点细节
+    // 必须监听 layoutstop 才能覆盖 euler 的 fit:true（布局完成后摄像头重置）
+    // 0.15 = 15% 缩放，能看到节点之间的边走向，但看不清节点标签
+    let initialZoomSet = false;
+    const setInitialZoom = () => {
+      if (initialZoomSet) return;
+      initialZoomSet = true;
+      cy.off('layoutstop', setInitialZoom);
+      cy.zoom(0.15);
+      cy.center();
+    };
+    cy.on('layoutstop', setInitialZoom);
+    // 万一布局已经跑完了（euler 动画很快），直接设
+    setInitialZoom();
+
     initDebugOverlay(uiState.renderer);
     updateStats(cy);
     syncBottomSheetStats(cy);

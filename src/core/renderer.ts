@@ -422,6 +422,9 @@ export class Renderer {
     const base = preset ? { ...preset } : {};
     if (overrides) Object.assign(base, overrides);
     if (!base.name) (base as Record<string, unknown>).name = name;
+    // 强制关闭 fit：所有布局都不自动 fit，完全由 main.ts 的 setInitialZoom
+    // 和用户手动操作（适应/F键）控制摄像头，防止布局的 fit:true 覆盖 zoom。
+    (base as Record<string, unknown>).fit = false;
 
     const nodes = this.cy.nodes().not(`.${CLASSES.LAYER_PARENT}`);
 
