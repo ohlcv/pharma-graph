@@ -18,6 +18,7 @@ import {
   EDGE_TYPE_STYLE,
   EDGE_TYPE_LABEL,
 } from '../core/config.js';
+import { buildLegend } from './legend-factory.js';
 import { updateStats, syncBottomSheetStats } from './graph-stats.js';
 
 // ── Active filter state ────────────────────────────────────────────────────────

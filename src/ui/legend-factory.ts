@@ -12,6 +12,7 @@
 import type { Core } from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
 import { uiState } from './state.js';
+import { invalidateStatic } from './dom-cache.js';
 
 export type ClickHandler = (key: string, highlight: HighlightEngine) => void;
 
@@ -170,6 +171,11 @@ export function buildLegend(cy: Core, descriptor: LegendAxisDescriptor): void {
       .join('');
     Array.from(mobile.children).forEach((c) => decorateRowA11y(c as HTMLElement));
   }
+
+  // Invalidate the legend caches so that staticEls() picks up the new DOM
+  // elements immediately. Without this, staticEls() returns a stale empty array
+  // if clearAllFilters() ran before the legend was built.
+  invalidateStatic();
 
   if (desktop) {
     attachDelegated(
