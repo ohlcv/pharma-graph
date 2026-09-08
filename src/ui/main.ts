@@ -44,9 +44,6 @@ import { initBigscreen, registerFitFn, registerTourController, registerCyAccesso
 import { initGraphEvents } from './graph-events.js';
 import { initSheetDrag, initPanelDrag, initPanelResize, syncTourBarPosition, initSectionHeights } from './drag-manager.js';
 import {
-  initEdgeTooltip,
-  showEdgeTooltip,
-  hideEdgeTooltip,
   spawnNodeRipple,
   showZoomIndicator,
   showToast,
@@ -158,8 +155,6 @@ async function boot(): Promise<void> {
       detailPanel: uiState.detailPanel!,
       spawnNodeRipple,
       setPrevSelectedNode,
-      showEdgeTooltip,
-      hideEdgeTooltip,
       showZoomIndicator,
       isDebugOverlayActive: () => debugOverlayActive,
       updateForensicPanel,
@@ -172,7 +167,6 @@ async function boot(): Promise<void> {
       // where it's coupled to the grab/free/dragfree event bindings.
     });
 
-    initEdgeTooltip();
     initDebugOverlay(uiState.renderer);
     updateStats(cy);
     syncBottomSheetStats(cy);

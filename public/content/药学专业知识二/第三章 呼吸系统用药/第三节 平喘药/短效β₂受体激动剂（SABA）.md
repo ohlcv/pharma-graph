@@ -9,8 +9,8 @@ data:
     section: 第三节 平喘药
     item: 短效β₂受体激动剂（SABA）
   tags:
+    - 短效β₂受体激动剂（SABA）
     - SABA
-    - 短效β₂受体激动剂
     - 特布他林
     - 沙丁胺醇
   summary:

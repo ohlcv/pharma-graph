@@ -8,10 +8,9 @@ data:
     chapter: 第一章 精神与中枢神经系统用药
     section: 第三节 抗抑郁药
   tags:
+    - 去甲肾上腺素能及特异性5-HT能抗抑郁药（NaSSA）
     - NaSSA
-    - NE释放
-    - 5-HT释放
-    - 抗抑郁药
+    - 米氮平
   summary:
     short: 拮抗中枢突触前**α2肾上腺素受体**，增加NE和5-HT间接释放，并拮抗5-HT2、5-HT3受体。代表药：米氮平。
     full: |-

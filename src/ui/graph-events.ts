@@ -19,8 +19,6 @@ export interface GraphEventDeps {
   detailPanel: DetailPanel;
   spawnNodeRipple: (x: number, y: number, color: string) => void;
   setPrevSelectedNode: (id: string | null, label: string | null) => void;
-  showEdgeTooltip: (text: string, x: number, y: number) => void;
-  hideEdgeTooltip: () => void;
   showZoomIndicator: (cy: cytoscape.Core) => void;
   isDebugOverlayActive: () => boolean;
   updateForensicPanel: (renderer: Renderer) => void;
@@ -129,18 +127,6 @@ export function initGraphEvents(deps: GraphEventDeps): void {
     node.removeClass('hovered');
     cy.edges().removeClass('tour-path-preview');
   });
-
-  cy.on('mouseover', 'edge', (evt) => {
-    // Issue #19: was `deps.renderer.getEdgeReason(evt.target)` and
-    // `deps.renderer.getEdgeMidpoint(...)`; both helpers only existed
-    // for this single caller, so the logic moved file-local.
-    const reason = evt.target.data('reason') as string | undefined;
-    if (!reason) return;
-    const mid = edgeMidpoint(evt.target);
-    deps.showEdgeTooltip(reason, mid.x, mid.y);
-  });
-
-  cy.on('mouseout', 'edge', () => { deps.hideEdgeTooltip(); });
 
   cy.on('grab', 'node', () => {
     deps.setDragging(true);
