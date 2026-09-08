@@ -8,9 +8,9 @@ data:
     chapter: 第一章 精神与中枢神经系统用药
     section: 第三节 抗抑郁药
   tags:
-    - NE释放
-    - 5-HT释放
-    - 作用机制
+    - 增加NE、5-HT释放
+    - NaSSA
+    - 米氮平
   summary:
     short: 通过**增加NE、5-HT释放**，增强中枢去甲肾上腺素能和5-HT能神经功能。
     full: |-

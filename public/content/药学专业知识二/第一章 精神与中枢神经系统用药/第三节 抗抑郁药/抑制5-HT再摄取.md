@@ -8,8 +8,10 @@ data:
     chapter: 第一章 精神与中枢神经系统用药
     section: 第三节 抗抑郁药
   tags:
-    - 5-HT再摄取
-    - 作用机制
+    - 抑制5-HT再摄取
+    - SSRI
+    - SARI
+    - 曲唑酮
   summary:
     short: 通过**抑制5-HT再摄取**，增加突触间隙5-HT浓度，增强中枢5-HT能神经功能。
     full: |-

@@ -8,8 +8,11 @@ data:
     chapter: 第一章 精神与中枢神经系统用药
     section: 第三节 抗抑郁药
   tags:
-    - 5-HT和NE再摄取
-    - 作用机制
+    - 抑制5-HT和NE再摄取
+    - SNRI
+    - TCAs
+    - 文拉法辛
+    - 阿米替林
   summary:
     short: 同时**抑制5-HT和NE再摄取**，使突触间隙5-HT和NE浓度升高，促进突触传递功能。
     full: |-

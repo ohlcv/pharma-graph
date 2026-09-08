@@ -8,8 +8,8 @@ data:
     chapter: 第一章 精神与中枢神经系统用药
     section: 第二节 抗癫痫发作药物
   tags:
-    - AMPA受体
-    - 谷氨酸受体
+    - 抑制AMPA型谷氨酸受体
+    - 吡仑帕奈
   summary:
     short: 通过**抑制AMPA型谷氨酸受体**发挥作用的机制，代表药为**吡仑帕奈**。
     full: |-

@@ -8,8 +8,10 @@ data:
     chapter: 第一章 精神与中枢神经系统用药
     section: 第三节 抗抑郁药
   tags:
-    - NE再摄取
-    - 作用机制
+    - 抑制NE再摄取
+    - NRI
+    - 四环类
+    - 马普替林
   summary:
     short: 通过**抑制NE再摄取**，增加突触间隙NE浓度，增强中枢去甲肾上腺素能神经功能。
     full: |-
