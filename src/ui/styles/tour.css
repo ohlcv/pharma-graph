@@ -292,7 +292,7 @@
         /* 注意：不写 display，由 JS 控制 */
         flex-direction: column;
         position: fixed;
-        top: 72px; left: 12px; right: auto; bottom: auto;
+        top: 72px; left: auto; right: 12px; bottom: auto;
         z-index: 900;
         border-radius: 16px;
         background: #1a1f35;
