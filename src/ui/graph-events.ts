@@ -165,7 +165,7 @@ export function initGraphEvents(deps: GraphEventDeps): void {
 
   cy.on('zoom', () => {
     const zoom = cy.zoom();
-    if (zoom < 0.05) cy.zoom(0.05);
+    if (zoom < 0.02) cy.zoom(0.02);
     if (zoom > 5.0) cy.zoom(5.0);
     deps.showZoomIndicator(cy);
   });

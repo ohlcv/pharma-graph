@@ -348,7 +348,7 @@ export class Renderer {
       data,
       layoutName = DEFAULT_LAYOUT,
       layoutConfigs = LAYOUTS,
-      minZoom = 0.2,
+      minZoom = 0.02,
       maxZoom = 4.0,
       maxDepth = 6,
     } = options;
