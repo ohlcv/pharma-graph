@@ -159,6 +159,12 @@ export function buildLegend(cy: Core, descriptor: LegendAxisDescriptor): void {
     ([k]) => descriptor.maxKey === undefined || Number(k) <= descriptor.maxKey,
   );
 
+  // Invalidate the legend caches BEFORE inserting new elements. This ensures that
+  // if highlightEssenceFilter/clearAllFilters ran before the legend was built
+  // (caching empty results), those stale caches are discarded so staticEls()
+  // inside those functions will re-query the newly inserted DOM.
+  invalidateStatic();
+
   if (desktop && desktop.children.length === 0) {
     desktop.innerHTML = entries
       .map(([k, v]) => descriptor.desktopRow(k, v))
@@ -171,11 +177,6 @@ export function buildLegend(cy: Core, descriptor: LegendAxisDescriptor): void {
       .join('');
     Array.from(mobile.children).forEach((c) => decorateRowA11y(c as HTMLElement));
   }
-
-  // Invalidate the legend caches so that staticEls() picks up the new DOM
-  // elements immediately. Without this, staticEls() returns a stale empty array
-  // if clearAllFilters() ran before the legend was built.
-  invalidateStatic();
 
   if (desktop) {
     attachDelegated(
