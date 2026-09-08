@@ -5,6 +5,7 @@
 
 import type cytoscape from 'cytoscape';
 import { Renderer, CLASSES, RIPPLE_COLORS } from '../core/renderer.js';
+import { EDGE_TYPE_STYLE } from '../core/config.js';
 import { HighlightEngine } from './highlight-engine.js';
 import { DetailPanel } from './detail-panel.js';
 import { TourController } from './tour-controller.js';
@@ -90,10 +91,10 @@ export function initGraphEvents(deps: GraphEventDeps): void {
 
   cy.on('tap', 'edge', (evt) => {
     deps.highlight.highlightEdgeOnly(evt.target.id());
-    // 选中边的源节点对应的详情面板（与节点点击行为一致）
-    // const srcId = evt.target.source().id();
-    // deps.detailPanel.show(srcId);
     const edge = evt.target;
+    const edgeType = edge.data('edgeType') as string | undefined;
+    const edgeStyle = edgeType ? (EDGE_TYPE_STYLE[edgeType] ?? EDGE_TYPE_STYLE.default) : EDGE_TYPE_STYLE.default;
+    const rippleColor = edgeStyle.color;
     const src = edge.source().renderedPosition();
     const tgt = edge.target().renderedPosition();
     const cont = edge.cy().container();
@@ -101,7 +102,7 @@ export function initGraphEvents(deps: GraphEventDeps): void {
       const midX = (src.x + tgt.x) / 2;
       const midY = (src.y + tgt.y) / 2;
       const rect = cont.getBoundingClientRect();
-      deps.spawnNodeRipple(rect.left + midX, rect.top + midY, RIPPLE_COLORS.EDGE);
+      deps.spawnNodeRipple(rect.left + midX, rect.top + midY, rippleColor);
     }
     updateStats(cy);
     syncBottomSheetStats(cy);
