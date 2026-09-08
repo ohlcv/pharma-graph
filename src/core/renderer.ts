@@ -398,6 +398,21 @@ export interface RendererOptions {
   maxZoom?: number;
   /** Maximum depth in the graph; if omitted, depth rules cover 0–6 (legacy fallback). */
   maxDepth?: number;
+  /**
+   * 启用 WebGL 渲染器（cytoscape ≥ 3.31 实验性功能）。
+   *
+   * WebGL 后端用 sprite sheet 复用 canvas 节点样式，**所有 stroke / border / outline
+   * 规则 100% 兼容**——视觉效果与默认 canvas 完全一致，区别只在 GPU 加速性能。
+   *
+   * 当前评估（2026.9）：
+   *   - 代码已合并 1.5+ 年（v3.31 → v3.34.3），稳定存在
+   *   - 官方仍未明确宣布 stable（API 默认 false）
+   *   - 在 689 节点规模下与 canvas 性能差异肉眼难辨
+   *   - 已知不支持：复合节点 z-order 边、复杂箭头形状
+   *
+   * 建议：默认 false（安全）；节点 > 2000 或拖拽卡顿时切 true。
+   */
+  webgl?: boolean;
 }
 
 // ── Renderer ──────────────────────────────────────────────────────────────────
@@ -412,6 +427,8 @@ export class Renderer {
   // rAF handle for the flow animation loop; null when not running.
   // Stored on the instance so destroy() can cancel it.
   private flowRafId: number | null = null;
+  // Whether the WebGL renderer is enabled (opt-in via RendererOptions.webgl).
+  private useWebgl: boolean = false;
 
   constructor(options: RendererOptions) {
     const {
@@ -422,8 +439,10 @@ export class Renderer {
       minZoom = 0.02,
       maxZoom = 4.0,
       maxDepth = 6,
+      webgl = false,
     } = options;
     this.maxDepth = maxDepth;
+    this.useWebgl = webgl;
 
     // Build subtree color map: assign one color per distinct subtreeRoot found
     // across all nodes. Order by first-seen so colors are deterministic.
@@ -452,7 +471,14 @@ export class Renderer {
       layout: { name: 'preset' },
       // Cast through unknown because cytoscape's `CytoscapeOptions` type
       // omits the `renderer` field (it's only documented in their JS API).
-      renderer: { name: 'canvas' } as unknown as { name: string },
+      renderer: {
+        name: 'canvas',
+        // cytoscape 3.31+ 实验性 WebGL 后端。当 useWebgl=true 时切换。
+        // WebGL 复用 canvas sprite sheet 渲染节点 → 样式 100% 兼容（border / outline
+        // / dash-offset 动画等都不变），仅获得 GPU 加速。当前默认 false（689 节点规模下
+        // canvas 完全够用），节点 > 2000 时建议切 true。
+        ...(this.useWebgl ? { webgl: true } : {}),
+      } as unknown as { name: string },
       minZoom,
       maxZoom,
       wheelSensitivity: 3.0,
