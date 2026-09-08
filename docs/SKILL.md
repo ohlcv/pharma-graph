@@ -32,7 +32,7 @@ description: "将纸质思维导图照片（或扫描件）转录为符合药学
 |---|---|---|---|
 | `sec-` | `cls-structure` | 组织结构（书/篇/章/节入口） | `sec-sedative-y2-01-01` |
 | `cls-` | `cls-classification` | 药物分类 | `cls-benzodiazepine-y2-01-01` |
-| `med-` | `cls-drug` | **重点药**（有完整药理卡片，stroke: flow） | `med-diazepam-y2-01-01`、`med-zolpidem-y2-01-01` |
+| `med-` | `cls-drug` | **重点药**（有完整药理卡片，stroke: glow） | `med-diazepam-y2-01-01`、`med-zolpidem-y2-01-01` |
 | `drug-` | `cls-drug` | **普通药**（仅提名，stroke: auto） | `drug-trizolam-y2-01-01` |
 | `disease-` | `cls-disease` | 疾病/症状 | `disease-insomnia-y2-01-01` |
 | `bio-` | `cls-biomolecule` | 生物实体（靶点/受体/酶） | `bio-gabaa-y2-01-01`、`bio-cyp3a4-y2-01` |
@@ -42,7 +42,7 @@ description: "将纸质思维导图照片（或扫描件）转录为符合药学
 | `sum-` | `cls-summary` | 总结/表格 | `sum-barbiturate-y2-01` |
 | `mem-` | `cls-mnemonic` | 口诀 | `mem-barbiturate-y2-01-01` |
 
-> **重点药 vs 普通药判定**：纸质版中该药物有独立框且框内有正文内容 → 重点药（`med-`，stroke: flow）；仅提名无独立画像 → 普通药（`drug-`，stroke: auto），普通药写入分类 `full【代表药】`，不单独建节点。
+> **重点药 vs 普通药判定**：纸质版中该药物有独立框且框内有正文内容 → 重点药（`med-`，stroke: glow）；仅提名无独立画像 → 普通药（`drug-`，stroke: auto），普通药写入分类 `full【代表药】`，不单独建节点。
 
 **章节后缀**：`y1`=药一、`y2`=药二、`y3`=药综、`y4`=法规，格式 `{书简写}-{章号}-{节号}`。
 
@@ -68,7 +68,7 @@ id: med-diazepam-y2-01-01
 label: 地西泮
 shape: auto
 fill: cls-drug
-stroke: flow
+stroke: glow
 location:
   book: 药学专业知识二
   chapter: 第一章 精神与中枢神经系统用药
@@ -264,7 +264,7 @@ edges_out:
 
 | 类型 | 前缀 | stroke | summary.full | 判定标准 |
 |---|---|---|---|---|
-| **重点药** | `med-` | `flow` | 有完整药理卡片 | 纸质版有独立框且框内有正文内容 |
+| **重点药** | `med-` | `glow` | 有完整药理卡片 | 纸质版有独立框且框内有正文内容 |
 | **普通药** | `drug-` | 不填（默认auto） | 留空（不写） | 仅提名，无独立正文框 |
 
 - 普通药节点的 `summary.short` 可基于分类信息简短描述（如"巴比妥类长效药"），也可留空
@@ -366,7 +366,7 @@ edges_out:
 - **shape**（可选）：OWL2 实体类型，每个类型对应**一个固定几何形状**（映射见 RULES §二）。合法值：`auto` / `class` / `named_individual` / `object_property` / `data_property` / `annotation_property`
   - **不填或 `auto`**：用 fill 的默认形状（可访问 FILL_CONFIG 中的扩展形状如 vee / tag / barrel）
   - **显式填写**：用映射表的固定形状，**覆盖** fill 的默认形状
-- **stroke**（可选）：**不填时由 fill 决定（默认 auto，无特效）**；只有需要强调时才显式填写。合法值：`flow`（流光，重点节点）/ `glow`（光晕，跨节大总结/表格）。**`auto` 不需要单独写**，不填就是 auto
+- **stroke**（可选）：**不填时由 fill 决定（默认 auto，无特效）**；只有需要强调时才显式填写。合法值：`glow`（呼吸光晕，重点节点/重点分类）。**`auto` 不需要单独写**，不填就是 auto
 
 **覆盖示例**：
 
@@ -384,21 +384,21 @@ fill: cls-feature
 shape: object_property   # → 六边形
 ```
 
-**stroke 填写规则（只写 flow / glow，不写 auto）**：
+**stroke 填写规则（只写 glow，不写 auto）**：
 
 | 节点类型 | stroke | 判定标准 |
 |---|---|---|
-| 重点药（临床用药评价里有独立评价框） | `flow` | 纸质版"临床用药评价"分支下有该药物的作用特点/临床应用/不良反应独立框 |
+| 重点药（临床用药评价里有独立评价框） | `glow` | 纸质版"临床用药评价"分支下有该药物的作用特点/临床应用/不良反应独立框 |
 | 普通药（仅提名，无独立评价框） | 不填（默认 auto） | 仅在分类框中提名，"临床用药评价"分支下无独立评价框 |
-| 重点分类（临床用药评价分支下有该分类） | `flow` | 纸质版"临床用药评价"分支下直接出现该分类名，且其下有作用特点/不良反应 |
+| 重点分类（临床用药评价分支下有该分类） | `glow` | 纸质版"临床用药评价"分支下直接出现该分类名，且其下有作用特点/不良反应 |
 | 普通分类（仅在分类与作用机制分支出现） | 不填（默认 auto） | 仅在"分类与作用机制"分支出现，"临床用药评价"分支下无该分类 |
 | 跨节大总结/表格 | `glow` | 跨节汇总对比 |
 | 节内总结 | 不填（默认 auto） | 仅本节内总结 |
 | 其他节点（作用特点/不良反应/口诀/节入口） | 不填（默认 auto） | — |
 
-> **关键区分**：flow 的判定依据是"该节点是否出现在纸质版'临床用药评价'分支下"，不是"该分类下有没有药"或"该分类有没有代表药"。分类与作用机制分支里的分类，即使列出了多个代表药，也不加 flow。
+> **关键区分**：glow 的判定依据是"该节点是否出现在纸质版'临床用药评价'分支下"，不是"该分类下有没有药"或"该分类有没有代表药"。分类与作用机制分支里的分类，即使列出了多个代表药，也不加 glow。
 >
-> **示例**：中枢肌松药的"非苯二氮䓬类"只出现在分类分支，临床用药评价分支下直接是乙哌立松/巴氯芬/氯唑沙宗三个药 → 非苯二氮䓬类不加 flow，三个药加 flow。
+> **示例**：中枢肌松药的"非苯二氮䓬类"只出现在分类分支，临床用药评价分支下直接是乙哌立松/巴氯芬/氯唑沙宗三个药 → 非苯二氮䓬类不加 glow，三个药加 glow。
 
 ### 5.2 summary 填写原则与格式规范
 
@@ -824,7 +824,7 @@ short: **苯二氮䓬类**长效代表药。
 - [ ] 平铺结构，无 `data:` 包装
 - [ ] `fill` 是已定义的药学顶层类（cls-drug / cls-disease / cls-mnemonic 等）
 - [ ] `shape` 合法值仅：`auto` / `class` / `named_individual` / `object_property` / `data_property` / `annotation_property`（已删除 `datatype`）
-- [ ] `stroke` 合法值仅：`auto` / `flow` / `glow`
+- [ ] `stroke` 合法值仅：`auto` / `glow`
 - [ ] `shape` / `stroke` 不填或填 `auto` 时由 fill 决定；显式填写时是合法值
 - [ ] `summary.full` 用了 `|` block scalar，【标签】分段，段落间空行
 - [ ] `summary.full` 无 AI 自动填充内容
@@ -845,7 +845,7 @@ short: **苯二氮䓬类**长效代表药。
 - [ ] **药物节点 instance_of 指向分类节点**，无药物直接挂节入口
 - [ ] **纸质版每一层分类框都建了对应节点**，包括"本节不重点介绍"的分类
 - [ ] **分类框中列出的所有药名都建了独立节点**，包括非本节重点分类下的药
-- [ ] **stroke: flow 只给了临床用药评价分支里的节点**（重点药/有临床评价的分类），分类与作用机制分支里的分类未误加 flow
+- [ ] **stroke: glow 只给了临床用药评价分支里的节点**（重点药/有临床评价的分类），分类与作用机制分支里的分类未误加 glow
 - [ ] 无显式 `stroke: auto`（不填即为默认 auto）
 - [ ] zip 打包后用 `unzip -l` 反查，文件数与节点总数一致
 
@@ -883,9 +883,9 @@ short: **苯二氮䓬类**长效代表药。
 | 旧 essence | 新 fill | 新 shape | 新 stroke |
 |---|---|---|---|
 | module | cls-structure | auto | auto |
-| umbrella-class | cls-classification | auto | 有临床评价 → flow |
-| strict-class | cls-classification | auto | 有临床评价 → flow |
-| medication | cls-drug | auto | flow |
+| umbrella-class | cls-classification | auto | 有临床评价 → glow |
+| strict-class | cls-classification | auto | 有临床评价 → glow |
+| medication | cls-drug | auto | glow |
 | drug | cls-drug | auto | auto |
 | notion（作用特点/评价） | cls-feature | auto | auto |
 | notion（不良反应/禁忌） | cls-adverse | auto | auto |

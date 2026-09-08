@@ -6,7 +6,7 @@
  * 
  * 迁移规则：
  *   essence: drug     → fill: cls-drug, stroke: auto
- *   essence: medication → fill: cls-drug, stroke: flow
+ *   essence: medication → fill: cls-drug, stroke: glow
  *   essence: module  → fill: cls-structure
  *   essence: umbrella-class / strict-class → fill: cls-classification
  *   essence: concept → fill: cls-concept
@@ -16,7 +16,7 @@
  *   essence: summary → fill: cls-summary
  * 
  * 前缀规则：
- *   med-* → 重点药 → stroke: flow
+ *   med-* → 重点药 → stroke: glow
  *   drug-* → 普通药 → stroke: auto
  *   其他 → stroke: auto
  * 
@@ -49,7 +49,7 @@ const ESSENCE_TO_FILL = {
   note: 'cls-feature',
 };
 
-// 重点药前缀（需要 stroke: flow）
+// 重点药前缀（需要 stroke: glow）
 const KEY_DRUG_PREFIXES = ['med-', 'drug-'];
 
 function getStrokeFromId(id) {
@@ -116,7 +116,7 @@ function migrateFrontmatter(data, filePath) {
   // 根据 id 前缀判断是否是重点药
   const isKeyDrug = id.startsWith('med-');
   if (isKeyDrug) {
-    changes.push(`stroke: flow`);
+    changes.push(`stroke: glow`);
     fm.stroke = 'flow';
   }
   

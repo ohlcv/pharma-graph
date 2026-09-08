@@ -92,65 +92,19 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
   // stroke 显式声明时覆盖 fill/subtreeRoot 的默认边框色。
   // stroke = auto（默认）：边框色由 subtreeRoot 或 depth 自动决定。
   
-  // stroke = flow：流光效果
-  //
-  // 实现方案（与 glow 完全对称，仅 outline 动画方式不同）：
-  //   Layer 1 — border 节点本身边框（solid，细 2px，节点色）
-  //   Layer 2 — outline dashed 虚线外圈（outline-offset 4，dashed 流动）
-  //   Layer 3 — ghost 内层（最亮）：ghost-offset 0，opacity 0.3
-  //   Layer 4 — ghost 外层：ghost-offset 10，opacity 0.18
-  //   Layer 5 — ghost 最外：ghost-offset 18，opacity 0.1
-  //   动画：outline border-dash-offset rAF 驱动 → 虚线"流动"
-  //
-  // 关键设计：
-  //   - 原 border 保持 solid 2px，节点轮廓始终清晰可见（不动原边框）
-  //   - outline 负责外围视觉效果：dashed 流动 = "流光"，solid 呼吸 = "光晕"
-  //   - ghost 三层叠加与 glow 完全相同，模糊边缘保持一致
-  const flowStrokeRule = {
-    selector: `node[stroke = "flow"]`,
-    style: {
-      // ── 节点本身边框（solid，保证轮廓清晰）────────────────────────────────
-      'border-color': '#60a5fa',
-      'border-width': 2,
-      'border-style': 'solid' as cytoscape.Css.LineStyle,
-      'border-opacity': 1,
-      // ── outline dashed 外圈（流光动画由 rAF 驱动）───────────────────────────
-      'outline-color': '#60a5fa',
-      'outline-width': 6,
-      'outline-style': 'dashed' as cytoscape.Css.LineStyle,
-      'outline-opacity': 0.4,
-      'outline-offset': 4,
-      // ── ghost 三层叠加（与 glow 完全对称）───────────────────────────────────
-      'ghost': true,
-      'ghost-offset-x': 0,
-      'ghost-offset-y': 0,
-      'ghost-opacity': 0.28,
-      'ghost-scale': 1,
-      // ── 过渡 ─────────────────────────────────────────────────────────────
-      'transition-property': 'border-color, outline-color, outline-opacity, ghost-opacity, border-width, outline-width',
-      'transition-duration': 400,
-      'transition-timing-function': 'ease-in-out',
-    },
-  };
-
-  // ── flow ghost 外层叠加（Layer 2 + Layer 3，单独 selector 叠加）───────────
-  // ghost-opacity = 0 的节点 ghost 不绘制（cytoscape 行为），但 selector 存在
-  // 可以被 JS 动态修改 opacity，所以这里只写样式定义，不写 opacity=0 的规则。
-
   // stroke = glow：光晕效果
   //
-  // 实现方案（与 flow 完全对称，仅 outline 动画方式不同）：
-  //   Layer 1 — border 节点本身边框（solid，细 2px，节点色）
-  //   Layer 2 — outline solid 外圈（outline-offset 4，呼吸脉冲动画）
-  //   Layer 3 — ghost 内层（最亮）：ghost-offset 0，opacity 0.3
-  //   Layer 4 — ghost 外层：ghost-offset 10，opacity 0.18
-  //   Layer 5 — ghost 最外：ghost-offset 18，opacity 0.1
+  // 实现方案：
+  //   Layer 1 — 节点 border solid 2px（轮廓清晰）
+  //   Layer 2 — outline solid 外层光晕（outline-offset 4，呼吸脉冲动画）
+  //   Layer 3 — ghost 外层光晕：ghost-offset 10，opacity 0.18
+  //   Layer 4 — ghost 最外模糊：ghost-offset 18，opacity 0.1
   //   动画：outline-width + outline-opacity 呼吸脉冲（rAF 驱动）
   //
   // 关键设计：
   //   - 原 border 保持 solid 2px，节点轮廓始终清晰可见
   //   - outline 负责外围视觉效果：solid 呼吸 = "光晕"，dashed 流动 = "流光"
-  //   - ghost 三层叠加与 flow 完全对称，模糊边缘保持一致
+  //   - ghost 三层叠加，模糊边缘保持一致
   const glowStrokeRule = {
     selector: `node[stroke = "glow"]`,
     style: {
@@ -178,19 +132,11 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
     },
   };
 
-  // flow/glow 的 subtreeRoot 颜色规则（动态生成）
-  //   - flow 节点：覆盖 border-color + outline-color（外围 dashed 流动）
-  //   - glow 节点：覆盖 border-color + outline-color + 稍增 ghost-opacity（光晕更亮）
-  const flowGlowSubtreeRules = Object.entries(subtreeColorMap)
+  // glow 的 subtreeRoot 颜色规则（动态生成）
+  //   glow 节点：覆盖 border-color + outline-color + ghost-opacity（光晕更亮）
+  const glowSubtreeRules = Object.entries(subtreeColorMap)
     .filter(([, color]) => color !== '#9ca3af') // 跳过无色/透明
     .flatMap(([rootId, color]) => [
-      {
-        selector: `node[stroke = "flow"][subtreeRoot = "${rootId}"]`,
-        style: {
-          'border-color': color,
-          'outline-color': color,
-        },
-      },
       {
         selector: `node[stroke = "glow"][subtreeRoot = "${rootId}"]`,
         style: {
@@ -292,11 +238,10 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
     // ②.b shape (OWL2 实体类型) 规则：显式填写时覆盖 fill 的默认形状（最高优先级）
     ...shapeOwlRules,
     // ③ stroke 边框色
-    flowStrokeRule,
     glowStrokeRule,
-    // ③.b flow/glow 的 subtreeRoot 颜色（覆盖上面的默认色）
-    ...flowGlowSubtreeRules,
-    // ③.c 显式 stroke 覆盖（stroke=auto 走 subtreeRoot，flow/glow 由上面规则处理）
+    // ③.b glow 的 subtreeRoot 颜色（覆盖上面的默认色）
+    ...glowSubtreeRules,
+    // ③.c 显式 stroke 覆盖（stroke=auto 走 subtreeRoot，glow 由上面规则处理）
     // ④ fill 边框色 fallback（stroke=auto 且无 subtreeRoot 时由 fill 决定）
     ...fillBorderRules,
     // ④.b subtree 边框色（stroke=auto 时生效，优先于 depth）
@@ -340,8 +285,8 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
     },
     // 边类型样式
     ...edgeTypeRules,
-    // 注：流光/光晕的视觉效果由主 stroke 规则（stroke="flow"/"glow"）直接控制：
-    //   - border-width 3 + dashed (flow) / solid (glow) 区分重点
+    // 注：光晕效果由 stroke="glow" 规则直接控制
+    //   - border-width 3 + solid 样式
     //   - overlay-color + overlay-opacity 模拟光晕外圈
     //   - transition-property 让状态变化时平滑过渡
     // ── 交互状态 ─────────────────────────────────────────────────────────────
@@ -472,9 +417,9 @@ export class Renderer {
   private currentLayoutInstance: cytoscape.Layouts | null = null;
   private maxDepth: number;
   private subtreeColorMap: Record<string, string> = {};
-  // rAF handle for the flow animation loop; null when not running.
+  // rAF handle for the glow animation loop; null when not running.
   // Stored on the instance so destroy() can cancel it.
-  private flowRafId: number | null = null;
+  private glowRafId: number | null = null;
   // Whether the WebGL renderer is enabled (opt-in via RendererOptions.webgl).
   private useWebgl: boolean = false;
 
@@ -539,76 +484,52 @@ export class Renderer {
     this.cy = cytoscape(cyOptions);
 
     this.runLayout(layoutName);
-    this.startFlowAnimations();
+    this.startGlowAnimations();
   }
 
   /**
-   * 为所有 stroke=flow 和 stroke=glow 节点启动视觉动画（rAF 驱动）。
+   * 为所有 stroke=glow 节点启动呼吸动画（rAF 驱动）。
    *
-   * Flow 流光动画（outline dashed）：
-   *   每帧把 outline-border-dash-offset 减 1 → 虚线在外围"倒流"
-   *   outline-dash-pattern [10, 5] → dash-sum = 15 一个完整周期
-   *   速度约 16ms/帧 → 60fps → 1 周期 ≈ 1s
-   *
-   * Glow 呼吸动画（outline solid）：
+   * Glow 呼吸动画（outline + ghost）：
    *   ghost-opacity: 0.18 ↔ 0.38（正弦曲线，最柔和）
    *   outline-opacity: 0.25 ↔ 0.45（正弦曲线，与 ghost 同步但幅度不同）
    *   outline-width:  5   ↔ 8  （正弦曲线，"光晕在胀缩"的视觉感）
-   *   一个呼吸周期 ≈ 2.4s（比 flow 慢，显得沉稳庄重）
-   *
-   * 为什么不分开两个 rAF？
-   *   两者都跑在 60fps，用同一个 rAF 减少调度开销，代码也更集中。
+   *   一个呼吸周期 ≈ 2.4s（沉稳庄重）
    */
-  private startFlowAnimations(): void {
+  private startGlowAnimations(): void {
     if (!this.cy) return;
-    this.stopFlowAnimations();
+    this.stopGlowAnimations();
 
-    const flowNodes = this.cy.nodes('[stroke = "flow"]');
     const glowNodes = this.cy.nodes('[stroke = "glow"]');
-    if (flowNodes.length === 0 && glowNodes.length === 0) return;
+    if (glowNodes.length === 0) return;
 
-    const flowDashSum = 15; // border-dash-pattern [10, 5]
     const glowBreathPeriod = 2400; // ms，一个完整呼吸周期
-    let flowOffset = 0;
     let glowPhase = 0; // 0..1，对应 0..2π
     let lastTimestamp = 0;
 
     const tick = (timestamp: number) => {
-      const dt = lastTimestamp === 0 ? 16 : Math.min(timestamp - lastTimestamp, 50); // cap at 50ms 防止 tab 切回后跳帧
+      const dt = lastTimestamp === 0 ? 16 : Math.min(timestamp - lastTimestamp, 50);
       lastTimestamp = timestamp;
 
-      // ── Flow：outline dashed 虚线流动（外围流光，不动原 border）──────────────
-      if (flowNodes.length > 0) {
-        flowOffset = (flowOffset - (dt / 16)) % flowDashSum;
-        const clampedOffset = flowOffset < 0 ? flowOffset + flowDashSum : flowOffset;
-        flowNodes.style('outline-border-dash-offset', Math.round(clampedOffset));
-      }
+      glowPhase = (glowPhase + dt / glowBreathPeriod) % 1;
+      const sine = Math.sin(glowPhase * 2 * Math.PI); // -1..1
+      glowNodes.style('ghost-opacity', 0.28 + 0.10 * sine);
+      glowNodes.style('outline-opacity', 0.35 + 0.10 * sine);
+      glowNodes.style('outline-width', 6.5 + 1.5 * sine);
 
-      // ── Glow：呼吸脉冲（正弦曲线，柔和无跳跃感）────────────────────────────
-      if (glowNodes.length > 0) {
-        glowPhase = (glowPhase + dt / glowBreathPeriod) % 1;
-        const sine = Math.sin(glowPhase * 2 * Math.PI); // -1..1
-        // ghost-opacity: 0.18 ↔ 0.38（中心 0.28，幅度 0.10）
-        glowNodes.style('ghost-opacity', 0.28 + 0.10 * sine);
-        // outline-opacity: 0.25 ↔ 0.45（中心 0.35，幅度 0.10）
-        glowNodes.style('outline-opacity', 0.35 + 0.10 * sine);
-        // outline-width: 5 ↔ 8（中心 6.5，幅度 1.5）
-        glowNodes.style('outline-width', 6.5 + 1.5 * sine);
-      }
-
-      this.flowRafId = requestAnimationFrame(tick);
+      this.glowRafId = requestAnimationFrame(tick);
     };
 
-    this.flowRafId = requestAnimationFrame(tick);
+    this.glowRafId = requestAnimationFrame(tick);
   }
 
   /**
-   * 停止流光动画（在 destroy() 里调用，避免 rAF 在 cytoscape 销毁后继续跑）。
+   * 停止呼吸动画（在 destroy() 里调用，避免 rAF 在 cytoscape 销毁后继续跑）。
    */
-  private stopFlowAnimations(): void {
-    if (this.flowRafId !== null) {
-      cancelAnimationFrame(this.flowRafId);
-      this.flowRafId = null;
+  private stopGlowAnimations(): void {
+    if (this.glowRafId !== null) {
+      cancelAnimationFrame(this.glowRafId);
+      this.glowRafId = null;
     }
   }
 
@@ -618,12 +539,11 @@ export class Renderer {
     this.cy.elements().remove();
     this.cy.add(this.buildElements(data));
     this.runLayout(layoutName ?? this.currentLayout);
-    // render() 后元素已重建，旧动画对象失效，需重新为新的 flow 节点启动动画
-    this.startFlowAnimations();
+    this.startGlowAnimations();
   }
 
   destroy(): void {
-    this.stopFlowAnimations();
+    this.stopGlowAnimations();
     this.cy.destroy();
   }
 
@@ -708,21 +628,20 @@ export class Renderer {
     return [
       ...data.nodes.map((n) => {
         // stroke 字段解析（stroke 是**全量覆盖层**，与 fill 平行独立）：
-        //   - 节点 stroke 字段有显式值（含 'auto'/'flow'/'glow'）→ 直接用
+        //   - 节点 stroke 字段有显式值（'auto'/'glow'）→ 直接用
         //   - 节点 stroke 字段为空（undefined/null/字段缺失）→ 用 fill.defaultStroke 兜底
         //   - fill 也没 defaultStroke（如兜底节点）→ 'auto'
         //
         // 用户填 stroke="auto" 就是显式表达"我要 auto"，不应再被 fill.defaultStroke 覆盖。
-        const userStroke = (n.stroke === 'auto' || n.stroke === 'flow' || n.stroke === 'glow')
+        const userStroke = (n.stroke === 'auto' || n.stroke === 'glow')
           ? n.stroke
           : (n.stroke as string | undefined); // 兼容未来扩展值，原样传递
         const effectiveStroke = userStroke
           ?? (n.fill && FILL_CONFIG[n.fill]?.defaultStroke)
           ?? 'auto';
 
-        // 注：原代码在这里 push `flow-border`/`glow-border` class，但 cytoscape stylesheet
-        // 中已用 stroke="flow"/"glow" 主规则直接控制流光/光晕的 border / overlay 属性，
-        // class 已是冗余占位（仅设 border-width: 2），所以这里不再加 class。
+        // 注：cytoscape stylesheet 中用 stroke="glow" 规则直接控制光晕的
+        // border / outline / ghost 属性，无需额外的 class。
 
         return {
           data: {

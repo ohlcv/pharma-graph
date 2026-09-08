@@ -39,13 +39,11 @@ export const SHAPE_BY_OWL2: Record<Exclude<ShapeType, 'auto'>, cytoscape.Css.Nod
 export const STROKE_CONFIG: Record<StrokeType, {
   color: string;
   lineStyle: 'solid' | 'dashed';
-  effect?: 'flow' | 'glow';
+  effect?: 'glow';
   description: string;
 }> = {
   auto:     { color: 'inherit', lineStyle: 'solid', description: 'subtreeRoot 色（无则走 fill fallback）' },
   fallback: { color: 'inherit', lineStyle: 'solid', description: 'fill 兜底边框色（FILL_BORDER_HINTS[fill]）' },
-  flow:     { color: '#60a5fa', lineStyle: 'dashed', effect: 'flow',
-    description: 'subtreeRoot 色 + outline dashed 虚线流光 + ghost 三层模糊光晕' },
   glow:     { color: '#818cf8', lineStyle: 'solid', effect: 'glow',
     description: 'subtreeRoot 色 + outline solid 外圈呼吸 + ghost 三层模糊光晕' },
 };
@@ -64,7 +62,7 @@ export const STROKE_CONFIG: Record<StrokeType, {
 //   description — 配置说明
 //
 // ⚠️ fill 不管边框色，但**默认 stroke** 由 fill 提供（见 FILL_CONFIG[fill].defaultStroke）：
-//   - 节点显式 stroke（flow/glow）→ STROKE_CONFIG[stroke].color
+//   - 节点显式 stroke（glow）→ STROKE_CONFIG[stroke].color
 //   - 节点未填 stroke → FILL_CONFIG[fill].defaultStroke
 //   - stroke=auto → STROKE_CONFIG.auto.color（子树色或 depth 灰阶）
 // 边框色最终由 STROKE_CONFIG / getSubtreeBorderColor 决定。
@@ -193,7 +191,7 @@ const CENTER_BORDER_COLOR = '#f59e0b';
  * 计算节点的实际边框色。
  *
  * 完整链路（按优先级）：
- *   1. stroke 显式声明（flow/glow）→ STROKE_CONFIG[stroke].color
+ *   1. stroke 显式声明（glow）→ STROKE_CONFIG[stroke].color
  *   2. stroke = auto + subtreeRoot 存在 → subtreeRoot 色
  *   3. stroke = auto + 无 subtreeRoot → FILL_BORDER_HINTS[fill]（fill 兜底）
  *   4. stroke = fallback（不论有无 subtreeRoot）→ FILL_BORDER_HINTS[fill]
@@ -236,8 +234,8 @@ export function getBorderStyle(stroke: string | undefined): 'solid' | 'dashed' {
   return 'solid';
 }
 
-/** 获取 stroke 的特效（flow/glow）*/
-export function getBorderEffect(stroke: string | undefined): 'flow' | 'glow' | undefined {
+/** 获取 stroke 的特效（glow）*/
+export function getBorderEffect(stroke: string | undefined): 'glow' | undefined {
   if (stroke) {
     const cfg = STROKE_CONFIG[stroke as StrokeType];
     return cfg?.effect;

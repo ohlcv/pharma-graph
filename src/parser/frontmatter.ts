@@ -6,7 +6,7 @@
 //
 // 字段说明：
 //   fill   — 领域顶层类 IRI（如 cls-drug, cls-classification），决定默认形状/背景色/边框色
-//   stroke — 边框样式（auto|flow|glow），显式填写时覆盖 fill 的默认边框
+//   stroke — 边框样式（auto|glow），显式填写时覆盖 fill 的默认边框
 //   shape  — OWL2 实体类型（class/named_individual/object_property/data_property/annotation_property），
 //            每个类型对应一个固定几何形状（SHAPE_BY_OWL2）。显式填写时覆盖 fill 的默认形状。
 //            留空时使用 fill 的默认形状（可访问 FILL_CONFIG 中的扩展形状如 vee/tag/barrel 等）。

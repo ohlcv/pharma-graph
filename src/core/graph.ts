@@ -9,7 +9,7 @@
 // ── 类型定义 ────────────────────────────────────────────────────────────────
 
 /** 边框样式枚举（stroke 取值） */
-export type StrokeType = 'auto' | 'flow' | 'glow' | 'fallback';
+export type StrokeType = 'auto' | 'glow' | 'fallback';
 
 /** OWL2 实体类型枚举（shape 取值）
  *  每个类型对应一个固定的 Cytoscape 几何形状（见 SHAPE_BY_OWL2）
@@ -40,7 +40,7 @@ export interface NodeData {
   /** 领域顶层类 IRI（如 cls-drug, cls-classification, cls-adverse 等）*/
   fill?: string;
 
-  /** 边框样式：auto（默认）| flow（彩色流光）| glow（多层光晕）。
+  /** 边框样式：auto（默认）| glow（多层光晕）。
    *  显式填写时覆盖 fill 的默认边框（边框色由 subtreeRoot 决定）*/
   stroke?: StrokeType;
 

@@ -22,7 +22,7 @@
 - **stroke**（边框样式组合值）：显式填写时覆盖 fill 的默认边框（流光/光晕）
 
 > **fill 是配置中心**：每个药学顶层类定义完整默认外观；shape/stroke 显式填写时覆盖 fill 默认值。
-> **flow / glow 需显式填写**：所有 fill 的 `defaultStroke` 统一为 `auto`（默认无特效）；如需流光或光晕，必须在节点 frontmatter 中显式写 `stroke: flow` 或 `stroke: glow`。
+> **glow 需显式填写**：所有 fill 的 `defaultStroke` 统一为 `auto`（默认无特效）；如需光晕，必须在节点 frontmatter 中显式写 `stroke: glow`。
 
 ---
 
@@ -65,7 +65,7 @@
 ## 四、fill 默认外观配置表
 
 > **原则**：fill 只管背景色 + 默认形状 + **默认 stroke**。边框色由 `stroke` 方案决定：
-> 1. 节点显式 `stroke`（flow/glow）→ `STROKE_CONFIG[stroke].color` + 对应特效
+> 1. 节点显式 `stroke`（glow）→ `STROKE_CONFIG[stroke].color` + 对应特效
 > 2. 节点没填 `stroke` → 用 `FILL_CONFIG[fill].defaultStroke`（所有 fill 均默认为 `auto`）
 > 3. 节点填了 `stroke="auto"` 或没 fill → 走 subtreeRoot 色 / fill 兜底边框色 fallback
 
@@ -112,8 +112,7 @@
 - `fill: cls-drug`（无 shape/stroke）→ 椭圆药物 + 默认边框（`auto`，无特效）
 - `fill: cls-drug, shape: object_property` → 六边形药物 + 默认边框（shape 显式覆盖为六边形，stroke 仍走 auto）
 - `fill: cls-drug, stroke: auto` → 椭圆药物 + fill 兜底边框色（subtreeRoot 色优先，无则 `#7aa8d9`）
-- `fill: cls-drug, stroke: flow` → 椭圆药物 + 流光边框（重点药，显式特效）
-- `fill: cls-drug, shape: object_property, stroke: glow` → 六边形药物 + 光晕边框（两个都显式）
+- `fill: cls-drug, stroke: glow` → 椭圆药物 + 光晕边框（重点药/重点分类，呼吸脉冲特效）
 
 ### 4.3 形状分配设计意图
 
@@ -130,7 +129,7 @@
 |---|---|---|
 | 所有 fill | `auto` | 所有 fill 统一默认 `auto`（无特效）；特效需在节点 frontmatter 中显式填写 |
 
-> **为什么统一为 auto？** 流光（flow）和光晕（glow）是有意强调的视觉特效，不应该是某类节点的"默认行为"。只有需要强调的节点才显式写 `stroke: flow`（重点药/重点分类）或 `stroke: glow`（跨节总结/表格），其余节点保持简洁的实线边框。
+> **为什么统一为 auto？** 光晕（glow）是有意强调的视觉特效，不应该是某类节点的"默认行为"。只有需要强调的重点节点（临床用药评价分支下的重点药/重点分类）才显式写 `stroke: glow`，其余节点保持简洁的实线边框。
 >
 > 如需某 fill 始终按 fill 颜色着色（不跟子树走），可把 `defaultStroke` 改为 `fallback`（需同步改 `src/core/config.ts`）。
 
@@ -145,7 +144,7 @@
 >
 > **覆盖规则**：
 > - 显式填写 `shape: hexagon` → 覆盖 fill 的默认几何形状
-> - 显式填写 `stroke: flow` → 覆盖 fill 的默认边框（流光动画）
+> - 显式填写 `stroke: glow` → 覆盖 fill 的默认边框（流光动画）
 > - 显式填写 `stroke: glow` → 覆盖 fill 的默认边框（呼吸光晕）
 > - 不填或填 `auto` → 使用 fill 的默认配置（`defaultStroke: auto`，无特效）
 
@@ -155,19 +154,31 @@
 
 ### 5.1 stroke 组合值
 
-| stroke 值 | 边框色 | 线型 | 特效 |
-|---|---|---|---|
-| `auto` | subtreeRoot 色 或 `FILL_BORDER_HINTS[fill]` | solid 实线 | 无 |
-| `fallback` | `FILL_BORDER_HINTS[fill]`（不查 subtreeRoot） | solid 实线 | 无 |
-| `flow` | subtreeRoot 色 | dashed 虚线 | ghost 三层叠加 + 流光动画 |
-| `glow` | subtreeRoot 色 | solid 实线 | outline + ghost 五层叠加 + 呼吸脉冲动画 |
+| stroke 值 | 边框色 | 线型 | 特效 | 适用场景 |
+|---|---|---|---|---|
+| `auto` | subtreeRoot 色 或 `FILL_BORDER_HINTS[fill]` | solid 实线 | 无 | 普通节点（默认） |
+| `fallback` | `FILL_BORDER_HINTS[fill]`（不查 subtreeRoot） | solid 实线 | 无 | 按 fill 自身颜色着色的节点 |
+| `glow` | subtreeRoot 色 | solid 实线 | outline + ghost 多层叠加 + **呼吸脉冲动画** | **重点节点**：临床用药评价分支下的重点药（med-）/重点分类 |
+
+**什么是重点节点（stroke: glow）？**
+
+临床用药评价分支下独立成框的节点：
+
+| 节点类型 | 示例 | 判定标准 |
+|---|---|---|
+| **重点药** | 地西泮、唑吡坦、巴氯芬 | 纸质版"临床用药评价"分支下有该药的独立框（含作用特点/临床应用/不良反应正文） |
+| **重点分类** | 巴比妥类、苯二氮䓬类 | 纸质版"临床用药评价"分支下直接出现该分类名，且其下有作用特点/不良反应 |
+
+> **关键区分**：glow 的判定依据是"该节点是否出现在纸质版'临床用药评价'分支下"，不是"该分类下有没有药"或"该分类有没有代表药"。分类与作用机制分支里的分类，即使列出了代表药，也不加 glow。
+>
+> **示例**：中枢肌松药的"非苯二氮䓬类"只出现在分类分支，临床用药评价分支下直接是乙哌立松/巴氯芬/氯唑沙宗三个药 → 非苯二氮䓬类不加 glow，三个药加 glow。
 
 **完整 stroke 链路（按优先级）**：
 
-1. 用户填 stroke=flow/glow → `STROKE_CONFIG[stroke].color` + 对应特效（subtreeRoot 色优先）
-2. 用户填 stroke=fallback → 直接用 `FILL_BORDER_HINTS[fill]`，**跳过 subtreeRoot**
-3. 用户填 stroke=auto + 有 subtreeRoot → subtreeRoot 色
-4. 用户填 stroke=auto + 无 subtreeRoot → `FILL_BORDER_HINTS[fill]`
+1. 用户填 `stroke: glow` → `STROKE_CONFIG[stroke].color` + 呼吸脉冲光晕特效（subtreeRoot 色优先）
+2. 用户填 `stroke: fallback` → 直接用 `FILL_BORDER_HINTS[fill]`，**跳过 subtreeRoot**
+3. 用户填 `stroke: auto` + 有 subtreeRoot → subtreeRoot 色
+4. 用户填 `stroke: auto` + 无 subtreeRoot → `FILL_BORDER_HINTS[fill]`
 5. 用户不填 stroke → `FILL_CONFIG[fill].defaultStroke`（统一为 `auto`，再走 1~4）
 6. 节点连 fill 都没填 → `FILL_BORDER_DEFAULT`（中性灰）
 
@@ -185,9 +196,9 @@
 |---|---|---|---|
 | 书/篇/章/节入口 | `cls-structure` | `auto` | — |
 | 药物分类（无临床评价） | `cls-classification` | `auto` | — |
-| 药物分类（有临床评价） | `cls-classification` | — | `flow` |
+| 药物分类（有临床评价） | `cls-classification` | — | `glow` |
 | 普通药（仅提名） | `cls-drug` | `auto` | — |
-| 重点药（有药理卡片） | `cls-drug` | — | `flow` |
+| 重点药（有药理卡片） | `cls-drug` | — | `glow` |
 | 疾病/症状 | `cls-disease` | `auto` | — |
 | 靶点/受体/酶 | `cls-biomolecule` | `auto` | — |
 | 作用特点/临床评价 | `cls-feature` | `auto` | — |

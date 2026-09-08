@@ -51,12 +51,11 @@ fill: string                # 可选，领域顶层 Class IRI（如 cls-drug / c
 # 缺省时不写节点（节点归入通用类），具体 fill 值见 RULES §二。
 # 决定背景色 + 默认几何形状 + 默认边框色，并在 RULES 中定义该类的完整默认外观。
 
-stroke: auto | fallback | flow | glow
+stroke: auto | fallback | glow
 # 可选，缺省由 fill 的 defaultStroke 决定（见 RULES §3.4）。
 # auto  → 先查 subtreeRoot，没子树时降级到 fill 兜底边框色（FILL_BORDER_HINTS[fill]）
 # fallback → 永远按 fill 兜底边框色着色（跳过 subtreeRoot）
-# flow  → 高亮彩色流光边框（重点药/分类）
-# glow  → 高亮多层光晕边框（跨节总结）
+# glow  → 高亮多层光晕边框（重点节点：临床用药评价分支下的重点药/重点分类）
 # 完整 stroke 链路见 RULES §4.1。
 
 # === 定位与内容 ===
@@ -144,8 +143,7 @@ stroke 是自定义 AnnotationProperty `style` 的简写，值为组合枚举，
 |---|---|---|---|---|
 | `auto`（如显式填写） | subtreeRoot 色 或 FILL_BORDER_HINTS[fill] | 实线 | — | 跟子树走 |
 | `fallback` | FILL_BORDER_HINTS[fill]（不查 subtreeRoot） | 实线 | — | 按 fill 自身颜色着色的节点 |
-| `flow` | subtreeRoot 色 | 实线 | **彩色流光** | 重点药、重点分类 |
-| `glow` | subtreeRoot 色 | 实线 | **多层光晕** | 跨节大总结 |
+| `glow` | subtreeRoot 色 | 实线 | **多层光晕 + 呼吸脉冲动画** | 重点节点：临床用药评价分支下的重点药/重点分类 |
 | *不填* | 由 `FILL_CONFIG[fill].defaultStroke` 决定（再走 1~4） | — | — | 多数节点的推荐写法 |
 
 > 边框宽度固定 2px，不参与区分。
@@ -203,7 +201,7 @@ stroke 是自定义 AnnotationProperty `style` 的简写，值为组合枚举，
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │  边框色 = 基础层（subtreeRoot 或 fill 兜底）                  │
-│         + 强调层（stroke 显式：flow/glow 的彩色特效）         │
+│         + 强调层（stroke 显式：glow 的彩色特效）         │
 │                                                              │
 │  基础层（自动计算）        强调层（显式声明）                 │
 │  ─────────────────        ─────────────────                   │
@@ -215,11 +213,11 @@ stroke 是自定义 AnnotationProperty `style` 的简写，值为组合枚举，
 
 完整 6 步链路（优先级从高到低）：
 
-1. 用户填 `stroke: flow` / `stroke: glow` → subtreeRoot 色 + 对应特效
+1. 用户填 `stroke: glow` → subtreeRoot 色 + 对应特效
 2. 用户填 `stroke: fallback` → 直接用 `FILL_BORDER_HINTS[fill]`，**跳过 subtreeRoot**
 3. 用户填 `stroke: auto` + 有 subtreeRoot → subtreeRoot 色
 4. 用户填 `stroke: auto` + 无 subtreeRoot → `FILL_BORDER_HINTS[fill]`（fill 兜底边框色）
-5. 用户不填 stroke → `FILL_CONFIG[fill].defaultStroke`（按 fill 类型可能是 auto/flow/glow/fallback，再走 1~4）
+5. 用户不填 stroke → `FILL_CONFIG[fill].defaultStroke`（统一为 auto，再走 1~4）
 6. 节点连 fill 都没填 → `FILL_BORDER_DEFAULT`（中性灰）
 
 ### 4.2 auto vs fallback
@@ -235,16 +233,16 @@ stroke 是自定义 AnnotationProperty `style` 的简写，值为组合枚举，
 ### 4.4 融合设计示例
 
 ```yaml
-# 示例 1：重点药 + 分类归属色（stroke 覆盖）
+# 示例 1：重点药（stroke: glow）
 fill: cls-drug
-stroke: flow        # → 蓝色流光边框（stroke 显式，subtreeRoot 色被覆盖）
+stroke: glow        # → 呼吸光晕边框（重点药特效）
 
 # 示例 2：普通药（用 fill 兜底边框色，不跟子树走）
 fill: cls-drug
 stroke: fallback    # → 浅蓝边框，按 fill 自身颜色着色
 
 # 示例 3：默认（不填 stroke，用 fill 的 defaultStroke）
-fill: cls-drug       # 默认 stroke=flow（cls-drug 默认），效果同示例 1
+fill: cls-drug       # 默认 stroke=auto（无特效）
 ```
 
 ---
@@ -287,7 +285,7 @@ edges_out:
 id: med-diazepam-y2-01-01
 label: 地西泮
 fill: cls-drug
-stroke: flow
+stroke: glow
 
 location:
   book: 药学专业知识二
@@ -311,7 +309,7 @@ edges_out:
 ---
 ```
 
-渲染：圆形 + 浅蓝背景 + **蓝色流光彩色边框**（stroke 覆盖 fill 默认的灰色边框）。
+渲染：圆形 + 浅蓝背景 + **呼吸光晕边框**（stroke: glow，呼吸脉冲特效）。
 
 ### 示例 3：不良反应
 
