@@ -93,38 +93,33 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
   // stroke = auto（默认）：边框色由 subtreeRoot 或 depth 自动决定。
   
   // stroke = flow：流光效果
-  //   - 虚线边框 + 加粗 → 视觉上像"流动"
-  //   - overlay-color 高饱和色 + overlay-opacity 0.5 → 边框外层光晕
-  //   - transition-property 让 color 在状态变化时平滑过渡
+  //   - border-width 3 → 醒目
+  //   - border-style dashed → 流动虚线视觉暗示
+  //   - 注：cytoscape canvas 节点不支持 box-shadow，且 overlay 会画矩形（不按 shape
+  //     描边，对椭圆/八边形/星形节点会变成矩形光晕），故弃用 overlay，改用纯边框样式
   const flowStrokeRule = {
     selector: `node[stroke = "flow"]`,
     style: {
       'border-color': '#3b82f6', // 备用色，实际颜色由 subtreeRoot 规则决定
       'border-width': 3,
       'border-style': 'dashed' as cytoscape.Css.LineStyle,
-      'overlay-color': '#3b82f6',
-      'overlay-padding': 2,
-      'overlay-opacity': 0.5,
-      'transition-property': 'border-color, overlay-color, overlay-opacity, border-width',
+      'transition-property': 'border-color, border-width',
       'transition-duration': 300,
       'transition-timing-function': 'ease-in-out',
     },
   };
 
   // stroke = glow：光晕效果
-  //   - 实线边框 + 加粗 → 醒目
-  //   - overlay-padding 更大 → 多层光晕外圈
-  //   - overlay-opacity 0.7 → 更强的光晕
+  //   - border-style double → cytoscape 原生双线边框，外线 + 内线 + 中间透明，
+  //     视觉上像"光晕外圈"且严格按节点 shape 描边（不会变成矩形）
+  //   - border-width 3 → 双线总宽 6px，比 flow 更醒目
   const glowStrokeRule = {
     selector: `node[stroke = "glow"]`,
     style: {
       'border-color': '#3b82f6', // 备用色，实际颜色由 subtreeRoot 规则决定
       'border-width': 3,
-      'border-style': 'solid' as cytoscape.Css.LineStyle,
-      'overlay-color': '#3b82f6',
-      'overlay-padding': 4,
-      'overlay-opacity': 0.7,
-      'transition-property': 'border-color, overlay-color, overlay-opacity, border-width',
+      'border-style': 'double' as cytoscape.Css.LineStyle,
+      'transition-property': 'border-color, border-width',
       'transition-duration': 300,
       'transition-timing-function': 'ease-in-out',
     },
@@ -136,11 +131,11 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
     .flatMap(([rootId, color]) => [
       {
         selector: `node[stroke = "flow"][subtreeRoot = "${rootId}"]`,
-        style: { 'border-color': color, 'overlay-color': color },
+        style: { 'border-color': color },
       },
       {
         selector: `node[stroke = "glow"][subtreeRoot = "${rootId}"]`,
-        style: { 'border-color': color, 'overlay-color': color },
+        style: { 'border-color': color },
       },
     ]);
 
