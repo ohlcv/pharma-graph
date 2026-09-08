@@ -80,20 +80,19 @@
 | `cls-classification` | 药物分类 | octagon（八边形） | `#e8d5e0` 柔藕荷 | `auto` | `#c9a06a` 莫兰迪棕黄 |
 | `cls-drug` | 药物 | ellipse（椭圆） | `#dbeafe` 柔天空蓝 | `flow` | `#7aa8d9` 浅蓝 |
 | `cls-disease` | 疾病 | diamond（菱形） | `#fce7f3` 柔樱花粉 | `auto` | `#e89bb8` 浅粉 |
-| `cls-biomolecule` | 生物实体 | round-octagon（圆角八边形） | `#d1fae5` 柔薄荷绿 | `auto` | `#6dbfa0` 浅绿 |
-| `cls-feature` | 作用特点/临床评价 | heptagon（七边形） | `#cffafe` 柔湖青 | `auto` | `#7db8c4` 浅青 |
-| `cls-adverse` | 不良反应/禁忌 | triangle（三角形） | `#ffe4e6` 柔玫瑰粉 | `auto` | `#d4868f` 浅玫 |
-| `cls-concept` | 抽象概念/总论 | round-triangle（圆角三角） | `#e0e7ff` 柔雾紫蓝 | `auto` | `#818cf8` 浅紫 |
+| `cls-biomolecule` | 生物实体 | round-triangle（圆角三角） | `#d1fae5` 柔薄荷绿 | `auto` | `#6dbfa0` 浅绿 |
+| `cls-feature` | 作用特点/临床评价 | star（星形） | `#cffafe` 柔湖青 | `auto` | `#7db8c4` 浅青 |
+| `cls-adverse` | 不良反应/禁忌 | round-hexagon（圆角六边形） | `#ffe4e6` 柔玫瑰粉 | `auto` | `#d4868f` 浅玫 |
+| `cls-concept` | 抽象概念/总论 | round-rectangle（圆角矩形） | `#e0e7ff` 柔雾紫蓝 | `auto` | `#818cf8` 浅紫 |
 | `cls-summary` | 总结 | bottom-round-rectangle（下圆矩形） | `#fef9c3` 柔麦穗黄 | `glow` | `#c9b96a` 浅黄 |
-| `cls-mnemonic` | 口诀 | tag（标签形） | `#fed7aa` 柔蜜桃橙 | `auto` | `#d4884e` 浅橙 |
-| `owl:Thing`（兜底） | 默认 | ellipse | `#f9fafb` 默认 | `auto` | `#9ca3af`（`FILL_BORDER_DEFAULT`） |
+z'z| `owl:Thing`（兜底） | 默认 | ellipse | `#f9fafb` 默认 | `auto` | `#9ca3af`（`FILL_BORDER_DEFAULT`） |
 
 > 边框色名称统一：**"fill 兜底边框色"** = stroke=auto 链路无子树时的边框色 = `FILL_BORDER_HINTS[fill]` 值。
 > 该色同时被 `stroke: fallback` 链路使用（详见 4.1 第 2 步）。
 
 ### 3.2 字段兜底关系：fill / shape / stroke 三件套
 
-> **核心原则**：三个字段都是**"我要你长什么样"**——用户显式填写的值就是最终决定；不填时由 `fill` 兜底。
+> **核心原则**：三个字段都是**"我要你z'z'z长什么样"**——用户显式填写的值就是最终决定；不填时由 `fill` 兜底。
 
 | 字段 | 用户显式值 | 用户不填（undefined/字段缺失） |
 |---|---|---|
@@ -115,9 +114,12 @@
 - `fill: cls-drug, shape: diamond, stroke: glow` → 菱形药物 + 光晕边框（两个都显式覆盖）
 
 ### 3.3 形状分配设计意图
-- 结构/总结：方形系（pentagon / bottom-round-rectangle）—— 稳定的"骨架"
-- 分类/特点：多边形系（octagon / heptagon）—— 明显的"层级"
-- 药物/疾病/口诀：特征形（ellipse / diamond / tag）—— 直觉化的"实物"
+- 结构/概念：方形系（round-pentagon / round-rectangle）—— 稳定的"骨架/定义"
+- 分类/总结：多边形系（octagon / bottom-round-rectangle）—— 明显的"层级"
+- 药物/疾病：实物形（ellipse / diamond）—— 直觉化的"物质"
+- 生物实体：圆角三角形（round-triangle）—— 三角形的"指向/锚定"意象，靶点/受体是药理作用的锚点
+- 特点/口诀：特征形（star / tag）—— 醒目的"标签/亮点"
+- 不良反应：警示形（round-hexagon）—— 类似交通警示标志，唤起警惕
 
 ### 3.4 默认 stroke 设计意图
 | fill | defaultStroke | 理由 |

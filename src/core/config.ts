@@ -133,9 +133,9 @@ export const FILL_CONFIG: Record<string, {
     description: '疾病/症状/综合征',
   },
   // ── 生物实体 ──────────────────────────────────────────────────────────────
-  // round-octagon：圆角八边形，柔化"靶点"感
+  // round-triangle：圆角三角形，三角形表"指向/锚定"——靶点/受体是药理作用的锚点
   'cls-biomolecule': {
-    shape: 'round-octagon',
+    shape: 'round-triangle',
     background: '#d1fae5',         // 柔薄荷绿
     backgroundDark: '#a7f3d0',
     defaultStroke: 'auto',
@@ -143,9 +143,9 @@ export const FILL_CONFIG: Record<string, {
     description: '靶点/受体/酶/转运体/基因',
   },
   // ── 作用特点/临床评价 ────────────────────────────────────────────────────
-  // heptagon：七边形，独特形状
+  // star：星形，突出"亮点/重点特征"
   'cls-feature': {
-    shape: 'heptagon',
+    shape: 'star',
     background: '#cffafe',         // 柔湖青
     backgroundDark: '#a5f3fc',
     defaultStroke: 'auto',
@@ -153,9 +153,9 @@ export const FILL_CONFIG: Record<string, {
     description: '作用特点/临床用药评价/选药原则',
   },
   // ── 不良反应/禁忌 ────────────────────────────────────────────────────────
-  // triangle：三角形，警示感
+  // round-hexagon：圆角六边形，警示标志意象，警示感
   'cls-adverse': {
-    shape: 'triangle',
+    shape: 'round-hexagon',
     background: '#ffe4e6',         // 柔玫瑰粉
     backgroundDark: '#fecdd3',
     defaultStroke: 'auto',
@@ -163,9 +163,9 @@ export const FILL_CONFIG: Record<string, {
     description: '典型不良反应/禁忌/毒性',
   },
   // ── 抽象概念/总论 ────────────────────────────────────────────────────────
-  // round-triangle：圆角三角形，柔化抽象感
+  // round-rectangle：圆角矩形，中性稳定，承载抽象定义
   'cls-concept': {
-    shape: 'round-triangle',
+    shape: 'round-rectangle',
     background: '#e0e7ff',         // 柔雾紫蓝
     backgroundDark: '#c7d2fe',
     defaultStroke: 'auto',
