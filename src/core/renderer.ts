@@ -92,42 +92,55 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
   // stroke 显式声明时覆盖 fill/subtreeRoot 的默认边框色。
   // stroke = auto（默认）：边框色由 subtreeRoot 或 depth 自动决定。
   
-  // stroke = flow：流光效果
-  //   - border-width 4 → 较粗，使 cytoscape canvas 的虚线 dash 段明显（width=3 时
-  //     dash 段 ~2px 看起来像点状，width=4 时 dash 段 ~3-4px 才是"流光虚线"）
-  //   - border-style dashed → 流动虚线视觉暗示
-  //   - 注：cytoscape canvas 节点不支持 box-shadow，且 overlay 会画矩形（不按 shape
-  //     描边，对椭圆/八边形/星形节点会变成矩形光晕），故弃用 overlay，改用纯边框样式
+  // stroke = flow：流光效果（cytoscape 官方推荐做法）
+  //   - border-style dashed + border-dash-pattern 自定义 dash 段长
+  //   - border-dash-offset 配合 cy.animation() 循环 → 真正的流光动画（虚线沿
+  //     边框"流动"）。文档原话：border-dash-offset 'is useful for creating
+  //     edge animations'。动画由 renderer.ts 末尾的 startFlowAnimations()
+  //     启动，对所有 stroke=flow 节点绑一次循环动画。
+  //   - 注：cytoscape canvas 不支持 @keyframes，但 ele.animation() 是官方
+  //     推荐的循环动画机制。
   const flowStrokeRule = {
     selector: `node[stroke = "flow"]`,
     style: {
       'border-color': '#3b82f6', // 备用色，实际颜色由 subtreeRoot 规则决定
-      'border-width': 4,
+      'border-width': 2,
       'border-style': 'dashed' as cytoscape.Css.LineStyle,
-      'transition-property': 'border-color, border-width',
+      'border-dash-pattern': [6, 4] as unknown as cytoscape.Css.LineStyle, // 6px dash + 4px gap
+      'border-dash-offset': 0,
+      'transition-property': 'border-color',
       'transition-duration': 300,
       'transition-timing-function': 'ease-in-out',
     },
   };
 
-  // stroke = glow：光晕效果
-  //   - border-width 5 → cytoscape canvas 的 double 边框间隙随 width 增大（width=3
-  //     时两条线几乎贴在一起像粗线，width=5 时双线间隙 ~2-3px 才像"光晕"）
-  //   - border-style double → cytoscape 原生双线边框 = 外线 + 中间透明 + 内线，
-  //     视觉上严格按节点 shape 描边（不会变成矩形 overlay）
+  // stroke = glow：光晕效果（cytoscape 官方推荐做法）
+  //   - 用 outline-* 系列属性做"光晕外圈"：outline 是 cytoscape 节点独立于
+  //     border 的轮廓层，outline-offset 控制离节点边缘的距离，outline-opacity
+  //     控制光晕透明度。严格按节点 shape 描边（不会变成矩形 overlay）。
+  //   - border 仅作节点本身的细边框；光晕完全由 outline 承担。
+  //   - transition 让 outline 在状态变化时平滑过渡；outline-color 用更亮的
+  //     色调以营造"发光"感。
   const glowStrokeRule = {
     selector: `node[stroke = "glow"]`,
     style: {
-      'border-color': '#3b82f6', // 备用色，实际颜色由 subtreeRoot 规则决定
-      'border-width': 5,
-      'border-style': 'double' as cytoscape.Css.LineStyle,
-      'transition-property': 'border-color, border-width',
+      'border-color': '#3b82f6', // 节点本身边框色，由 subtreeRoot 规则覆盖
+      'border-width': 2,
+      'border-style': 'solid' as cytoscape.Css.LineStyle,
+      'outline-color': '#3b82f6', // 光晕色（subtreeRoot 规则会覆盖）
+      'outline-width': 4,
+      'outline-style': 'solid' as cytoscape.Css.LineStyle,
+      'outline-opacity': 0.4,
+      'outline-offset': 3,
+      'transition-property': 'border-color, outline-color, outline-opacity, outline-width',
       'transition-duration': 300,
       'transition-timing-function': 'ease-in-out',
     },
   };
 
   // flow/glow 的 subtreeRoot 颜色规则（动态生成）
+  //   - flow 节点：覆盖 border-color（虚线主色）
+  //   - glow 节点：同时覆盖 border-color（节点本身）+ outline-color（光晕色）
   const flowGlowSubtreeRules = Object.entries(subtreeColorMap)
     .filter(([, color]) => color !== '#9ca3af') // 跳过无色/透明
     .flatMap(([rootId, color]) => [
@@ -137,7 +150,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
       },
       {
         selector: `node[stroke = "glow"][subtreeRoot = "${rootId}"]`,
-        style: { 'border-color': color },
+        style: { 'border-color': color, 'outline-color': color },
       },
     ]);
 
@@ -396,6 +409,9 @@ export class Renderer {
   private currentLayoutInstance: cytoscape.Layouts | null = null;
   private maxDepth: number;
   private subtreeColorMap: Record<string, string> = {};
+  // rAF handle for the flow animation loop; null when not running.
+  // Stored on the instance so destroy() can cancel it.
+  private flowRafId: number | null = null;
 
   constructor(options: RendererOptions) {
     const {
@@ -449,6 +465,51 @@ export class Renderer {
     this.cy = cytoscape(cyOptions);
 
     this.runLayout(layoutName);
+    this.startFlowAnimations();
+  }
+
+  /**
+   * 为所有 stroke=flow 节点启动真正的循环流光动画（cytoscape 官方推荐做法）。
+   *
+   * 背景：cytoscape canvas 节点不支持 @keyframes，但官方明确支持通过
+   * `ele.animation()` + 持续修改 `border-dash-offset` 来做"虚线流动"动画
+   * （文档原话：border-dash-offset 'is useful for creating edge animations'）。
+   *
+   * 实现：requestAnimationFrame 循环，每帧把所有 flow 节点的 border-dash-offset
+   * 加 1（一个 dash 周期后回到 0，看起来是无限循环的流光）。
+   *
+   * 为什么不直接用 ele.animation()？
+   *   cytoscape 的 SingularAnimationOptions 要求同时给 position 或 renderedPosition，
+   *   会强制把节点位置也动画——节点会跑到 (0,0) 然后回到当前位置，造成抖动。
+   *   用 rAF 直接更新样式更安全，开销也更低。
+   *
+   * 性能：rAF 自动按显示器刷新率（60fps）跑；只改几十个节点的 dash-offset，
+   * cytoscape 会增量更新样式，开销可忽略。
+   */
+  private startFlowAnimations(): void {
+    if (!this.cy) return;
+    // 防止 render() 被多次调用时 rAF loop 叠加
+    this.stopFlowAnimations();
+    const flowNodes = this.cy.nodes('[stroke = "flow"]');
+    if (flowNodes.length === 0) return;
+    const dashSum = 10; // border-dash-pattern [6, 4] = 6+4 = 10
+    let offset = 0;
+    const tick = () => {
+      offset = (offset - 1 + dashSum) % dashSum; // 倒序流动（视觉上更自然）
+      flowNodes.style('border-dash-offset', offset);
+      this.flowRafId = requestAnimationFrame(tick);
+    };
+    this.flowRafId = requestAnimationFrame(tick);
+  }
+
+  /**
+   * 停止流光动画（在 destroy() 里调用，避免 rAF 在 cytoscape 销毁后继续跑）。
+   */
+  private stopFlowAnimations(): void {
+    if (this.flowRafId !== null) {
+      cancelAnimationFrame(this.flowRafId);
+      this.flowRafId = null;
+    }
   }
 
   // ── Public API ──────────────────────────────────────────────────────────────
@@ -457,9 +518,12 @@ export class Renderer {
     this.cy.elements().remove();
     this.cy.add(this.buildElements(data));
     this.runLayout(layoutName ?? this.currentLayout);
+    // render() 后元素已重建，旧动画对象失效，需重新为新的 flow 节点启动动画
+    this.startFlowAnimations();
   }
 
   destroy(): void {
+    this.stopFlowAnimations();
     this.cy.destroy();
   }
 
