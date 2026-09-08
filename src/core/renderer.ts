@@ -37,6 +37,13 @@ export const CLASSES = {
   LAYER_PARENT: 'layer-parent',
 } as const;
 
+// Ripple colors — single source of truth; both graph-events.ts and
+// anim-pulse.ts import from here so one edit propagates everywhere.
+export const RIPPLE_COLORS = {
+  NODE: '#818cf8',   // indigo-400, matches the default node color
+  EDGE: '#fbbf24',   // amber-400, matches highlighted-edge line color
+} as const;
+
 // ── Stylesheet (computed once at module load) ───────────────────────────────────
 
 // 视觉层级（从上到下依次展开）：

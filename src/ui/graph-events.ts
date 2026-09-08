@@ -4,7 +4,7 @@
 // mapping from cytoscape events to UI actions.
 
 import type cytoscape from 'cytoscape';
-import { Renderer, CLASSES } from '../core/renderer.js';
+import { Renderer, CLASSES, RIPPLE_COLORS } from '../core/renderer.js';
 import { HighlightEngine } from './highlight-engine.js';
 import { DetailPanel } from './detail-panel.js';
 import { TourController } from './tour-controller.js';
@@ -75,7 +75,7 @@ export function initGraphEvents(deps: GraphEventDeps): void {
     if (cont) {
       const pos = node.renderedPosition();
       const rect = cont.getBoundingClientRect();
-      deps.spawnNodeRipple(rect.left + pos.x, rect.top + pos.y, node.data('color') || '#818cf8');
+      deps.spawnNodeRipple(rect.left + pos.x, rect.top + pos.y, node.data('color') || RIPPLE_COLORS.NODE);
     }
     const prev = deps.highlight.highlightNode(node.id());
     deps.setPrevSelectedNode(prev.prevNodeId, prev.prevNodeName);
@@ -101,7 +101,7 @@ export function initGraphEvents(deps: GraphEventDeps): void {
       const midX = (src.x + tgt.x) / 2;
       const midY = (src.y + tgt.y) / 2;
       const rect = cont.getBoundingClientRect();
-      deps.spawnNodeRipple(rect.left + midX, rect.top + midY, '#fbbf24');
+      deps.spawnNodeRipple(rect.left + midX, rect.top + midY, RIPPLE_COLORS.EDGE);
     }
     updateStats(cy);
     syncBottomSheetStats(cy);
