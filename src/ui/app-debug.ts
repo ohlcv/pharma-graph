@@ -374,7 +374,8 @@ function buildRulesTable(cy: cytoscape.Core): string {
   // results that don't reflect the essence mapping.
   const visible = cy.nodes().not('.layer-parent').filter((n: NodeSingular) => !n.hasClass('dimmed'));
   visible.forEach((n: NodeSingular) => {
-    const t = n.data('essence') ?? '?';
+    const fill = n.data('fill') ?? '?';
+    const essence = n.data('essence') ?? '?';
     const shape = n.style('shape') as string;
     const bc = n.style('border-color') as string;
     const bw = n.style('border-width') as string;
@@ -384,8 +385,9 @@ function buildRulesTable(cy: cytoscape.Core): string {
     const isSelected = n.hasClass('selected-node');
     rows.push(`<tr class="${isSelected ? 'dbg-rules-table__tr--active' : ''}">
       <td class="dbg-rules-table__td">${label}</td>
-      <td class="dbg-rules-table__td dbg-rules-table__td--type">${t}</td>
+      <td class="dbg-rules-table__td dbg-rules-table__td--type">${fill}</td>
       <td class="dbg-rules-table__td dbg-rules-table__td--shape">${shape}</td>
+      <td class="dbg-rules-table__td dbg-rules-table__td--shape">${essence}</td>
       <td class="dbg-rules-table__td dbg-rules-table__td--w">wt=${w} rw=${rw}</td>
       <td class="dbg-rules-table__td" style="font-size:9px">
         <span title="border-color: ${bc}">${bc}</span>
@@ -408,11 +410,12 @@ function nodeProps(node: NodeSingular): string {
   const w = node.data('weight') ?? '?';
   const rw = node.renderedWidth().toFixed(1);
   const rh = node.renderedHeight().toFixed(1);
+  const fill = node.data('fill') ?? '?';
   const essence = node.data('essence') ?? '?';
   const opacity = node.renderedStyle('opacity') as string;
   const classes = (node.classes() as string[]).join(' ');
 
-  const shapeOk = shape !== 'ellipse' || essence === 'medication';
+  const shapeOk = shape !== 'ellipse' || fill === 'cls-drug';
   const bcOk = !bc.includes('255,255,255') && !bc.includes('#ffffff');
 
   return [
@@ -428,7 +431,7 @@ function nodeProps(node: NodeSingular): string {
     classBadge('H', node.hasClass('highlighted')),
     classBadge('V', node.hasClass('hovered')),
     `</div>`,
-    `<div class="dbg-props-meta">essence=${essence} | opacity=${opacity}</div>`,
+    `<div class="dbg-props-meta">fill=${fill} | essence=${essence} | opacity=${opacity}</div>`,
     `<div class="dbg-props-classes">cls:[${classes || '∅'}]</div>`,
   ].join('');
 }
@@ -687,10 +690,12 @@ export function updateForensicPanel(renderer: Renderer): void {
   const coverageEl = el('dbg-coverage');
   if (coverageEl) {
     const allNodes = cy.nodes().not('.layer-parent');
-    const noEssence = allNodes.filter((n: NodeSingular) => !n.data('essence')).length;
-    const total     = allNodes.length;
-    const essenceWarn = noEssence > 0 ? `<span style="color:#f87171">⚠ essence 缺失: ${noEssence}/${total}</span>` : `<span style="color:#4ade80">✓ essence 全覆盖</span>`;
-    coverageEl.innerHTML = `<div style="font-size:9px;line-height:1.8">${essenceWarn}</div>`;
+    const noFill = allNodes.filter((n: NodeSingular) => !n.data('fill')).length;
+    const total = allNodes.length;
+    const fillWarn = noFill > 0
+      ? `<span style="color:#f87171">⚠ fill 缺失: ${noFill}/${total}</span>`
+      : `<span style="color:#4ade80">✓ fill 全覆盖</span>`;
+    coverageEl.innerHTML = `<div style="font-size:9px;line-height:1.8">${fillWarn}</div>`;
   }
 
   // ── Node panel diagnostics ─────────────────────────────────────────

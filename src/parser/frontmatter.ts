@@ -2,7 +2,15 @@
 // Pure JS frontmatter parser, browser-compatible.
 //
 // Schema (new, post-migration):
-//   id, label, essence, summary, location, tags, edges_out
+//   id, label, fill, stroke, shape, essence, summary, location, tags, edges_out
+//
+// 字段说明：
+//   fill   — 领域顶层类 IRI（如 cls-drug, cls-classification），决定默认形状/背景色/边框色
+//   stroke — 边框样式（auto|flow|glow），显式填写时覆盖 fill 的默认边框
+//   shape  — OWL2 实体类型（class/named_individual/object_property/data_property/annotation_property），
+//            每个类型对应一个固定几何形状（SHAPE_BY_OWL2）。显式填写时覆盖 fill 的默认形状。
+//            留空时使用 fill 的默认形状（可访问 FILL_CONFIG 中的扩展形状如 vee/tag/barrel 等）。
+//   essence — 旧字段，向后兼容，自动映射到 fill
 //
 // Frontmatter may be either top-level keys or nested under a `data:` block
 // (the latter is what the migration script emits). Both shapes are accepted,
@@ -11,14 +19,29 @@
 
 import { parse as yamlParse, stringify as yamlStringify } from 'yaml';
 import { DEFAULT_EDGE_TYPE } from '../core/edge-types.js';
+import type { StrokeType, ShapeType } from '../core/graph.js';
 
 // --- frontmatter 字段类型 ---
 
 export interface NodeMeta {
   id: string;
   label: string;
-  /** 节点本质（决定形状 + 填充色，9 种 essence 9 种色） */
+  
+  // ── 新字段（基于 OWL2）─────────────────────────────────────────────
+  /** 领域顶层类 IRI（如 cls-drug, cls-classification, cls-adverse 等）*/
+  fill?: string;
+  
+  /** 边框样式：auto | flow | glow（显式填写时覆盖 fill 的默认边框）*/
+  stroke?: StrokeType;
+  
+  /** OWL2 实体类型（显式填写时覆盖 fill 的默认形状）。
+   *  留空时使用 fill 的默认形状（可访问 FILL_CONFIG 中的扩展形状）*/
+  shape?: ShapeType;
+  
+  // ── 旧字段（向后兼容）────────────────────────────────────────────
+  /** @deprecated 使用 fill 代替 */
   essence?: string;
+  
   /** 简短摘要 */
   shortSummary?: string;
   /** 完整摘要 */
@@ -164,6 +187,13 @@ export function parseFrontmatterWithWarnings(
   }
 
   const label = getField(fm, 'label') ?? basename(filePath);
+  
+  // 新字段解析（基于 OWL2）
+  const fill = getField(fm, 'fill') ?? '';
+  const strokeRaw = getField(fm, 'stroke');
+  const shape = getField(fm, 'shape');
+  
+  // 旧字段解析（向后兼容）
   const essence = getField(fm, 'essence') ?? '';
 
   const rawSummary = fm['summary'] as Record<string, unknown> | string | undefined;
@@ -239,7 +269,10 @@ export function parseFrontmatterWithWarnings(
     fm: {
       id,
       label,
-      essence,
+      fill: fill || undefined,
+      stroke: strokeRaw as StrokeType | undefined,
+      shape: shape as ShapeType | undefined,
+      essence: essence || undefined,
       shortSummary,
       fullSummary,
       summary,
@@ -306,7 +339,14 @@ export function stringifyFrontmatter(
 
   if (fm.id)              top['id']     = fm.id;
   if (fm.label)           top['label']  = fm.label;
-  if (fm.essence)         top['essence'] = fm.essence;
+  
+  // 新字段（基于 OWL2）
+  if (fm.fill)            top['fill']   = fm.fill;
+  if (fm.stroke)         top['stroke'] = fm.stroke;
+  if (fm.shape)          top['shape']  = fm.shape;
+  
+  // 旧字段（向后兼容）
+  if (fm.essence)        top['essence'] = fm.essence;
   if (fm.shortSummary || fm.fullSummary) {
     top['summary'] = fm.shortSummary ?? fm.fullSummary;
   }

@@ -233,14 +233,28 @@ export function buildGraph(
   }
 
   // Second pass — build nodes with degree-derived weight and BFS-computed depth.
+  // 合并新字段 fill/stroke 和旧字段 essence（向后兼容）。
   const nodes: NodeData[] = [];
   const seenNode = new Set<string>();
   for (const [fp, fm] of frontmatters) {
     if (!fm.id || seenNode.has(fm.id)) continue;
     seenNode.add(fm.id);
+    
+    // 字段合并：新字段优先，旧字段兼容
+    // fill: 新字段 > essence 映射
+    // stroke: 直接使用新字段
+    const fill = fm.fill || fm.essence || '';
+    const stroke = fm.stroke;
+    const shape = fm.shape;
+    
     nodes.push({
       id: fm.id,
       label: fm.label,
+      // 新字段
+      fill: fill || undefined,
+      stroke,
+      shape,
+      // 旧字段（兼容）
       essence: fm.essence ?? '',
       depth: ringDepth[fm.id] ?? 0,
       subtreeRoot: subtreeRoot[fm.id],

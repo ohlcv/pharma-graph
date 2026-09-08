@@ -157,6 +157,24 @@ export class HighlightEngine {
     this.dimUnhighlightedEdges();
   }
 
+  /**
+   * Highlight nodes by their `fill` value (领域顶层类), e.g. `cls-drug`, `cls-feature`.
+   * This is the primary filter for the essence legend under the new OWL2 spec.
+   */
+  highlightFill(fill: string): void {
+    this.resetClasses();
+
+    this.cy.nodes().not(`.${CLASSES.LAYER_PARENT}`).forEach((n: cytoscape.NodeSingular) => {
+      if (n.data('fill') === fill) {
+        n.addClass(CLASSES.HIGHLIGHTED);
+      } else {
+        n.addClass(CLASSES.DIMMED);
+      }
+    });
+
+    this.dimUnhighlightedEdges();
+  }
+
   highlightEdgeType(edgeType: string): void {
     this.resetClasses();
 

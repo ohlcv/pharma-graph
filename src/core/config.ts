@@ -1,74 +1,280 @@
 // src/core/config.ts
-// 全局配置：节点 essence → 形状/填充色，level → 边框色，边类型 → 颜色/线型
+// 全局配置：节点 fill/shape/stroke → 形状/填充色/边框，边类型 → 颜色/线型
 // 视觉配置的单一来源（Single Source of Truth）
 //
-// 视觉维度与知识语义一一对应：
+// 视觉语义分离设计（shape/stroke 覆盖 fill 默认值）：
+//   fill（领域顶层类）  → 形状 + 背景色 + 边框色（配置中心）
+//   shape（几何形状）   → 显式填写时覆盖 fill 的默认形状
+//   stroke（边框样式）  → 显式填写时覆盖 fill 的默认边框
+//   subtreeRoot        → 自动计算的分类归属色（fallback）
 //
-//   Essence（本质）  → 形状 + 填充色     → 回答"这是什么"（药/病/概念/机制/口诀...，9 种颜色一一对应）
-//   Level（层级）    → 边框色           → 回答"在纸图第几级"（1-6 级结构）
-//   EdgeType（边类型）→ 边颜色/线型      → 回答"和谁怎么连"（6 种关系家族）
-//
-// 禁止用字体、字号、字重、阴影、透明度、渐变、节点大小等额外视觉变量承载语义。
-//
-// 9 种 essence 填充色选择逻辑（柔和马卡龙 · 降饱和 + 提亮度，温柔不刺眼）：
-//   module         浅白  #fafafa — 中性骨架
-//   umbrella-class 柔黄  #fde68a — 粗分类
-//   strict-class   浅黄  #fef9c3 — 细分类
-//   medication     柔蓝  #93c5fd — 药物
-//   illness        柔红  #fca5a5 — 疾病
-//   notion         柔紫  #d8b4fe — 认知
-//   mnemonic       柔绿  #86efac — 口诀
-//   concept        柔青  #67e8f9 — 概念
-//   summary        柔粉  #f9a8d4 — 总结
+// 兼容旧字段：essence → fill（前端自动映射）
 
 import cytoscape from 'cytoscape';
 import { EDGE_TYPES, type EdgeType } from './edge-types.js';
 
-// ── Essence → 形状（节点本质决定形状）──────────────────────────────────────────
+// ── 类型别名（与 graph.ts 同步）─────────────────────────────────────────────
+export type StrokeType = 'auto' | 'flow' | 'glow' | 'fallback';
 
-export const NODE_TYPE_SHAPE: Record<string, string> = {
-  module: 'round-rectangle',          // 结构模块/入口 — 圆角矩形
-  'strict-class': 'pentagon',         // 严格分类（细分类）— 五边形
-  'umbrella-class': 'hexagon',        // 伞形分类（粗分类）— 六边形
-  concept: 'rectangle',               // 概念/术语 — 正方形（rectangle 是 cytoscape 中最接近正方形的形状）
-  medication: 'ellipse',              // 重点药物（详细讲解的制剂）— 椭圆
-  drug: 'ellipse',                    // 普通药物（仅提名的药）— 椭圆（柔蓝填充）
-  illness: 'diamond',                 // 疾病/病理状态 — 菱形
-  notion: 'tag',                      // 学习性认知单元 — 标签形
-  mnemonic: 'vee',                    // 记忆口诀 — V形
-  summary: 'octagon',                 // 总结/归纳 — 八边形
+/** OWL2 实体类型枚举（shape 取值）
+ *  每个类型对应一个固定的 Cytoscape 几何形状（见 SHAPE_BY_OWL2） */
+export type ShapeType =
+  | 'auto'
+  | 'class'
+  | 'named_individual'
+  | 'object_property'
+  | 'data_property'
+  | 'annotation_property';
+
+// ── Shape (OWL2 实体类型) → Cytoscape 几何形状 ───────────────────────────────
+//
+// 每个 OWL2 实体类型对应一个固定的 Cytoscape 几何形状（一对一）。
+// shape 留空时，节点使用 fill（FILL_CONFIG）配置的默认形状。
+//
+// 设计意图：
+//   - 简单场景：填 shape（如 named_individual），立即得到圆形
+//   - 复杂场景：不填 shape，让 fill 的扩展形状生效（如 cls-mnemonic 的 vee、cls-summary 的 round-rectangle）
+//
+export const SHAPE_BY_OWL2: Record<Exclude<ShapeType, 'auto'>, cytoscape.Css.NodeShape> = {
+  class:              'round-rectangle',  // 类：圆角矩形（适合分类/概念集合）
+  named_individual:   'ellipse',          // 具名个体：椭圆（适合具体药物/疾病）
+  object_property:    'hexagon',          // 对象属性：六边形（适合关系实体化）
+  data_property:      'rectangle',        // 数据属性：矩形（适合数值属性）
+  annotation_property:'tag',              // 注释属性：标签形（适合定义/口诀/总结）
 };
 
+// ── Stroke → 边框样式配置（新增）─────────────────────────────────────────────
+//
+// 边框色计算优先级：
+//   stroke 显式声明 → 优先
+//   stroke = auto → subtreeRoot 色（自动计算）
+//   无 subtreeRoot → depth 灰阶 fallback
+
+export const STROKE_CONFIG: Record<StrokeType, {
+  color: string;
+  lineStyle: 'solid' | 'dashed';
+  effect?: 'flow' | 'glow';
+  description: string;
+}> = {
+  auto:     { color: 'inherit', lineStyle: 'solid', description: 'subtreeRoot 色（无则走 fill fallback）' },
+  fallback: { color: 'inherit', lineStyle: 'solid', description: 'fill 兜底边框色（FILL_BORDER_HINTS[fill]）' },
+  flow:     { color: '#3b82f6', lineStyle: 'solid', effect: 'flow', description: 'subtreeRoot 色 + 流光动画（重点药/分类）' },
+  glow:     { color: '#3b82f6', lineStyle: 'solid', effect: 'glow', description: 'subtreeRoot 色 + 光晕效果（跨节总结）' },
+};
+
+// ── Fill → 形状 + 背景色配置 ────────────────────────────────────────────────
+//
+// fill 是领域顶层类 IRI，决定节点的默认形状和背景色。
+// 新 fill 值与旧 essence 值的映射关系：
+//   cls-structure    → module
+//   cls-classification → strict-class / umbrella-class
+//   cls-drug         → medication / drug
+//   cls-disease      → illness
+//   cls-feature      → notion（部分）
+//   cls-adverse      → notion（部分）
+//   cls-concept      → concept
+//   cls-summary      → summary
+//   cls-mnemonic     → mnemonic
+//   cls-biomolecule  → (预留)
+//
+// ── fill 配置 ────────────────────────────────────────────────────────────────
+//
+// 字段说明：
+//   shape       — Cytoscape 几何形状（fill 的默认形状；显式填 shape 时由 SHAPE_BY_OWL2 覆盖）
+//   background  — 节点背景色
+//   backgroundDark — 暗色主题下的备用背景色（当前实现同 background，预留扩展）
+//   label       — 中文标签（用于文档/UI 显示）
+//   description — 配置说明
+//
+// ⚠️ fill 不管边框色，但**默认 stroke** 由 fill 提供（见 FILL_CONFIG[fill].defaultStroke）：
+//   - 节点显式 stroke（flow/glow）→ STROKE_CONFIG[stroke].color
+//   - 节点未填 stroke → FILL_CONFIG[fill].defaultStroke
+//   - stroke=auto → STROKE_CONFIG.auto.color（子树色或 depth 灰阶）
+// 边框色最终由 STROKE_CONFIG / getSubtreeBorderColor 决定。
+//
+export const FILL_CONFIG: Record<string, {
+  shape: string;
+  background: string;
+  backgroundDark: string;
+  /** 默认 stroke 行为，节点不填 stroke 时启用
+   *  - auto: 子树统一色（subtreeRoot），无子树时降级到 fill 兜底边框色
+   *  - fallback: 直接用 fill 兜底边框色（按 fill 类型着色，不跟随子树）
+   *  - flow: subtreeRoot 色 + 流光动画
+   *  - glow: subtreeRoot 色 + 光晕效果 */
+  defaultStroke: StrokeType;
+  label: string;
+  description: string;
+}> = {
+  // ── 结构入口 ────────────────────────────────────────────────────────────
+  // round-pentagon：五边形（柔），区别于章的矩形
+  'cls-structure': {
+    shape: 'round-pentagon',
+    background: '#fae8e3',         // 柔奶杏粉
+    backgroundDark: '#f5d0c5',
+    defaultStroke: 'auto',
+    label: '组织结构',
+    description: '书/篇/章/节入口',
+  },
+  // ── 分类 ──────────────────────────────────────────────────────────────────
+  // octagon：八边形，明显的"分类"层级感
+  'cls-classification': {
+    shape: 'octagon',
+    background: '#ffe4b5',         // 柔莫兰迪黄
+    backgroundDark: '#ffcc80',
+    defaultStroke: 'auto',
+    label: '药物分类',
+    description: '粗分类/细分类/亚类',
+  },
+  // ── 药物 ──────────────────────────────────────────────────────────────────
+  // ellipse：椭圆，最通用的具体物形状
+  'cls-drug': {
+    shape: 'ellipse',
+    background: '#dbeafe',         // 柔天空蓝
+    backgroundDark: '#bfdbfe',
+    defaultStroke: 'flow',
+    label: '药物',
+    description: '具体药物（重点+普通）',
+  },
+  // ── 疾病 ──────────────────────────────────────────────────────────────────
+  // diamond：菱形，"病症"的尖锐感
+  'cls-disease': {
+    shape: 'diamond',
+    background: '#fce7f3',         // 柔樱花粉
+    backgroundDark: '#fbcfe8',
+    defaultStroke: 'auto',
+    label: '疾病',
+    description: '疾病/症状/综合征',
+  },
+  // ── 生物实体 ──────────────────────────────────────────────────────────────
+  // round-octagon：圆角八边形，柔化"靶点"感
+  'cls-biomolecule': {
+    shape: 'round-octagon',
+    background: '#d1fae5',         // 柔薄荷绿
+    backgroundDark: '#a7f3d0',
+    defaultStroke: 'auto',
+    label: '生物实体',
+    description: '靶点/受体/酶/转运体/基因',
+  },
+  // ── 作用特点/临床评价 ────────────────────────────────────────────────────
+  // heptagon：七边形，独特形状
+  'cls-feature': {
+    shape: 'heptagon',
+    background: '#cffafe',         // 柔湖青
+    backgroundDark: '#a5f3fc',
+    defaultStroke: 'auto',
+    label: '作用特点',
+    description: '作用特点/临床用药评价/选药原则',
+  },
+  // ── 不良反应/禁忌 ────────────────────────────────────────────────────────
+  // triangle：三角形，警示感
+  'cls-adverse': {
+    shape: 'triangle',
+    background: '#ffe4e6',         // 柔玫瑰粉
+    backgroundDark: '#fecdd3',
+    defaultStroke: 'auto',
+    label: '不良反应',
+    description: '典型不良反应/禁忌/毒性',
+  },
+  // ── 抽象概念/总论 ────────────────────────────────────────────────────────
+  // round-triangle：圆角三角形，柔化抽象感
+  'cls-concept': {
+    shape: 'round-triangle',
+    background: '#e0e7ff',         // 柔雾紫蓝
+    backgroundDark: '#c7d2fe',
+    defaultStroke: 'auto',
+    label: '概念',
+    description: '定义性概念/总论/术语',
+  },
+  // ── 总结 ──────────────────────────────────────────────────────────────────
+  // bottom-round-rectangle：下圆矩形，像"汇总底栏"
+  'cls-summary': {
+    shape: 'bottom-round-rectangle',
+    background: '#fef9c3',         // 柔麦穗黄
+    backgroundDark: '#fef08a',
+    defaultStroke: 'glow',
+    label: '总结',
+    description: '节内总结/跨节大总结/表格',
+  },
+  // ── 口诀 ──────────────────────────────────────────────────────────────────
+  // tag：标签形，像"附加的口诀便签"
+  'cls-mnemonic': {
+    shape: 'tag',
+    background: '#fed7aa',         // 柔蜜桃橙
+    backgroundDark: '#fdba74',
+    defaultStroke: 'auto',
+    label: '口诀',
+    description: '记忆口诀/顺口溜',
+  },
+};
+
+// ── 旧字段兼容：essence → fill 映射表 ──────────────────────────────────────
+// 保留向后兼容，新的 fill 配置优先
+
+export const ESSENCE_TO_FILL: Record<string, string> = {
+  module: 'cls-structure',
+  'strict-class': 'cls-classification',
+  'umbrella-class': 'cls-classification',
+  concept: 'cls-concept',
+  medication: 'cls-drug',
+  drug: 'cls-drug',
+  illness: 'cls-disease',
+  notion: 'cls-feature',   // notion 映射到 feature（部分 notion 是不良反应，用 cls-adverse）
+  mnemonic: 'cls-mnemonic',
+  summary: 'cls-summary',
+  table: 'cls-summary',
+  note: 'cls-feature',
+  // 预留
+  'cls-disease': 'cls-disease',
+  'cls-biomolecule': 'cls-biomolecule',
+};
+
+// ── 旧字段兼容：essence → 形状/颜色（保留给 renderer.ts 使用）────────────────
+
+/** @deprecated 使用 FILL_CONFIG 代替 */
+export const NODE_TYPE_SHAPE: Record<string, string> = {
+  module: 'round-rectangle',
+  'strict-class': 'pentagon',
+  'umbrella-class': 'hexagon',
+  concept: 'rectangle',
+  medication: 'ellipse',
+  drug: 'ellipse',
+  illness: 'diamond',
+  notion: 'tag',
+  mnemonic: 'vee',
+  summary: 'octagon',
+};
+
+/** @deprecated 使用 FILL_CONFIG['cls-drug'].background 代替 */
 export const NODE_TYPE_COLOR: Record<string, string> = {
-  module: '#fafafa',               // 浅白 — 结构模块骨架
-  'umbrella-class': '#fde68a',     // 柔黄 — 粗分类
-  'strict-class': '#fef9c3',       // 浅黄 — 细分类
-  concept: '#67e8f9',               // 柔青 — 概念/术语
-  medication: '#fb923c',             // 柔橙 — 重点药物（详细讲解的制剂）
-  drug: '#7dd3fc',                    // 柔蓝 — 普通药物（仅提名的药）
-  illness: '#fca5a5',              // 柔红 — 疾病/病理状态
-  notion: '#d8b4fe',               // 柔紫 — 学习认知单元
-  mnemonic: '#86efac',              // 柔绿 — 记忆口诀
-  summary: '#f9a8d4',              // 柔粉 — 总结/归纳
+  module: '#fafafa',
+  'umbrella-class': '#fde68a',
+  'strict-class': '#fef9c3',
+  concept: '#67e8f9',
+  medication: '#fb923c',
+  drug: '#7dd3fc',
+  illness: '#fca5a5',
+  notion: '#d8b4fe',
+  mnemonic: '#86efac',
+  summary: '#f9a8d4',
   default: '#94a3b8',
 };
 
+/** @deprecated 使用 FILL_CONFIG['cls-drug'].backgroundDark 代替 */
 export const NODE_TYPE_COLOR_DARK: Record<string, string> = {
-  module: '#e5e7eb',               // 浅白→更白
-  'umbrella-class': '#d97706',      // 柔黄→深黄
-  'strict-class': '#ca8a04',        // 浅黄→深黄
-  concept: '#0891b2',               // 柔青→深青
-  medication: '#ea580c',             // 柔橙→深橙（重点药）
-  drug: '#0284c7',                    // 柔蓝→深天蓝（普通药）
-  illness: '#dc2626',               // 柔红→深红
-  notion: '#9333ea',               // 柔紫→深紫
-  mnemonic: '#16a34a',             // 柔绿→深绿
-  summary: '#db2777',              // 柔粉→深粉
+  module: '#e5e7eb',
+  'umbrella-class': '#d97706',
+  'strict-class': '#ca8a04',
+  concept: '#0891b2',
+  medication: '#ea580c',
+  drug: '#0284c7',
+  illness: '#dc2626',
+  notion: '#9333ea',
+  mnemonic: '#16a34a',
+  summary: '#db2777',
   default: '#64748b',
 };
 
-// ── Essence → 中文标签 ───────────────────────────────────────────────────────
-
+/** @deprecated 使用 FILL_CONFIG 代替 */
 export const ESSENCE_LABEL: Record<string, string> = {
   module: '模块',
   'strict-class': '细分类',
@@ -82,20 +288,68 @@ export const ESSENCE_LABEL: Record<string, string> = {
   summary: '总结',
 };
 
-// ── 节点边框色（单套语义：subtree 色环 + 中性灰 fallback）───────────────────────
-//
-// 之前两套色环并存（depth 色环 hue 0°/37°/... + subtree 色环 hue 200°/24°/...），
-// 用户没法一眼分清"这条边的色是来自 subtree 还是 depth"——两套语义互相覆盖但没图例说清。
-//
-// 现在的设计：
-//   - 唯一语义色 = subtree 色环（按 id hash 稳定映射到 15 个色相桶）
-//   - 没有 subtreeRoot 的节点 → 用**中性灰阶**做 fallback（depth 越深灰越深）
-//   - 中心节点 (depth 0) 保留金色作为视觉锚点——不是颜色环的一部分，是品牌色
-//
-// 这样视觉上一眼就能区分"这棵子树 vs 游离节点"两态，subtree 色不再被 depth 色稀释。
+// ── 边框色计算函数 ───────────────────────────────────────────────────────────
 
 /** 中心节点边框色（视觉锚，不参与光谱） */
 const CENTER_BORDER_COLOR = '#f59e0b';
+
+/**
+ * 计算节点的实际边框色。
+ *
+ * 完整链路（按优先级）：
+ *   1. stroke 显式声明（flow/glow）→ STROKE_CONFIG[stroke].color
+ *   2. stroke = auto + subtreeRoot 存在 → subtreeRoot 色
+ *   3. stroke = auto + 无 subtreeRoot → FILL_BORDER_HINTS[fill]（fill 兜底）
+ *   4. stroke = fallback（不论有无 subtreeRoot）→ FILL_BORDER_HINTS[fill]
+ *   5. 节点连 fill 都没有 → FILL_BORDER_DEFAULT
+ */
+export function getBorderColor(
+  stroke: string | undefined,
+  subtreeRoot: string | undefined,
+  depth: number | undefined,
+  fill?: string,  // ← 新增：节点 fill，决定 fallback 兜底色
+): string {
+  // 1. stroke 显式声明（flow/glow）
+  if (stroke && stroke !== 'auto' && stroke !== 'fallback') {
+    const cfg = STROKE_CONFIG[stroke as StrokeType];
+    if (cfg && cfg.color !== 'inherit') {
+      return cfg.color;
+    }
+  }
+
+  // 4. stroke = fallback → 直接用 fill 兜底，跳过 subtreeRoot
+  if (stroke === 'fallback') {
+    return FILL_BORDER_HINTS[fill ?? ''] ?? FILL_BORDER_DEFAULT;
+  }
+
+  // 2. auto + subtreeRoot 存在 → subtreeRoot 色
+  if (subtreeRoot) {
+    return getSubtreeBorderColor(subtreeRoot);
+  }
+
+  // 3. auto + 无 subtreeRoot → fill 兜底
+  return FILL_BORDER_HINTS[fill ?? ''] ?? FILL_BORDER_DEFAULT;
+}
+
+/** 获取 stroke 的线型（solid/dashed）*/
+export function getBorderStyle(stroke: string | undefined): 'solid' | 'dashed' {
+  if (stroke) {
+    const cfg = STROKE_CONFIG[stroke as StrokeType];
+    if (cfg) return cfg.lineStyle;
+  }
+  return 'solid';
+}
+
+/** 获取 stroke 的特效（flow/glow）*/
+export function getBorderEffect(stroke: string | undefined): 'flow' | 'glow' | undefined {
+  if (stroke) {
+    const cfg = STROKE_CONFIG[stroke as StrokeType];
+    return cfg?.effect;
+  }
+  return undefined;
+}
+
+// ── Subtree 色（自动计算，保留现有逻辑）─────────────────────────────────────
 
 /** Subtree 色起点（避开暖色红橙区，从冷蓝紫开始） */
 const SUBTREE_HUE_START_DEG = 200;
@@ -552,5 +806,35 @@ export const LAYOUTS: Record<string, LayoutConfig> = {
     },
   },
 };
+
+// ── FILL_BORDER_HINTS ───────────────────────────────────────────────────────
+// fill 的**默认边框色**。当 stroke='auto' 且节点无 subtreeRoot 时，渲染器按
+// FILL_BORDER_HINTS[fill] 取边框色（替代旧的 depth 灰阶 fallback）。
+//
+// 设计原则：每个 fill 的边框色与背景色系协调、取同一色相的中等明度版本，
+// 既保持"色块是这类内容"的视觉记忆，又不抢主体内容。
+//
+// 完整 stroke 链路：
+//   - stroke 显式填写（flow/glow）→ STROKE_CONFIG[stroke].color
+//   - stroke='auto' + 有 subtreeRoot → subtreeRoot 色
+//   - stroke='auto' + 无 subtreeRoot → FILL_BORDER_HINTS[fill]
+//
+// 修改此表会直接影响 stroke=auto 节点的边框色。如需自定义，优先改 STROKE_CONFIG，
+// 此表作为"按 fill 类型给的中性边框"。
+export const FILL_BORDER_HINTS: Record<string, string> = {
+  'cls-structure':       '#c89b8a',  // 浅棕（柔奶杏粉背景的中等明度版）
+  'cls-classification':  '#c9a06a',  // 莫兰迪棕黄
+  'cls-drug':            '#7aa8d9',  // 浅蓝
+  'cls-disease':         '#e89bb8',  // 浅粉
+  'cls-biomolecule':     '#6dbfa0',  // 浅绿
+  'cls-feature':         '#7db8c4',  // 浅青
+  'cls-adverse':         '#d4868f',  // 浅玫
+  'cls-concept':         '#818cf8',  // 浅紫
+  'cls-summary':         '#c9b96a',  // 浅黄
+  'cls-mnemonic':        '#d4884e',  // 浅橙
+};
+
+// FILL_BORDER_HINTS 没列到的 fill 时使用此兜底色（节点连合法 fill 都没有的情况）
+export const FILL_BORDER_DEFAULT = '#9ca3af';
 
 export const DEFAULT_LAYOUT = 'euler';

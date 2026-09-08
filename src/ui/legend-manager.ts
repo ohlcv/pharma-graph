@@ -12,12 +12,11 @@ import { staticEls } from './dom-cache.js';
 import { uiState } from './state.js';
 import {
   SHAPE_LABEL,
-  ESSENCE_LABEL,
-  NODE_TYPE_COLOR,
-  NODE_TYPE_SHAPE,
   EDGE_TYPE_STYLE,
   EDGE_TYPE_LABEL,
+  FILL_CONFIG,
 } from '../core/config.js';
+import { DEFAULT_EDGE_TYPE, isEdgeType } from '../core/edge-types.js';
 import { buildLegend } from './legend-factory.js';
 import { updateStats, syncBottomSheetStats } from './graph-stats.js';
 
@@ -46,17 +45,22 @@ export function clearAllFilters(): void {
 
 // ── Axis populators ────────────────────────────────────────────────────────────
 
-// Shapes are read from the canonical NODE_TYPE_SHAPE in config.ts so the
+// Shapes are read from the canonical FILL_CONFIG in config.ts so the
 // legend stays in sync with the actual node renderer. Defensive fallback
-// keeps the legend rendering even if an essence is added without a shape.
-const NODE_TYPE_SHAPE_MAP: Record<string, string> = NODE_TYPE_SHAPE;
+// keeps the legend rendering even if a fill is added without a config.
+const FILL_LABEL_MAP: Record<string, string> = Object.fromEntries(
+  Object.entries(FILL_CONFIG).map(([k, v]) => [k, v.label]),
+);
+const FILL_SHAPE_MAP: Record<string, string> = Object.fromEntries(
+  Object.entries(FILL_CONFIG).map(([k, v]) => [k, v.shape]),
+);
+const FILL_COLOR_MAP: Record<string, string> = Object.fromEntries(
+  Object.entries(FILL_CONFIG).map(([k, v]) => [k, v.background]),
+);
 
-function makeShapeSwatch(shape: string): string {
-  return `<span class="legend-node--shape shape-${shape}" style="background:#94a3b8"></span>`;
-}
-
-function makeEssenceSwatch(essenceKey: string, shape: string): string {
-  const fill = NODE_TYPE_COLOR[essenceKey] ?? '#94a3b8';
+function makeFillSwatch(fillKey: string): string {
+  const shape = FILL_SHAPE_MAP[fillKey] ?? 'ellipse';
+  const fill = FILL_COLOR_MAP[fillKey] ?? '#94a3b8';
   return `<span class="legend-node--shape shape-${shape}" style="background:${fill}"></span>`;
 }
 
@@ -64,18 +68,18 @@ function makeEssenceSwatch(essenceKey: string, shape: string): string {
 
 export function populateEssenceLegend(cy: Core): void {
   buildLegend(cy, {
-    labels: ESSENCE_LABEL,
+    labels: FILL_LABEL_MAP,
     countScope: 'nodes',
-    countSelector: '[essence = "${key}"]',
+    countSelector: '[fill = "${key}"]',
     desktopContainerId: 'legend-essence-grid',
     mobileContainerId: 'bs-essence-chips',
     desktopCountPrefix: 'legend-essence-count-',
     mobileCountPrefix: 'bs-essence-count-',
     rowClass: 'legend-row',
     dataKey: 'data-type',
-    desktopRow: (k, label) => `<div class="legend-row" data-type="${k}">${makeEssenceSwatch(k, NODE_TYPE_SHAPE_MAP[k] ?? 'rectangle')}<span class="legend-row__label">${label}</span><span class="legend-row__count" id="legend-essence-count-${k}"></span></div>`,
-    mobileChip: (k, label) => `<div class="bs-chip" data-type="${k}">${makeEssenceSwatch(k, NODE_TYPE_SHAPE_MAP[k] ?? 'rectangle')}<span>${label}</span><span class="bs-chip__count" id="bs-essence-count-${k}"></span></div>`,
-    onClick: (key, highlight) => highlightShape(key, highlight),
+    desktopRow: (k, label) => `<div class="legend-row" data-type="${k}">${makeFillSwatch(k)}<span class="legend-row__label">${label}</span><span class="legend-row__count" id="legend-essence-count-${k}"></span></div>`,
+    mobileChip: (k, label) => `<div class="bs-chip" data-type="${k}">${makeFillSwatch(k)}<span>${label}</span><span class="bs-chip__count" id="bs-essence-count-${k}"></span></div>`,
+    onClick: (key, highlight) => highlightFillFilter(key, highlight),
     onCycle: (_key, delta, highlight) => { cycleHighlightedNodes(delta, highlight); },
   });
 }
@@ -190,16 +194,13 @@ export function cycleHighlightedNodes(
 // ── Filter highlight handlers ──────────────────────────────────────────────────
 
 /**
- * Highlight nodes by essence type (for legend clicks).
- * @deprecated Use highlightEssence instead - kept for API compatibility with action-handlers.
+ * Highlight nodes by fill type (领域顶层类, e.g. cls-drug) from the legend click.
+ * Uses highlightFill() to match n.data('fill') directly — in sync with the new
+ * OWL2 spec where the node's `fill` field (not legacy `essence`) is the primary
+ * visual-classification key.
  */
-/**
- * Highlight nodes by essence type from the legend click.
- * Note: Despite the name, this function uses essence-based matching (not shape),
- * because multiple essences (medication/drug) share the same shape (ellipse).
- */
-export function highlightEssenceFilter(essence: string, highlight: HighlightEngine): void {
-  if (activeShapeFilter === essence) {
+export function highlightFillFilter(fill: string, highlight: HighlightEngine): void {
+  if (activeShapeFilter === fill) {
     // Toggle off: clear filter and reset all nodes
     clearAllFilters();
     highlight.reset();
@@ -207,26 +208,29 @@ export function highlightEssenceFilter(essence: string, highlight: HighlightEngi
     syncBottomSheetStats(highlight.getCy());
     return;
   }
-  
+
   // Set new filter
   clearAllFilters();
-  activeShapeFilter = essence;
-  highlight.highlightEssence(essence);
+  activeShapeFilter = fill;
+  highlight.highlightFill(fill);
 
+  // Activate the matching legend row/chip
   staticEls('.legend-row[data-type]').forEach((el) => {
-    if (el.dataset.type === essence) el.classList.add('active');
+    if (el.dataset.type === fill) el.classList.add('active');
   });
   staticEls('.bs-chip[data-type]').forEach((el) => {
-    if (el.dataset.type === essence) el.classList.add('active');
+    if (el.dataset.type === fill) el.classList.add('active');
   });
 
   updateStats(highlight.getCy());
   syncBottomSheetStats(highlight.getCy());
 }
 
-// Keep legacy name for action-handlers compatibility
-const highlightShape = highlightEssenceFilter;
-export { highlightShape };
+/** @deprecated kept for action-handlers compatibility */
+const highlightEssenceFilter = highlightFillFilter;
+/** @deprecated kept for action-handlers compatibility */
+const highlightShape = highlightFillFilter;
+export { highlightEssenceFilter, highlightShape };
 
 export function highlightEdgeTypeFilter(edge: string, highlight: HighlightEngine): void {
   if (activeEdgeFilter === edge) {

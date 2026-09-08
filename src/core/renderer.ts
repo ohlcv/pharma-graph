@@ -16,6 +16,14 @@ import {
   LAYOUTS,
   LayoutConfig,
   DEFAULT_LAYOUT,
+  FILL_CONFIG,
+  FILL_BORDER_HINTS,
+  FILL_BORDER_DEFAULT,
+  STROKE_CONFIG,
+  SHAPE_BY_OWL2,
+  getBorderColor,
+  getBorderStyle,
+  getBorderEffect,
 } from './config.js';
 
 cytoscape.use(coseBilkent);
@@ -35,6 +43,9 @@ export const CLASSES = {
   DRAGGING_SIMPLIFIED: 'dragging-simplified',
   TOUR_PATH_PREVIEW: 'tour-path-preview',
   LAYER_PARENT: 'layer-parent',
+  // stroke 特效类
+  FLOW_BORDER: 'flow-border',
+  GLOW_BORDER: 'glow-border',
 } as const;
 
 // Ripple colors — single source of truth; both graph-events.ts and
@@ -48,60 +59,122 @@ export const RIPPLE_COLORS = {
 
 // 视觉层级（从上到下依次展开）：
 //   ① 节点基础样式（默认椭圆、权重决定大小、文字底对齐）
-//   ② essence → 形状 + 填充色（节点本质；9 种颜色一一对应）
-//   ③ depth → 边框色（思维导图结构深度，0=中心节点）
-//   ④ 边、选中/悬停等交互状态
+//   ② fill → 形状 + 背景色 + **默认 stroke 兜底**
+//   ③ stroke（节点显式 / fill 兜底后） → 边框色 + 效果
+//   ④ subtreeRoot → 边框色（stroke=auto 时生效）
+//   ⑤ depth → 边框色（无 subtreeRoot 时 fallback）
+//   ⑥ 边、选中/悬停等交互状态
+//
+// fill 兜底逻辑在 buildElements()：节点 stroke 字段未填时按 fill 查 FILL_CONFIG[fill].defaultStroke。
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) => any[] = (maxDepth, subtreeColorMap) => {
-  // Default fill when an essence has no explicit color mapping (safety net;
-  // every essence defined in config.ts has its own color, so this only fires
-  // for legacy/missing values). Halo/glow was removed in Batch G —
-  // cytoscape's underlay can only be ellipse or round-rectangle and looks
-  // inconsistent across node shapes.
-  const ESSENCE_DEFAULT_FILL = '#f8fafc';
+  // Default fill when a fill has no explicit color mapping (safety net;
+  // every fill defined in config.ts has its own color, so this only fires
+  // for legacy/missing values).
+  const FILL_DEFAULT = '#f8fafc';
 
-  // Essence 规则 — 形状 + 填充色（节点本质；9 种颜色一一对应）
-  const nodeTypeRules = Object.entries(NODE_TYPE_SHAPE).map(([key, shape]) => ({
-    selector: `node[essence = "${key}"]`,
+  // ── Fill 规则 — 形状 + 背景色 + 默认边框色 ─────────────────────────────────
+  // fill 是领域顶层类，决定默认形状、背景色、边框色（配置中心）。
+  // 显式填写 shape → shapeOverrideRules 覆盖默认形状（最高优先级）。
+  // 显式填写 stroke → flow/glow 规则覆盖默认边框（次高优先级）。
+  // 兼容旧字段：使用 essence 映射到 fill。
+  // fill 规则：只管 shape + background（边框交给 stroke 方案管）
+  const fillRules = Object.entries(FILL_CONFIG).map(([fill, cfg]) => ({
+    selector: `node[fill = "${fill}"]`,
     style: {
-      shape: shape as cytoscape.Css.NodeShape,
-      'background-color': NODE_TYPE_COLOR[key] ?? ESSENCE_DEFAULT_FILL,
+      shape: cfg.shape as cytoscape.Css.NodeShape,
+      'background-color': cfg.background,
+      'border-width': 2,
     },
   }));
 
-  // Depth 规则 — 边框色（只覆盖**没有** subtreeRoot 的节点，作为中性灰 fallback）
-  //
-  // 改回去之前的两套光谱，原因是：subtree 色环已经表达"分类归属"，
-  // 没有 subtreeRoot 的节点用什么色都不该再传达"depth 信息"——depth 只
-  // 是渲染时凑巧有的字段，并不携带用户可感知的语义。
-  // 这里用 slate-灰阶：depth 越大灰越浅，让"靠近中心"的节点视觉权重自然高。
-  const NEUTRAL_FALLBACK_BORDER: Record<number, string> = {
-    0: '#f59e0b', // 金色锚（中心节点，无论有无 subtreeRoot 都保留）
-    1: '#64748b',
-    2: '#94a3b8',
-    3: '#cbd5e1',
-    4: '#e2e8f0',
-    5: '#f1f5f9',
-  };
-  const depthRules = [];
-  for (let d = 0; d <= maxDepth; d++) {
-    const color = NEUTRAL_FALLBACK_BORDER[d] ?? '#cbd5e1';
-    depthRules.push({
-      // [!subtreeRoot] 表示"未分配子树"的节点；中心节点 (d=0) 例外，
-      // 即使有子树也是金色锚——所以单独写一条规则
-      selector: d === 0
-        ? `node[depth = 0]`
-        : `node[depth = ${d}][!subtreeRoot]`,
-      style: { 'border-color': color, 'border-width': 2 },
-    });
-  }
+  // ── 旧 essence 规则（向后兼容）──────────────────────────────────────────────
+  const essenceRules = Object.entries(NODE_TYPE_SHAPE).map(([key, shape]) => ({
+    selector: `node[essence = "${key}"]`,
+    style: {
+      shape: shape as cytoscape.Css.NodeShape,
+      'background-color': NODE_TYPE_COLOR[key] ?? FILL_DEFAULT,
+    },
+  }));
 
-  // edge-type rules — 让边自带"源亮 → 目的暗"的渐变, 但 cytoscape 的
-  // `line-gradient-stop-colors` 接受空格分隔的多颜色 token, 且
-  // color 解析走 util.color2tuple() — 它只支持 6 位 hex / rgb() /
-  // rgba().  *不允许 stop 各自 alpha*, 所以源亮目的暗必须用**两个
-  // 不同 hex** (lightColor 和 darkColor).
+  // ── Shape (OWL2 实体类型) 规则：显式填写 shape 时覆盖 fill 的默认形状 ──────
+  // 每个 OWL2 类型对应一个固定形状（SHAPE_BY_OWL2）。
+  // 不填 shape 时使用 fill 的默认形状（可为 FILL_CONFIG 中的扩展形状）。
+  const shapeOwlRules = (Object.entries(SHAPE_BY_OWL2) as [string, cytoscape.Css.NodeShape][])
+    .map(([owlType, shape]) => ({
+      selector: `node[shape = "${owlType}"]`,
+      style: { shape },
+    }));
+
+  // ── Stroke 规则 — 边框色 + 效果 ────────────────────────────────────────────
+  // stroke 显式声明时覆盖 fill/subtreeRoot 的默认边框色。
+  // stroke = auto（默认）：边框色由 subtreeRoot 或 depth 自动决定。
+  
+  // stroke = flow：subtreeRoot 色 + 流光边框类
+  const flowStrokeRule = {
+    selector: `node[stroke = "flow"]`,
+    style: {
+      'border-color': '#3b82f6', // 备用色，实际颜色由 subtreeRoot 规则决定
+      'border-width': 2,
+      'border-style': 'solid' as cytoscape.Css.LineStyle,
+    },
+  };
+
+  // stroke = glow：subtreeRoot 色 + 光晕边框类
+  const glowStrokeRule = {
+    selector: `node[stroke = "glow"]`,
+    style: {
+      'border-color': '#3b82f6', // 备用色，实际颜色由 subtreeRoot 规则决定
+      'border-width': 2,
+      'border-style': 'solid' as cytoscape.Css.LineStyle,
+    },
+  };
+
+  // flow/glow 的 subtreeRoot 颜色规则（动态生成）
+  const flowGlowSubtreeRules = Object.entries(subtreeColorMap)
+    .filter(([, color]) => color !== '#9ca3af') // 跳过无色/透明
+    .flatMap(([rootId, color]) => [
+      {
+        selector: `node[stroke = "flow"][subtreeRoot = "${rootId}"]`,
+        style: { 'border-color': color },
+      },
+      {
+        selector: `node[stroke = "glow"][subtreeRoot = "${rootId}"]`,
+        style: { 'border-color': color },
+      },
+    ]);
+
+  // Fill 边框色 fallback — stroke='auto' 或 'fallback' 时按 fill 取色
+  //   - stroke='fallback'：不论有无 subtreeRoot，直接用 fill 兜底色
+  //   - stroke='auto' + 无 subtreeRoot：用 fill 兜底色
+  //   - stroke='auto' + 有 subtreeRoot：subtreeRoot 色优先（见下面的 subtreeColorMap 规则）
+  const fillBorderRules = [
+    // ① 节点有合法 fill → 用 FILL_BORDER_HINTS[fill]
+    ...Object.entries(FILL_BORDER_HINTS)
+      .filter(([, color]) => color && color !== 'transparent')
+      .map(([fill, color]) => ({
+        selector: `node[fill = "${fill}"][stroke = "fallback"]`,
+        style: { 'border-color': color, 'border-width': 2 },
+      })),
+    ...Object.entries(FILL_BORDER_HINTS)
+      .filter(([, color]) => color && color !== 'transparent')
+      .map(([fill, color]) => ({
+        selector: `node[fill = "${fill}"][!subtreeRoot][stroke = "auto"]`,
+        style: { 'border-color': color, 'border-width': 2 },
+      })),
+    // ② 兜底：节点连 fill 都没有 → 用 FILL_BORDER_DEFAULT
+    {
+      selector: `node[!fill][stroke = "fallback"]`,
+      style: { 'border-color': FILL_BORDER_DEFAULT, 'border-width': 2 },
+    },
+    {
+      selector: `node[!fill][!subtreeRoot][stroke = "auto"]`,
+      style: { 'border-color': FILL_BORDER_DEFAULT, 'border-width': 2 },
+    },
+  ];
+
+  // edge-type rules — 让边自带"源亮 → 目的暗"的渐变
   const darken = (hex: string, amount: number) => {
     const h = hex.replace('#', '');
     const r = Math.max(0, parseInt(h.slice(0, 2), 16) - amount);
@@ -110,7 +183,6 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
     return '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
   };
   const edgeTypeRules = Object.entries(EDGE_TYPE_STYLE).map(([type, s]) => {
-    // 对称关系（disjoint_with / equivalent_to）渲染为双向
     const isBidirectional = type === 'disjoint_with' || type === 'equivalent_to';
     return {
       selector: `edge[edgeType = "${type}"]`,
@@ -146,38 +218,38 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         'text-background-color': 'rgba(15,17,23,0.82)',
         'text-background-shape': 'roundrectangle',
         'text-background-padding': '3px',
-        // No underlay halo — cytoscape 3.20+ underlay can only be
-        // round-rectangle or ellipse (per `underlay-shape` enum), which
-        // doesn't track per-node shapes (hexagon / star / tag etc.) and
-        // looks inconsistent. Halo was removed in Batch G; we lean on
-        // border-color + opacity for the visual emphasis instead.
         'border-width': 1.5,
         'border-color': '#475569',
-        'background-color': ESSENCE_DEFAULT_FILL,
+        'background-color': FILL_DEFAULT,
         'background-fill': 'solid',
         'background-blacken': 0,
         shape: 'ellipse',
         'text-events': 'yes',
-        // Stagger entrance: when the `.entering` class is removed, opacity
-        // fades back in over ~280ms with ease-out. Width/height are NOT
-        // transitioned (cy's transition machinery doesn't scale up node
-        // radii smoothly without layout races — see anim-pulse.ts for
-        // the dedicated width/height pipeline).
         'transition-property': 'opacity, border-color, border-width, background-color',
         'transition-duration': '280ms',
         'transition-timing-function': 'ease-out',
       },
     },
-    // ② depth 边框色（思维导图结构深度，0=中心节点）
-    ...depthRules,
-    // ②.b subtree 边框色（按分类子树统一色，优先于 depth 色）
-    // 一棵子树（其分类根及所有后代）共享一个色。每个分类根 id → 一个色。
+    // ② fill 形状 + 背景色（新字段）
+    ...fillRules,
+    // ②.b 旧 essence 规则（向后兼容）
+    ...essenceRules,
+    // ②.c shape (OWL2 实体类型) 规则：显式填写时覆盖 fill 的默认形状（最高优先级）
+    ...shapeOwlRules,
+    // ③ stroke 边框色
+    flowStrokeRule,
+    glowStrokeRule,
+    // ③.b flow/glow 的 subtreeRoot 颜色（覆盖上面的默认色）
+    ...flowGlowSubtreeRules,
+    // ③.c 显式 stroke 覆盖（stroke=auto 走 subtreeRoot，flow/glow 由上面规则处理）
+    // ④ fill 边框色 fallback（stroke=auto 且无 subtreeRoot 时由 fill 决定）
+    ...fillBorderRules,
+    // ④.b subtree 边框色（stroke=auto 时生效，优先于 depth）
     ...Object.entries(subtreeColorMap).map(([rootId, color]) => ({
-      selector: `node[subtreeRoot = "${rootId}"]`,
+      // stroke=auto 时由 subtreeRoot 色接管（包括 fill 兜底的 auto）
+      selector: `node[subtreeRoot = "${rootId}"][stroke = "auto"]`,
       style: { 'border-color': color },
     })),
-    // ③ essence 形状 + 填充色（节点本质决定）
-    ...nodeTypeRules,
     // 虚拟层父节点
     {
       selector: '.layer-parent',
@@ -197,9 +269,6 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
       style: {
         width: 1.5,
         'line-color': 'rgba(100,116,139,0.45)',
-        // cytoscape 3.34 仅支持 node background gradient 的 direction;
-        // edge 的 line-fill gradient 方向永远沿 source→target 走, 所以
-        // 只设 stop-colors 与 stop-positions 即可, 不设 direction.
         'line-fill': 'linear-gradient',
         'line-gradient-stop-positions': '0% 100%',
         'line-gradient-stop-colors': 'rgba(100,116,139,0.55) rgba(100,116,139,0.15)',
@@ -209,10 +278,6 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         'arrow-scale': 0.7,
         opacity: 0.85,
         'haystack-radius': 0,
-        // Edge entrance: when the `.entering` class is removed on a per-edge
-        // delay, opacity eases 0 → 0.85 over 400ms. Matches the wider node
-        // stagger so the graph "lights up like a constellation" rather
-        // than popping on as a static network.
         'transition-property': 'line-color, opacity, width, target-arrow-color',
         'transition-duration': '400ms',
         'transition-timing-function': 'ease-out',
@@ -220,10 +285,23 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
     },
     // 边类型样式
     ...edgeTypeRules,
-    // ── 交互状态 ──────────────────────────────────────────────────────────────
-    // .selected-node, .hovered, .highlighted are defined above with
-    // overlay-* support (cytoscape 3.20+). Don't redefine them here —
-    // duplicate selectors work but bloat the stylesheet.
+    // ── stroke 特效类 ───────────────────────────────────────────────────────
+    // flow-border：流光动画
+    {
+      selector: '.flow-border',
+      style: {
+        // 流光效果通过 CSS 动画实现，这里设置基础样式
+        'border-width': 2,
+      },
+    },
+    // glow-border：光晕效果
+    {
+      selector: '.glow-border',
+      style: {
+        'border-width': 2,
+      },
+    },
+    // ── 交互状态 ─────────────────────────────────────────────────────────────
     {
       selector: '.dimmed',
       style: {
@@ -238,29 +316,20 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
       },
     },
     { selector: '.entering', style: { opacity: 0 } },
-    // Hover / select / highlight all use border-color + border-width
-    // (Batch G). overlay-* and underlay-* were both removed because
-    // cytoscape's overlay/underlay-shape only supports round-rectangle
-    // and ellipse, which look inconsistent on the 8 essence shapes
-    // (hexagon, star, tag, etc.). Border tracks the node shape exactly.
     {
       selector: '.hovered',
       style: {
         opacity: 1,
         'border-width': 3,
-        'border-color': '#818cf8', // indigo-400
+        'border-color': '#818cf8',
       },
     },
     {
-      // 选中节点 + 邻居高亮共用边框色 + opacity 增强。
-      // 原来两套规则（.selected-node / .highlighted）除了 border-width 差 1px
-      // 完全重复，合并成一套：border-width: 4，邻居也变粗一点（视觉上邻居
-      // 和选中节点统一，参考 A1 方案「中性化」思路）。
       selector: '.selected-node, .highlighted',
       style: {
         opacity: 1,
         'border-width': 4,
-        'border-color': '#fbbf24', // amber-400
+        'border-color': '#fbbf24',
       },
     },
     {
@@ -288,9 +357,6 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
     {
       selector: '.pulse',
       style: {
-        // width/height intentionally omitted — anim-pulse.ts animates them via
-        // inline styles using the base formula, then clears them at end.
-        // border is what makes the pulse visually obvious.
         'border-width': 2.5,
         'border-color': '#fbbf24',
       },
@@ -494,29 +560,61 @@ export class Renderer {
   private buildElements(data: GraphData) {
     const nodeIds = new Set(data.nodes.map((n) => n.id));
     return [
-      ...data.nodes.map((n) => ({
-        data: {
-          id: n.id,
-          label: n.label || n.id,
-          essence: n.essence || 'default',
-          depth: n.depth,
-          subtreeRoot: n.subtreeRoot,
-          shortSummary: n.shortSummary,
-          fullSummary: n.fullSummary,
-          summary: n.summary,
-          location: n.location,
-          tags: n.tags ?? [],
-          body: n.body,
-          weight: n.weight ?? 60,
-          edges_out: n.edges_out ?? [],
-          color: n.essence
-            ? (NODE_TYPE_COLOR[n.essence] ?? NODE_TYPE_COLOR.default)
-            : NODE_TYPE_COLOR.default,
-          colorDark: n.essence
-            ? (NODE_TYPE_COLOR_DARK[n.essence] ?? NODE_TYPE_COLOR_DARK.default)
-            : NODE_TYPE_COLOR_DARK.default,
-        },
-      })),
+      ...data.nodes.map((n) => {
+        // stroke 字段解析（stroke 是**全量覆盖层**，与 fill 平行独立）：
+        //   - 节点 stroke 字段有显式值（含 'auto'/'flow'/'glow'）→ 直接用
+        //   - 节点 stroke 字段为空（undefined/null/字段缺失）→ 用 fill.defaultStroke 兜底
+        //   - fill 也没 defaultStroke（如兜底节点）→ 'auto'
+        //
+        // 用户填 stroke="auto" 就是显式表达"我要 auto"，不应再被 fill.defaultStroke 覆盖。
+        const userStroke = (n.stroke === 'auto' || n.stroke === 'flow' || n.stroke === 'glow')
+          ? n.stroke
+          : (n.stroke as string | undefined); // 兼容未来扩展值，原样传递
+        const effectiveStroke = userStroke
+          ?? (n.fill && FILL_CONFIG[n.fill]?.defaultStroke)
+          ?? 'auto';
+
+        // flow/glow 特效需要添加 CSS 类（按 effectiveStroke 判断，包含 fill 兜底）
+        const classes = [];
+        if (effectiveStroke === 'flow') classes.push(CLASSES.FLOW_BORDER);
+        if (effectiveStroke === 'glow') classes.push(CLASSES.GLOW_BORDER);
+
+        return {
+          data: {
+            id: n.id,
+            label: n.label || n.id,
+            // 新字段（基于 OWL2）
+            fill: n.fill,
+            // stroke 字段：填的是 effectiveStroke（含 fill 兜底），保证 Cytoscape 选择器链路完整
+            stroke: effectiveStroke,
+            shape: n.shape,
+            // 旧字段（兼容）
+            essence: n.essence || 'default',
+            depth: n.depth,
+            subtreeRoot: n.subtreeRoot,
+            shortSummary: n.shortSummary,
+            fullSummary: n.fullSummary,
+            summary: n.summary,
+            location: n.location,
+            tags: n.tags ?? [],
+            body: n.body,
+            weight: n.weight ?? 60,
+            edges_out: n.edges_out ?? [],
+            // 颜色（兼容旧逻辑）
+            color: n.fill
+              ? (FILL_CONFIG[n.fill]?.background ?? NODE_TYPE_COLOR.default)
+              : (n.essence
+                ? (NODE_TYPE_COLOR[n.essence] ?? NODE_TYPE_COLOR.default)
+                : NODE_TYPE_COLOR.default),
+            colorDark: n.fill
+              ? (FILL_CONFIG[n.fill]?.backgroundDark ?? NODE_TYPE_COLOR_DARK.default)
+              : (n.essence
+                ? (NODE_TYPE_COLOR_DARK[n.essence] ?? NODE_TYPE_COLOR_DARK.default)
+                : NODE_TYPE_COLOR_DARK.default),
+          },
+          classes: classes.join(' ') || undefined,
+        };
+      }),
       ...data.edges
         .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
         .map((e, idx) => ({

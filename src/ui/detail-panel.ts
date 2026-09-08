@@ -5,6 +5,7 @@ import cytoscape from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
 import {
   NODE_TYPE_COLOR,
+  FILL_CONFIG,
   ESSENCE_LABEL,
   EDGE_TYPE_LABEL,
   LEVEL_LABEL,
@@ -243,10 +244,16 @@ function rgba(hex: string, alpha: number): string {
 // ── Build helpers ─────────────────────────────────────────────────────────────
 
 function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
-  const essenceVal = (d.essence as string) || '';
-  const color = essenceVal ? (NODE_TYPE_COLOR[essenceVal] ?? NODE_TYPE_COLOR.default) : '#94a3b8';
+  // fill 是新规范，essence 是旧规范兼容字段。优先取 fill，没有则降级到 essence。
+  const fillVal = (d.fill as string) || (d.essence as string) || '';
+  const color = fillVal
+    ? (FILL_CONFIG[fillVal]?.background ?? NODE_TYPE_COLOR[fillVal] ?? NODE_TYPE_COLOR.default)
+    : '#94a3b8';
   const nodeName = (d.label as string) || (d.id as string);
-  const essenceText = essenceVal ? (ESSENCE_LABEL[essenceVal] ?? essenceVal) : '—';
+  // 优先用 FILL_CONFIG（fill label），降级到 ESSENCE_LABEL（旧 essence label）
+  const essenceText = fillVal
+    ? (FILL_CONFIG[fillVal]?.label ?? ESSENCE_LABEL[fillVal] ?? fillVal)
+    : '—';
   const depthVal = typeof d.depth === 'number' ? d.depth : 0;
   const depthLabel = LEVEL_LABEL[depthVal] ?? `${depthVal}级`;
   // A1：徽章色不再按 depth 取，而是按"是否属于某个子树"——
@@ -268,7 +275,7 @@ function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
   // 标签渲染到徽章区域，过滤掉与 label 重复的标签
   const rawTags = d.tags as string[] | undefined;
   const filteredTags = rawTags?.filter(
-    (t) => t !== nodeName && !(d.essence === 'mnemonic' && t === '口诀')
+    (t) => t !== nodeName && !(fillVal === 'cls-mnemonic' && t === '口诀')
   );
   const tagsHtml = filteredTags?.length
     ? filteredTags.map((t) => `<span class="np-tag np-tag--inline">${escHtml(t)}</span>`).join('')
