@@ -93,7 +93,8 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
   // stroke = auto（默认）：边框色由 subtreeRoot 或 depth 自动决定。
   
   // stroke = flow：流光效果
-  //   - border-width 3 → 醒目
+  //   - border-width 4 → 较粗，使 cytoscape canvas 的虚线 dash 段明显（width=3 时
+  //     dash 段 ~2px 看起来像点状，width=4 时 dash 段 ~3-4px 才是"流光虚线"）
   //   - border-style dashed → 流动虚线视觉暗示
   //   - 注：cytoscape canvas 节点不支持 box-shadow，且 overlay 会画矩形（不按 shape
   //     描边，对椭圆/八边形/星形节点会变成矩形光晕），故弃用 overlay，改用纯边框样式
@@ -101,7 +102,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
     selector: `node[stroke = "flow"]`,
     style: {
       'border-color': '#3b82f6', // 备用色，实际颜色由 subtreeRoot 规则决定
-      'border-width': 3,
+      'border-width': 4,
       'border-style': 'dashed' as cytoscape.Css.LineStyle,
       'transition-property': 'border-color, border-width',
       'transition-duration': 300,
@@ -110,14 +111,15 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
   };
 
   // stroke = glow：光晕效果
-  //   - border-style double → cytoscape 原生双线边框，外线 + 内线 + 中间透明，
-  //     视觉上像"光晕外圈"且严格按节点 shape 描边（不会变成矩形）
-  //   - border-width 3 → 双线总宽 6px，比 flow 更醒目
+  //   - border-width 5 → cytoscape canvas 的 double 边框间隙随 width 增大（width=3
+  //     时两条线几乎贴在一起像粗线，width=5 时双线间隙 ~2-3px 才像"光晕"）
+  //   - border-style double → cytoscape 原生双线边框 = 外线 + 中间透明 + 内线，
+  //     视觉上严格按节点 shape 描边（不会变成矩形 overlay）
   const glowStrokeRule = {
     selector: `node[stroke = "glow"]`,
     style: {
       'border-color': '#3b82f6', // 备用色，实际颜色由 subtreeRoot 规则决定
-      'border-width': 3,
+      'border-width': 5,
       'border-style': 'double' as cytoscape.Css.LineStyle,
       'transition-property': 'border-color, border-width',
       'transition-duration': 300,
