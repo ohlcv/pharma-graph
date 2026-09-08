@@ -675,6 +675,9 @@
 .np-badge--type    { border-color: rgba(99,102,241,0.4);  background: rgba(99,102,241,0.12); }
 .np-hero__name     { font-size: 1rem; font-weight: 700; color: var(--text); letter-spacing: -0.01em; line-height: 1.35; word-break: break-word; }
 .np-hero__location { font-size: 0.66rem; color: var(--muted); line-height: 1.5; word-break: break-word; }
+.np-hero__tags     { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.np-tag--inline    { font-size: 0.6rem; font-weight: 500; color: var(--text-2); background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 2px 9px; transition: background 0.12s, color 0.12s, border-color 0.12s; cursor: pointer; }
+.np-tag--inline:hover { background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.4); color: var(--accent); }
 
 .np-summary-section { display: flex; flex-direction: column; gap: 6px; }
 .np-summary { font-size: 0.75rem; color: var(--text-2); line-height: 1.65; padding: 10px 12px; background: rgba(99,102,241,0.06); border-left: 2px solid rgba(99,102,241,0.35); border-radius: 0 6px 6px 0; }

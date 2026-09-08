@@ -130,7 +130,7 @@ export class DetailPanel {
     const sourcePath = typeof d.sourcePath === 'string' ? d.sourcePath : '';
 
     this.overviewPage.innerHTML =
-      buildHeroHtml(d) + buildSummaryHtml(d) + buildTagsHtml(d) + buildEdgesHtml(node, this.cy);
+      buildHeroHtml(d) + buildSummaryHtml(d) + buildEdgesHtml(node, this.cy);
     this.bodyPage.innerHTML = buildBodyHtml(d, sourcePath);
 
     this.applySectionState();
@@ -265,11 +265,17 @@ function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
     if (parts.length > 0) location = `<div class="np-hero__location">${parts.join(' / ')}</div>`;
   }
 
+  // 标签渲染到徽章区域
+  const tagsHtml = (d.tags as string[] | undefined)?.length
+    ? (d.tags as string[]).map((t) => `<span class="np-tag np-tag--inline">${escHtml(t)}</span>`).join('')
+    : '';
+
   return `<div class="np-hero">
   <div class="np-hero__badges">
     <span class="np-badge np-badge--type" style="color:${color};border-color:${rgba(color, 0.4)};background:${rgba(color, 0.12)}">${escHtml(essenceText)}</span>
     <span class="np-badge np-badge--depth" style="color:${depthColor};border-color:${rgba(depthColor, 0.4)};background:${rgba(depthColor, 0.12)}">${escHtml(depthLabel)}</span>
   </div>
+  ${tagsHtml ? `<div class="np-hero__tags">${tagsHtml}</div>` : ''}
   <div class="np-hero__name">${escHtml(nodeName)}</div>
   ${location}
 </div>`;
