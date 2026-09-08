@@ -265,9 +265,13 @@ function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
     if (parts.length > 0) location = `<div class="np-hero__location">${parts.join(' / ')}</div>`;
   }
 
-  // 标签渲染到徽章区域
-  const tagsHtml = (d.tags as string[] | undefined)?.length
-    ? (d.tags as string[]).map((t) => `<span class="np-tag np-tag--inline">${escHtml(t)}</span>`).join('')
+  // 标签渲染到徽章区域，过滤掉与 label 重复的标签
+  const rawTags = d.tags as string[] | undefined;
+  const filteredTags = rawTags?.filter(
+    (t) => t !== nodeName && !(d.essence === 'mnemonic' && t === '口诀')
+  );
+  const tagsHtml = filteredTags?.length
+    ? filteredTags.map((t) => `<span class="np-tag np-tag--inline">${escHtml(t)}</span>`).join('')
     : '';
 
   return `<div class="np-hero">
