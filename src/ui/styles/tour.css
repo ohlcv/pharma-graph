@@ -160,22 +160,11 @@
     .tour-dt__stat-label { color: rgba(226,232,240,0.55); }
     .tour-dt__stat-val   { font-weight: 700; color: rgba(226,232,240,0.9); font-variant-numeric: tabular-nums; }
     
-.tour-dt__progress       { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 80px; max-width: 200px; }
-.tour-dt__progress-track { flex: 1; height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: visible; position: relative; }
-.tour-dt__progress-fill  { height: 100%; background: linear-gradient(90deg, var(--tour-accent), var(--tour-accent-2)); border-radius: 2px; transition: width 0.3s ease; width: 0%; }
-/* Timeline marker — a small dot riding the leading edge of the fill so users
-   can pinpoint where they are in the sequence. The JS sets `left:%` to match
-   the fill width, keeping both visually in sync. */
-.tour-dt__progress-marker {
-  position: absolute; top: 50%; left: 0;
-  width: 8px; height: 8px; border-radius: 50%;
-  background: #fff; box-shadow: 0 0 0 2px var(--tour-accent), 0 0 6px rgba(99,102,241,0.6);
-  transform: translate(-50%, -50%);
-  transition: left 0.3s ease;
-  pointer-events: none;
-}
-.tour-state--idle    .tour-dt__progress-marker { display: none; }
-.tour-dt__progress-label { font-size: 0.6rem; color: rgba(226,232,240,0.55); font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
+/* Timeline label — single "current / total" text in place of the old
+   progress bar + dot marker. The bar routinely outgrew its track and read
+   as visual noise; the compact text conveys the same information. */
+.tour-dt__progress       { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.tour-dt__progress-label { font-size: 0.7rem; color: rgba(226,232,240,0.75); font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; padding: 0 4px; }
     
     .tour-dt__params      { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
     .tour-dt__param-label { display: flex; align-items: center; gap: 3px; font-size: 0.6rem; color: rgba(226,232,240,0.55); white-space: nowrap; }

@@ -29,12 +29,6 @@ import { Renderer } from '../core/renderer.js';
 import { DetailPanel } from './detail-panel.js';
 import type { TourEngine } from '../core/tour.js';
 
-const BADGE_IDS = [
-  'tour-depth-badge',
-  'tour-depth-badge-mob2',
-  'tour-depth-badge-dt',
-  'tour-depth-badge-dt2',
-];
 const NAME_IDS = ['tour-dt-node-name', 'tour-dt-node-name2'];
 const COUNT_IDS = [
   'tour-count-badge',
@@ -45,15 +39,9 @@ const COUNT_IDS = [
 
 function setupDom() {
   document.body.innerHTML = '';
-  for (const id of [...BADGE_IDS, ...NAME_IDS, ...COUNT_IDS]) {
+  for (const id of [...NAME_IDS, ...COUNT_IDS]) {
     const el = document.createElement('span');
     el.id = id;
-    document.body.appendChild(el);
-  }
-  // tour-progress-fill-dt / dt2 — referenced in onComplete
-  for (const suffix of ['', '2']) {
-    const el = document.createElement('div');
-    el.id = `tour-progress-fill-dt${suffix}`;
     document.body.appendChild(el);
   }
 }
@@ -140,9 +128,6 @@ describe('TourController.onComplete — issue #16 reason branching', () => {
     p.paused = false;
     p.onComplete('depth-reached');
 
-    for (const id of BADGE_IDS) {
-      expect(document.getElementById(id)?.textContent).toBe('\u2713');
-    }
     for (const id of NAME_IDS) {
       expect(document.getElementById(id)?.textContent).toBe('完成');
     }
@@ -157,9 +142,6 @@ describe('TourController.onComplete — issue #16 reason branching', () => {
     p.paused = false;
     p.onComplete('no-more-restarts');
 
-    for (const id of BADGE_IDS) {
-      expect(document.getElementById(id)?.textContent).toBe('⏹');
-    }
     for (const id of NAME_IDS) {
       expect(document.getElementById(id)?.textContent).toBe('已停止 · 已试 3 轮');
     }
@@ -167,7 +149,7 @@ describe('TourController.onComplete — issue #16 reason branching', () => {
     expect(p.paused).toBe(false);
   });
 
-  it('clears count badges and fills progress bar to 100% on either path', () => {
+  it('clears count badges on either completion path', () => {
     const c = makeController();
     const p = poke(c);
     p.running = true;
@@ -175,10 +157,6 @@ describe('TourController.onComplete — issue #16 reason branching', () => {
 
     for (const id of COUNT_IDS) {
       expect(document.getElementById(id)?.textContent).toBe('—');
-    }
-    for (const suffix of ['', '2']) {
-      const el = document.getElementById(`tour-progress-fill-dt${suffix}`);
-      expect(el?.style.width).toBe('100%');
     }
   });
 

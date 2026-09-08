@@ -498,17 +498,13 @@ export class TourController {
     else                 ph.push(info.nodeId);
 
     // Mobile bars (top + bottom — both exist in DOM with unique IDs)
-    this.setText('tour-depth-badge',        String(info.layerIndex));
-    this.setText('tour-depth-badge-mob2',  String(info.layerIndex));
-    this.setText('tour-count-badge',        String(info.layerIndex));
-    this.setText('tour-count-badge-mob2',  String(info.layerIndex));
+    this.setText('tour-count-badge',        String(info.totalExplored));
+    this.setText('tour-count-badge-mob2',  String(info.totalExplored));
     this.setText('tour-cycle-num',         String(info.cycleCount + 1));
     this.setText('tour-cycle-num-mob2',    String(info.cycleCount + 1));
     // Desktop bars (top + bottom)
-    this.setText('tour-depth-badge-dt',     String(info.layerIndex));
-    this.setText('tour-depth-badge-dt2',    String(info.layerIndex));
-    this.setText('tour-count-badge-dt',     String(info.layerIndex));
-    this.setText('tour-count-badge-dt2',    String(info.layerIndex));
+    this.setText('tour-count-badge-dt',     String(info.totalExplored));
+    this.setText('tour-count-badge-dt2',    String(info.totalExplored));
     this.setText('tour-cycle-num-dt',       String(info.cycleCount + 1));
     this.setText('tour-cycle-num-dt2',      String(info.cycleCount + 1));
     this.setText('tour-dt-node-name',       this.labelOf(info.nodeId) || info.nodeId);
@@ -522,20 +518,17 @@ export class TourController {
   }
 
   /**
-   * Update the progress bar + "N / M" counter + the dot marker showing the
-   * current step. The marker is positioned over the progress track by
-   * `left:%` so it lines up with the leading edge of the fill.
+   * Update the per-step counter "N / M". The old purple progress bar + marker
+   * were removed (issue #?): the fill element routinely outgrew the desktop
+   * bar width and read as visual noise. The compact text "current / total"
+   * is enough to convey progress.
    */
   private renderTimeline(current: number, total: number): void {
     if (total <= 0) return;
-    const ratio = Math.max(0, Math.min(1, current / total));
-    // Update both desktop bars' progress
-    for (const suffix of ['', '2']) {
-      this.setProgress(`tour-progress-fill-dt${suffix}`, ratio);
-      this.setText(`tour-progress-label-dt${suffix}`, `${current} / ${total}`);
-      const marker = document.getElementById(`tour-progress-marker-dt${suffix}`);
-      if (marker) marker.style.left = (ratio * 100).toFixed(2) + '%';
-    }
+    const text = `${current} / ${total}`;
+    // Desktop bars (top + bottom): single text label in place of the bar.
+    this.setText('tour-progress-label-dt',  text);
+    this.setText('tour-progress-label-dt2', text);
     // Mobile uses a compact "current/total" stat in place of the bar.
     this.setText('tour-step-badge',       String(current));
     this.setText('tour-step-badge-mob2', String(current));
@@ -555,20 +548,14 @@ export class TourController {
     const badge = exhausted ? '⏹' : '\u2713';
     const nameLabel = exhausted ? '已停止' : '完成';
 
-    this.setText('tour-depth-badge',        badge);
-    this.setText('tour-depth-badge-mob2',  badge);
     this.setText('tour-count-badge',        '—');
     this.setText('tour-count-badge-mob2',  '—');
-    this.setText('tour-depth-badge-dt',     badge);
-    this.setText('tour-depth-badge-dt2',    badge);
     this.setText('tour-count-badge-dt',     '—');
     this.setText('tour-count-badge-dt2',    '—');
     this.setText('tour-dt-node-name',      nameLabel);
     this.setText('tour-dt-node-name2',    nameLabel);
-    for (const suffix of ['', '2']) {
-      const fillEl = document.getElementById(`tour-progress-fill-dt${suffix}`);
-      if (fillEl) fillEl.style.width = '100%';
-    }
+    this.setText('tour-progress-label-dt',  '完成');
+    this.setText('tour-progress-label-dt2', '完成');
 
     // If the tour exhausted itself, surface a title so the bar reads
     // "已停止 — 已试 3 轮" instead of just "已停止". The tooltip stays
@@ -626,11 +613,6 @@ export class TourController {
   private setText(id: string, text: string): void {
     const el = document.getElementById(id);
     if (el) el.textContent = text;
-  }
-
-  private setProgress(id: string, ratio: number): void {
-    const el = document.getElementById(id);
-    if (el) el.style.width = Math.round(ratio * 100) + '%';
   }
 
   private labelOf(nodeId: string): string {
