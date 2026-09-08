@@ -246,7 +246,10 @@ export function highlightEdgeTypeFilter(edge: string, highlight: HighlightEngine
 }
 
 function activateAxis(selector: string, attr: string, key: string): void {
-  staticEls(selector).forEach((el) => {
-    if (el.dataset[attr] === key) el.classList.add('active');
+  // Always query directly — avoids stale staticEls cache. buildLegend invalidates
+  // the cache when it rebuilds, but the re-query here is cheap and always correct.
+  const resolved = Array.from(document.querySelectorAll<HTMLElement>(selector));
+  resolved.forEach((el) => {
+    if (el.getAttribute(attr) === key) el.classList.add('active');
   });
 }
