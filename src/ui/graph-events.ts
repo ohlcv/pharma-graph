@@ -90,6 +90,16 @@ export function initGraphEvents(deps: GraphEventDeps): void {
 
   cy.on('tap', 'edge', (evt) => {
     deps.highlight.highlightEdgeOnly(evt.target.id());
+    const edge = evt.target;
+    const src = edge.source().renderedPosition();
+    const tgt = edge.target().renderedPosition();
+    const cont = edge.cy().container();
+    if (src && tgt && cont) {
+      const midX = (src.x + tgt.x) / 2;
+      const midY = (src.y + tgt.y) / 2;
+      const rect = cont.getBoundingClientRect();
+      deps.spawnNodeRipple(rect.left + midX, rect.top + midY, '#fbbf24');
+    }
     updateStats(cy);
     syncBottomSheetStats(cy);
   });
