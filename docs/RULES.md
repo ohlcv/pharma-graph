@@ -110,10 +110,10 @@
 
 **示例**（假设 fill=cls-drug）：
 - `fill: cls-drug`（无 shape/stroke）→ 椭圆药物 + 默认边框（`auto`，无特效）
-- `fill: cls-drug, shape: diamond` → 菱形药物 + 默认边框（shape 显式，stroke 仍走 auto）
+- `fill: cls-drug, shape: object_property` → 六边形药物 + 默认边框（shape 显式覆盖为六边形，stroke 仍走 auto）
 - `fill: cls-drug, stroke: auto` → 椭圆药物 + fill 兜底边框色（subtreeRoot 色优先，无则 `#7aa8d9`）
 - `fill: cls-drug, stroke: flow` → 椭圆药物 + 流光边框（重点药，显式特效）
-- `fill: cls-drug, shape: diamond, stroke: glow` → 菱形药物 + 光晕边框（两个都显式）
+- `fill: cls-drug, shape: object_property, stroke: glow` → 六边形药物 + 光晕边框（两个都显式）
 
 ### 4.3 形状分配设计意图
 
