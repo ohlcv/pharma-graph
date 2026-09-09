@@ -15,7 +15,6 @@ tags:
   - 抗癫痫发作药
 
 summary:
-  short: "通过抑制AMPA型谷氨酸受体抑制兴奋性神经传递，代表药见full。"
   full: |
     【代表药】吡仑帕奈
 

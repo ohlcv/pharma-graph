@@ -21,7 +21,7 @@
 //   complete (engine callback) → idle, then auto-hide after 2s
 
 import cytoscape from 'cytoscape';
-import { TourEngine, TourStrategy, TourStepInfo, getLocationKey } from '../core/tour.js';
+import { TourEngine, TourStrategy, TourStepInfo, getLocationKey, TOUR_DEPTH_CONFIG, isKeyDrug } from '../core/tour.js';
 import { Renderer } from '../core/renderer.js';
 import { DetailPanel } from './detail-panel.js';
 import { uiState, registerTourBarToggle } from './state.js';
@@ -170,8 +170,9 @@ export class TourController {
   }
 
   private currentMaxDepth(): number {
-    const v = this.findSlider('maxdepth')?.range.valueAsNumber ?? 10;
-    return v >= 10 ? -1 : v;
+    const v = this.findSlider('maxdepth')?.range.valueAsNumber ?? 5;
+    // 档位 5 = 全部（无限漫游）
+    return v >= 5 ? -1 : v;
   }
 
   private findSlider(which: 'interval' | 'maxdepth'): SliderBind | undefined {
@@ -297,8 +298,8 @@ export class TourController {
         document.getElementById(mobileDepth.id + '-fill'),
         document.getElementById(mobileDepth.id + '-val'),
         document.getElementById('tour-depth-val-dt'),
-        (v) => v >= 10 ? '\u221e' : String(v),
-        (v) => this.engine?.setMaxDepth(v >= 10 ? -1 : v),
+        (v) => v >= 5 ? '\u221e' : TOUR_DEPTH_CONFIG.getLabel(v),
+        (v) => this.engine?.setMaxDepth(v >= 5 ? -1 : v),
         [desktopDepth2].filter(Boolean) as HTMLInputElement[],
         [document.getElementById('tour-depth-val-dt2')],
       ));

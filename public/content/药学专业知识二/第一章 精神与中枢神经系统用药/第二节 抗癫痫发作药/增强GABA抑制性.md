@@ -15,7 +15,6 @@ tags:
   - 抗癫痫发作药
 
 summary:
-  short: "通过增强**GABA能抑制性**神经传递发挥抗癫痫作用，包括激动GABAA受体、抑制GABA转运体、抑制GABA氨基转移酶。"
 
 edges_out:
   - target: sec-epilepsy-y2-01-02

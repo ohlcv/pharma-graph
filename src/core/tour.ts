@@ -1,6 +1,85 @@
 // src/core/tour.ts
 // Auto-exploration engine — Strategy pattern, 2 built-in strategies.
 
+/** 漫游深度层级配置：5档设计，区分重点药和普通药 */
+export const TOUR_DEPTH_CONFIG = {
+  // 档位 1-5 对应的 fill 类型包含关系
+  // 每档包含所有更低档的内容
+  levels: [
+    {
+      level: 1,
+      label: '章节-结构',
+      description: '快速浏览章节框架',
+      includes: ['cls-structure'],
+    },
+    {
+      level: 2,
+      label: '章节分类-概览',
+      description: '了解知识分类',
+      includes: ['cls-structure', 'cls-classification'],
+    },
+    {
+      level: 3,
+      label: '重点药-复习',
+      description: '只看重点药（跳过普通药）',
+      includes: ['cls-structure', 'cls-classification', 'cls-drug-key'], // key = 重点药
+    },
+    {
+      level: 4,
+      label: '口诀总结-学习',
+      description: '加入记忆内容',
+      includes: ['cls-structure', 'cls-classification', 'cls-drug-key', 'cls-summary', 'cls-mnemonic'],
+    },
+    {
+      level: 5,
+      label: '全部节点-全面',
+      description: '完整学习',
+      includes: ['all'], // 全部类型
+    },
+  ] as const,
+
+  /** 从档位获取显示标签 */
+  getLabel(level: number): string {
+    if (level >= 5) return this.levels[4].label;
+    if (level <= 0) return this.levels[0].label;
+    return this.levels[Math.floor(level) - 1].label;
+  },
+};
+
+/** 判断节点是否为"重点药"（有 glow 边框的 cls-drug 节点） */
+export function isKeyDrug(node: cytoscape.NodeSingular): boolean {
+  const fill = node.data('fill') as string;
+  const stroke = node.data('stroke') as string | undefined;
+  return fill === 'cls-drug' && stroke === 'glow';
+}
+
+/** 判断节点是否属于给定档位的内容范围 */
+export function isNodeInLevel(node: cytoscape.NodeSingular, level: number): boolean {
+  const fill = node.data('fill') as string;
+  const isKey = isKeyDrug(node);
+
+  // 档位 5 = 全部
+  if (level >= 5) return true;
+
+  // 档位 4 = structure + classification + 重点药 + summary + mnemonic
+  if (level >= 4) {
+    return ['cls-structure', 'cls-classification', 'cls-summary', 'cls-mnemonic'].includes(fill) || isKey;
+  }
+
+  // 档位 3 = structure + classification + 重点药（跳过普通药）
+  if (level >= 3) {
+    return ['cls-structure', 'cls-classification'].includes(fill) || isKey;
+  }
+
+  // 档位 2 = structure + classification
+  if (level >= 2) {
+    return ['cls-structure', 'cls-classification'].includes(fill);
+  }
+
+  // 档位 1 = structure
+  return fill === 'cls-structure';
+}
+
 export type TourCompleteReason = 'depth-reached' | 'no-more-restarts' | 'no-root';
 
 export interface TourOptions {
@@ -888,6 +967,14 @@ export class TourEngine {
     this.maxDepth = depth;
   }
 
+  /**
+   * 获取当前档位对应的中文标签
+   */
+  getDepthLabel(): string {
+    if (this.maxDepth < 0) return '全部节点-全面';
+    return TOUR_DEPTH_CONFIG.getLabel(this.maxDepth);
+  }
+
   private scheduleNext(): void {
     if (this.stopped) return;
     clearTimeout(this.timer);
@@ -913,6 +1000,13 @@ export class TourEngine {
         // 策略钩子：允许策略在节点进入视野前拦截（过滤或自定义行为）
         if (this._hooks.shouldVisit && !this._hooks.shouldVisit(id, this.cy)) continue;
         if (!node.empty() && !node.hasClass('layer-parent')) {
+          // 档位过滤：检查节点是否属于当前档位的内容范围
+          // maxDepth 为 1-5，档位 5 = 全部（相当于无限）
+          if (this.maxDepth > 0 && this.maxDepth < 5) {
+            if (!isNodeInLevel(node, this.maxDepth)) {
+              continue; // 跳过不在当前档位范围内的节点
+            }
+          }
           this.currentStep++;
           // Use the graph's real BFS depth (0=root/center, higher=outer layers).
           const nodeDepth = (node.data('depth') as number) ?? 0;
