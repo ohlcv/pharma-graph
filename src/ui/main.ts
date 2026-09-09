@@ -39,7 +39,7 @@ import { logInfo } from './logger.js';
 import { loadContent } from '../core/content-loader.js';
 import { installDispatcher, dispatchAction } from './action-dispatcher.js';
 import { updateStats, syncBottomSheetStats } from './graph-stats.js';
-import { fitGraph, randomize, syncLayoutDisplay, setCurrentLayout } from './layout-manager.js';
+import { fitGraph, randomize, syncLayoutDisplay, setCurrentLayout, restoreBsAdvancedPrefs } from './layout-manager.js';
 import { initBigscreen, registerFitFn, registerTourController, registerCyAccessor, isBigscreen } from './bigscreen.js';
 import { initGraphEvents } from './graph-events.js';
 import { initSheetDrag, initPanelDrag, initPanelResize, syncTourBarPosition, initSectionHeights } from './drag-manager.js';
@@ -116,6 +116,7 @@ async function boot(): Promise<void> {
     // Sync once at bootstrap so first paint shows the DEFAULT_LAYOUT, not 'COSE'.
     syncLayoutDisplay(DEFAULT_LAYOUT);
     setCurrentLayout(DEFAULT_LAYOUT);
+    restoreBsAdvancedPrefs();
 
     uiState.detailPanel = new DetailPanel(uiState.renderer.getCy(), uiState.highlight, {
       onNodeClick: (nodeId) => {

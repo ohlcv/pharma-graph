@@ -20,6 +20,8 @@ import {
   randomize,
   animatePulse,
   toggleBsParams,
+  toggleBsLayout,
+  toggleBsAdvanced,
   applyBsParams,
 } from './layout-manager.js';
 import { highlightShape, clearShapeFilter } from './legend-manager.js';
@@ -95,6 +97,14 @@ export function registerAppActions(
 
   registerAction('toggle-bs-params', () => {
     toggleBsParams();
+  });
+
+  registerAction('toggle-bs-layout', () => {
+    toggleBsLayout();
+  });
+
+  registerAction('toggle-bs-advanced', () => {
+    toggleBsAdvanced();
   });
 
   registerAction('apply-bs-params', () => {

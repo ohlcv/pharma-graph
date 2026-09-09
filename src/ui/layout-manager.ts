@@ -244,6 +244,69 @@ export function toggleBsParams(): void {
   if (open) renderBsLayoutParams(_currentLayout);
 }
 
+/**
+ * 图谱布局折叠/展开（图谱布局 7 键网格）。状态独立于"布局参数"，用户可单独
+ * 打开"图谱布局"调换布局但保持参数折叠。
+ */
+export function toggleBsLayout(): void {
+  const block = document.getElementById('bs-layout-block');
+  const body = document.getElementById('bs-layout-body');
+  if (!block || !body) return;
+  const open = block.classList.toggle('open');
+  body.style.display = open ? '' : 'none';
+  try { localStorage.setItem('pg.bs.layoutOpen', open ? '1' : '0'); } catch { /* ignore */ }
+}
+
+/**
+ * 高级设置外层折叠（图谱布局 + 布局参数 一起）。首次默认折叠，
+ * 后续按 localStorage 'pg.bs.advancedOpen' 记忆。
+ */
+export function toggleBsAdvanced(): void {
+  const adv = document.getElementById('bs-advanced');
+  const head = document.getElementById('bs-advanced-toggle');
+  if (!adv) return;
+  const willOpen = adv.classList.contains('collapsed'); // 当前折叠 → 即将展开
+  adv.classList.toggle('collapsed', !willOpen);
+  head?.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+  try { localStorage.setItem('pg.bs.advancedOpen', willOpen ? '1' : '0'); } catch { /* ignore */ }
+}
+
+/**
+ * 恢复默认时同步清空折叠偏好（避免老用户一直看不到"高级设置"）。
+ */
+export function resetBsAdvancedPrefs(): void {
+  try {
+    localStorage.removeItem('pg.bs.advancedOpen');
+    localStorage.removeItem('pg.bs.layoutOpen');
+  } catch { /* ignore */ }
+}
+
+/**
+ * 应用 localStorage 偏好到 DOM。HTML 默认 `.bs-advanced.collapsed` +
+ * `#bs-layout-body{display:none}` 已经默认折叠，所以这一调用只负责"上次
+ * 用户展开过 → 还原成展开"。在 boot 时调用。
+ */
+export function restoreBsAdvancedPrefs(): void {
+  let advancedOpen = false;
+  let layoutOpen = false;
+  try {
+    advancedOpen = localStorage.getItem('pg.bs.advancedOpen') === '1';
+    layoutOpen = localStorage.getItem('pg.bs.layoutOpen') === '1';
+  } catch { /* ignore */ }
+  if (advancedOpen) {
+    const adv = document.getElementById('bs-advanced');
+    const head = document.getElementById('bs-advanced-toggle');
+    adv?.classList.remove('collapsed');
+    head?.setAttribute('aria-expanded', 'true');
+  }
+  if (layoutOpen) {
+    const block = document.getElementById('bs-layout-block');
+    const body = document.getElementById('bs-layout-body');
+    block?.classList.add('open');
+    if (body) body.style.display = '';
+  }
+}
+
 export function applyBsParams(renderer: Renderer): void {
   const container = document.getElementById('bs-layout-params');
   if (!container) return;

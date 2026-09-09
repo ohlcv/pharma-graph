@@ -1002,6 +1002,18 @@
 .bs-layout-btn.active           { background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.4); color: var(--accent); box-shadow: 0 0 12px rgba(99,102,241,0.25); }
 .bs-layout-btn:active:not(.active) { background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.4); color: var(--accent); }
 
+/* ── "高级设置"容器：把图谱布局 + 布局参数这两块放到一起，共享折叠记忆 ────── */
+.bs-advanced { display: flex; flex-direction: column; gap: 8px; }
+.bs-advanced__head { display: flex; align-items: center; justify-content: space-between; padding: 6px 4px 0; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.bs-advanced__title { display: flex; align-items: center; gap: 6px; }
+.bs-advanced__chev { width: 12px; height: 12px; color: var(--muted); transition: transform 0.2s ease; flex-shrink: 0; }
+.bs-advanced.open .bs-advanced__chev { transform: rotate(90deg); }
+.bs-advanced__hint { font-size: 0.6rem; font-weight: 500; color: var(--muted); letter-spacing: 0.04em; }
+.bs-advanced__body { display: flex; flex-direction: column; gap: 8px; }
+.bs-advanced.collapsed .bs-advanced__body { display: none; }
+.bs-advanced__head { background: transparent; border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; font-family: inherit; }
+.bs-advanced__head:active .bs-advanced__title { color: var(--accent); }
+
 .bs-params-block   { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
 .bs-params-toggle  { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 14px; background: rgba(255,255,255,0.02); border: none; color: var(--text-2); font-size: 0.72rem; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.14s, color 0.14s; -webkit-tap-highlight-color: transparent; }
 .bs-params-toggle:active { background: rgba(99,102,241,0.08); color: var(--accent); }
