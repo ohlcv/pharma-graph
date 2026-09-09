@@ -822,7 +822,7 @@ export class TourEngine {
     this.attachGraphMutators();
 
     // silent=false: fire onStep immediately so the detail panel appears right away
-    this.highlightAndFocus(this.seq[0], [this.seq[0]], 0, this.seq.length, 1, false);
+    this.highlightAndFocus(this.seq[0], [this.seq[0]], 0, this.totalSteps(), 1, false);
     this.scheduleNext();
   }
 
@@ -922,9 +922,20 @@ export class TourEngine {
     return this.paused && !this.stopped;
   }
 
-  /** Total steps in this tour's sequence (built once at start()). */
+  /** Total steps in this tour's sequence, filtered by current depth level. */
   totalSteps(): number {
-    return this.seq.length;
+    if (this._depthLevel >= 5) {
+      return this.seq.length; // 档位 5 = 全部，不过滤
+    }
+    // 档位 1-4：计算实际会被访问的节点数
+    let count = 0;
+    for (const id of this.seq) {
+      const node = this.cy.getElementById(id);
+      if (node.empty() || node.hasClass('layer-parent')) continue;
+      if (!isNodeInLevel(node, this._depthLevel)) continue;
+      count++;
+    }
+    return count;
   }
 
   /** Current step in the sequence (1-indexed; matches TourStepInfo.currentStep). */
@@ -1028,7 +1039,7 @@ export class TourEngine {
           this.currentStep++;
           // Use the graph's real BFS depth (0=root/center, higher=outer layers).
           const nodeDepth = (node.data('depth') as number) ?? 0;
-          this.highlightAndFocus(id, [id], nodeDepth, this.seq.length, this.seqIndex);
+          this.highlightAndFocus(id, [id], nodeDepth, this.totalSteps(), this.seqIndex);
           // 调试日志
           console.log(`[Tour DEBUG] 显示节点 id=${id}, currentStep=${this.currentStep}, maxDepth=${this.maxDepth}, maxDepth>0=${this.maxDepth > 0}, currentStep>=maxDepth=${this.currentStep >= this.maxDepth}`);
           // currentStep 从 1 开始，maxDepth = N 表示最多显示 N 步

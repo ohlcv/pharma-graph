@@ -524,21 +524,19 @@ export class TourController {
     if (prev.length > 0) ph.push(prev[prev.length - 1], info.nodeId);
     else                 ph.push(info.nodeId);
 
-    // Mobile bars (top + bottom — both exist in DOM with unique IDs)
-    this.setText('tour-count-badge',        String(info.totalExplored));
-    this.setText('tour-count-badge-mob2',  String(info.totalExplored));
+    // 节点 badge = 已访问节点 / 档位总节点（X/Y 格式）
+    const nodeBadge = `${info.currentStep}/${info.totalToExplore}`;
     this.setText('tour-cycle-num',         String(info.cycleCount + 1));
     this.setText('tour-cycle-num-mob2',    String(info.cycleCount + 1));
-    // Desktop bars (top + bottom)
-    this.setText('tour-count-badge-dt',     String(info.totalExplored));
-    this.setText('tour-count-badge-dt2',    String(info.totalExplored));
+    // Desktop bars
     this.setText('tour-cycle-num-dt',       String(info.cycleCount + 1));
     this.setText('tour-cycle-num-dt2',      String(info.cycleCount + 1));
+    // 节点显示：移动端和桌面端都靠 renderTimeline 设置
+    this.setText('tour-count-badge',        nodeBadge);
+    this.setText('tour-count-badge-mob2',   nodeBadge);
     this.setText('tour-dt-node-name',       this.labelOf(info.nodeId) || info.nodeId);
     this.setText('tour-dt-node-name2',     this.labelOf(info.nodeId) || info.nodeId);
-    // Progress: current step / total steps in the sequence. We read totals
-    // from the engine rather than info.totalToExplore because totalToExplore
-    // shrinks when maxDepth caps the run.
+    // 进度：current step / total steps in the sequence
     const total = this.engine?.totalSteps() ?? info.totalToExplore;
     const step  = this.engine?.currentStepIndex() ?? info.currentStep;
     this.renderTimeline(step, total);
@@ -553,14 +551,11 @@ export class TourController {
   private renderTimeline(current: number, total: number): void {
     if (total <= 0) return;
     const text = `${current} / ${total}`;
-    // Desktop bars (top + bottom): single text label in place of the bar.
+    // 节点显示 X / Y：桌面端 + 移动端都用同一个进度文字
     this.setText('tour-progress-label-dt',  text);
     this.setText('tour-progress-label-dt2', text);
-    // Mobile uses a compact "current/total" stat in place of the bar.
-    this.setText('tour-step-badge',       String(current));
-    this.setText('tour-step-badge-mob2', String(current));
-    this.setText('tour-step-total',       String(total));
-    this.setText('tour-step-total-mob2', String(total));
+    this.setText('tour-count-badge',       text);
+    this.setText('tour-count-badge-mob2',  text);
   }
 
   private onComplete(reason: 'depth-reached' | 'no-more-restarts' | 'no-root'): void {
