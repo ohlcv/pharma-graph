@@ -408,7 +408,11 @@
       /* 统计数字 */
       .tour-mob__stats { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 0; }
       .tour-mob__stat-item { display: flex; flex-direction: column; align-items: center; gap: 1px; }
-      .tour-mob__stat-num  { font-size: 0.82rem; font-weight: 600; color: rgba(226,232,240,0.9); font-variant-numeric: tabular-nums; line-height: 1; }
+      .tour-mob__stat-num  { font-size: 0.82rem; font-weight: 600; color: rgba(226,232,240,0.9); font-variant-numeric: tabular-nums; line-height: 1; white-space: nowrap; }
+      /* 节点进度用上下两行的分数形式，紧凑 */
+      .tour-mob__stat-frac { display: flex; flex-direction: column; align-items: center; gap: 1px; line-height: 1; }
+      .tour-mob__stat-frac .tour-mob__stat-num { font-size: 0.72rem; }
+      .tour-mob__stat-rule { width: 100%; min-width: 14px; height: 1px; background: rgba(226,232,240,0.45); }
       .tour-mob__stat-item svg { width: 11px; height: 11px; stroke: currentColor; color: rgba(226,232,240,0.55); flex-shrink: 0; }
       .tour-mob__stat-lbl  { font-size: 0.48rem; color: rgba(226,232,240,0.28); user-select: none; letter-spacing: 0.02em; }
     

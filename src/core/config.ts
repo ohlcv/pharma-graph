@@ -336,7 +336,21 @@ export const LEVEL_LABEL: Record<number, string> = {
   4: '四级',
   5: '五级',
   6: '六级',
+  7: '七级',
+  8: '八级',
+  9: '九级',
+  10: '十级',
 };
+// 超过 10 级时兜底（理论上不会发生）
+const CHINESE_NUMERALS = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+function toChineseNumeral(n: number): string {
+  if (n <= 10) return CHINESE_NUMERALS[n];
+  return `${n}级`; // 超过十级用阿拉伯数字
+}
+export function getLevelLabel(depthVal: number): string {
+  if (depthVal in LEVEL_LABEL) return LEVEL_LABEL[depthVal];
+  return `${toChineseNumeral(depthVal)}级`;
+}
 // ── Edge type → visual style ────────────────────────────────────────────────
 // 5 种 OWL/RDF 风格边类型，每种对应一种关系家族。
 // 具体药学语义（治疗/导致/抑制...）放进 reason，不再各占一个 type。

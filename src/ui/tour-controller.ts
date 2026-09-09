@@ -527,15 +527,9 @@ export class TourController {
     // 节点 badge = 已访问节点 / 档位总节点（X/Y 格式）
     const nodeBadge = `${info.currentStep}/${info.totalToExplore}`;
     this.setText('tour-cycle-num',         String(info.cycleCount + 1));
-    this.setText('tour-cycle-num-mob2',    String(info.cycleCount + 1));
     // Desktop bars
     this.setText('tour-cycle-num-dt',       String(info.cycleCount + 1));
-    this.setText('tour-cycle-num-dt2',      String(info.cycleCount + 1));
-    // 节点显示：移动端和桌面端都靠 renderTimeline 设置
-    this.setText('tour-count-badge',        nodeBadge);
-    this.setText('tour-count-badge-mob2',   nodeBadge);
     this.setText('tour-dt-node-name',       this.labelOf(info.nodeId) || info.nodeId);
-    this.setText('tour-dt-node-name2',     this.labelOf(info.nodeId) || info.nodeId);
     // 进度：current step / total steps in the sequence
     const total = this.engine?.totalSteps() ?? info.totalToExplore;
     const step  = this.engine?.currentStepIndex() ?? info.currentStep;
@@ -550,12 +544,14 @@ export class TourController {
    */
   private renderTimeline(current: number, total: number): void {
     if (total <= 0) return;
+    // 节点显示 X / Y：桌面端横排，移动端用上下两行的分数形式
     const text = `${current} / ${total}`;
-    // 节点显示 X / Y：桌面端 + 移动端都用同一个进度文字
     this.setText('tour-progress-label-dt',  text);
-    this.setText('tour-progress-label-dt2', text);
-    this.setText('tour-count-badge',       text);
-    this.setText('tour-count-badge-mob2',  text);
+    this.setText('tour-count-badge-num',   String(current));
+    this.setText('tour-count-badge-den',   String(total));
+    // 桌面端"步" = 当前步数（纯数字）
+    this.setText('tour-step-badge-dt',      String(current));
+    this.setText('tour-step-badge-mob',     String(current));
   }
 
   private onComplete(reason: 'depth-reached' | 'no-more-restarts' | 'no-root'): void {
@@ -570,14 +566,12 @@ export class TourController {
     const badge = exhausted ? '⏹' : '\u2713';
     const nameLabel = exhausted ? '已停止' : '完成';
 
-    this.setText('tour-count-badge',        '—');
-    this.setText('tour-count-badge-mob2',  '—');
-    this.setText('tour-count-badge-dt',     '—');
-    this.setText('tour-count-badge-dt2',    '—');
+    this.setText('tour-count-badge-num',   '—');
+    this.setText('tour-count-badge-den',   '—');
     this.setText('tour-dt-node-name',      nameLabel);
-    this.setText('tour-dt-node-name2',    nameLabel);
     this.setText('tour-progress-label-dt',  '完成');
-    this.setText('tour-progress-label-dt2', '完成');
+    this.setText('tour-step-badge-dt',     '—');
+    this.setText('tour-step-badge-mob',    '—');
 
     // If the tour exhausted itself, surface a title so the bar reads
     // "已停止 — 已试 3 轮" instead of just "已停止". The tooltip stays

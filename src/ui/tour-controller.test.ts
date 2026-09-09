@@ -29,12 +29,11 @@ import { Renderer } from '../core/renderer.js';
 import { DetailPanel } from './detail-panel.js';
 import type { TourEngine } from '../core/tour.js';
 
-const NAME_IDS = ['tour-dt-node-name', 'tour-dt-node-name2'];
+const NAME_IDS = ['tour-dt-node-name'];
 const COUNT_IDS = [
-  'tour-count-badge',
-  'tour-count-badge-mob2',
-  'tour-count-badge-dt',
-  'tour-count-badge-dt2',
+  'tour-count-badge-num',
+  'tour-count-badge-den',
+  'tour-progress-label-dt',
 ];
 
 function setupDom() {

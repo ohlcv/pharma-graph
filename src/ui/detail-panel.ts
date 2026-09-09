@@ -7,6 +7,7 @@ import {
   FILL_CONFIG,
   EDGE_TYPE_LABEL,
   LEVEL_LABEL,
+  getLevelLabel,
   getNeutralBorderColor,
   getSubtreeBorderColor,
 } from '../core/config.js';
@@ -251,7 +252,7 @@ function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
     ? (FILL_CONFIG[fillVal]?.label ?? fillVal)
     : '—';
   const depthVal = typeof d.depth === 'number' ? d.depth : 0;
-  const depthLabel = LEVEL_LABEL[depthVal] ?? `${depthVal}级`;
+  const depthLabel = getLevelLabel(depthVal);
   // A1：徽章色不再按 depth 取，而是按"是否属于某个子树"——
   // 有子树时用子树色（与图上一致），游离节点用中性灰 fallback。
   const subtreeRoot = typeof d.subtreeRoot === 'string' ? d.subtreeRoot : '';

@@ -1066,6 +1066,8 @@ export class TourEngine {
           const strategy = getStrategy(this.getStrategyId());
           this.seq = normalizeSeq(this.cy, strategy.buildSequence(this.cy));
           this.seqIndex = 0;
+          // 新一轮：currentStep 也要重置回 0（visitNext 内会 ++ 到 1）
+          this.currentStep = 0;
           // 策略钩子：一轮遍历结束（即将开始新一轮）
           this._hooks.onCycleEnd?.(this.cy);
           continue;
