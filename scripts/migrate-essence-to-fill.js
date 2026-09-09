@@ -57,8 +57,8 @@ function getStrokeFromId(id) {
   // medication 类型通常是重点药，drug 类型是普通药
   // 但在当前系统中，id 前缀并不完全代表重点/普通
   // 所以我们保守处理：只有明确是重点药时才添加 stroke
-  if (id && (id.startsWith('med-') || id.startsWith('drug-'))) {
-    return 'flow';
+  if (id && id.startsWith('med-')) {
+    return 'glow';
   }
   return undefined; // auto
 }
@@ -117,7 +117,7 @@ function migrateFrontmatter(data, filePath) {
   const isKeyDrug = id.startsWith('med-');
   if (isKeyDrug) {
     changes.push(`stroke: glow`);
-    fm.stroke = 'flow';
+    fm.stroke = 'glow';
   }
   
   return { fm, changes, originalData: newData };

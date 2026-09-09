@@ -30,7 +30,7 @@ export interface NodeMeta {
   /** 领域顶层类 IRI（如 cls-drug, cls-classification, cls-adverse 等）*/
   fill?: string;
 
-  /** 边框样式：auto | flow | glow | fallback（显式填写时覆盖 fill 的默认边框）*/
+  /** 边框样式：auto | glow | fallback（显式填写时覆盖 fill 的默认边框）*/
   stroke?: StrokeType;
 
   /** OWL2 实体类型（显式填写时覆盖 fill 的默认形状）。

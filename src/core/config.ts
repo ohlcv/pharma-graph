@@ -74,8 +74,7 @@ export const FILL_CONFIG: Record<string, {
   /** 默认 stroke 行为，节点不填 stroke 时启用
    *  - auto: 子树统一色（subtreeRoot），无子树时降级到 fill 兜底边框色
    *  - fallback: 直接用 fill 兜底边框色（按 fill 类型着色，不跟随子树）
-   *  - flow: subtreeRoot 色 + 流光动画
-   *  - glow: subtreeRoot 色 + 光晕效果 */
+   *  - glow: subtreeRoot 色 + 呼吸光晕效果 */
   defaultStroke: StrokeType;
   label: string;
   description: string;
@@ -203,7 +202,7 @@ export function getBorderColor(
   depth: number | undefined,
   fill?: string,  // ← 新增：节点 fill，决定 fallback 兜底色
 ): string {
-  // 1. stroke 显式声明（flow/glow）
+  // 1. stroke 显式声明（glow）
   if (stroke && stroke !== 'auto' && stroke !== 'fallback') {
     const cfg = STROKE_CONFIG[stroke as StrokeType];
     if (cfg && cfg.color !== 'inherit') {
@@ -709,7 +708,7 @@ export const LAYOUTS: Record<string, LayoutConfig> = {
 // 既保持"色块是这类内容"的视觉记忆，又不抢主体内容。
 //
 // 完整 stroke 链路：
-//   - stroke 显式填写（flow/glow）→ STROKE_CONFIG[stroke].color
+//   - stroke 显式填写（glow）→ STROKE_CONFIG[stroke].color
 //   - stroke='auto' + 有 subtreeRoot → subtreeRoot 色
 //   - stroke='auto' + 无 subtreeRoot → FILL_BORDER_HINTS[fill]
 //
