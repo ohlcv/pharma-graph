@@ -69,6 +69,9 @@ export class TourController {
   isRunning(): boolean { return this.running; }
   isPaused():  boolean { return this.paused; }
 
+  /** 追踪期望的档位（1-5，5=全部），用于在 start() 时覆盖 DOM 滑块值 */
+  private _pendingMaxDepth: number = 5;
+
   start(): void {
     if (this.engine?.isRunning() || this.engine?.isPaused()) {
       this.stop();
@@ -77,7 +80,8 @@ export class TourController {
     this.engine = new TourEngine(this.cy);
     this.engine.start(rootId, {
       interval: this.currentInterval(),
-      maxDepth: this.currentMaxDepth(),
+      // 传递档位（5=全部），TourEngine 内部会处理为无限模式
+      maxDepth: this._pendingMaxDepth,
       strategy: uiState.tour.strategy,
       onStep:           (info) => this.onStep(info),
       onStepAfterCenter:(info) => { this.detailPanel.show(info.nodeId); },
@@ -176,7 +180,17 @@ export class TourController {
   }
 
   private findSlider(which: 'interval' | 'maxdepth'): SliderBind | undefined {
-    return this.sliders.find((s) => s.range.dataset['tourSlider'] === which);
+    // 优先通过 data 属性查找（如果有的话）
+    const byData = this.sliders.find((s) => s.range.dataset['tourSlider'] === which);
+    if (byData) return byData;
+    
+    // 回退：通过滑块 ID 查找
+    const idMap: Record<string, string[]> = {
+      interval: ['tour-interval', 'tour-interval-mob2', 'tour-interval-dt', 'tour-interval-dt2'],
+      maxdepth: ['tour-maxdepth', 'tour-maxdepth-mob2', 'tour-maxdepth-dt', 'tour-maxdepth-dt2'],
+    };
+    const ids = idMap[which] ?? [];
+    return this.sliders.find((s) => ids.includes(s.range.id));
   }
 
   /** Set the tour strategy. If currently running, restart with the new strategy. */
@@ -293,13 +307,25 @@ export class TourController {
       document.getElementById('tour-maxdepth') as HTMLInputElement | null,
       document.getElementById('tour-maxdepth-mob2') as HTMLInputElement | null,
     ].filter(Boolean) as HTMLInputElement[]) {
+      // 移动端深度标签 ID 是 tour-depth-val，不是 mobileDepth.id + '-val'
+      const mobileDepthValId = mobileDepth.id === 'tour-maxdepth' ? 'tour-depth-val' : 'tour-depth-val-mob2';
       this.sliders.push(this.bindSlider(
         mobileDepth, desktopDepth,
         document.getElementById(mobileDepth.id + '-fill'),
-        document.getElementById(mobileDepth.id + '-val'),
+        document.getElementById(mobileDepthValId),
         document.getElementById('tour-depth-val-dt'),
         (v) => v >= 5 ? '\u221e' : TOUR_DEPTH_CONFIG.getLabel(v),
-        (v) => this.engine?.setMaxDepth(v >= 5 ? -1 : v),
+        (v) => {
+          // 同时更新追踪状态和 DOM 滑块值，确保下次 start() 时使用正确的值
+          this._pendingMaxDepth = v;
+          // 同步更新 DOM 滑块
+          const depthSlider = this.findSlider('maxdepth');
+          if (depthSlider) {
+            depthSlider.range.value = String(v);
+            this.paintFill(depthSlider);
+          }
+          this.engine?.setMaxDepth(v);
+        },
         [desktopDepth2].filter(Boolean) as HTMLInputElement[],
         [document.getElementById('tour-depth-val-dt2')],
       ));

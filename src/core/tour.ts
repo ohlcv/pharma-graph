@@ -8,41 +8,41 @@ export const TOUR_DEPTH_CONFIG = {
   levels: [
     {
       level: 1,
-      label: '章节-结构',
+      label: '结构',
       description: '快速浏览章节框架',
       includes: ['cls-structure'],
     },
     {
       level: 2,
-      label: '章节分类-概览',
+      label: '概览',
       description: '了解知识分类',
       includes: ['cls-structure', 'cls-classification'],
     },
     {
       level: 3,
-      label: '重点药-复习',
+      label: '复习',
       description: '只看重点药（跳过普通药）',
       includes: ['cls-structure', 'cls-classification', 'cls-drug-key'], // key = 重点药
     },
     {
       level: 4,
-      label: '口诀总结-学习',
+      label: '口诀',
       description: '加入记忆内容',
       includes: ['cls-structure', 'cls-classification', 'cls-drug-key', 'cls-summary', 'cls-mnemonic'],
     },
     {
       level: 5,
-      label: '全部节点-全面',
+      label: '全面',
       description: '完整学习',
       includes: ['all'], // 全部类型
     },
   ] as const,
 
-  /** 从档位获取显示标签 */
+  /** 从档位获取显示标签（固定两字） */
   getLabel(level: number): string {
-    if (level >= 5) return this.levels[4].label;
-    if (level <= 0) return this.levels[0].label;
-    return this.levels[Math.floor(level) - 1].label;
+    // level 0 或负数 = 档位 5（全部）
+    if (level <= 0 || level >= 5) return this.levels[4].label;
+    return this.levels[level - 1].label;
   },
 };
 
@@ -56,7 +56,8 @@ export function isKeyDrug(node: cytoscape.NodeSingular): boolean {
 /** 判断节点是否属于给定档位的内容范围 */
 export function isNodeInLevel(node: cytoscape.NodeSingular, level: number): boolean {
   const fill = node.data('fill') as string;
-  const isKey = isKeyDrug(node);
+  const stroke = node.data('stroke') as string | undefined;
+  const isKey = fill === 'cls-drug' && stroke === 'glow';
 
   // 档位 5 = 全部
   if (level >= 5) return true;
@@ -728,6 +729,8 @@ export class TourEngine {
   private cy: cytoscape.Core;
   private interval = DEFAULT_INTERVAL_MS;
   private maxDepth = INFINITE_DEPTH;
+  /** 内容档位：1-5，决定漫游时过滤哪些 fill 类型。独立于 maxDepth（步数限制）。 */
+  private _depthLevel = 5;
   private timer: ReturnType<typeof setTimeout> | undefined = undefined;
   private paused = false;
   private stopped = false;
@@ -780,7 +783,12 @@ export class TourEngine {
     this.paused = false;
     this.stopped = false;
     this.interval = options.interval ?? DEFAULT_INTERVAL_MS;
-    this.maxDepth = options.maxDepth ?? INFINITE_DEPTH;
+    // maxDepth 参数表示档位（1-5），5 或负数 = 全部（无限漫游）
+    // 始终使用无限模式（步数不受限制），让档位过滤单独工作
+    const level = options.maxDepth ?? INFINITE_DEPTH;
+    this._depthLevel = level <= 0 ? 5 : level;
+    this.maxDepth = -1; // 始终无限
+    console.log(`[Tour DEBUG start] maxDepth=${this.maxDepth}, _depthLevel=${this._depthLevel}`);
     this.onStep = options.onStep;
     this.onStepAfterCenter = options.onStepAfterCenter;
     this.onComplete = options.onComplete;
@@ -964,30 +972,40 @@ export class TourEngine {
   }
 
   setMaxDepth(depth: number): void {
-    this.maxDepth = depth;
+    // 滑块值 1-5 只控制档位（显示层级），始终使用无限模式（步数不受限制）
+    // 档位 5 = 全部（无限漫游）
+    this._depthLevel = depth <= 0 ? 5 : depth;
+    this.maxDepth = -1; // 始终无限，让档位过滤单独工作
+    console.log(`[Tour DEBUG setMaxDepth] 档位已更新为 ${this._depthLevel}，maxDepth=${this.maxDepth}`);
   }
 
   /**
    * 获取当前档位对应的中文标签
    */
   getDepthLabel(): string {
-    if (this.maxDepth < 0) return '全部节点-全面';
-    return TOUR_DEPTH_CONFIG.getLabel(this.maxDepth);
+    return TOUR_DEPTH_CONFIG.getLabel(this._depthLevel);
   }
 
   private scheduleNext(): void {
     if (this.stopped) return;
     clearTimeout(this.timer);
     const t = this;
+    // 总间隔 = 滑块值（包含动画 600ms），所以 setTimeout 延迟 = 滑块值 - 动画时间
+    // 如果滑块值小于动画时间，则间隔设为 0（动画完成后立即开始下一步）
+    const delay = Math.max(0, this.interval - 600);
     this.timer = setTimeout(() => {
       if (!t.stopped && !t.paused) {
         t.visitNext();
       }
-    }, this.interval);
+    }, delay);
   }
 
   private visitNext(): void {
-    if (this.stopped) return;
+    if (this.stopped) {
+      console.log('[Tour DEBUG visitNext] stopped=true，直接返回');
+      return;
+    }
+    console.log(`[Tour DEBUG visitNext] maxDepth=${this.maxDepth}, _depthLevel=${this._depthLevel}, seqIndex=${this.seqIndex}, seq.length=${this.seq.length}`);
     let restarted = false;
     let loopSafety = 0;
     while (true) {
@@ -1001,9 +1019,9 @@ export class TourEngine {
         if (this._hooks.shouldVisit && !this._hooks.shouldVisit(id, this.cy)) continue;
         if (!node.empty() && !node.hasClass('layer-parent')) {
           // 档位过滤：检查节点是否属于当前档位的内容范围
-          // maxDepth 为 1-5，档位 5 = 全部（相当于无限）
-          if (this.maxDepth > 0 && this.maxDepth < 5) {
-            if (!isNodeInLevel(node, this.maxDepth)) {
+          // _depthLevel 1-5，档位 5 = 全部（不过滤）
+          if (this._depthLevel < 5) {
+            if (!isNodeInLevel(node, this._depthLevel)) {
               continue; // 跳过不在当前档位范围内的节点
             }
           }
@@ -1011,7 +1029,11 @@ export class TourEngine {
           // Use the graph's real BFS depth (0=root/center, higher=outer layers).
           const nodeDepth = (node.data('depth') as number) ?? 0;
           this.highlightAndFocus(id, [id], nodeDepth, this.seq.length, this.seqIndex);
-          if (this.maxDepth > 0 && this.seqIndex >= this.maxDepth) {
+          // 调试日志
+          console.log(`[Tour DEBUG] 显示节点 id=${id}, currentStep=${this.currentStep}, maxDepth=${this.maxDepth}, maxDepth>0=${this.maxDepth > 0}, currentStep>=maxDepth=${this.currentStep >= this.maxDepth}`);
+          // currentStep 从 1 开始，maxDepth = N 表示最多显示 N 步
+          if (this.maxDepth > 0 && this.currentStep >= this.maxDepth) {
+            console.log(`[Tour DEBUG] 达到深度限制，停止`);
             this.stopped = true;
             this.onComplete?.('depth-reached');
           }

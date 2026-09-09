@@ -114,10 +114,16 @@ export function initGraphEvents(deps: GraphEventDeps): void {
       deps.highlight.reset();
       deps.detailPanel.close();
       // Tapping the empty canvas while a tour is active stops the tour.
-      // (Issue #11: tourController is guaranteed non-null here because
-      // main.ts constructs it before calling initGraphEvents.)
-      if (deps.tourController.isRunning() || deps.tourController.isPaused()) {
-        deps.tourController.stop();
+      // 但如果点击目标是漫游条内部元素（如滑块、按钮），则不停止漫游。
+      // 检查 originalEvent.target 是否是漫游条相关元素
+      const originalTarget = evt.originalEvent?.target as HTMLElement | null;
+      const isTourInteraction = originalTarget?.closest?.(
+        '[data-tour-action], .tour-mob__range, .tour-dt__range, .tour-mob__cell, .tour-mob__track'
+      );
+      if (!isTourInteraction) {
+        if (deps.tourController.isRunning() || deps.tourController.isPaused()) {
+          deps.tourController.stop();
+        }
       }
     }
   });
