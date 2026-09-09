@@ -295,9 +295,13 @@ function buildSummaryHtml(d: cytoscape.NodeDataDefinition): string {
   const hasFull = Boolean(fullSummary);
   const hasBoth = hasShort && hasFull;
 
-  // 根据当前模式决定显示哪个摘要
-  const currentSummary =
-    (uiState.summaryMode === 'full' && hasFull) ? fullSummary : shortSummary;
+  // 根据当前模式决定显示哪个摘要：优先 short，没有则 fallback 到 full
+  let currentSummary: string | undefined;
+  if (uiState.summaryMode === 'full') {
+    currentSummary = hasFull ? fullSummary : shortSummary;
+  } else {
+    currentSummary = hasShort ? shortSummary : fullSummary;
+  }
 
   if (!currentSummary) return '';
 
