@@ -6,7 +6,7 @@ pkill -9 -f "esbuild" 2>/dev/null
 sleep 1
 
 # 启动 vite
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 npx vite &
 PID=$!
 

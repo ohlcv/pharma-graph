@@ -1,4 +1,5 @@
 ---
+
 id: cls-gaba-inhibitory-y2-01-02
 label: 增强GABA抑制性
 fill: cls-classification
@@ -11,7 +12,9 @@ location:
 
 tags:
   - 增强GABA抑制性
+
   - 作用机制
+
   - 抗癫痫发作药
 
 summary:
@@ -20,4 +23,5 @@ edges_out:
   - target: sec-epilepsy-y2-01-02
     type: subclass_of
     reason: 抗癫痫发作药的作用机制分类
+
 ---

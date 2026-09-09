@@ -1,4 +1,5 @@
 ---
+
 id: mem-抑制AMPA型谷氨酸受体-y2-01-02
 label: 抑制AMPA型谷氨酸受体口诀
 fill: cls-mnemonic
@@ -11,14 +12,17 @@ location:
 
 tags:
   - 抑制AMPA型谷氨酸受体
+
   - 口诀
+
   - 抗癫痫发作药
 
 summary:
-  short: "**ABPA帕**"
+  short: 
 
 edges_out:
   - target: cls-ampa-y2-01-02
     type: part_of
     reason: 抑制AMPA型谷氨酸受体记忆口诀
+
 ---

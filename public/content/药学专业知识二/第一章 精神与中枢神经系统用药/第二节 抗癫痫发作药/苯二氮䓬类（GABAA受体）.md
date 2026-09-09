@@ -1,4 +1,5 @@
 ---
+
 id: cls-benzodiazepine-gaba-y2-01-02
 label: 苯二氮䓬类
 fill: cls-classification
@@ -11,11 +12,14 @@ location:
 
 tags:
   - 苯二氮䓬类
+
   - 激动GABAA受体
+
   - 抗癫痫发作药
 
 edges_out:
   - target: cls-gaba-a-y2-01-02
     type: subclass_of
     reason: 激动GABAA受体的药物子类
+
 ---

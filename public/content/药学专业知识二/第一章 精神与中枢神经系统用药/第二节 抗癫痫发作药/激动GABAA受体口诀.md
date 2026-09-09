@@ -1,4 +1,5 @@
 ---
+
 id: mem-gaba-a-y2-01-02
 label: 激动GABAA受体口诀
 fill: cls-mnemonic
@@ -11,14 +12,17 @@ location:
 
 tags:
   - 激动GABAA受体
+
   - 口诀
+
   - 抗癫痫发作药
 
 summary:
-  short: "**巴比索要苯二受**"
+  short: 
 
 edges_out:
   - target: cls-gaba-a-y2-01-02
     type: part_of
     reason: 激动GABAA受体记忆口诀
+
 ---

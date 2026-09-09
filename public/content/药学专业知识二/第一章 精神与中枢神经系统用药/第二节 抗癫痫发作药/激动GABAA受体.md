@@ -1,4 +1,5 @@
 ---
+
 id: cls-gaba-a-y2-01-02
 label: 激动GABAA受体
 fill: cls-classification
@@ -11,15 +12,18 @@ location:
 
 tags:
   - 激动GABAA受体
+
   - 作用机制
+
   - 抗癫痫发作药
 
 summary:
   full: |
-    【代表药】苯二氮䓬类药物，如氯硝西泮、地西泮、劳拉西泮、咪达唑仑、氯巴占、加奈索酮等
+    【代表药】**苯二氮䓬类**药物，如氯硝西泮、**地西泮**、**劳拉西泮**、**咪达唑仑**、**氯巴占**、**加奈索酮**等
 
 edges_out:
   - target: cls-gaba-inhibitory-y2-01-02
     type: subclass_of
     reason: 抑制性的具体机制
+
 ---
