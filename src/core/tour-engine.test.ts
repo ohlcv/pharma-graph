@@ -2,15 +2,15 @@
  * @vitest-environment jsdom
  *
  * Tests the issue #16 contract: `TourEngine.onComplete` is called with a
- * `reason` argument that distinguishes the normal depth-reached stop from
- * the infinite-mode restart-loop exhaustion.
+ * `TourCompleteInfo` object { reason, maxAttempts } that distinguishes the
+ * normal depth-reached stop from the infinite-mode restart-loop exhaustion.
  *
  * We don't drive the full engine here (the headless-cy + rAF dance
  * needed for `visitNext` to actually advance is brittle and out of
  * scope for the unit-level reason-routing test). Instead, we install the
  * `onComplete` callback directly on the engine's private field and
  * invoke it as if the engine had completed — verifying the controller
- * receives the right reason string for each documented stop path.
+ * receives the right info for each documented stop path.
  *
  * jsdom doesn't define requestAnimationFrame — stub so engine
  * construction doesn't crash.
@@ -22,41 +22,51 @@ if (typeof globalThis.requestAnimationFrame !== 'function') {
   globalThis.cancelAnimationFrame = (id: number) => clearTimeout(id);
 }
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import cytoscape from 'cytoscape';
-import { TourEngine, asStrategy, registerStrategy, unregisterStrategy } from './tour.js';
+import { TourEngine, asStrategy, registerStrategy, unregisterStrategy, TourCompleteInfo } from './tour.js';
 
+/** Single-node graph — sufficient for onComplete reason-routing tests that
+ *  never advance the tour. */
 function makeCy() {
   const cy = cytoscape({ headless: true, styleEnabled: false });
   cy.add([{ group: 'nodes', data: { id: 'a' } }]);
   return cy;
 }
 
-function installOnComplete(engine: TourEngine, fn: (r: string) => void) {
-  (engine as unknown as { onComplete: (r: string) => void }).onComplete = fn;
+/** Install a callback that receives the new TourCompleteInfo object shape. */
+function installOnComplete(engine: TourEngine, fn: (info: TourCompleteInfo) => void) {
+  (engine as unknown as { onComplete: (info: TourCompleteInfo) => void }).onComplete = fn;
 }
 
 describe('TourEngine onComplete reason routing (issue #16)', () => {
-  it('the reason argument is "depth-reached" when maxDepth is bounded', () => {
+  it('passes { reason: "depth-reached", maxAttempts } when maxDepth is bounded', () => {
     const cy = makeCy();
     const engine = new TourEngine(cy);
-    let captured: string | null = null;
-    installOnComplete(engine, (r) => {
-      captured = r;
-    });
-    engine['onComplete']?.('depth-reached');
-    expect(captured).toBe('depth-reached');
+    let captured: TourCompleteInfo | null = null;
+    installOnComplete(engine, (info) => { captured = info; });
+    engine['onComplete']?.({ reason: 'depth-reached', maxAttempts: 3 });
+    expect(captured?.reason).toBe('depth-reached');
+    expect(captured?.maxAttempts).toBe(3);
   });
 
-  it('the reason argument is "no-more-restarts" when infinite mode exhausts', () => {
+  it('passes { reason: "no-more-restarts", maxAttempts } when infinite mode exhausts', () => {
     const cy = makeCy();
     const engine = new TourEngine(cy);
-    let captured: string | null = null;
-    installOnComplete(engine, (r) => {
-      captured = r;
-    });
-    engine['onComplete']?.('no-more-restarts');
-    expect(captured).toBe('no-more-restarts');
+    let captured: TourCompleteInfo | null = null;
+    installOnComplete(engine, (info) => { captured = info; });
+    engine['onComplete']?.({ reason: 'no-more-restarts', maxAttempts: 3 });
+    expect(captured?.reason).toBe('no-more-restarts');
+    expect(captured?.maxAttempts).toBe(3);
+  });
+
+  it('passes { reason: "no-root", maxAttempts } when no root node found', () => {
+    const cy = makeCy();
+    const engine = new TourEngine(cy);
+    let captured: TourCompleteInfo | null = null;
+    installOnComplete(engine, (info) => { captured = info; });
+    engine['onComplete']?.({ reason: 'no-root', maxAttempts: 3 });
+    expect(captured?.reason).toBe('no-root');
   });
 
   it('the restart-attempt counter is reset to 0 once the engine finalises', () => {
@@ -79,27 +89,30 @@ describe('TourEngine onComplete reason routing (issue #16)', () => {
     const cy = makeCy();
     const engine = new TourEngine(cy);
     const seen: string[] = [];
-    installOnComplete(engine, (r) => seen.push(r));
-    engine['onComplete']?.('depth-reached');
-    engine['onComplete']?.('no-more-restarts');
-    engine['onComplete']?.('no-root');
+    installOnComplete(engine, (info) => seen.push(info.reason));
+    engine['onComplete']?.({ reason: 'depth-reached', maxAttempts: 3 });
+    engine['onComplete']?.({ reason: 'no-more-restarts', maxAttempts: 3 });
+    engine['onComplete']?.({ reason: 'no-root', maxAttempts: 3 });
     expect(seen).toEqual(['depth-reached', 'no-more-restarts', 'no-root']);
   });
 });
 
 describe('TourEngine totalExplored live sync (issue #15 fix)', () => {
-  function makeCy() {
+  function makeCy3() {
     const cy = cytoscape({ headless: true, styleEnabled: false });
+    // has-dfs starts from cls-structure nodes; tag a, b, c as such so the
+    // strategy's DFS produces a non-empty seq (otherwise the engine's new
+    // empty-seq guard would stop before listeners attach).
     cy.add([
-      { group: 'nodes', data: { id: 'a' } },
-      { group: 'nodes', data: { id: 'b' } },
-      { group: 'nodes', data: { id: 'c' } },
+      { group: 'nodes', data: { id: 'a', fill: 'cls-structure' } },
+      { group: 'nodes', data: { id: 'b', fill: 'cls-structure' } },
+      { group: 'nodes', data: { id: 'c', fill: 'cls-structure' } },
     ]);
     return cy;
   }
 
   it('initial totalExplored equals cy.nodes().size() at start()', () => {
-    const cy = makeCy();
+    const cy = makeCy3();
     const engine = new TourEngine(cy);
     engine.start('a', {
       interval: 1,
@@ -112,7 +125,7 @@ describe('TourEngine totalExplored live sync (issue #15 fix)', () => {
   });
 
   it('removing a node mid-tour updates totalExplored', () => {
-    const cy = makeCy();
+    const cy = makeCy3();
     const engine = new TourEngine(cy);
     engine.start('a', {
       interval: 1,
@@ -130,7 +143,7 @@ describe('TourEngine totalExplored live sync (issue #15 fix)', () => {
   });
 
   it('adding a node mid-tour updates totalExplored', () => {
-    const cy = makeCy();
+    const cy = makeCy3();
     const engine = new TourEngine(cy);
     engine.start('a', {
       interval: 1,
@@ -146,7 +159,7 @@ describe('TourEngine totalExplored live sync (issue #15 fix)', () => {
   });
 
   it('removing then adding back updates totalExplored twice (proves listener is live)', () => {
-    const cy = makeCy();
+    const cy = makeCy3();
     const engine = new TourEngine(cy);
     engine.start('a', {
       interval: 1,
@@ -164,7 +177,7 @@ describe('TourEngine totalExplored live sync (issue #15 fix)', () => {
   });
 
   it('stop() detaches listeners — post-stop mutations no longer update totalExplored', () => {
-    const cy = makeCy();
+    const cy = makeCy3();
     const engine = new TourEngine(cy);
     engine.start('a', {
       interval: 1,
@@ -182,7 +195,7 @@ describe('TourEngine totalExplored live sync (issue #15 fix)', () => {
   });
 
   it('starting a new tour re-attaches listeners (no leaks across restarts)', () => {
-    const cy = makeCy();
+    const cy = makeCy3();
     const engine = new TourEngine(cy);
     engine.start('a', {
       interval: 1,
@@ -204,7 +217,7 @@ describe('TourEngine totalExplored live sync (issue #15 fix)', () => {
   });
 
   it('does not leak handlers: attach→detach leaves no active listeners on cy', () => {
-    const cy = makeCy();
+    const cy = makeCy3();
     const engine = new TourEngine(cy);
     engine.start('a', {
       interval: 1,
@@ -248,7 +261,7 @@ describe('TourEngine shouldRestart hook (issue #7)', () => {
       { group: 'nodes', data: { id: 'c' } },
     ]);
     const engine = new TourEngine(cy);
-    let captured: string | null = null;
+    let captured: TourCompleteInfo | null = null;
 
     engine.start('a', {
       interval: 1_000_000, // 几乎不会触发，但 visitNext 同步跑
@@ -257,9 +270,7 @@ describe('TourEngine shouldRestart hook (issue #7)', () => {
     });
     // start 会用 options.onComplete 覆盖 engine.onComplete，所以**之后**再装
     // 真正的捕获回调，否则我们的 captured 永远不会被赋值。
-    installOnComplete(engine, (r) => {
-      captured = r;
-    });
+    installOnComplete(engine, (info) => { captured = info; });
 
     // 手动同步驱动 visitNext 把 seq 走完——而不是依赖 setTimeout。
     // seq = [a,b,c]，start 已经访问过 a（seqIndex=1），
@@ -268,7 +279,7 @@ describe('TourEngine shouldRestart hook (issue #7)', () => {
     (engine as unknown as { visitNext: () => void }).visitNext(); // visit c → seq exhausted
     (engine as unknown as { visitNext: () => void }).visitNext(); // triggers restart logic
 
-    expect(captured).toBe('no-more-restarts');
+    expect(captured?.reason).toBe('no-more-restarts');
     expect(engine['_restartAttempts']).toBe(0); // shouldRestart=false 直接跳过计数
 
     engine.stop();
@@ -283,8 +294,17 @@ describe('TourEngine shouldRestart hook (issue #7)', () => {
 // engine's internal `wasAlreadyPaused` short-circuited, leaving the
 // controller's `paused` flag stale and causing Space-bar resume to no-op.
 
-import { vi } from 'vitest';
 describe('TourEngine prev/next pause-emit contract', () => {
+  function makeCy() {
+    const cy = cytoscape({ headless: true, styleEnabled: false });
+    cy.add([
+      { group: 'nodes', data: { id: 'a' } },
+      { group: 'nodes', data: { id: 'b' } },
+      { group: 'nodes', data: { id: 'c' } },
+    ]);
+    return cy;
+  }
+
   it('next() always fires onPause, even when already paused', () => {
     const cy = makeCy();
     const engine = new TourEngine(cy);
@@ -303,18 +323,22 @@ describe('TourEngine prev/next pause-emit contract', () => {
     engine.stop();
   });
 
-  it('prev() always fires onPause (when seqIndex > 0)', () => {
+  it('prev() always fires onPause (when _visited has history to back up into)', () => {
     const cy = makeCy();
     const engine = new TourEngine(cy);
     const onPause = vi.fn();
     (engine as unknown as { onPause: () => void }).onPause = onPause;
     (engine as unknown as { paused: boolean }).paused = false;
+    // Seed _visited so prev() has somewhere to go.
+    (engine as unknown as { _visited: string[] })._visited = ['a', 'b'];
     (engine as unknown as { seqIndex: number }).seqIndex = 2;
     (engine as unknown as { seq: string[] }).seq = ['a', 'b', 'c'];
     engine.prev();
     expect(onPause).toHaveBeenCalledTimes(1);
+    // Second prev: now _visited = ['a'], can't go further, returns early.
     engine.prev();
-    expect(onPause).toHaveBeenCalledTimes(2);
+    // onPause should NOT be called when there's nothing to go back to.
+    expect(onPause).toHaveBeenCalledTimes(1);
     engine.stop();
   });
 });

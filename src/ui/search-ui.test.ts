@@ -45,7 +45,7 @@ function setupInputs(): {
   cy: cytoscape.Core;
   search: Search;
   show: ReturnType<typeof vi.fn>;
-  detailPanel: { show: (id: string) => void };
+  detailPanel: { show: (id: string, userInitiated?: boolean) => void };
 } {
   document.body.innerHTML = `
     <div id="search-announcer" aria-live="polite"></div>
@@ -58,7 +58,7 @@ function setupInputs(): {
   vi.spyOn(cy, 'stop').mockImplementation(() => undefined as never);
   const search = new Search(cy, makeHighlight(cy));
   const show = vi.fn();
-  const detailPanel = { show } as unknown as { show: (id: string) => void };
+  const detailPanel = { show } as unknown as { show: (id: string, userInitiated?: boolean) => void };
   initSearchUI(cy, makeHighlight(cy), search, detailPanel as never);
   return { cy, search, show, detailPanel };
 }
@@ -83,7 +83,7 @@ describe('search-ui integration', () => {
     input.value = '阿';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     fireKey(input, 'Enter');
-    expect(show).toHaveBeenCalledWith('a');
+    expect(show).toHaveBeenCalledWith('a', true);
     expect(search.getCurrentId()).toBe('a');
   });
 
@@ -95,7 +95,7 @@ describe('search-ui integration', () => {
     fireKey(input, 'ArrowDown');
     fireKey(input, 'ArrowDown');
     expect(search.getCurrentId()).toBe('b');
-    expect(show).toHaveBeenLastCalledWith('b');
+    expect(show).toHaveBeenLastCalledWith('b', true);
   });
 
   it('Escape clears the search and resets the cursor', () => {
@@ -124,7 +124,7 @@ describe('search-ui integration', () => {
     // After compositionend, Enter should now navigate.
     fireKey(input, 'Enter');
     expect(search.getCurrentId()).toBe('a');
-    expect(show).toHaveBeenCalledWith('a');
+    expect(show).toHaveBeenCalledWith('a', true);
   });
 
   it('mobile input mirrors the desktop input value', () => {

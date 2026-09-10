@@ -60,7 +60,7 @@ function makeController(): TourController {
   const cy = cytoscape({ headless: true, styleEnabled: false });
   cy.add({ group: 'nodes', data: { id: 'a', label: 'A' } });
   const renderer = { getCy: () => cy } as unknown as Renderer;
-  const detailPanel = { close: () => {}, show: () => {} } as unknown as DetailPanel;
+  const detailPanel = { close: () => {}, closeSilently: () => {}, show: () => {} } as unknown as DetailPanel;
   return new TourController(cy, renderer, detailPanel);
 }
 
@@ -185,9 +185,9 @@ describe('TourController.onComplete — issue #16 reason branching', () => {
     // Cast through unknown to bypass the type narrowing — the controller
     // types the reason as a union, but the JSDoc says future enum values
     // may be added and should not crash.
-    expect(() =>
-      p.onComplete('some-future-reason' as unknown as 'depth-reached'),
-    ).not.toThrow();
+    expect(() => {
+      p.onComplete('some-future-reason' as unknown as 'depth-reached');
+    }).not.toThrow();
     // Default branch: badge stays at the original value (depth-style ✓),
     // name stays at its prior value. We just assert onComplete finishes
     // cleanly and resets the running flag.
@@ -392,3 +392,4 @@ describe('TourController — keyboard shortcuts', () => {
     expect(engine.resume).not.toHaveBeenCalled();
   });
 });
+

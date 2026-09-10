@@ -83,6 +83,14 @@ export function isNodeInLevel(node: cytoscape.NodeSingular, level: number): bool
 
 export type TourCompleteReason = 'depth-reached' | 'no-more-restarts' | 'no-root';
 
+/** Payload passed to onComplete — the engine's terminal state. The max
+ *  attempt count is exposed so controllers don't hardcode a literal "3"
+ *  that would drift out of sync with MAX_RESTART_ATTEMPTS. */
+export interface TourCompleteInfo {
+  reason: TourCompleteReason;
+  maxAttempts: number;
+}
+
 export interface TourOptions {
   interval: number;
   maxDepth: number;
@@ -97,7 +105,7 @@ export interface TourOptions {
    * was getting a silent stop and didn't know why), or there was no
    * root node to start from.
    */
-  onComplete?: (reason: TourCompleteReason) => void;
+  onComplete?: (info: TourCompleteInfo) => void;
   onPause?: () => void;
   onResume?: () => void;
 }
@@ -762,6 +770,20 @@ export class TourEngine {
   /** The starting node selected by the user. Persists across restart cycles
    *  so that cycle 2 still begins from the same subtree as cycle 1. */
   private _rootId: string = '';
+  /**
+   * Stack of nodes the tour has actually visited (emitted via onStep),
+   * in chronological order. Used by prev() to reliably step backward
+   * without the old `seqIndex -= 2` hack, which broke after the restart
+   * path reset `seqIndex` to 0 and produced a "visit the start node again"
+   * instead of a true backward step.
+   */
+  private _visited: string[] = [];
+  /** Pre-computed total visit count for the current seq+depth combo.
+   *  Without this, totalSteps() would be O(N) on every step (renderer.ts
+   *  + tour-controller.ts both call it for the progress badge), turning a
+   *  641-step tour into 41万 iterations. Recomputed only when seq or
+   *  _depthLevel change. */
+  private _cachedTotalSteps = 0;
   // tour invocation, when infinite mode (maxDepth < 0) loops back. Caps at 3
   // to prevent pathological re-runs from locking the UI. Resets in start() and
   // when the tour ends naturally. Previously misnamed `_recursionCount` —
@@ -781,7 +803,14 @@ export class TourEngine {
     });
   }
 
-  start(rootId: string, options: TourOptions): void {
+  /**
+   * Begin a tour starting from `rootId`. Returns `false` if the tour has
+   * nothing to visit (empty root, no nodes match the current depth level,
+   * or rootId is not in the strategy sequence) — callers should surface
+   * a user-visible error rather than letting the UI claim a tour is
+   * running when nothing will move.
+   */
+  start(rootId: string, options: TourOptions): boolean {
     this.stop();
     this.paused = false;
     this.stopped = false;
@@ -806,6 +835,9 @@ export class TourEngine {
     this.strategyId = options.strategy;
     this._hooks = strategy as Partial<StrategyHooks>;
 
+    // Visit history resets on every start (fresh tour).
+    this._visited = [];
+
     // Build full sequence
     this.seq = normalizeSeq(this.cy, strategy.buildSequence(this.cy));
     // Remember the root so subsequent restarts can re-scope the tour to the
@@ -820,6 +852,11 @@ export class TourEngine {
     // cls-sga-y2-01-07 produces a tour that starts there and walks its
     // subtree, not the entire 641-node graph.
     this.applyRootScope();
+    // applyRootScope re-computes the cached total only when seq actually
+    // changes (i.e. when rootId sliced the seq). If rootId was empty /
+    // already seq[0] the seq is unchanged, so we still need a one-time
+    // compute here for the very first start.
+    this.recomputeTotal();
 
     this.seqIndex = 1; // seq[0] is visited below; visitNext should start from seq[1]
     this.currentStep = 1;
@@ -829,9 +866,21 @@ export class TourEngine {
     // Listeners are removed on stop() so they don't outlive the engine.
     this.attachGraphMutators();
 
+    // If seq ends up empty or every node is filtered out by depth level,
+    // there is nothing to visit. Bail instead of pretending the tour
+    // is running. (Can happen when the user picks a node whose fill type
+    // doesn't match the current depth slider, e.g. a drug under "structure
+    // only" mode.)
+    if (this.seq.length === 0 || this._cachedTotalSteps === 0) {
+      this.stop();
+      return false;
+    }
+
     // silent=false: fire onStep immediately so the detail panel appears right away
+    this._visited.push(this.seq[0]);
     this.highlightAndFocus(this.seq[0], [this.seq[0]], 0, this.totalSteps(), 1, false);
     this.scheduleNext();
+    return true;
   }
 
   /** Advance to next node in sequence (for manual prev/next) */
@@ -848,16 +897,25 @@ export class TourEngine {
     this.onPause?.();
   }
 
-  /** Go to previous node in sequence */
+  /** Go to previous node in sequence.
+   *  Uses `_visited` history instead of the old `seqIndex -= 2` hack, which
+   *  was unreliable after restart (which resets `seqIndex` to 0). The
+   *  history stack also survives restart, so prev() still walks back through
+   *  recent visits even mid-cycle. */
   prev(): void {
     if (this.stopped) return;
     if (this.timer) { clearTimeout(this.timer); this.timer = undefined; }
-    if (this.seqIndex <= 0) return;
-    // Same rationale as next(): always emit onPause.
+    if (this._visited.length <= 1) return; // can't go before start node
+    // Pop the current node, then visit the previous one (the new top).
+    const target = this._visited[this._visited.length - 2];
+    this._visited.pop();
+    const node = this.cy.getElementById(target);
+    if (node.empty() || node.hasClass('layer-parent')) return;
+    // rewind seqIndex so visitNext's internal bookkeeping matches.
+    this.seqIndex = Math.max(0, this.seqIndex - 1);
+    this.currentStep--;
     this.paused = true;
-    this.seqIndex -= 2; // back up two: one to undo the last visitNext increment, one more to go back
-    if (this.seqIndex < 0) this.seqIndex = 0;
-    this.visitNext();
+    this.highlightAndFocus(target, [target], 0, this.totalSteps(), this.seqIndex, /* silent */ false);
     this.onPause?.();
   }
 
@@ -930,12 +988,23 @@ export class TourEngine {
     return this.paused && !this.stopped;
   }
 
-  /** Total steps in this tour's sequence, filtered by current depth level. */
+  /** Total steps in this tour's sequence, filtered by current depth level.
+   *  Returns the cached pre-computed value when seq/_depthLevel are unchanged
+   *  since the last compute. recomputeTotal() must be called whenever either
+   *  changes (start, depth-level change, restart). */
   totalSteps(): number {
+    return this._cachedTotalSteps;
+  }
+
+  /** Re-scan the current seq and cache the count of visitable nodes for this
+   *  depth level. Call once after applyRootScope()/setMaxDepth()/restart —
+   *  anywhere the seq or _depthLevel changes. O(N) but only paid once per
+   *  mutation instead of O(N×steps). */
+  private recomputeTotal(): void {
     if (this._depthLevel >= 5) {
-      return this.seq.length; // 档位 5 = 全部，不过滤
+      this._cachedTotalSteps = this.seq.length;
+      return;
     }
-    // 档位 1-4：计算实际会被访问的节点数
     let count = 0;
     for (const id of this.seq) {
       const node = this.cy.getElementById(id);
@@ -943,7 +1012,7 @@ export class TourEngine {
       if (!isNodeInLevel(node, this._depthLevel)) continue;
       count++;
     }
-    return count;
+    this._cachedTotalSteps = count;
   }
 
   /** Current step in the sequence (1-indexed; matches TourStepInfo.currentStep). */
@@ -993,7 +1062,13 @@ export class TourEngine {
   setMaxDepth(depth: number): void {
     // 滑块值 1-5 只控制档位（显示层级），始终使用无限模式（步数不受限制）
     // 档位 5 = 全部（无限漫游）
-    this._depthLevel = depth <= 0 ? 5 : depth;
+    const newLevel = depth <= 0 ? 5 : depth;
+    if (newLevel !== this._depthLevel) {
+      this._depthLevel = newLevel;
+      // Depth changed — the visible node count for the same seq is now
+      // different, so invalidate the cache.
+      this.recomputeTotal();
+    }
     this.maxDepth = -1; // 始终无限，让档位过滤单独工作
   }
 
@@ -1044,6 +1119,9 @@ export class TourEngine {
       // rootId not in seq (shouldn't happen, but handle defensively)
       this.seq = [rootId, ...this.seq.filter((id) => id !== rootId)];
     }
+    // seq changed (length and contents); refresh the cached visit count
+    // so totalSteps() returns an accurate value without re-scanning.
+    this.recomputeTotal();
   }
 
   private visitNext(): void {
@@ -1070,12 +1148,8 @@ export class TourEngine {
           this.currentStep++;
           // Use the graph's real BFS depth (0=root/center, higher=outer layers).
           const nodeDepth = (node.data('depth') as number) ?? 0;
+          this._visited.push(id);
           this.highlightAndFocus(id, [id], nodeDepth, this.totalSteps(), this.seqIndex);
-          // currentStep 从 1 开始，maxDepth = N 表示最多显示 N 步
-          if (this.maxDepth > 0 && this.currentStep >= this.maxDepth) {
-            this.stopped = true;
-            this.onComplete?.('depth-reached');
-          }
           return;
         }
       }
@@ -1102,6 +1176,8 @@ export class TourEngine {
           this.seqIndex = 0;
           // 新一轮：currentStep 也要重置回 0（visitNext 内会 ++ 到 1）
           this.currentStep = 0;
+          // Also reset visit history — start of a new cycle.
+          this._visited = [];
           // 策略钩子：一轮遍历结束（即将开始新一轮）
           this._hooks.onCycleEnd?.(this.cy);
           continue;
@@ -1110,11 +1186,12 @@ export class TourEngine {
 
       this._restartAttempts = 0;
       this.stopped = true;
-      // Distinguish the "tried 3 times, giving up" path from the normal
-      // depth-reached path so the controller can tell the user why the
-      // tour stopped (issue #16).
+      // Distinguish between the configured-depth (normal) and the
+      // restart-loop exhaustion paths so the controller can tell the user
+      // why the tour stopped on its own (issue #16). Include maxAttempts so
+      // the controller doesn't have to hardcode "3".
       const reason: TourCompleteReason = this.maxDepth < 0 ? 'no-more-restarts' : 'depth-reached';
-      this.onComplete?.(reason);
+      this.onComplete?.({ reason, maxAttempts: MAX_RESTART_ATTEMPTS });
       return;
     }
   }

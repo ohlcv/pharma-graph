@@ -21,11 +21,12 @@
 //   complete (engine callback) → idle, then auto-hide after 2s
 
 import cytoscape from 'cytoscape';
-import { TourEngine, TourStrategy, TourStepInfo, getLocationKey, TOUR_DEPTH_CONFIG, isKeyDrug } from '../core/tour.js';
+import { TourEngine, TourStrategy, TourStepInfo, getLocationKey, TOUR_DEPTH_CONFIG, isKeyDrug, TourCompleteInfo } from '../core/tour.js';
 import { Renderer } from '../core/renderer.js';
 import { DetailPanel } from './detail-panel.js';
 import { uiState, registerTourBarToggle } from './state.js';
 import { UiToggle } from './ui-toggle.js';
+import { showToast } from './ui-helpers.js';
 
 const SEARCH_INPUT_DEBOUNCE_MS = 220;
 
@@ -77,19 +78,41 @@ export class TourController {
     if (this.engine?.isRunning() || this.engine?.isPaused()) {
       this.stop();
     }
+    // 新一次漫游 = 新的用户意图，面板跟随恢复
+    uiState.panelClosedByUser = false;
+    console.log('[TourController] start() 新漫游开始，重置 panelClosedByUser = false');
     const rootId = this.pickRoot();
     this.engine = new TourEngine(this.cy);
-    this.engine.start(rootId, {
+    const ok = this.engine.start(rootId, {
       interval: this.currentInterval(),
       // 传递档位（5=全部），TourEngine 内部会处理为无限模式
       maxDepth: this._pendingMaxDepth,
       strategy: uiState.tour.strategy,
       onStep:           (info) => this.onStep(info),
-      onStepAfterCenter:(info) => { this.detailPanel.show(info.nodeId); },
+      onStepAfterCenter:(info) => {
+        // 只有用户没有主动关闭过面板，才自动显示
+        console.log('[TourController] onStepAfterCenter, panelClosedByUser =', uiState.panelClosedByUser);
+        if (!uiState.panelClosedByUser) {
+          this.detailPanel.show(info.nodeId);
+        }
+      },
       onPause:          () => this.onEnginePause(),
       onResume:         () => this.onEngineResume(),
       onComplete:       (reason) => this.onComplete(reason),
     });
+    // Engine returns false when there's nothing to visit at this depth —
+    // e.g. the selected node's fill type doesn't match the slider position.
+    // Don't switch the UI to "running" in that case; surface a brief toast
+    // and stay idle so the user knows to pick a different node or depth.
+    if (!ok) {
+      this.engine = null;
+      this.running = false;
+      this.paused = false;
+      this.setIdleUI();
+      showToast('当前档位下没有可漫游的节点 — 试试调高档位或点选其他节点', 'info');
+      this.announceStatus('漫游启动失败：当前档位无可访问节点');
+      return;
+    }
     this.running = true;
     this.paused = false;
     this.setRunningUI();
@@ -131,13 +154,13 @@ export class TourController {
   prev(): void {
     if (!this.engine) return;
     this.engine.prev();
-    this.detailPanel.close();
+    this.detailPanel.closeSilently();
   }
 
   next(): void {
     if (!this.engine) return;
     this.engine.next();
-    this.detailPanel.close();
+    this.detailPanel.closeSilently();
   }
 
   /** 调试用：预览指定策略（或全部策略）的漫游序列。控制台调用：
@@ -583,14 +606,17 @@ export class TourController {
     this.setText('tour-step-badge-mob',     String(current));
   }
 
-  private onComplete(reason: 'depth-reached' | 'no-more-restarts' | 'no-root'): void {
+  private onComplete(
+    info: { reason: 'depth-reached' | 'no-more-restarts' | 'no-root'; maxAttempts: number } | 'depth-reached' | 'no-more-restarts' | 'no-root',
+  ): void {
     this.running = false;
     this.paused = false;
-
-    // Issue #16: distinguish between the user finishing the configured
-    // depth (normal completion, show ✓) and the infinite-mode restart loop
-    // burning out (show ⏹ and a hint so the user understands why the tour
-    // stopped on its own).
+    // Accept both the new TourCompleteInfo object and the legacy string
+    // (tests drive the callback directly via the private field).
+    const isString = typeof info === 'string';
+    const reason: 'depth-reached' | 'no-more-restarts' | 'no-root' = isString ? info : info.reason;
+    // Legacy tests pass a string; the engine always passes TourCompleteInfo.
+    const maxAttempts: number = isString ? 3 : info.maxAttempts;
     const exhausted = reason === 'no-more-restarts';
     const badge = exhausted ? '⏹' : '\u2713';
     const nameLabel = exhausted ? '已停止' : '完成';
@@ -598,16 +624,20 @@ export class TourController {
     this.setText('tour-count-badge-num',   '—');
     this.setText('tour-count-badge-den',   '—');
     this.setText('tour-dt-node-name',      nameLabel);
-    this.setText('tour-progress-label-dt',  '完成');
+    // The progress label was previously hardcoded to '完成' regardless of
+    // completion reason, which broke the test that asserts all count
+    // badges reset to '—'. Match it to the same dash convention.
+    this.setText('tour-progress-label-dt',  '—');
     this.setText('tour-step-badge-dt',     '—');
     this.setText('tour-step-badge-mob',    '—');
 
     // If the tour exhausted itself, surface a title so the bar reads
-    // "已停止 — 已试 3 轮" instead of just "已停止". The tooltip stays
-    // bounded so the bar never grows taller than the running layout.
+    // "已停止 · 已试 N 轮" instead of just "已停止". Use the engine's
+    // reported maxAttempts — never hardcode the cap here.
     if (exhausted) {
-      this.setText('tour-dt-node-name',   '已停止 · 已试 3 轮');
-      this.setText('tour-dt-node-name2', '已停止 · 已试 3 轮');
+      const label = `已停止 · 已试 ${maxAttempts} 轮`;
+      this.setText('tour-dt-node-name',   label);
+      this.setText('tour-dt-node-name2', label);
     }
 
     // Issue #29: announce terminal tour state to screen readers. This
@@ -615,7 +645,7 @@ export class TourController {
     // would be too noisy.
     this.announceStatus(
       exhausted
-        ? '漫游已停止 · 已试 3 轮'
+        ? `漫游已停止 · 已试 ${maxAttempts} 轮`
         : '漫游已完成',
     );
 
