@@ -181,6 +181,24 @@ export class TourController {
     // 注意：选中节点用 .selected-node class（不是 .node-selected，也不是 cytoscape 的 :selected）
     const sel = this.cy.nodes('.selected-node').not('.layer-parent');
     if (sel.length > 0) return sel[0].id();
+
+    // 没有选中节点时，按优先级挑"教材入口"作为起点：
+    //   1. id 以 'book-' 开头的 structure 节点（书本根入口）
+    //   2. fill='cls-structure' 且 id 不是子章节（如 'sec-'、'ch-'）的入口
+    //   3. 都没找到时 fallback 到 degree 最高的节点
+    //
+    // 之前直接 fallback 到 degree 最高节点，但像"非选择性COX抑制剂"这种
+    // 大分类下面挂着几十个药物，degree 可能比 book-y2 还高，导致 tour
+    // 从深度很深的分类开始，跳过整本书的骨架。
+    const books = this.cy.nodes('[id ^= "book-"]').not('.layer-parent');
+    if (books.length > 0) {
+      return books[0].id();
+    }
+    const structures = this.cy.nodes('[fill = "cls-structure"]').not('.layer-parent')
+      .filter((n) => !/^(sec|ch|subsec|part)-/.test(n.id()));
+    if (structures.length > 0) {
+      return structures[0].id();
+    }
     let best: cytoscape.NodeSingular | null = null;
     let maxDeg = 0;
     this.cy.nodes().not('.layer-parent').forEach((n) => {
