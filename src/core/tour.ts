@@ -253,6 +253,18 @@ function buildLocationFallbackSeq(cy: cytoscape.Core, seen: ReadonlySet<string>)
   return cy.nodes().not('.layer-parent')
     .toArray()
     .sort((a, b) => {
+      // 无 book 的孤儿节点（完全无 location）排序到末尾，不应排在有定位的节点之前。
+      // 空字符串 < '\x00' < 'y2'（字符集序），所以必须显式判断 book 而非依赖 key 比较。
+      const aBook = getLocationBook(a as cytoscape.NodeSingular);
+      const bBook = getLocationBook(b as cytoscape.NodeSingular);
+      if (!aBook && bBook) return  1; // a 无定位，b 有 → a 排后面
+      if (!bBook && aBook) return -1; // b 无定位，a 有 → b 排后面
+      if (!aBook && !bBook) {
+        // 两个都是孤儿，按 label 排序保持稳定
+        const la = (a.data('label') ?? a.id()) as string;
+        const lb = (b.data('label') ?? b.id()) as string;
+        return la < lb ? -1 : la > lb ? 1 : 0;
+      }
       const la = getLocationKey(a as cytoscape.NodeSingular);
       const lb = getLocationKey(b as cytoscape.NodeSingular);
       return la < lb ? -1 : la > lb ? 1 : 0;
