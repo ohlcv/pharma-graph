@@ -63,6 +63,7 @@ export class TourController {
     this.bindSliders();
     this.bindStrategyToggle();
     this.bindMobileCollapse();
+    this.bindSelectionHint();
     this.setIdleUI();
   }
 
@@ -89,7 +90,6 @@ export class TourController {
       onResume:         () => this.onEngineResume(),
       onComplete:       (reason) => this.onComplete(reason),
     });
-    console.log('[DEBUG start] maxDepth=', this.currentMaxDepth(), 'interval=', this.currentInterval());
     this.running = true;
     this.paused = false;
     this.setRunningUI();
@@ -158,7 +158,8 @@ export class TourController {
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   private pickRoot(): string {
-    const sel = this.cy.nodes('.node-selected').not('.layer-parent');
+    // 注意：选中节点用 .selected-node class（不是 .node-selected，也不是 cytoscape 的 :selected）
+    const sel = this.cy.nodes('.selected-node').not('.layer-parent');
     if (sel.length > 0) return sel[0].id();
     let best: cytoscape.NodeSingular | null = null;
     let maxDeg = 0;
@@ -166,7 +167,8 @@ export class TourController {
       const d = n.degree();
       if (d > maxDeg) { maxDeg = d; best = n; }
     });
-    return (best as cytoscape.NodeSingular | null)?.id() ?? '';
+    const result = (best as cytoscape.NodeSingular | null)?.id() ?? '';
+    return result;
   }
 
   private currentInterval(): number {
@@ -489,6 +491,34 @@ export class TourController {
     });
   }
 
+  /** 监听节点选中/取消选中，动态显示/隐藏"从这里开始"提示 */
+  private bindSelectionHint(): void {
+    // 初始化时立即检查一次当前选中状态
+    this.updateStartHint();
+
+    // 监听 cytoscape 的 select/unselect 事件（highlightNode 会调用 node.select()）
+    this.cy.on('select', 'node', () => { this.updateStartHint(); });
+    this.cy.on('unselect', 'node', () => { this.updateStartHint(); });
+
+    // 也监听 class 变化（某些操作可能只改 class）
+    this.cy.on('class', 'node', () => {
+      // 一旦检测到 selected-node 出现，下一次 updateStartHint 就会打诊断
+      (window as unknown as { __tourDiag?: boolean }).__tourDiag = true;
+      this.updateStartHint();
+    });
+  }
+
+  /**
+   * Public hook so the graph event layer can re-evaluate the start hint
+   * after `highlightNode()` runs (which is the actual code path that adds
+   * `.selected-node`). Cytoscape's `select`/`class` events aren't always
+   * reliable in every browser when programmatic `node.select()` runs from
+   * a `tap` handler, so we trigger the refresh explicitly.
+   */
+  public refreshStartHintFromHighlight(): void {
+    this.updateStartHint();
+  }
+
   // ── Engine callbacks ───────────────────────────────────────────────────────
 
   /**
@@ -515,7 +545,6 @@ export class TourController {
     if (!this.cy) return;
     const loc = this.cy.getElementById(info.nodeId).data('location') as Record<string, string> | null;
     const key = loc ? getLocationKey(this.cy.getElementById(info.nodeId) as cytoscape.NodeSingular) : '(no location)';
-    console.log(`[Tour step ${info.currentStep}/${info.totalToExplore}]  ${info.nodeId}  key=[${key}]${loc ? `  item=${loc['item']} section=${loc['section']}` : ''}`);
     this.running = true;
     this.paused = false;
     // Push to history
@@ -624,6 +653,19 @@ export class TourController {
     const root = document.documentElement;
     root.classList.remove('tour-state--idle', 'tour-state--running', 'tour-state--paused');
     root.classList.add(`tour-state--${state}`);
+    this.updateStartHint();
+  }
+
+  /** idle + 选中非父层节点 → 显示"从这里开始"提示 */
+  private updateStartHint(): void {
+    // 注意：选中节点用 .selected-node class（不是 .node-selected，也不是 cytoscape 的 :selected）
+    const isIdle = !this.running && !this.paused;
+    const hasSelection = this.cy.nodes('.selected-node').not('.layer-parent').length > 0;
+    const show = isIdle && hasSelection;
+    const hintDt = document.getElementById('tour-start-hint-dt');
+    const hintMob = document.getElementById('tour-start-hint');
+    hintDt?.classList.toggle('show', show);
+    hintMob?.classList.toggle('show', show);
   }
 
   private setText(id: string, text: string): void {

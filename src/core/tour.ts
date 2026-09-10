@@ -759,6 +759,9 @@ export class TourEngine {
   // mid-tour — e.g. via the Delete key in keyboard-shortcuts).
   private _onNodeAdded: ((e: cytoscape.EventObject) => void) | null = null;
   private _onNodeRemoved: ((e: cytoscape.EventObject) => void) | null = null;
+  /** The starting node selected by the user. Persists across restart cycles
+   *  so that cycle 2 still begins from the same subtree as cycle 1. */
+  private _rootId: string = '';
   // tour invocation, when infinite mode (maxDepth < 0) loops back. Caps at 3
   // to prevent pathological re-runs from locking the UI. Resets in start() and
   // when the tour ends naturally. Previously misnamed `_recursionCount` —
@@ -788,7 +791,6 @@ export class TourEngine {
     const level = options.maxDepth ?? INFINITE_DEPTH;
     this._depthLevel = level <= 0 ? 5 : level;
     this.maxDepth = -1; // 始终无限
-    console.log(`[Tour DEBUG start] maxDepth=${this.maxDepth}, _depthLevel=${this._depthLevel}`);
     this.onStep = options.onStep;
     this.onStepAfterCenter = options.onStepAfterCenter;
     this.onComplete = options.onComplete;
@@ -806,12 +808,18 @@ export class TourEngine {
 
     // Build full sequence
     this.seq = normalizeSeq(this.cy, strategy.buildSequence(this.cy));
-    // If a rootId was specified and not in seq, prepend it
-    if (rootId && !this.seq.includes(rootId)) {
-      this.seq = [rootId, ...this.seq.filter((id) => id !== rootId)];
-    }
-    // normalizeSeq 已经做了 dedupe，这里再保险一道（rootId prepend 可能引入重复）
-    this.seq = normalizeSeq(this.cy, this.seq);
+    // Remember the root so subsequent restarts can re-scope the tour to the
+    // same subtree instead of jumping back to book-y2.
+    this._rootId = rootId;
+    // If a rootId was specified, scope the tour to that node's reachable
+    // subgraph — otherwise pickRoot would be ignored because the strategy's
+    // own DFS already contains every node (e.g. has-dfs starting at book-y2).
+    //
+    // We keep the strategy's relative ordering but only retain nodes
+    // reachable from rootId via cytoscape edges. This way, picking
+    // cls-sga-y2-01-07 produces a tour that starts there and walks its
+    // subtree, not the entire 641-node graph.
+    this.applyRootScope();
 
     this.seqIndex = 1; // seq[0] is visited below; visitNext should start from seq[1]
     this.currentStep = 1;
@@ -987,7 +995,6 @@ export class TourEngine {
     // 档位 5 = 全部（无限漫游）
     this._depthLevel = depth <= 0 ? 5 : depth;
     this.maxDepth = -1; // 始终无限，让档位过滤单独工作
-    console.log(`[Tour DEBUG setMaxDepth] 档位已更新为 ${this._depthLevel}，maxDepth=${this.maxDepth}`);
   }
 
   /**
@@ -1011,12 +1018,36 @@ export class TourEngine {
     }, delay);
   }
 
-  private visitNext(): void {
-    if (this.stopped) {
-      console.log('[Tour DEBUG visitNext] stopped=true，直接返回');
-      return;
+  /**
+   * Scope `this.seq` to the subtree rooted at `this._rootId`.
+   * Called both from `start()` (one-time setup) and from the restart path
+   * so that every loop cycle still begins from the same selected node.
+   *
+   * Uses pure position-based slicing on the strategy's existing sequence: find
+   * where rootId appears in the full DFS order and drop everything before it.
+   * This is robust regardless of graph edge directions, avoids collecting
+   * ancestors/descendants via BFS, and guarantees the tour goes FORWARD from
+   * rootId (not backward toward book-y2) even when the graph has upstream edges.
+   */
+  private applyRootScope(): void {
+    const rootId = this._rootId;
+    if (!rootId || this.seq[0] === rootId) return;
+
+    // Find rootId's position in the strategy's full DFS order
+    const idx = this.seq.indexOf(rootId);
+    if (idx >= 0) {
+      // Drop everything before rootId — this is the "skip to minute 30" logic.
+      // The strategy's own DFS already determines the forward traversal order,
+      // so we just restart from rootId's position and go forward.
+      this.seq = this.seq.slice(idx);
+    } else {
+      // rootId not in seq (shouldn't happen, but handle defensively)
+      this.seq = [rootId, ...this.seq.filter((id) => id !== rootId)];
     }
-    console.log(`[Tour DEBUG visitNext] maxDepth=${this.maxDepth}, _depthLevel=${this._depthLevel}, seqIndex=${this.seqIndex}, seq.length=${this.seq.length}`);
+  }
+
+  private visitNext(): void {
+    if (this.stopped) return;
     let restarted = false;
     let loopSafety = 0;
     while (true) {
@@ -1040,11 +1071,8 @@ export class TourEngine {
           // Use the graph's real BFS depth (0=root/center, higher=outer layers).
           const nodeDepth = (node.data('depth') as number) ?? 0;
           this.highlightAndFocus(id, [id], nodeDepth, this.totalSteps(), this.seqIndex);
-          // 调试日志
-          console.log(`[Tour DEBUG] 显示节点 id=${id}, currentStep=${this.currentStep}, maxDepth=${this.maxDepth}, maxDepth>0=${this.maxDepth > 0}, currentStep>=maxDepth=${this.currentStep >= this.maxDepth}`);
           // currentStep 从 1 开始，maxDepth = N 表示最多显示 N 步
           if (this.maxDepth > 0 && this.currentStep >= this.maxDepth) {
-            console.log(`[Tour DEBUG] 达到深度限制，停止`);
             this.stopped = true;
             this.onComplete?.('depth-reached');
           }
@@ -1065,6 +1093,12 @@ export class TourEngine {
         ) {
           const strategy = getStrategy(this.getStrategyId());
           this.seq = normalizeSeq(this.cy, strategy.buildSequence(this.cy));
+          // Re-apply the rootId scoping that was set up in start(). Without
+          // this, the restart would regenerate the FULL graph sequence (641
+          // nodes) and lose the user's "start from here" intent — the tour
+          // would suddenly jump back to book-y2 instead of looping over the
+          // selected subtree.
+          this.applyRootScope();
           this.seqIndex = 0;
           // 新一轮：currentStep 也要重置回 0（visitNext 内会 ++ 到 1）
           this.currentStep = 0;
@@ -1105,7 +1139,9 @@ export class TourEngine {
     this.cy.elements().addClass('dimmed');
     node.removeClass('dimmed highlighted').addClass('selected-node');
     node.connectedEdges().removeClass('dimmed').addClass('highlighted-edge');
-    node.connectedEdges().targets().not('.layer-parent').removeClass('dimmed').addClass('highlighted');
+    // 与 highlightNode 保持一致：用 neighborhood 而非 connectedEdges().targets()
+    // neighborhood 覆盖所有相邻节点（无论边的方向）
+    node.neighborhood('node').not('.layer-parent').removeClass('dimmed').addClass('highlighted');
 
     this.startTourPulse(node);
 

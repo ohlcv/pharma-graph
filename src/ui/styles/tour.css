@@ -225,11 +225,29 @@
       60%  { border-color: #34d399; box-shadow: 0 0 0 2px rgba(52,211,153,0.2);  color: #6ee7b7; background-color: rgba(52,211,153,0.08); }
       100% { border-color: rgba(99,102,241,0.3); box-shadow: none; color: rgba(226,232,240,0.9); background-color: rgba(99,102,241,0.08); }
     }
+    @keyframes hintPulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.55; }
+    }
+    @keyframes hintBounce {
+      0%, 100% { transform: translateX(0); }
+      50%       { transform: translateX(3px); }
+    }
     .tour-dt__select.strategy-switched {
       animation: strategyFlash 0.6s ease-out forwards;
     }
 
     .tour-dt__ctrl { display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: auto; }
+    /* 起点提示在播放按钮右侧 */
+    .tour-start-hint {
+      flex-shrink: 0; margin-left: 2px;
+      display: none; align-items: center; gap: 2px;
+      color: #6ee7b7; font-size: 0.62rem; font-weight: 700;
+      font-family: inherit; white-space: nowrap;
+      animation: hintPulse 1.8s ease-in-out infinite;
+    }
+    .tour-start-hint svg { width: 11px; height: 11px; animation: hintBounce 1.8s ease-in-out infinite; }
+    .tour-start-hint.show { display: flex; }
     .tour-dt__btn {
       display: flex; align-items: center; justify-content: center;
       padding: 5px 8px; border-radius: 8px; border: 1px solid transparent;
@@ -381,6 +399,21 @@
       .tour-mob__badge--next:active { transform: scale(0.96); }
       .tour-mob__badge--prev > *,
       .tour-mob__badge--next > * { position: relative; z-index: 1; }
+
+      /* 起点提示：嵌在控制按钮行内（column 模式下自动在按钮下方），默认隐藏 */
+      .tour-start-hint {
+        display: none; align-items: center; gap: 2px;
+        color: #6ee7b7; font-size: 0.62rem; font-weight: 700;
+        font-family: inherit; white-space: nowrap;
+        animation: hintPulse 1.8s ease-in-out infinite;
+        padding: 4px 6px;
+        background: rgba(52,211,153,0.1);
+        border: 1px solid rgba(52,211,153,0.3);
+        border-radius: 6px;
+        margin-top: 2px;
+      }
+      .tour-start-hint svg { width: 11px; height: 11px; animation: hintBounce 1.8s ease-in-out infinite; }
+      .tour-start-hint.show { display: flex; }
 
       /* 策略切换器（移动端紧凑） */
       .tour-mob__strategy {

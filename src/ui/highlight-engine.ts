@@ -83,6 +83,9 @@ export class HighlightEngine {
     if (node.empty()) return;
     node.neighborhood('node').not(`.${CLASSES.LAYER_PARENT}`).addClass(CLASSES.HIGHLIGHTED);
     node.connectedEdges().addClass(CLASSES.HIGHLIGHTED_EDGE);
+    // 修复: 与 highlightNode 保持一致，确保邻居外的节点都被 dim
+    this.dimUnhighlightedNodes();
+    this.dimUnhighlightedEdges();
   }
 
   highlightSearch(query: string): string[] {
