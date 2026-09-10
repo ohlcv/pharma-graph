@@ -180,19 +180,24 @@ export class TourController {
   private pickRoot(): string {
     // 注意：选中节点用 .selected-node class（不是 .node-selected，也不是 cytoscape 的 :selected）
     const sel = this.cy.nodes('.selected-node').not('.layer-parent');
-    if (sel.length > 0) return sel[0].id();
+    if (sel.length > 0) {
+      return sel[0].id();
+    }
 
     // 没有选中节点时，按优先级挑"教材入口"作为起点：
     //   1. id 以 'book-' 开头的 structure 节点（书本根入口）
     //   2. fill='cls-structure' 且 id 不是子章节（如 'sec-'、'ch-'）的入口
     //   3. 都没找到时 fallback 到 degree 最高的节点
-    //
-    // 之前直接 fallback 到 degree 最高节点，但像"非选择性COX抑制剂"这种
-    // 大分类下面挂着几十个药物，degree 可能比 book-y2 还高，导致 tour
-    // 从深度很深的分类开始，跳过整本书的骨架。
     const books = this.cy.nodes('[id ^= "book-"]').not('.layer-parent');
     if (books.length > 0) {
-      return books[0].id();
+      // 按书籍优先级排序：药二(y2) → 药综(y3) → 药一(y1) → 法规(y4)
+      const BOOK_PRIORITY: Record<string, number> = { y2: 0, y3: 1, y1: 2, y4: 3 };
+      const getBookPriority = (id: string) => {
+        const m = id.match(/^book-y(\d)$/);
+        return m ? (BOOK_PRIORITY[`y${m[1]}`] ?? 99) : 99;
+      };
+      const sorted = books.sort((a, b) => getBookPriority(a.id()) - getBookPriority(b.id()));
+      return sorted[0].id();
     }
     const structures = this.cy.nodes('[fill = "cls-structure"]').not('.layer-parent')
       .filter((n) => !/^(sec|ch|subsec|part)-/.test(n.id()));
@@ -205,8 +210,7 @@ export class TourController {
       const d = n.degree();
       if (d > maxDeg) { maxDeg = d; best = n; }
     });
-    const result = (best as cytoscape.NodeSingular | null)?.id() ?? '';
-    return result;
+    return (best as cytoscape.NodeSingular | null)?.id() ?? '';
   }
 
   private currentInterval(): number {

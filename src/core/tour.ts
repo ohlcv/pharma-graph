@@ -679,7 +679,9 @@ registerStrategy({
     // 之前直接按 FILL_ORDER + location 追加到末尾，导致用户看到"突然跳到
     // 一个无家可归的节点"。现在改用共享的 insertOrphansNearAncestors 工具，
     // 让游离节点尽量紧贴它的 location 祖先出现。
+    const beforeOrphanLen = result.length;
     insertOrphansNearAncestors(cy, result, visited);
+    const afterOrphanLen = result.length;
 
     return result;
   },
@@ -887,6 +889,7 @@ export class TourEngine {
     // Remember the root so subsequent restarts can re-scope the tour to the
     // same subtree instead of jumping back to book-y2.
     this._rootId = rootId;
+
     // If a rootId was specified, scope the tour to that node's reachable
     // subgraph — otherwise pickRoot would be ignored because the strategy's
     // own DFS already contains every node (e.g. has-dfs starting at book-y2).
@@ -1162,7 +1165,9 @@ export class TourEngine {
    */
   private applyRootScope(): void {
     const rootId = this._rootId;
-    if (!rootId || this.seq[0] === rootId) return;
+    if (!rootId || this.seq[0] === rootId) {
+      return;
+    }
 
     // Find rootId's position in the strategy's full DFS order
     const idx = this.seq.indexOf(rootId);
