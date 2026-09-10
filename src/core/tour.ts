@@ -141,7 +141,10 @@ export type TourStrategy = string & { readonly __brand: 'TourStrategy' };
 /** 一个漫游策略的最小定义 */
 export interface TourStrategyDef {
   id: string;
+  /** 显示在 UI 策略选择器里的主标签，例如"教材顺序"。 */
   label: string;
+  /** 一句话副标题，解释这个策略适合什么场景。显示在 label 下方。 */
+  description?: string;
   buildSequence: (cy: cytoscape.Core) => string[];
   /** 可选钩子集合；详见 StrategyHooks 注释。 */
   hooks?: StrategyHooks;
@@ -259,6 +262,105 @@ function buildLocationFallbackSeq(cy: cytoscape.Core, seen: ReadonlySet<string>)
 }
 
 /**
+ * 把"主序列跑完还没覆盖"的游离节点，按 location 祖先就近原则插入 `seq`。
+ *
+ * 解决的问题：之前 has-dfs 末尾追加游离节点 → 用户看到"突然跳到无家可归
+ * 的药物"。现在统一抽到本工具，两个策略共享一份实现。
+ *
+ * 算法：
+ *   1. 找出所有不在 seq 里的节点，按 location 排序兜底
+ *   2. 对每个游离节点，找 seq 中第一个"以该节点 location prefix 为前缀"
+ *      的位置（即最早出现的后代），插到那里之前
+ *   3. 跳过 cls-classification 节点（粗/细分类是 section 入口，不应被打断）
+ *   4. 找不到任何后代的位置就追加到末尾
+ *
+ * @param cy    图实例
+ * @param seq   主序列（in-place 修改；新元素插在合适位置）
+ * @param seen  seq 中已存在的 id 集合（用于判定"游离"）
+ */
+function insertOrphansNearAncestors(
+  cy: cytoscape.Core,
+  seq: string[],
+  seen: ReadonlySet<string>,
+): void {
+  const getLocationPrefix = (node: cytoscape.NodeSingular): string => {
+    const book       = getLocationBook(node);
+    const chapter    = getLocationChapter(node);
+    const part       = getLocationPart(node);
+    const section    = getLocationSection(node);
+    const subsection = getLocationSubsection(node);
+
+    let chapterNum: string;
+    if (chapter) {
+      chapterNum = extractSectionNumber(chapter).toString().padStart(3, '0');
+    } else if (part) {
+      chapterNum = extractSectionNumber(part).toString().padStart(3, '0');
+    } else {
+      chapterNum = '000';
+    }
+    const sectionNum    = section    ? extractSectionNumber(section).toString().padStart(3, '0')    : '';
+    const subsectionNum = subsection ? extractSectionNumber(subsection).toString().padStart(3, '0') : '';
+
+    let key = book + '\x00' + chapterNum;
+    if (sectionNum)    key += '\x00' + sectionNum;
+    if (subsectionNum) key += '\x00' + subsectionNum;
+    return key;
+  };
+
+  const unvisited = buildLocationFallbackSeq(cy, seen);
+  const toAppend: string[] = [];
+  const insertions: Array<{ pos: number; id: string }> = [];
+
+  for (const uid of unvisited) {
+    const uNode = cy.getElementById(uid);
+    const uPrefix = getLocationPrefix(uNode);
+    // 没有 book 的"完全孤儿"（比如跨书的总论、口诀）按 fill 顺序追加到
+    // 末尾，否则会因 uPrefix='\x00000' 而匹配 seq[0]（book-y2）插到第一位。
+    const book = getLocationBook(uNode);
+    if (!book) {
+      toAppend.push(uid);
+      continue;
+    }
+
+    // 找 seq 中第一个 location key 以 uPrefix 为前缀的节点（即祖先）。
+    // 然后从祖先向后扫到第一个"非结构、非分类"位置，把游离节点插在那里
+    // —— 这样它紧贴第一个 sibling，而不是打断章节标题或分类头。
+    let ancestorPos = -1;
+    for (let i = 0; i < seq.length; i++) {
+      const seqNode = cy.getElementById(seq[i]);
+      const seqKey  = getLocationKey(seqNode);
+      if (seqKey.startsWith(uPrefix + '\x00') || seqKey === uPrefix) {
+        ancestorPos = i;
+        break;
+      }
+    }
+
+    if (ancestorPos >= 0) {
+      let insertPos = ancestorPos + 1;
+      // 跳过 structure / classification 节点：它们是章节入口，不应被游离节点打断
+      while (insertPos < seq.length) {
+        const fill = cy.getElementById(seq[insertPos]).data('fill') as string;
+        if (fill === 'cls-structure' || fill === 'cls-classification') {
+          insertPos++;
+          continue;
+        }
+        break;
+      }
+      insertions.push({ pos: insertPos, id: uid });
+    } else {
+      toAppend.push(uid);
+    }
+  }
+
+  // 按插入位置倒序处理，避免插入后后续 pos 偏移
+  insertions.sort((a, b) => b.pos - a.pos);
+  for (const { pos, id } of insertions) {
+    seq.splice(pos, 0, id);
+  }
+  seq.push(...toAppend);
+}
+
+/**
  * 序列归一化：保证 seq 非空 + 无重复 + 保留首次出现顺序。
  *
  * - 若 seq 为空 → fallback 到"全图节点打乱后"的 id 列表
@@ -295,6 +397,38 @@ const INFINITE_DEPTH = -1;
 
 /** 安全循环上限，防止无限循环 */
 const LOOP_SAFETY_LIMIT = 20000;
+
+/** previewSequence 控制台输出截断：保留前 N 行 */
+const PREVIEW_HEAD_LINES = 20;
+/** previewSequence 控制台输出截断：保留后 N 行 */
+const PREVIEW_TAIL_LINES = 10;
+
+/**
+ * 全图 fill 类型的"教学优先"遍历顺序。
+ * 之前 has-dfs 用数组、topo-prereq 用 Record，两处各写一份导致容易漂移；
+ * 这里是唯一权威来源，导出供外部（含 isNodeInLevel）使用。
+ *
+ * 顺序的含义：当父节点下同时有结构/分类/药物等子节点时，按此序访问
+ * —— 先看章节结构，再看分类，再看药物，最后看口诀/概念/总结，
+ * 跟人脑"先骨架后细节"的复习节奏一致。
+ */
+export const FILL_VISIT_ORDER = [
+  'cls-structure',
+  'cls-classification',
+  'cls-biomolecule',
+  'cls-feature',
+  'cls-drug',
+  'cls-disease',
+  'cls-adverse',
+  'cls-mnemonic',
+  'cls-concept',
+  'cls-summary',
+] as const;
+
+/** FILL_VISIT_ORDER 的索引 Map（O(1) 排序比较用），导出方便测试。 */
+export const FILL_ORDER_INDEX: ReadonlyMap<string, number> = new Map(
+  FILL_VISIT_ORDER.map((fill, i) => [fill, i]),
+);
 
 /**
  * 调用策略的 `shouldRestart` 钩子（如果有），决定当前是否要再走一轮。
@@ -413,6 +547,7 @@ export function getLocationKey(node: cytoscape.NodeSingular): string {
 registerStrategy({
   id: 'has-dfs',
   label: '教材顺序（深度优先）',
+  description: '按书 → 章 → 节 → 分类 → 药 → 口诀的顺序走，适合初次复习整本书。',
   buildSequence(cy) {
     // 书籍优先级：y2(药二)→y3(药综)→y1(药一)→y4(法规)
     // key 兼容正则捕获的 'y2'/'2' 两种格式
@@ -424,7 +559,7 @@ registerStrategy({
       return m ? (BOOK_ORDER[m[1]] ?? 99) : 99;
     };
 
-    const nodes = cy.nodes().not('.layer-parent').toArray();
+    const nodes = cy.nodes().not('.layer-parent').toArray() as cytoscape.NodeSingular[];
 
     // 建立 parentMap[childId] = parentId（通过 subclass_of / instance_of 边）
     const parentMap = new Map<string, string>();
@@ -469,8 +604,8 @@ registerStrategy({
       });
     }
 
-    // FILL_ORDER：fill 值遍历顺序：structure → classification → biomolecule → feature → drug → disease → adverse → mnemonic → concept → summary
-    const FILL_ORDER = ['cls-structure', 'cls-classification', 'cls-biomolecule', 'cls-feature', 'cls-drug', 'cls-disease', 'cls-adverse', 'cls-mnemonic', 'cls-concept', 'cls-summary'];
+    // FILL_VISIT_ORDER 已在模块顶部统一定义；这里直接用
+    // （has-dfs 与 topo-prereq 之前各写一份导致漂移风险）。
 
     // 收集所有 structure 节点（树根/入口）
     const allStructures = nodes.filter((n) => (n.data('fill') as string) === 'cls-structure');
@@ -484,7 +619,7 @@ registerStrategy({
 
     // DFS：fill-order 顺序遍历子节点；visited 防重；递归所有子节点以确保树完整遍历
     const dfsChildren = (parentId: string) => {
-      for (const fill of FILL_ORDER) {
+      for (const fill of FILL_VISIT_ORDER) {
         const kids = (children.get(parentId) ?? []).filter(
           (k) => (k.data('fill') as string) === fill,
         );
@@ -496,9 +631,9 @@ registerStrategy({
           dfsChildren(k.id());
         }
       }
-      // 其他所有类型（非上述 FILL_ORDER）
+      // 其他所有类型（非 FILL_VISIT_ORDER 中列出的新 fill 值）
       for (const k of (children.get(parentId) ?? []).filter(
-        (k) => !FILL_ORDER.includes((k.data('fill') as string) ?? ''),
+        (k) => !FILL_VISIT_ORDER.includes((k.data('fill') ?? '') as typeof FILL_VISIT_ORDER[number]),
       )) {
         if (!visited.has(k.id())) {
           visited.add(k.id());
@@ -528,25 +663,11 @@ registerStrategy({
       dfsChildren(structure.id());
     }
 
-    // ── 第二步：收集未出现在树中的节点（按 fill 顺序追加）───────────────────────
-    // visited 已由第一步（structure DFS）填充，包含所有树中节点
-    // 剩余节点（游离节点）按 fill 顺序 + location 追加
-    const remaining = nodes.filter((n) => !visited.has(n.id()));
-    // 按 FILL_ORDER 分类排序剩余节点
-    const sortedRemaining = [...remaining].sort((a, b) => {
-      const fa = FILL_ORDER.indexOf((a.data('fill') as string) ?? '');
-      const fb = FILL_ORDER.indexOf((b.data('fill') as string) ?? '');
-      if (fa !== fb) return fa - fb;
-      const la = getLocationKey(a), lb = getLocationKey(b);
-      return la < lb ? -1 : la > lb ? 1 : 0;
-    });
-
-    for (const n of sortedRemaining) {
-      if (!visited.has(n.id())) {
-        visited.add(n.id());
-        result.push(n.id());
-      }
-    }
+    // ── 第二步：把游离节点插入到它们的"语义最近邻"位置 ───────────────────
+    // 之前直接按 FILL_ORDER + location 追加到末尾，导致用户看到"突然跳到
+    // 一个无家可归的节点"。现在改用共享的 insertOrphansNearAncestors 工具，
+    // 让游离节点尽量紧贴它的 location 祖先出现。
+    insertOrphansNearAncestors(cy, result, visited);
 
     return result;
   },
@@ -557,6 +678,7 @@ registerStrategy({
 registerStrategy({
   id: 'topo-prereq',
   label: '层级依赖（广度优先）',
+  description: '按知识依赖关系走（基础先于应用），适合查漏补缺单知识点。',
   // 拓扑序跑一次就完整覆盖全部节点，再循环一遍得到相同序列，毫无意义。
   // 因此显式拒绝重启——引擎收到 false 后会立即以 'no-more-restarts' 收束。
   hooks: {
@@ -590,21 +712,9 @@ registerStrategy({
     const noPrereq: string[] = [];
     inDegree.forEach((deg, id) => { if (deg === 0) noPrereq.push(id); });
 
-    // FILL_ORDER：fill 值顺序：structure → classification → biomolecule → feature → drug → disease → adverse → mnemonic → concept → summary
-    const FILL_ORDER: Record<string, number> = {
-      'cls-structure': 0,
-      'cls-classification': 1,
-      'cls-biomolecule': 2,
-      'cls-feature': 3,
-      'cls-drug': 4,
-      'cls-disease': 5,
-      'cls-adverse': 6,
-      'cls-mnemonic': 7,
-      'cls-concept': 8,
-      'cls-summary': 9,
-    };
+    // FILL_VISIT_ORDER 已在模块顶部统一定义；这里直接读索引避免重复声明
     const getFillOrder = (id: string): number =>
-      FILL_ORDER[cy.getElementById(id).data('fill') as string] ?? 99;
+      FILL_ORDER_INDEX.get(cy.getElementById(id).data('fill') as string) ?? 99;
 
     // 比较函数：先按 fill，再按 location
     const nodeCompare = (a: string, b: string): number => {
@@ -639,87 +749,9 @@ registerStrategy({
 
     // ── 兜底：把层级依赖未覆盖的节点插入 seq ────────────────────────────────────
     //
-    // 策略：
-    //   1. 对每个未访问节点，找它在 seq 中"最早出现的后代节点"的位置。
-    //      后代定义：seq 中某节点的 location key 以该节点的 location prefix 为前缀。
-    //   2. 若找到，就把它插到那个后代之前（入口节点紧贴第一个子节点）。
-    //   3. 若找不到，按 location 排序追加到末尾。
-    //
-    // 这样章级/篇级入口不再被甩到最后，而是紧贴着它的第一个子节点出现。
-
-    const seqSet = new Set(seq);
-
-    // 未访问节点：共享的"按 location 兜底"工具，按 location key 升序
-    const unvisited = buildLocationFallbackSeq(cy, seqSet);
-
-    // getLocationPrefix：取 location key 中的层级段（不含 item+label 后缀），
-    // 用来做"祖先前缀匹配"
-    const getLocationPrefix = (node: cytoscape.NodeSingular): string => {
-      const book       = getLocationBook(node);
-      const chapter    = getLocationChapter(node);
-      const part       = getLocationPart(node);
-      const section    = getLocationSection(node);
-      const subsection = getLocationSubsection(node);
-
-      let chapterNum: string;
-      if (chapter) {
-        chapterNum = extractSectionNumber(chapter).toString().padStart(3, '0');
-      } else if (part) {
-        chapterNum = extractSectionNumber(part).toString().padStart(3, '0');
-      } else {
-        chapterNum = '000';
-      }
-      const sectionNum    = section    ? extractSectionNumber(section).toString().padStart(3, '0')    : '';
-      const subsectionNum = subsection ? extractSectionNumber(subsection).toString().padStart(3, '0') : '';
-
-      let key = book + '\x00' + chapterNum;
-      if (sectionNum)    key += '\x00' + sectionNum;
-      if (subsectionNum) key += '\x00' + subsectionNum;
-      return key;
-    };
-
-    const toAppend: string[] = [];
-    const insertions: Array<{ pos: number; id: string }> = [];
-
-    for (const uid of unvisited) {
-      const uNode = cy.getElementById(uid);
-      const uPrefix = getLocationPrefix(uNode);
-
-      // 在 seq 中找第一个 location key 以 uPrefix 为前缀的节点（即最早的后代）
-      let bestPos = -1;
-      for (let i = 0; i < seq.length; i++) {
-        const seqNode = cy.getElementById(seq[i]);
-        const seqKey  = getLocationKey(seqNode);
-        if (seqKey.startsWith(uPrefix + '\x00') || seqKey === uPrefix) {
-          bestPos = i;
-          break;
-        }
-      }
-
-      if (bestPos >= 0) {
-        // 跳过 classification 节点：粗/细分类是 section 的入口，不应被其他节点打断
-        // 如果 bestPos 命中了一个 classification，就找下一个非 classification 的位置
-        if (seq[bestPos]?.includes('classification')) {
-          for (let j = bestPos + 1; j < seq.length; j++) {
-            if (!seq[j]?.includes('classification')) {
-              bestPos = j;
-              break;
-            }
-          }
-        }
-        insertions.push({ pos: bestPos, id: uid });
-      } else {
-        toAppend.push(uid);
-      }
-    }
-
-    // 按插入位置倒序处理，避免插入后后续 pos 偏移
-    insertions.sort((a, b) => b.pos - a.pos);
-    for (const { pos, id } of insertions) {
-      seq.splice(pos, 0, id);
-    }
-
-    seq.push(...toAppend);
+    // 之前在这里写了一份 ~80 行的"找 location 祖先插入"逻辑。现在统一抽到
+    // insertOrphansNearAncestors，两个策略共享同一份实现。
+    insertOrphansNearAncestors(cy, seq, new Set(seq));
 
     return seq;
   },
@@ -1025,6 +1057,9 @@ export class TourEngine {
    * 控制台调用示例：
    *   uiState.tour.engine.previewSequence()           // 全部两种
    *   uiState.tour.engine.previewSequence('has-dfs')  // 单种
+   *
+   * 输出截断：超过 PREVIEW_HEAD + PREVIEW_TAIL 行时中间省略，
+   * 避免一次 dump 641 行刷屏控制台。
    */
   previewSequence(strategyId?: TourStrategy): void {
     const targets = strategyId
@@ -1038,7 +1073,7 @@ export class TourEngine {
         return;
       }
 
-      const lines = seq.map((id, i) => {
+      const formatLine = (id: string, i: number): string => {
         const n = this.cy.getElementById(id);
         const label = n.empty() ? `(missing: ${id})` : (n.data('label') || id);
         const loc = n.empty() ? '' : (() => {
@@ -1047,11 +1082,20 @@ export class TourEngine {
           return [l['book'], l['chapter'], l['section']].filter(Boolean).join(' › ');
         })();
         return `  ${String(i + 1).padStart(3)}. ${label}${loc ? `  [${loc}]` : ''}`;
-      });
+      };
 
-      // 输出到控制台便于调试
-      console.log(`[Tour Preview] ${s.name} (${seq.length} nodes):`);
-      lines.forEach((line) => console.log(line));
+      console.log(`[Tour Preview] ${s.label} (${seq.length} nodes):`);
+      const head = PREVIEW_HEAD_LINES;
+      const tail = PREVIEW_TAIL_LINES;
+      if (seq.length <= head + tail) {
+        seq.forEach((id, i) => console.log(formatLine(id, i)));
+      } else {
+        seq.slice(0, head).forEach((id, i) => console.log(formatLine(id, i)));
+        console.log(`  ... (${seq.length - head - tail} nodes omitted) ...`);
+        seq.slice(seq.length - tail).forEach((id, i) =>
+          console.log(formatLine(id, seq.length - tail + i)),
+        );
+      }
     });
   }
 
