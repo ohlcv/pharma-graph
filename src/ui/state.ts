@@ -90,6 +90,17 @@ export const uiState = {
   summaryMode: 'short' as 'short' | 'full',
 
   /**
+   * 详情面板是否被用户手动关闭过。
+   * - false: 面板从未关闭过，或被手动重新打开
+   * - true:  用户主动关闭了面板（点击关闭按钮或画布空白）
+   *
+   * 用途：漫游自动切节点时，只有当 panelClosedByUser === false 才自动 show 面板。
+   * 这样用户关掉面板后漫游不会再强制弹出，想看时只能手动点击节点。
+   * 该字段由 DetailPanel 的 close() / show() 维护。
+   */
+  panelClosedByUser: false,
+
+  /**
    * Whether the desktop node panel is pinned. Read-only proxy to the
    * `UiToggle` registered by DetailPanel. To mutate, call
    * `detailPanel.pinToggle.toggle()` (or set the field directly on

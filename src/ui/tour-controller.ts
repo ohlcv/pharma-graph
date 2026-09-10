@@ -80,7 +80,6 @@ export class TourController {
     }
     // 新一次漫游 = 新的用户意图，面板跟随恢复
     uiState.panelClosedByUser = false;
-    console.log('[TourController] start() 新漫游开始，重置 panelClosedByUser = false');
     const rootId = this.pickRoot();
     this.engine = new TourEngine(this.cy);
     const ok = this.engine.start(rootId, {
@@ -90,8 +89,6 @@ export class TourController {
       strategy: uiState.tour.strategy,
       onStep:           (info) => this.onStep(info),
       onStepAfterCenter:(info) => {
-        // 只有用户没有主动关闭过面板，才自动显示
-        console.log('[TourController] onStepAfterCenter, panelClosedByUser =', uiState.panelClosedByUser);
         if (!uiState.panelClosedByUser) {
           this.detailPanel.show(info.nodeId);
         }

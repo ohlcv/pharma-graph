@@ -121,11 +121,22 @@ export class DetailPanel {
     });
   }
 
-  show(nodeId: string): void {
+  /**
+   * 显示节点详情面板。
+   * @param userInitiated - 是否为用户手动触发（点击节点/面板内邻居等）。
+   *                         用户触发时重置 panelClosedByUser 标记，允许漫游自动跟随。
+   *                         程序自动调用（如漫游切节点）时不应重置标记。
+   */
+  show(nodeId: string, userInitiated = false): void {
     const node = this.cy.getElementById(nodeId);
     if (node.empty()) return;
 
     this._currentNodeId = nodeId;
+    // 只有用户手动触发打开面板时才重置"用户关闭过"的标记，
+    // 程序自动调用（如漫游切节点）不应重置，否则用户关面板后漫游仍会弹出
+    if (userInitiated) {
+      uiState.panelClosedByUser = false;
+    }
     const d = node.data();
     const sourcePath = typeof d.sourcePath === 'string' ? d.sourcePath : '';
 
@@ -148,9 +159,22 @@ export class DetailPanel {
   }
 
   close(): void {
+    uiState.panelClosedByUser = true;
     this.panel.classList.remove('visible');
     this._currentNodeId = null;
     this.onClose();
+  }
+
+  /**
+   * 供外部（tour prev/next）调用，漫游导航时关闭面板。
+   * 不设置 panelClosedByUser，避免误标记为"用户主动关闭"。
+   * 注意：这不会触发 onClose() 回调。
+   */
+  closeSilently(): void {
+    this.panel.classList.remove('visible');
+    this._currentNodeId = null;
+    // 漫游导航时也需要清除图上高亮，但不走 close() 流程
+    this.highlight.reset();
   }
 
   onClose(): void {

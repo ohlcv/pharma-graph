@@ -123,7 +123,7 @@ async function boot(): Promise<void> {
         const node = uiState.renderer!.getCy().getElementById(nodeId);
         if (!node.empty()) {
           uiState.highlight!.highlightNode(nodeId);
-          uiState.detailPanel!.show(nodeId);
+          uiState.detailPanel!.show(nodeId, true); // 用户从面板内点击邻居节点
           uiState.renderer!.getCy().animate({
             center: { eles: node },
             zoom: 1.5,

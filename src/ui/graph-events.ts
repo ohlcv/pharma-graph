@@ -80,7 +80,7 @@ export function initGraphEvents(deps: GraphEventDeps): void {
     }
     const prev = deps.highlight.highlightNode(node.id());
     deps.setPrevSelectedNode(prev.prevNodeId, prev.prevNodeName);
-    deps.detailPanel.show(node.id());
+    deps.detailPanel.show(node.id(), true); // 用户手动点击节点
     updateStats(cy);
     syncBottomSheetStats(cy);
 

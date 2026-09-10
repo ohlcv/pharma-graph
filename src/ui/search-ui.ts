@@ -173,16 +173,16 @@ function attachSearchHandlers(input: HTMLInputElement | null, ctx: HandlersCtx):
 
     if (e.key === 'ArrowDown') {
       const id = search.navigateNext();
-      if (id) detailPanel.show(id);
+      if (id) detailPanel.show(id, true);
       e.preventDefault();
     } else if (e.key === 'ArrowUp') {
       const id = search.navigatePrev();
-      if (id) detailPanel.show(id);
+      if (id) detailPanel.show(id, true);
       e.preventDefault();
     } else if (e.key === 'Enter') {
       cancelPendingCenter();
       const id = search.commit();
-      if (id) detailPanel.show(id);
+      if (id) detailPanel.show(id, true);
       e.preventDefault();
     }
   });
