@@ -36,6 +36,8 @@ interface SliderBind {
   range: HTMLInputElement;
   fill?: HTMLElement | null;       // optional: vertical track fill (#tour-interval-fill / depth-fill)
   value?: HTMLElement | null;      // optional: external value label
+  /** Horizontal mirror input (desktop). paintFill syncs gradient background here. */
+  mirror?: HTMLInputElement | null;
   format: (v: number) => string;
   onCommit: (v: number) => void;
 }
@@ -422,11 +424,15 @@ export class TourController {
     const onInput = (src: HTMLInputElement, other: HTMLInputElement) => {
       // 拖动时实时同步镜像 fill（仅同步 value，不触发跳转）
       if (Number(other.value) !== src.valueAsNumber) other.value = src.value;
+      const pct = Math.max(0, Math.min(1, Number(src.value) / 100));
       const fillMob = document.getElementById('tour-progress-fill');
       const fillDt  = document.getElementById('tour-progress-fill-dt');
-      const scale = Math.max(0, Math.min(1, Number(src.value) / 100));
-      if (fillMob) fillMob.style.transform = `scaleX(${scale})`;
-      if (fillDt)  fillDt.style.transform  = `scaleX(${scale})`;
+      const thumbMob = document.getElementById('tour-progress-thumb');
+      const thumbDt  = document.getElementById('tour-progress-thumb-dt');
+      if (fillMob) fillMob.style.transform = `scaleX(${pct})`;
+      if (fillDt)  fillDt.style.transform  = `scaleX(${pct})`;
+      if (thumbMob) thumbMob.style.left = `${pct * 100}%`;
+      if (thumbDt)  thumbDt.style.left  = `${pct * 100}%`;
     };
 
     mob.addEventListener('input',  () => onInput(mob, dt));
@@ -440,12 +446,16 @@ export class TourController {
   private resetProgress(): void {
     const mob = document.getElementById('tour-progress')    as HTMLInputElement | null;
     const dt  = document.getElementById('tour-progress-dt') as HTMLInputElement | null;
-    const fillMob = document.getElementById('tour-progress-fill');
-    const fillDt  = document.getElementById('tour-progress-fill-dt');
+    const fillMob  = document.getElementById('tour-progress-fill');
+    const fillDt   = document.getElementById('tour-progress-fill-dt');
+    const thumbMob = document.getElementById('tour-progress-thumb');
+    const thumbDt  = document.getElementById('tour-progress-thumb-dt');
     if (mob) mob.value = '0';
     if (dt)  dt.value  = '0';
     if (fillMob) fillMob.style.transform = 'scaleX(0)';
     if (fillDt)  fillDt.style.transform  = 'scaleX(0)';
+    if (thumbMob) thumbMob.style.left = '0%';
+    if (thumbDt)  thumbDt.style.left  = '0%';
   }
 
   /**
@@ -466,6 +476,7 @@ export class TourController {
       range: primary,
       fill: primaryFill,
       value: primaryValueLabel,
+      mirror,
       format,
       onCommit,
     };
@@ -510,12 +521,11 @@ export class TourController {
       // 因为 CSS 已经不再用 left:0 定位了。
       s.fill.style.transform = `translateX(-50%) scaleY(${centerFromBottom / trackLen})`;
     } else {
-      // Horizontal track (desktop) — paint gradient background on all mirrors
+      // Horizontal track (desktop) — paint gradient background on the desktop mirror.
+      // s.range 是 mobile primary（vertical），它不需要 horizontal gradient，
+      // 所以 background 设给 s.mirror（desktop input）。
       const bg = `linear-gradient(to right, var(--tour-accent) 0%, var(--tour-accent) ${pct * 100}%, rgba(255,255,255,0.1) ${pct * 100}%, rgba(255,255,255,0.1) 100%)`;
-      // Primary mirror (the original desktop slider)
-      if (s.range.id.endsWith('-dt')) {
-        s.range.style.background = bg;
-      }
+      if (s.mirror) s.mirror.style.background = bg;
     }
   }
 
@@ -681,6 +691,8 @@ export class TourController {
     const pct = Math.max(0, Math.min(1, current / total));
     this.setProgressFill('tour-progress-fill',    pct);
     this.setProgressFill('tour-progress-fill-dt', pct);
+    this.setProgressThumb('tour-progress-thumb',    pct);
+    this.setProgressThumb('tour-progress-thumb-dt', pct);
     // 进度条 range value：0-100，由 change 监听反推 seqIdx
     const rangeVal = Math.round(pct * 100);
     this.setProgressRange('tour-progress',    rangeVal);
@@ -691,6 +703,12 @@ export class TourController {
   private setProgressFill(id: string, pct: number): void {
     const el = document.getElementById(id);
     if (el) el.style.transform = `scaleX(${pct})`;
+  }
+
+  /** 圆形滑块：left = pct% (0~100) */
+  private setProgressThumb(id: string, pct: number): void {
+    const el = document.getElementById(id);
+    if (el) el.style.left = `${Math.max(0, Math.min(100, pct * 100))}%`;
   }
 
   private setProgressRange(id: string, value: number): void {

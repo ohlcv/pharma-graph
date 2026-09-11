@@ -141,6 +141,10 @@
     .tour-dt__node-name { font-size: 0.72rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: opacity 0.2s; }
     
     .tour-dt__sep { width: 1px; height: 20px; background: rgba(255,255,255,0.08); margin: 0 8px; flex-shrink: 0; }
+    /* 策略 (tour-dt__strategy) 已 display:none，但它两旁的 sep 紧贴在一起视觉上像两道杠。
+       用 :has 选择器自动隐藏紧邻隐藏兄弟的 sep（Chrome 105+/Safari 15.4+） */
+    .tour-dt__sep:has(+ .tour-dt__strategy),
+    .tour-dt__strategy + .tour-dt__sep { display: none; }
     
     .tour-dt__stats     { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
     .tour-dt__stat      { display: flex; align-items: center; gap: 4px; font-size: 0.68rem; }
@@ -165,7 +169,8 @@
       height: 4px;
       background: rgba(255,255,255,0.10);
       border-radius: 2px;
-      overflow: hidden;
+      /* overflow: visible 让 thumb（10px）能突出 track（4px）的上下边界 */
+      overflow: visible;
     }
     .tour-dt__progress-fill {
       position: absolute; left: 0; top: 0; bottom: 0;
@@ -177,6 +182,18 @@
       box-shadow: 0 0 6px rgba(99,102,241,0.55);
       transition: transform 0.1s ease;
       pointer-events: none;
+    }
+    /* 圆形滑块：跟随 fill 末端移动 (left = pct%) */
+    .tour-dt__progress-thumb {
+      position: absolute;
+      top: 50%; left: 0;
+      width: 10px; height: 10px;
+      transform: translate(-50%, -50%);
+      background: #fff;
+      border-radius: 50%;
+      box-shadow: 0 0 6px rgba(99,102,241,0.9), 0 1px 2px rgba(0,0,0,0.5);
+      pointer-events: none;
+      transition: left 0.1s ease;
     }
     .tour-dt__progress-range {
       position: absolute; inset: -6px -4px;
@@ -190,6 +207,7 @@
       z-index: 3;
     }
     .tour-state--idle .tour-dt__progress-fill { background: rgba(255,255,255,0.15); box-shadow: none; }
+    .tour-state--idle .tour-dt__progress-thumb { background: rgba(255,255,255,0.5); box-shadow: none; }
     .tour-state--idle .tour-dt__progress-range { pointer-events: none; cursor: default; }
     
 /* Timeline label — single "current / total" text in place of the old
@@ -214,7 +232,7 @@
     .tour-dt__range::-moz-range-thumb { width: 10px; height: 10px; border: none; border-radius: 50%; background: var(--tour-accent); box-shadow: 0 0 6px rgba(99,102,241,0.5); cursor: pointer; }
     .tour-dt__param-val { font-size: 0.6rem; color: rgba(226,232,240,0.55); font-variant-numeric: tabular-nums; min-width: 20px; }
     /* 固定宽度防止布局抖动（深度滑块标签长度不同） */
-    #tour-depth-val-dt { min-width: 32px; text-align: right; }
+    #tour-depth-val-dt { min-width: 24px; }
 
     /* Strategy selector */
     .tour-dt__strategy { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
@@ -557,7 +575,8 @@
         height: 4px;
         background: rgba(255,255,255,0.10);
         border-radius: 2px;
-        overflow: hidden;
+        /* overflow: visible 让 thumb（10px）能突出 track（4px）的上下边界 */
+        overflow: visible;
       }
       .tour-mob__progress-fill {
         position: absolute; left: 0; top: 0; bottom: 0;
@@ -569,6 +588,18 @@
         box-shadow: 0 0 6px rgba(99,102,241,0.55);
         transition: transform 0.1s ease;
         pointer-events: none;
+      }
+      /* 圆形滑块：跟随 fill 末端移动 (left = pct%) */
+      .tour-mob__progress-thumb {
+        position: absolute;
+        top: 50%; left: 0;
+        width: 10px; height: 10px;
+        transform: translate(-50%, -50%);
+        background: #fff;
+        border-radius: 50%;
+        box-shadow: 0 0 8px rgba(99,102,241,0.9), 0 1px 2px rgba(0,0,0,0.5);
+        pointer-events: none;
+        transition: left 0.1s ease;
       }
       /* 罩在 fill 上方的隐形 input，只用于点击/拖动交互 */
       .tour-mob__progress-range {
@@ -584,6 +615,7 @@
       }
       /* Idle / 未启动时进度条置灰、不可点 */
       .tour-state--idle .tour-mob__progress-fill { background: rgba(255,255,255,0.15); box-shadow: none; }
+      .tour-state--idle .tour-mob__progress-thumb { background: rgba(255,255,255,0.5); box-shadow: none; }
       .tour-state--idle .tour-mob__progress-range { pointer-events: none; cursor: default; }
     
       /* 滑块区 */
