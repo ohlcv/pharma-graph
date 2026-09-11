@@ -201,8 +201,8 @@
       touch-action: none;
       z-index: 3;
     }
-    .tour-dt--idle .tour-dt__progress-fill { background: rgba(255,255,255,0.15); box-shadow: none; }
-    .tour-dt--idle .tour-dt__progress-range { pointer-events: none; cursor: default; }
+    .tour-state--idle .tour-dt__progress-fill { background: rgba(255,255,255,0.15); box-shadow: none; }
+    .tour-state--idle .tour-dt__progress-range { pointer-events: none; cursor: default; }
     
 /* Timeline label — single "current / total" text in place of the old
    progress bar + dot marker. The bar routinely outgrew its track and read
@@ -592,8 +592,8 @@
         z-index: 3;
       }
       /* Idle / 未启动时进度条置灰、不可点 */
-      .tour-mob--idle .tour-mob__progress-fill { background: rgba(255,255,255,0.15); box-shadow: none; }
-      .tour-mob--idle .tour-mob__progress-range { pointer-events: none; cursor: default; }
+      .tour-state--idle .tour-mob__progress-fill { background: rgba(255,255,255,0.15); box-shadow: none; }
+      .tour-state--idle .tour-mob__progress-range { pointer-events: none; cursor: default; }
     
       /* 滑块区 */
       .tour-mob__sliders { display: flex; flex-direction: column; align-items: center; gap: 10px; flex-shrink: 0; padding: 0; }

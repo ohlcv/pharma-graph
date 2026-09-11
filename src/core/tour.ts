@@ -977,6 +977,29 @@ export class TourEngine {
     this.onPause?.();
   }
 
+  /** 进度条跳转：直接定位到序列第 seqIdx 个节点（0-indexed），并继续漫游。
+   *  - 不调用 pause()，因为跳转后用户希望继续自动播放
+   *  - seqIndex 推到 seqIdx+1，保证 visitNext 下次从 seqIdx+1 开始
+   *  - _visited 重建为 seq[0..seqIdx]，prev() 可正常回退
+   *  - scheduleNext() 负责触发下一次自动跳转的定时器 */
+  jumpToNode(seqIdx: number): void {
+    if (this.stopped) return;
+    if (!this.seq.length) return;
+    const clamped = Math.max(0, Math.min(this.seq.length - 1, Math.floor(seqIdx)));
+    const id = this.seq[clamped];
+    if (!id) return;
+    const node = this.cy.getElementById(id);
+    if (node.empty() || node.hasClass('layer-parent')) return;
+    if (this.timer) { clearTimeout(this.timer); this.timer = undefined; }
+    this.seqIndex = clamped + 1;
+    this.currentStep = clamped + 1;
+    this._visited = this.seq.slice(0, clamped + 1);
+    const nodeDepth = (node.data('depth') as number) ?? 0;
+    this.paused = false; // 让 scheduleNext 的 !t.paused 条件成立
+    this.highlightAndFocus(id, [id], nodeDepth, this.totalSteps(), this.seqIndex, /* silent */ false);
+    this.scheduleNext();
+  }
+
   pause(): void {
     if (this.paused || this.stopped) return;
     this.paused = true;

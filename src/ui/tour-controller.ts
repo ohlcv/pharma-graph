@@ -260,6 +260,8 @@ export class TourController {
                        'tour-strategy-toggle-mob', 'tour-strategy-toggle-mob2']) {
       this.flashStrategyButton(document.getElementById(id));
     }
+    // 策略切换后，序列定义变了 → 进度条必须重置为 0%（即使 idle 状态）
+    this.resetProgress();
     if (this.running || this.paused) this.start();
   }
 
@@ -404,8 +406,63 @@ export class TourController {
       mobileDepth.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: true });
     }
 
+    // 节点进度条：移动 + 桌面镜像绑定（详见 bindProgress 注释）
+    this.bindProgress();
+
     // Initial paint so the fill heights and background gradients match defaults.
     for (const s of this.sliders) this.paintFill(s);
+  }
+
+  /** 节点进度条 input 的 change 监听 → 反推 seqIdx → engine.jumpToNode
+   *  - 镜像（移动 <-> 桌面）双向同步
+   *  - Idle 时 listener 不响应（CSS pointer-events: none 已禁掉事件，这里再做兜底）
+   *  - 策略切换时由调用方负责把两个 input value 重置为 0 */
+  private bindProgress(): void {
+    const mob   = document.getElementById('tour-progress')    as HTMLInputElement | null;
+    const dt    = document.getElementById('tour-progress-dt') as HTMLInputElement | null;
+    if (!mob || !dt) return;
+
+    const onChange = (src: HTMLInputElement, other: HTMLInputElement) => {
+      // Idle 兜底：CSS 已经 pointer-events: none，但拖动可能在 release 时
+      // 才触发 change 事件，所以这里再判一次
+      if (!this.engine || !this.running) return;
+      const total = this.engine.totalSteps();
+      if (total <= 0) return;
+      const pct = Math.max(0, Math.min(100, Number(src.value))) / 100;
+      const seqIdx = Math.min(total - 1, Math.max(0, Math.round(pct * (total - 1))));
+      // 同步镜像 value（保持视觉一致；不重写自己避免 input 事件循环）
+      if (Number(other.value) !== src.valueAsNumber) other.value = src.value;
+      // 调用引擎跳转
+      this.engine.jumpToNode(seqIdx);
+    };
+
+    const onInput = (src: HTMLInputElement, other: HTMLInputElement) => {
+      // 拖动时实时同步镜像 fill（仅同步 value，不触发跳转）
+      if (Number(other.value) !== src.valueAsNumber) other.value = src.value;
+      const fillMob = document.getElementById('tour-progress-fill');
+      const fillDt  = document.getElementById('tour-progress-fill-dt');
+      const scale = Math.max(0, Math.min(1, Number(src.value) / 100));
+      if (fillMob) fillMob.style.transform = `scaleX(${scale})`;
+      if (fillDt)  fillDt.style.transform  = `scaleX(${scale})`;
+    };
+
+    mob.addEventListener('input',  () => onInput(mob, dt));
+    mob.addEventListener('change', () => onChange(mob, dt));
+    dt.addEventListener('input',   () => onInput(dt, mob));
+    dt.addEventListener('change',  () => onChange(dt, mob));
+  }
+
+  /** 策略切换后重置进度条为 0%（fill 缩到 0，value 清零，镜像同步）。
+   *  由策略切换的处理逻辑调用。 */
+  private resetProgress(): void {
+    const mob = document.getElementById('tour-progress')    as HTMLInputElement | null;
+    const dt  = document.getElementById('tour-progress-dt') as HTMLInputElement | null;
+    const fillMob = document.getElementById('tour-progress-fill');
+    const fillDt  = document.getElementById('tour-progress-fill-dt');
+    if (mob) mob.value = '0';
+    if (dt)  dt.value  = '0';
+    if (fillMob) fillMob.style.transform = 'scaleX(0)';
+    if (fillDt)  fillDt.style.transform  = 'scaleX(0)';
   }
 
   /**
