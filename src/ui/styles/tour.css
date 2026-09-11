@@ -365,11 +365,11 @@
       .tour-mob.collapsed .tour-mob__inner { display: none; }
       .tour-mob.collapsed { min-height: unset; padding: 0; border-radius: 24px; }
 
-      /* 内容区 */
+      /* 内容区：高度完全 auto，由内容撑开 */
       .tour-mob__inner {
         display: flex; flex-direction: column; align-items: center;
         padding: 4px 4px 6px; gap: 6px;
-        max-height: calc(100vh - 180px); overflow-y: auto; height: auto;
+        height: auto; overflow-y: visible;
         transition: opacity 0.2s;
       }
       .tour-mob__inner::-webkit-scrollbar { width: 3px; }
