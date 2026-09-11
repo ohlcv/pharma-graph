@@ -335,7 +335,7 @@
         align-items: center;
         position: fixed;
         /* 顶部 topbar 下方右侧，远离底部面板 */
-        top: 56px; left: auto; right: 8px; bottom: auto;
+        top: 80px; left: auto; right: 8px; bottom: auto;
         /* 用 fit-content 让漫游条收缩到最宽子元素，不会被背景撑大 */
         width: fit-content; min-width: 0; max-width: calc(100vw - 16px);
         padding: 8px;
@@ -346,13 +346,14 @@
         touch-action: none;
         user-select: none;
         overflow: visible;
-        gap: 6px;
+        gap: 4px;
       }
     
-      /* 折叠把手 */
+      /* 折叠把手：固定尺寸，便于点击和识别 */
       .tour-mob__handle {
         display: flex; align-items: center; justify-content: center;
-        padding: 6px 10px; cursor: pointer; min-height: auto; flex-shrink: 0;
+        padding: 8px 12px; cursor: pointer; min-height: 32px; min-width: 48px;
+        flex-shrink: 0;
         color: rgba(148,163,184,0.5); transition: color 0.15s, background 0.15s;
         touch-action: manipulation;
       }
@@ -368,7 +369,7 @@
       /* 内容区：高度完全 auto，由内容撑开 */
       .tour-mob__inner {
         display: flex; flex-direction: column; align-items: center;
-        padding: 4px 4px 6px; gap: 6px;
+        padding: 4px 4px 6px; gap: 4px;
         height: auto; overflow-y: visible;
         transition: opacity 0.2s;
       }
@@ -376,14 +377,14 @@
       .tour-mob__inner::-webkit-scrollbar-track { background: transparent; }
       .tour-mob__inner::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
     
-      /* 控制按钮 */
+      /* 控制按钮：间距 auto（用 row-gap: auto 让按钮之间自动均分剩余空间） */
       .tour-mob__ctrl {
         display: flex; flex-direction: column; align-items: center; justify-content: center;
-        gap: 6px; padding: 0;
+        padding: 0; row-gap: auto; column-gap: 0;
       }
       .tour-mob__close {
         display: flex; align-items: center; justify-content: center;
-        padding: 4px 8px;
+        padding: 4px 8px; margin: 2px 0;
         background: rgba(239,68,113,0.1); border: 1px solid rgba(239,68,113,0.3);
         border-radius: 7px; color: #f87171; cursor: pointer; flex-shrink: 0;
         font-size: 0.66rem; font-weight: 500; font-family: inherit;
@@ -399,7 +400,7 @@
 
       .tour-mob__badge {
         display: flex; align-items: center; justify-content: center;
-        padding: 4px 8px;
+        padding: 4px 8px; margin: 2px 0;
         background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.3);
         border-radius: 7px; color: #a78bfa; cursor: pointer; flex-shrink: 0;
         font-size: 0.66rem; font-weight: 500; font-family: inherit;
@@ -426,7 +427,7 @@
       }
       .tour-mob__badge--prev,
       .tour-mob__badge--next {
-        padding: 3px 6px;
+        padding: 3px 6px; margin: 2px 0;
         background: rgba(255,255,255,0.05);
         border: 1px solid rgba(255,255,255,0.1);
         color: rgba(167,139,250,0.7);
@@ -470,7 +471,7 @@
       }
       .tour-mob__strategy-toggle {
         display: inline-flex; align-items: center; justify-content: center;
-        height: auto; padding: 2px 5px;
+        height: auto; min-width: 32px; padding: 2px 5px;
         background: rgba(255,255,255,0.06);
         border: 1px solid rgba(99,102,241,0.25); border-radius: 5px;
         color: rgba(226,232,240,0.85); font-size: 0.58rem; font-weight: 600;
