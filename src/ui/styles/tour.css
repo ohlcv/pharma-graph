@@ -568,21 +568,23 @@
         z-index: 2;
       }
 
-      /* 滑块圆点：加大触摸热区（负 margin 超出 container 边界），便于抓取 */
+      /* 滑块圆点：声明尺寸 18×18px，不使用负 margin（上一版本 margin: -6px -8px 会让
+         视觉位置和原生声明尺寸脱钩，导致 fill 公式（基于声明尺寸 18px）和 thumb 真实
+         渲染位置不一致，pct=1 时 fill 顶端比 thumb 圆心低 ~6px）。
+         现在触摸热区由 container 加宽到 32px 来保证（见 .tour-mob__track-container）。 */
       .tour-mob__range::-webkit-slider-thumb {
         -webkit-appearance: none;
         width: 18px; height: 18px; border-radius: 50%;
         background: #fff; border: none;
         box-shadow: 0 0 8px rgba(99,102,241,0.9), 0 1px 4px rgba(0,0,0,0.4);
         cursor: pointer;
-        /* 负 margin 扩大热区：上下各多 6px，左右各多 8px */
-        margin: -6px -8px;
+        margin: 0;
       }
       .tour-mob__range::-moz-range-thumb {
         width: 18px; height: 18px; border-radius: 50%;
         background: #fff; border: none;
         box-shadow: 0 0 8px rgba(99,102,241,0.9); cursor: pointer;
-        margin: -6px -8px;
+        margin: 0;
       }
       /* Firefox track 样式 */
       .tour-mob__range::-moz-range-track {
