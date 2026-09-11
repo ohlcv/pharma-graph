@@ -153,16 +153,14 @@
     .tour-dt__stat-label { color: rgba(226,232,240,0.55); }
     .tour-dt__stat-val   { font-weight: 700; color: rgba(226,232,240,0.9); font-variant-numeric: tabular-nums; }
 
-    /* ── 节点进度条（桌面端）────────────────────────────────────────────── */
+    /* ── 节点进度条（桌面端）──────────────────────────────────────────────
+       独立参数块结构，跟 .tour-dt__params 一致：横排 label + track + val。
+       label 用 .tour-dt__param-label（与间隔/深度共用），分数用 .tour-dt__stat-val
+       显示在 stat 里（"节点 X / Y"）。
+       track 撑开剩余空间，宽度由父容器决定，不再写死 min/max-width。 */
     .tour-dt__progress {
-      display: flex; align-items: center; gap: 6px;
-      flex: 1; min-width: 100px; max-width: 200px;
-    }
-    .tour-dt__progress-frac {
-      font-weight: 700; color: rgba(226,232,240,0.9);
-      font-variant-numeric: tabular-nums;
-      white-space: nowrap;
-      flex-shrink: 0;
+      display: flex; align-items: center; gap: 5px;
+      flex: 1 1 auto; min-width: 80px; max-width: 220px;
     }
     .tour-dt__progress-track {
       position: relative;
@@ -210,13 +208,7 @@
     .tour-state--idle .tour-dt__progress-fill { background: rgba(255,255,255,0.15); box-shadow: none; }
     .tour-state--idle .tour-dt__progress-thumb { background: rgba(255,255,255,0.5); box-shadow: none; }
     .tour-state--idle .tour-dt__progress-range { pointer-events: none; cursor: default; }
-    
-/* Timeline label — single "current / total" text in place of the old
-   progress bar + dot marker. The bar routinely outgrew its track and read
-   as visual noise; the compact text conveys the same information. */
-.tour-dt__progress       { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
-.tour-dt__progress-label { font-size: 0.7rem; color: rgba(226,232,240,0.75); font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; padding: 0 4px; }
-    
+
     .tour-dt__params      { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
     .tour-dt__param-label { display: flex; align-items: center; gap: 3px; font-size: 0.6rem; color: rgba(226,232,240,0.55); white-space: nowrap; }
     .tour-dt__param-label svg { width: 12px; height: 12px; stroke: currentColor; flex-shrink: 0; }
