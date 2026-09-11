@@ -159,6 +159,50 @@
     .tour-dt__stat svg  { width: 14px; height: 14px; stroke: currentColor; flex-shrink: 0; }
     .tour-dt__stat-label { color: rgba(226,232,240,0.55); }
     .tour-dt__stat-val   { font-weight: 700; color: rgba(226,232,240,0.9); font-variant-numeric: tabular-nums; }
+
+    /* ── 节点进度条（桌面端）────────────────────────────────────────────── */
+    .tour-dt__progress {
+      display: flex; align-items: center; gap: 6px;
+      flex: 1; min-width: 100px; max-width: 200px;
+    }
+    .tour-dt__progress-frac {
+      font-weight: 700; color: rgba(226,232,240,0.9);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .tour-dt__progress-track {
+      position: relative;
+      flex: 1; min-width: 60px;
+      height: 4px;
+      background: rgba(255,255,255,0.10);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .tour-dt__progress-fill {
+      position: absolute; left: 0; top: 0; bottom: 0;
+      width: 100%;
+      transform-origin: left center;
+      transform: scaleX(0);
+      background: linear-gradient(to right, #6366f1, #a78bfa);
+      border-radius: 2px;
+      box-shadow: 0 0 6px rgba(99,102,241,0.55);
+      transition: transform 0.1s ease;
+      pointer-events: none;
+    }
+    .tour-dt__progress-range {
+      position: absolute; inset: -6px -4px;
+      width: auto; height: auto;
+      margin: 0; padding: 0;
+      background: transparent;
+      -webkit-appearance: none; appearance: none;
+      cursor: pointer;
+      opacity: 0;
+      touch-action: none;
+      z-index: 3;
+    }
+    .tour-dt--idle .tour-dt__progress-fill { background: rgba(255,255,255,0.15); box-shadow: none; }
+    .tour-dt--idle .tour-dt__progress-range { pointer-events: none; cursor: default; }
     
 /* Timeline label — single "current / total" text in place of the old
    progress bar + dot marker. The bar routinely outgrew its track and read
@@ -502,6 +546,54 @@
       .tour-mob__stat-rule { width: 100%; min-width: 14px; height: 1px; background: rgba(226,232,240,0.45); }
       .tour-mob__stat-item svg { width: 10px; height: 10px; stroke: currentColor; color: rgba(226,232,240,0.55); flex-shrink: 0; }
       .tour-mob__stat-lbl  { font-size: 0.46rem; color: rgba(226,232,240,0.28); user-select: none; letter-spacing: 0.02em; }
+
+      /* ── 节点进度条（数字后面 + 进度条）────────────────────────────────── */
+      .tour-mob__progress {
+        display: flex; align-items: center; gap: 5px;
+        width: 100%; max-width: 56px;     /* 节点 stat-item 内的最大宽度 */
+        min-width: 0;
+      }
+      .tour-mob__progress-frac {
+        display: flex; align-items: baseline; gap: 1px;
+        font-size: 0.68rem; line-height: 1;
+        flex-shrink: 0;
+      }
+      .tour-mob__progress-frac .tour-mob__stat-num { font-size: inherit; }
+      .tour-mob__progress-sep { color: rgba(226,232,240,0.35); font-size: 0.62rem; }
+      .tour-mob__progress-track {
+        position: relative;
+        flex: 1; min-width: 24px;
+        height: 4px;
+        background: rgba(255,255,255,0.10);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .tour-mob__progress-fill {
+        position: absolute; left: 0; top: 0; bottom: 0;
+        width: 100%;
+        transform-origin: left center;
+        transform: scaleX(0);
+        background: linear-gradient(to right, #6366f1, #a78bfa);
+        border-radius: 2px;
+        box-shadow: 0 0 6px rgba(99,102,241,0.55);
+        transition: transform 0.1s ease;
+        pointer-events: none;
+      }
+      /* 罩在 fill 上方的隐形 input，只用于点击/拖动交互 */
+      .tour-mob__progress-range {
+        position: absolute; inset: -8px -6px;   /* 命中区上下各扩 8px，左右各扩 6px */
+        width: auto; height: auto;
+        margin: 0; padding: 0;
+        background: transparent;
+        -webkit-appearance: none; appearance: none;
+        cursor: pointer;
+        opacity: 0;                  /* 完全隐形，只接收事件 */
+        touch-action: none;
+        z-index: 3;
+      }
+      /* Idle / 未启动时进度条置灰、不可点 */
+      .tour-mob--idle .tour-mob__progress-fill { background: rgba(255,255,255,0.15); box-shadow: none; }
+      .tour-mob--idle .tour-mob__progress-range { pointer-events: none; cursor: default; }
     
       /* 滑块区 */
       .tour-mob__sliders { display: flex; flex-direction: column; align-items: center; gap: 10px; flex-shrink: 0; padding: 0; }
