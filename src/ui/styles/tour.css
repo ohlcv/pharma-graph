@@ -335,7 +335,7 @@
         align-items: center;
         position: fixed;
         /* 顶部 topbar 下方右侧，远离底部面板 */
-        top: 80px; left: auto; right: 8px; bottom: auto;
+        top: 100px; left: auto; right: 8px; bottom: auto;
         /* 用 fit-content 让漫游条收缩到最宽子元素，不会被背景撑大 */
         width: fit-content; min-width: 0; max-width: calc(100vw - 16px);
         padding: 8px;
@@ -369,7 +369,7 @@
       /* 内容区：高度完全 auto，由内容撑开 */
       .tour-mob__inner {
         display: flex; flex-direction: column; align-items: center;
-        padding: 4px 4px 6px; gap: 4px;
+        padding: 4px 4px 6px; gap: 6px;
         height: auto; overflow-y: visible;
         transition: opacity 0.2s;
       }
@@ -384,10 +384,11 @@
       }
       .tour-mob__close {
         display: flex; align-items: center; justify-content: center;
-        padding: 4px 8px; margin: 2px 0;
+        padding: 6px 10px; margin: 4px 0;
         background: rgba(239,68,113,0.1); border: 1px solid rgba(239,68,113,0.3);
         border-radius: 7px; color: #f87171; cursor: pointer; flex-shrink: 0;
         font-size: 0.66rem; font-weight: 500; font-family: inherit;
+        touch-action: manipulation;
         transition: background 0.14s, border-color 0.14s, color 0.14s, box-shadow 0.14s;
         position: relative; overflow: hidden;
       }
@@ -400,10 +401,11 @@
 
       .tour-mob__badge {
         display: flex; align-items: center; justify-content: center;
-        padding: 4px 8px; margin: 2px 0;
+        padding: 6px 10px; margin: 4px 0;
         background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.3);
         border-radius: 7px; color: #a78bfa; cursor: pointer; flex-shrink: 0;
         font-size: 0.66rem; font-weight: 500; font-family: inherit;
+        touch-action: manipulation;
         transition: background 0.14s, border-color 0.14s, color 0.14s, box-shadow 0.14s;
         position: relative; overflow: hidden;
       }
@@ -427,12 +429,13 @@
       }
       .tour-mob__badge--prev,
       .tour-mob__badge--next {
-        padding: 3px 6px; margin: 2px 0;
+        padding: 5px 8px; margin: 4px 0;
         background: rgba(255,255,255,0.05);
         border: 1px solid rgba(255,255,255,0.1);
         color: rgba(167,139,250,0.7);
         border-radius: 7px;
         font-size: 0.66rem; font-weight: 500; font-family: inherit;
+        touch-action: manipulation;
         transition: background 0.14s, border-color 0.14s, color 0.14s, box-shadow 0.14s;
         position: relative; overflow: hidden;
       }
@@ -471,11 +474,13 @@
       }
       .tour-mob__strategy-toggle {
         display: inline-flex; align-items: center; justify-content: center;
-        height: auto; min-width: 32px; padding: 2px 5px;
+        height: auto; min-width: 40px; min-height: 24px; padding: 4px 8px;
         background: rgba(255,255,255,0.06);
         border: 1px solid rgba(99,102,241,0.25); border-radius: 5px;
-        color: rgba(226,232,240,0.85); font-size: 0.58rem; font-weight: 600;
+        color: rgba(226,232,240,0.85); font-size: 0.62rem; font-weight: 600;
         font-family: inherit; line-height: 1; cursor: pointer; outline: none;
+        /* 父容器 touch-action: none 会延迟 click，这里强制 manipulation 恢复即时响应 */
+        touch-action: manipulation;
         transition: transform 0.08s ease, border-color 0.15s ease, background 0.15s ease;
       }
       .tour-mob__strategy-toggle:active { transform: scale(0.96); }
@@ -499,9 +504,9 @@
       .tour-mob__stat-lbl  { font-size: 0.46rem; color: rgba(226,232,240,0.28); user-select: none; letter-spacing: 0.02em; }
     
       /* 滑块区 */
-      .tour-mob__sliders { display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; padding: 0; }
+      .tour-mob__sliders { display: flex; flex-direction: column; align-items: center; gap: 10px; flex-shrink: 0; padding: 0; }
       .tour-mob__cell {
-        display: flex; flex-direction: column; align-items: center; gap: 2px;
+        display: flex; flex-direction: column; align-items: center; gap: 4px;
         position: relative;
         /* auto 让 fit-content 容器自然收缩到子元素宽度 */
         width: auto; min-height: auto;
@@ -511,27 +516,31 @@
       #tour-depth-val, #tour-depth-val-mob2 { min-width: 28px; text-align: center; }
       .tour-mob__lbl { font-size: 0.46rem; color: rgba(226,232,240,0.28); user-select: none; letter-spacing: 0.02em; }
 
-      /* 轨道高度 auto，让内容撑开；宽度保持 4px 作为竖向滑块 */
-      .tour-mob__track { width: 4px; height: auto; aspect-ratio: 1/8; background: rgba(255,255,255,0.08); border-radius: 2px; position: relative; overflow: visible; display: flex; flex-direction: column; justify-content: flex-end; }
+      /* 轨道：固定 4px 宽 + 足够长的实际高度，便于拖动 */
+      .tour-mob__track { width: 4px; height: 80px; background: rgba(255,255,255,0.08); border-radius: 2px; position: relative; overflow: visible; display: flex; flex-direction: column; justify-content: flex-end; }
       .tour-mob__fill  { position: absolute; left: 0; bottom: 0; width: 100%; height: 0%; background: linear-gradient(to top, #6366f1, #a78bfa); border-radius: 2px; transition: height 0.08s ease; box-shadow: 0 0 6px rgba(99,102,241,0.6); }
 
-      /* range input 宽度 auto，高度固定为滑块 thumb 的高度 */
+      /* range input：精确覆盖 track 区域。track 位于 cell 中部 (val 12px + gap 4px = 16px)。*/
       .tour-mob__range {
-        position: absolute; top: 50%; left: 50%;
-        transform: translateX(-50%) translateY(-50%) rotate(-90deg);
+        position: absolute;
+        /* 精确对齐 track：top = val(12px) + gap(4px) = 16px；left 居中；width=80px 旋转后变 4px 宽 */
+        top: 16px; left: 50%;
+        width: 80px; height: 4px;
+        margin: 0; padding: 0;
+        transform: translate(-50%, 0) rotate(-90deg);
         transform-origin: center center;
-        width: auto; height: 16px; margin: 0; padding: 0;
         -webkit-appearance: none; appearance: none;
         background: transparent; cursor: pointer;
+        z-index: 2;
       }
       .tour-mob__range::-webkit-slider-thumb {
-        -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+        -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
         background: #fff; border: none;
         box-shadow: 0 0 8px rgba(99,102,241,0.9), 0 1px 4px rgba(0,0,0,0.4);
         cursor: pointer; position: relative;
       }
       .tour-mob__range::-moz-range-thumb {
-        width: 16px; height: 16px; border-radius: 50%;
+        width: 18px; height: 18px; border-radius: 50%;
         background: #fff; border: none;
         box-shadow: 0 0 8px rgba(99,102,241,0.9); cursor: pointer;
       }
