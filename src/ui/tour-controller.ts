@@ -72,6 +72,8 @@ export class TourController {
     this.bindMobileCollapse();
     this.bindSelectionHint();
     this.setIdleUI();
+    // 初始化 fill（DOM 默认 value 不会触发 input 事件，需手动同步 fill）
+    for (const s of this.sliders) this.paintFill(s);
   }
 
   isRunning(): boolean { return this.running; }
@@ -470,13 +472,16 @@ export class TourController {
 
   private paintFill(s: SliderBind): void {
     const min = Number(s.range.min), max = Number(s.range.max);
-    const pct = ((s.range.valueAsNumber - min) / (max - min)) * 100;
-    if (s.fill && s.fill.style.height !== undefined) {
-      // Vertical track (mobile)
-      s.fill.style.height = pct + '%';
+    const pct = ((s.range.valueAsNumber - min) / (max - min));
+    if (s.fill) {
+      // Vertical track (mobile) — 用 transform: scaleY 比 height:% 更精确：
+      // scaleY 不受容器 height 变化影响，且能避免 fill 顶端穿过 thumb 中心。
+      // thumb 在 max/min 时的圆心位于 track 端点外侧 (thumb 半径 = 9px)，
+      // 我们让 fill 的实际高度按比例覆盖 thumb 圆心范围，让 fill 顶端 ≈ thumb 圆心。
+      s.fill.style.transform = `scaleY(${pct})`;
     } else {
       // Horizontal track (desktop) — paint gradient background on all mirrors
-      const bg = `linear-gradient(to right, var(--tour-accent) 0%, var(--tour-accent) ${pct}%, rgba(255,255,255,0.1) ${pct}%, rgba(255,255,255,0.1) 100%)`;
+      const bg = `linear-gradient(to right, var(--tour-accent) 0%, var(--tour-accent) ${pct * 100}%, rgba(255,255,255,0.1) ${pct * 100}%, rgba(255,255,255,0.1) 100%)`;
       // Primary mirror (the original desktop slider)
       if (s.range.id.endsWith('-dt') || s.range.id.endsWith('-dt2')) {
         s.range.style.background = bg;

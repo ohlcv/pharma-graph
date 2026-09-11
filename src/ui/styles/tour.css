@@ -528,16 +528,17 @@
         background: rgba(255,255,255,0.08); border-radius: 2px;
         overflow: hidden;                  /* 限制 fill 不溢出圆角 */
       }
-      /* 已填充进度：用 inset 控制位置，避免 left/width/height 在 writing-mode 下被污染。
-         inset-block-end:0 让 fill 贴着底部；inset-block-start 由 JS 设置百分比控制高度。
-         同时显式 width:100% 覆盖 writing-mode 默认的横向 100%。 */
+      /* 已填充进度：用 transform: scaleY 控制比例（transform-origin: bottom）。
+         这种方式比 height:% 更精确：scaleY 不受容器 height 变化影响，且与 thumb
+         位置计算方式完全脱钩，避免 fill 顶端穿过 thumb 中心。 */
       .tour-mob__fill {
         position: absolute;
         left: 0; right: 0; bottom: 0;      /* 横向铺满 + 贴底 */
-        height: 0%;                         /* 竖向高度，由 JS 控制 */
-        width: 100%;
+        width: 100%; height: 100%;          /* 占满整个 track */
+        transform-origin: bottom center;
+        transform: scaleY(0);               /* JS 动态设置 scaleY(0~1) */
         background: linear-gradient(to top, #6366f1, #a78bfa); border-radius: 2px;
-        transition: height 0.08s ease;
+        transition: transform 0.08s ease;
         box-shadow: 0 0 6px rgba(99,102,241,0.6);
       }
 
