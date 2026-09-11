@@ -520,18 +520,20 @@
       .tour-mob__track { width: 4px; height: 80px; background: rgba(255,255,255,0.08); border-radius: 2px; position: relative; overflow: visible; display: flex; flex-direction: column; justify-content: flex-end; }
       .tour-mob__fill  { position: absolute; left: 0; bottom: 0; width: 100%; height: 0%; background: linear-gradient(to top, #6366f1, #a78bfa); border-radius: 2px; transition: height 0.08s ease; box-shadow: 0 0 6px rgba(99,102,241,0.6); }
 
-      /* range input：精确覆盖 track 区域。track 位于 cell 中部 (val 12px + gap 4px = 16px)。*/
+      /* range input：包裹层 container 用 relative，让 range 用 inset:0 完全覆盖它（即完全覆盖 track） */
+      .tour-mob__cell { position: relative; }
+      .tour-mob__track-container { position: relative; }
       .tour-mob__range {
         position: absolute;
-        /* 精确对齐 track：top = val(12px) + gap(4px) = 16px；left 居中；width=80px 旋转后变 4px 宽 */
-        top: 16px; left: 50%;
-        width: 80px; height: 4px;
-        margin: 0; padding: 0;
-        transform: translate(-50%, 0) rotate(-90deg);
+        /* inset: 0 让 range 完全覆盖 container/track，不依赖任何像素猜测 */
+        inset: 0;
+        /* 旋转 -90°：80px 变高（竖向滑条），4px 变宽（与 track 4px 宽对齐）*/
+        transform: rotate(-90deg);
         transform-origin: center center;
         -webkit-appearance: none; appearance: none;
         background: transparent; cursor: pointer;
         z-index: 2;
+        width: unset; height: unset;
       }
       .tour-mob__range::-webkit-slider-thumb {
         -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;

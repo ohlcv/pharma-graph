@@ -740,20 +740,24 @@
         <!-- 间隔滑块：数值在上，track在中，标签在下 -->
         <div class="tour-mob__cell">
           <span class="tour-mob__val" id="tour-interval-val">3s</span>
-          <div class="tour-mob__track">
-            <div class="tour-mob__fill" id="tour-interval-fill"></div>
+          <div class="tour-mob__track-container">
+            <div class="tour-mob__track">
+              <div class="tour-mob__fill" id="tour-interval-fill"></div>
+            </div>
+            <input type="range" class="tour-mob__range" id="tour-interval" min="1000" max="10000" step="500" value="3000">
           </div>
           <span class="tour-mob__lbl">间隔</span>
-          <input type="range" class="tour-mob__range" id="tour-interval" min="1000" max="10000" step="500" value="3000">
         </div>
         <!-- 深度滑块：数值在上，track在中，标签在下 -->
         <div class="tour-mob__cell">
           <span class="tour-mob__val" id="tour-depth-val">&infin;</span>
-          <div class="tour-mob__track">
-            <div class="tour-mob__fill" id="tour-depth-fill"></div>
+          <div class="tour-mob__track-container">
+            <div class="tour-mob__track">
+              <div class="tour-mob__fill" id="tour-depth-fill"></div>
+            </div>
+            <input type="range" class="tour-mob__range" id="tour-maxdepth" min="1" max="5" step="1" value="5">
           </div>
           <span class="tour-mob__lbl">深度</span>
-          <input type="range" class="tour-mob__range" id="tour-maxdepth" min="1" max="5" step="1" value="5">
         </div>
       </div>
     </div>
