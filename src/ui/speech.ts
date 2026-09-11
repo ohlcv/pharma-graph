@@ -7,6 +7,9 @@
 // - Auto-cancels previous utterance before starting a new one — prevents
 //   overlapping voices from rapid step transitions.
 // - Voice selection: prefers zh-CN voices, falls back to any available voice.
+// - iOS Safari: first speechSynthesis.speak() must be a user gesture AND must
+//   use a real (even zero-volume) utterance — AudioContext tricks don't help.
+//   Fix: prime the engine with an empty utterance in the toggle() handler.
 // - Rate: 1.0 (default). Could be exposed as a setting in future.
 // - State is NOT persisted — TTS is off by default on every page load.
 
@@ -17,6 +20,9 @@ class SpeechController {
   private currentUtterance: SpeechSynthesisUtterance | null = null;
   private voices: SpeechSynthesisVoice[] = [];
   private voiceReady = false;
+  /** iOS Safari: speech engine must be unlocked once per page session.
+   *  Guard so we only prime on the very first toggle ON. */
+  private unlocked = false;
 
   constructor() {
     if (typeof speechSynthesis === 'undefined') return;
@@ -37,13 +43,29 @@ class SpeechController {
     return this.active;
   }
 
-  /** Toggle TTS on/off. Returns the new state. */
+  /**
+   * Toggle TTS on/off.
+   *
+   * iOS Safari: the very first time we turn TTS ON we MUST call
+   * speechSynthesis.speak() with a real utterance (even empty) while still
+   * inside the user-gesture call stack.  This "primes" the speech engine.
+   * After that, asynchronous speak() calls (from setTimeout etc.) work fine.
+   */
   toggle(): boolean {
     this.active = !this.active;
     if (!this.active) {
       this.stop();
+    } else {
+      this.updateButtonState();
+      // iOS Safari requires the *first* speak() call to be inside a user gesture
+      // AND to use an actual utterance.  Do it here — it unlocks the engine for
+      // the remainder of the page session.  Subsequent speak() calls (including
+      // those triggered by setTimeout in tour step transitions) will work.
+      if (!this.unlocked) {
+        this.unlockIOS();
+        this.unlocked = true;
+      }
     }
-    this.updateButtonState();
     return this.active;
   }
 
@@ -58,6 +80,9 @@ class SpeechController {
    * Speak the given text immediately.
    * Cancels any in-progress utterance first.
    * If TTS is inactive, does nothing.
+   *
+   * On iOS Safari this is safe to call from setTimeout / async callbacks
+   * because unlockIOS() was already called inside the toggle() gesture.
    */
   speak(text: string): void {
     if (!this.active || !text.trim() || typeof speechSynthesis === 'undefined') return;
@@ -81,6 +106,17 @@ class SpeechController {
 
     this.currentUtterance = utterance;
     speechSynthesis.speak(utterance);
+  }
+
+  /**
+   * iOS Safari: send a silent zero-volume utterance while we are still inside
+   * the toggle() user-gesture stack.  This is the ONLY thing that reliably
+   * unlocks the speech engine on iOS.  Must be called at most once per page load.
+   */
+  private unlockIOS(): void {
+    const u = new SpeechSynthesisUtterance('');
+    u.volume = 0;
+    speechSynthesis.speak(u);
   }
 
   private pickVoice(): Voice {
