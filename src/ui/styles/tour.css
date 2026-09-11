@@ -549,14 +549,14 @@
       .tour-mob__stat-item svg { width: 10px; height: 10px; stroke: currentColor; color: rgba(226,232,240,0.55); flex-shrink: 0; }
       .tour-mob__stat-lbl  { font-size: 0.46rem; color: rgba(226,232,240,0.28); user-select: none; letter-spacing: 0.02em; }
 
-      /* ── 节点进度条（数字后面 + 进度条）────────────────────────────────── */
+      /* ── 节点进度条（垂直：分数在上、track 在下，嵌入外层 stat-item 的 column 布局）──
+         宽度 100% 让它在 stat-item 列里横向撑满（与轮次/步的 num 等宽）。 */
       .tour-mob__progress {
-        display: flex; align-items: center; gap: 5px;
-        width: 100%; max-width: 56px;     /* 节点 stat-item 内的最大宽度 */
-        min-width: 0;
+        display: flex; flex-direction: column; align-items: stretch; gap: 3px;
+        width: 100%;
       }
       .tour-mob__progress-frac {
-        display: flex; align-items: baseline; gap: 1px;
+        display: flex; align-items: baseline; justify-content: center; gap: 1px;
         font-size: 0.68rem; line-height: 1;
         flex-shrink: 0;
       }
@@ -564,7 +564,9 @@
       .tour-mob__progress-sep { color: rgba(226,232,240,0.35); font-size: 0.62rem; }
       .tour-mob__progress-track {
         position: relative;
-        flex: 1; min-width: 24px;
+        /* 父 .tour-mob__progress 改为 column 后，flex: 1 表示占满剩余垂直空间而非水平宽度，
+           所以这里改用 width: 100% 让 track 横向填满父容器（外层 stat-item 的列宽）。 */
+        width: 100%; min-width: 24px;
         height: 4px;
         background: rgba(255,255,255,0.10);
         border-radius: 2px;
@@ -622,7 +624,16 @@
       .tour-mob__val { font-size: 0.62rem; font-weight: 600; color: rgba(167,139,250,0.9); font-variant-numeric: tabular-nums; user-select: none; line-height: 1; }
       /* 固定宽度防止布局抖动（深度滑块标签长度不同） */
       #tour-depth-val { min-width: 28px; text-align: center; }
-      .tour-mob__lbl { font-size: 0.46rem; color: rgba(226,232,240,0.28); user-select: none; letter-spacing: 0.02em; }
+      .tour-mob__lbl {
+        font-size: 0.46rem; color: rgba(226,232,240,0.28);
+        user-select: none; letter-spacing: 0.02em;
+        display: flex; align-items: center; justify-content: center; gap: 2px;
+        line-height: 1;
+      }
+      .tour-mob__lbl svg {
+        width: 10px; height: 10px; stroke: currentColor;
+        color: rgba(226,232,240,0.55); flex-shrink: 0;
+      }
 
       /* 轨道容器：加宽到 32px 作为触摸热区，但视觉上只露中间 4px 的细线。
          这种"看起来细、摸起来粗"的做法是 iOS/Android 系统设置滑块的通用模式，
