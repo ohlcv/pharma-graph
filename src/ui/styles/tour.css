@@ -278,6 +278,33 @@
     .tour-dt__btn--play:hover  { background: rgba(99,102,241,0.2); border-color: var(--tour-accent); box-shadow: 0 0 12px rgba(99,102,241,0.25); }
     .tour-dt__btn--play.active { background: rgba(99,102,241,0.25); border-color: var(--tour-accent); box-shadow: 0 0 12px rgba(99,102,241,0.4), 0 0 0 2px rgba(99,102,241,0.2); }
     .tour-dt__btn--close:hover { background: rgba(239,68,68,0.1); border-color: rgba(239,68,113,0.3); color: #f87171; }
+
+    /* 朗读按钮 */
+    .tour-dt__btn--speech {
+      padding: 3px 5px;
+      background: transparent;
+      border-color: transparent;
+      color: var(--text-2);
+      flex-shrink: 0;
+    }
+    .tour-dt__btn--speech:hover {
+      background: rgba(255,255,255,0.07);
+      border-color: rgba(255,255,255,0.1);
+      color: var(--text);
+    }
+    .tour-dt__btn--speech.active {
+      color: #a78bfa;
+    }
+    .tour-dt__btn--speech.active .speech-wave-1,
+    .tour-dt__btn--speech.active .speech-wave-2 {
+      opacity: 1;
+    }
+    .speech-wave-1,
+    .speech-wave-2 {
+      opacity: 0.4;
+      transition: opacity 0.2s;
+    }
+
     .tour-dt__btn svg { width: 14px; height: 14px; flex-shrink: 0; }
     
     /* ─────────────────────────────────────────────────────────────────────────
@@ -376,6 +403,17 @@
       .tour-mob__badge:hover { background: rgba(99,102,241,0.2); border-color: rgba(99,102,241,0.5); box-shadow: 0 0 10px rgba(99,102,241,0.2); color: var(--accent); }
       .tour-mob__badge.tour-active { background: rgba(99,102,241,0.25) !important; border-color: var(--tour-accent) !important; box-shadow: 0 0 12px rgba(99,102,241,0.4); color: var(--tour-accent) !important; }
       .tour-mob__badge svg { width: 14px; height: 14px; stroke: currentColor; }
+
+      /* 朗读按钮：active 时显示音波（默认隐藏音波，对齐桌面端行为） */
+      .tour-mob__badge .speech-wave-1,
+      .tour-mob__badge .speech-wave-2 {
+        opacity: 0.35;
+        transition: opacity 0.2s;
+      }
+      .tour-mob__badge.active .speech-wave-1,
+      .tour-mob__badge.active .speech-wave-2 {
+        opacity: 1;
+      }
       .tour-mob__badge--prev,
       .tour-mob__badge--next {
         padding: 4px 8px;

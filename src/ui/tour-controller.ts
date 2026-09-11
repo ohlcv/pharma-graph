@@ -27,6 +27,7 @@ import { DetailPanel } from './detail-panel.js';
 import { uiState, registerTourBarToggle } from './state.js';
 import { UiToggle } from './ui-toggle.js';
 import { showToast } from './ui-helpers.js';
+import { speechController } from './speech.js';
 
 const SEARCH_INPUT_DEBOUNCE_MS = 220;
 
@@ -150,6 +151,7 @@ export class TourController {
     this.running = false;
     this.paused = false;
     this.detailPanel.close();
+    speechController.stop();
     this.setIdleUI();
   }
 
@@ -281,6 +283,7 @@ export class TourController {
         case 'prev':        this.prev();        break;
         case 'next':        this.next();        break;
         case 'toggle-strategy': this.toggleStrategy(); break;
+        case 'toggle-speech':   speechController.toggle(); break;
       }
     });
 
@@ -622,6 +625,8 @@ export class TourController {
     // Desktop bars
     this.setText('tour-cycle-num-dt',       String(info.cycleCount + 1));
     this.setText('tour-dt-node-name',       this.labelOf(info.nodeId) || info.nodeId);
+    // 朗读当前节点名（用户开启后每步自动读）
+    speechController.speak(this.labelOf(info.nodeId) || info.nodeId);
     // 进度：current step / total steps in the sequence
     const total = this.engine?.totalSteps() ?? info.totalToExplore;
     const step  = this.engine?.currentStepIndex() ?? info.currentStep;
