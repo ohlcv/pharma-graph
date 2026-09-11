@@ -36,10 +36,6 @@ interface SliderBind {
   range: HTMLInputElement;
   fill?: HTMLElement | null;       // optional: vertical track fill (#tour-interval-fill / depth-fill)
   value?: HTMLElement | null;      // optional: external value label
-  /** All additional mirrors to keep in sync (values + labels) */
-  extraMirrors?: HTMLInputElement[];
-  /** All additional value labels to update */
-  extraMirrorLabels?: (HTMLElement | null)[];
   format: (v: number) => string;
   onCommit: (v: number) => void;
 }
@@ -236,11 +232,11 @@ export class TourController {
     // 优先通过 data 属性查找（如果有的话）
     const byData = this.sliders.find((s) => s.range.dataset['tourSlider'] === which);
     if (byData) return byData;
-    
+
     // 回退：通过滑块 ID 查找
     const idMap: Record<string, string[]> = {
-      interval: ['tour-interval', 'tour-interval-mob2', 'tour-interval-dt', 'tour-interval-dt2'],
-      maxdepth: ['tour-maxdepth', 'tour-maxdepth-mob2', 'tour-maxdepth-dt', 'tour-maxdepth-dt2'],
+      interval: ['tour-interval', 'tour-interval-dt'],
+      maxdepth: ['tour-maxdepth', 'tour-maxdepth-dt'],
     };
     const ids = idMap[which] ?? [];
     return this.sliders.find((s) => ids.includes(s.range.id));
@@ -249,15 +245,14 @@ export class TourController {
   /** Set the tour strategy. If currently running, restart with the new strategy. */
   setStrategy(next: TourStrategy): void {
     uiState.tour.strategy = next;
-    // Sync both desktop selects
-    for (const id of ['tour-strategy-select-dt', 'tour-strategy-select-dt2']) {
+    // Sync desktop <select>
+    for (const id of ['tour-strategy-select-dt']) {
       const sel = document.getElementById(id) as HTMLSelectElement | null;
       if (sel) sel.value = next;
     }
     this.syncMobileStrategyLabel(next);
-    // Flash all strategy controls
-    for (const id of ['tour-strategy-select-dt', 'tour-strategy-select-dt2',
-                       'tour-strategy-toggle-mob', 'tour-strategy-toggle-mob2']) {
+    // Flash strategy controls
+    for (const id of ['tour-strategy-select-dt', 'tour-strategy-toggle-mob']) {
       this.flashStrategyButton(document.getElementById(id));
     }
     // 策略切换后，序列定义变了 → 进度条必须重置为 0%（即使 idle 状态）
@@ -351,17 +346,13 @@ export class TourController {
   }
 
   private bindSliders(): void {
-    // Desktop sliders (top + bottom) act as mirrors for all mobile sliders
+    // Desktop sliders mirror the mobile slider's value via bindSlider()
     const desktopInterval = document.getElementById('tour-interval-dt') as HTMLInputElement | null;
     const desktopDepth    = document.getElementById('tour-maxdepth-dt')  as HTMLInputElement | null;
-    const desktopInterval2 = document.getElementById('tour-interval-dt2') as HTMLInputElement | null;
-    const desktopDepth2    = document.getElementById('tour-maxdepth-dt2')  as HTMLInputElement | null;
 
-    // Bind ALL mobile interval sliders (there are two: top + bottom bars) to both desktop sliders
-    for (const mobileInterval of [
-      document.getElementById('tour-interval') as HTMLInputElement | null,
-      document.getElementById('tour-interval-mob2') as HTMLInputElement | null,
-    ].filter(Boolean) as HTMLInputElement[]) {
+    // Bind mobile interval slider + its desktop mirror
+    const mobileInterval = document.getElementById('tour-interval') as HTMLInputElement | null;
+    if (mobileInterval) {
       this.sliders.push(this.bindSlider(
         mobileInterval, desktopInterval,
         document.getElementById(mobileInterval.id + '-fill'),
@@ -369,24 +360,18 @@ export class TourController {
         document.getElementById('tour-interval-val-dt'),
         (v) => Math.round(v / 1000) + 's',
         (v) => this.engine?.setInterval(v),
-        [desktopInterval2].filter(Boolean) as HTMLInputElement[],
-        [document.getElementById('tour-interval-val-dt2')],
       ));
       // 阻止 touchmove 冒泡，防止父容器（tour-mob__inner）把它当作滚动处理
       mobileInterval.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: true });
     }
 
-    // Bind ALL mobile depth sliders
-    for (const mobileDepth of [
-      document.getElementById('tour-maxdepth') as HTMLInputElement | null,
-      document.getElementById('tour-maxdepth-mob2') as HTMLInputElement | null,
-    ].filter(Boolean) as HTMLInputElement[]) {
-      // 移动端深度标签 ID 是 tour-depth-val，不是 mobileDepth.id + '-val'
-      const mobileDepthValId = mobileDepth.id === 'tour-maxdepth' ? 'tour-depth-val' : 'tour-depth-val-mob2';
+    // Bind mobile depth slider + its desktop mirror
+    const mobileDepth = document.getElementById('tour-maxdepth') as HTMLInputElement | null;
+    if (mobileDepth) {
       this.sliders.push(this.bindSlider(
         mobileDepth, desktopDepth,
         document.getElementById(mobileDepth.id + '-fill'),
-        document.getElementById(mobileDepthValId),
+        document.getElementById('tour-depth-val'),
         document.getElementById('tour-depth-val-dt'),
         (v) => v >= 5 ? '\u221e' : TOUR_DEPTH_CONFIG.getLabel(v),
         (v) => {
@@ -400,8 +385,6 @@ export class TourController {
           }
           this.engine?.setMaxDepth(v);
         },
-        [desktopDepth2].filter(Boolean) as HTMLInputElement[],
-        [document.getElementById('tour-depth-val-dt2')],
       ));
       mobileDepth.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: true });
     }
@@ -478,15 +461,11 @@ export class TourController {
     mirrorValueLabel: HTMLElement | null,
     format: (v: number) => string,
     onCommit: (v: number) => void,
-    extraMirrors?: HTMLInputElement[],
-    extraMirrorLabels?: (HTMLElement | null)[],
   ): SliderBind {
     const bind: SliderBind = {
       range: primary,
       fill: primaryFill,
       value: primaryValueLabel,
-      extraMirrors: extraMirrors ?? [],
-      extraMirrorLabels: extraMirrorLabels ?? [],
       format,
       onCommit,
     };
@@ -495,12 +474,6 @@ export class TourController {
       const text = format(primary.valueAsNumber);
       if (primaryValueLabel) primaryValueLabel.textContent = text;
       if (mirrorValueLabel) mirrorValueLabel.textContent = text;
-      for (let i = 0; i < (bind.extraMirrors?.length ?? 0); i++) {
-        const em = bind.extraMirrors![i];
-        const el = bind.extraMirrorLabels![i];
-        if (em) em.value = primary.value;
-        if (el)  el.textContent = text;
-      }
       if (mirror) mirror.value = primary.value;
       this.paintFill(bind);
     };
@@ -514,14 +487,6 @@ export class TourController {
         applyInput();
       });
       mirror.addEventListener('change', () => onCommit(mirror.valueAsNumber));
-    }
-
-    for (const em of bind.extraMirrors ?? []) {
-      em.addEventListener('input', () => {
-        primary.value = em.value;
-        applyInput();
-      });
-      em.addEventListener('change', () => onCommit(em.valueAsNumber));
     }
 
     return bind;
@@ -548,36 +513,26 @@ export class TourController {
       // Horizontal track (desktop) — paint gradient background on all mirrors
       const bg = `linear-gradient(to right, var(--tour-accent) 0%, var(--tour-accent) ${pct * 100}%, rgba(255,255,255,0.1) ${pct * 100}%, rgba(255,255,255,0.1) 100%)`;
       // Primary mirror (the original desktop slider)
-      if (s.range.id.endsWith('-dt') || s.range.id.endsWith('-dt2')) {
+      if (s.range.id.endsWith('-dt')) {
         s.range.style.background = bg;
       }
     }
   }
 
   private bindStrategyToggle(): void {
-    // Desktop <select> (top + bottom — both respond to changes)
-    for (const sel of [
-      document.getElementById('tour-strategy-select-dt') as HTMLSelectElement | null,
-      document.getElementById('tour-strategy-select-dt2') as HTMLSelectElement | null,
-    ].filter(Boolean) as HTMLSelectElement[]) {
-      sel.addEventListener('change', () => this.setStrategy(sel.value as TourStrategy));
-    }
+    // Desktop <select>
+    const sel = document.getElementById('tour-strategy-select-dt') as HTMLSelectElement | null;
+    if (sel) sel.addEventListener('change', () => this.setStrategy(sel.value as TourStrategy));
 
-    // Mobile compact buttons (top + bottom — both toggle between strategies)
-    for (const mobBtn of [
-      document.getElementById('tour-strategy-toggle-mob'),
-      document.getElementById('tour-strategy-toggle-mob2'),
-    ].filter(Boolean) as HTMLElement[]) {
-      mobBtn.addEventListener('click', () => this.toggleStrategy());
-    }
+    // Mobile compact button
+    const mobBtn = document.getElementById('tour-strategy-toggle-mob');
+    if (mobBtn) mobBtn.addEventListener('click', () => this.toggleStrategy());
   }
 
   private syncMobileStrategyLabel(strategy: TourStrategy): void {
     const label = strategy === 'has-dfs' ? '教材' : '层级';
-    for (const id of ['tour-strategy-value-mob', 'tour-strategy-value-mob2']) {
-      const el = document.getElementById(id);
-      if (el) el.textContent = label;
-    }
+    const el = document.getElementById('tour-strategy-value-mob');
+    if (el) el.textContent = label;
   }
 
   private flashStrategyButton(el: HTMLElement | null): void {

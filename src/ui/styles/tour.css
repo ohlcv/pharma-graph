@@ -54,38 +54,26 @@
    global state class so the JS layer doesn't have to touch style.display. */
 .tour-state--idle    #tour-badge-play,
 .tour-state--idle    #tour-badge-play-dt,
-.tour-state--idle    #tour-badge-play-dt2,
-.tour-state--idle    #tour-badge-play-mob2,
 .tour-state--idle    #tour-icon-play,
 .tour-state--idle    #bs-tour-icon-play  { display: inline-flex; }
 .tour-state--idle    #tour-badge-pause,
 .tour-state--idle    #tour-badge-pause-dt,
-.tour-state--idle    #tour-badge-pause-dt2,
-.tour-state--idle    #tour-badge-pause-mob2,
 .tour-state--idle    #tour-icon-stop,
 .tour-state--idle    #bs-tour-icon-stop  { display: none; }
 .tour-state--running #tour-badge-play,
 .tour-state--running #tour-badge-play-dt,
-.tour-state--running #tour-badge-play-dt2,
-.tour-state--running #tour-badge-play-mob2,
 .tour-state--running #tour-icon-play,
 .tour-state--running #bs-tour-icon-play { display: none; }
 .tour-state--running #tour-badge-pause,
 .tour-state--running #tour-badge-pause-dt,
-.tour-state--running #tour-badge-pause-dt2,
-.tour-state--running #tour-badge-pause-mob2,
 .tour-state--running #tour-icon-stop,
 .tour-state--running #bs-tour-icon-stop { display: inline-flex; }
 .tour-state--paused  #tour-badge-play,
 .tour-state--paused  #tour-badge-play-dt,
-.tour-state--paused  #tour-badge-play-dt2,
-.tour-state--paused  #tour-badge-play-mob2,
 .tour-state--paused  #tour-icon-play,
 .tour-state--paused  #bs-tour-icon-play  { display: inline-flex; }
 .tour-state--paused  #tour-badge-pause,
 .tour-state--paused  #tour-badge-pause-dt,
-.tour-state--paused  #tour-badge-pause-dt2,
-.tour-state--paused  #tour-badge-pause-mob2,
 .tour-state--paused  #tour-icon-stop,
 .tour-state--paused  #bs-tour-icon-stop { display: none; }
 
@@ -226,7 +214,7 @@
     .tour-dt__range::-moz-range-thumb { width: 10px; height: 10px; border: none; border-radius: 50%; background: var(--tour-accent); box-shadow: 0 0 6px rgba(99,102,241,0.5); cursor: pointer; }
     .tour-dt__param-val { font-size: 0.6rem; color: rgba(226,232,240,0.55); font-variant-numeric: tabular-nums; min-width: 20px; }
     /* 固定宽度防止布局抖动（深度滑块标签长度不同） */
-    #tour-depth-val-dt, #tour-depth-val-dt2 { min-width: 32px; text-align: right; }
+    #tour-depth-val-dt { min-width: 32px; text-align: right; }
 
     /* Strategy selector */
     .tour-dt__strategy { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
@@ -608,7 +596,7 @@
       }
       .tour-mob__val { font-size: 0.62rem; font-weight: 600; color: rgba(167,139,250,0.9); font-variant-numeric: tabular-nums; user-select: none; line-height: 1; }
       /* 固定宽度防止布局抖动（深度滑块标签长度不同） */
-      #tour-depth-val, #tour-depth-val-mob2 { min-width: 28px; text-align: center; }
+      #tour-depth-val { min-width: 28px; text-align: center; }
       .tour-mob__lbl { font-size: 0.46rem; color: rgba(226,232,240,0.28); user-select: none; letter-spacing: 0.02em; }
 
       /* 轨道容器：加宽到 32px 作为触摸热区，但视觉上只露中间 4px 的细线。
