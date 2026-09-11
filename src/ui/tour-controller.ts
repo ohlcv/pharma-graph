@@ -474,11 +474,17 @@ export class TourController {
     const min = Number(s.range.min), max = Number(s.range.max);
     const pct = ((s.range.valueAsNumber - min) / (max - min));
     if (s.fill) {
-      // Vertical track (mobile) — 用 transform: scaleY 比 height:% 更精确：
-      // scaleY 不受容器 height 变化影响，且能避免 fill 顶端穿过 thumb 中心。
-      // thumb 在 max/min 时的圆心位于 track 端点外侧 (thumb 半径 = 9px)，
-      // 我们让 fill 的实际高度按比例覆盖 thumb 圆心范围，让 fill 顶端 ≈ thumb 圆心。
-      s.fill.style.transform = `scaleY(${pct})`;
+      // Vertical track (mobile) — 原生 <input type="range"> 的 thumb 圆心
+      // 实际行程是 [thumbR, containerH - thumbR]（不是 [0, containerH]），
+      // 直接用 pct 当 scaleY 会让 fill 顶端穿过 thumb 圆心。
+      // 修正：把 pct 映射到 thumb 圆心的实际行程上，让 fill 顶端 = thumb 圆心。
+      const container = s.fill.parentElement as HTMLElement | null;
+      const trackLen = container?.clientHeight || 80;
+      const thumbSize = 18;        // 必须与 ::-webkit-slider-thumb 的 width/height 一致
+      const thumbR = thumbSize / 2;
+      const travel = Math.max(0, trackLen - thumbSize);
+      const centerFromBottom = thumbR + pct * travel;
+      s.fill.style.transform = `scaleY(${centerFromBottom / trackLen})`;
     } else {
       // Horizontal track (desktop) — paint gradient background on all mirrors
       const bg = `linear-gradient(to right, var(--tour-accent) 0%, var(--tour-accent) ${pct * 100}%, rgba(255,255,255,0.1) ${pct * 100}%, rgba(255,255,255,0.1) 100%)`;
