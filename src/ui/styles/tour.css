@@ -230,6 +230,9 @@
 
     /* Strategy selector */
     .tour-dt__strategy { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+    /* 2026-09-11: 策略切换控件全局隐藏（默认策略 has-dfs，详见 tour-controller.ts setStrategy） */
+    .tour-dt__strategy { display: none !important; }
+    .tour-mob__strategy { display: none !important; }
     .tour-dt__select {
       background: rgba(99,102,241,0.08);
       border: 1px solid rgba(99,102,241,0.3);
