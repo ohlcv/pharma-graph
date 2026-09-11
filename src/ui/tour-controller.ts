@@ -520,12 +520,13 @@ export class TourController {
       // 必须保留 translateX(-50%) 来维持 4px fill 在 32px container 中的居中，
       // 因为 CSS 已经不再用 left:0 定位了。
       s.fill.style.transform = `translateX(-50%) scaleY(${centerFromBottom / trackLen})`;
-    } else {
-      // Horizontal track (desktop) — paint gradient background on the desktop mirror.
-      // s.range 是 mobile primary（vertical），它不需要 horizontal gradient，
-      // 所以 background 设给 s.mirror（desktop input）。
+    }
+    // Horizontal track (desktop) — paint gradient background on the desktop mirror.
+    // 之前用 if/else 包住导致 s.fill 永真时 horizontal 分支永远不执行；
+    // 这里改成无条件执行，只要 s.mirror 存在就给横轨画渐变。
+    if (s.mirror) {
       const bg = `linear-gradient(to right, var(--tour-accent) 0%, var(--tour-accent) ${pct * 100}%, rgba(255,255,255,0.1) ${pct * 100}%, rgba(255,255,255,0.1) 100%)`;
-      if (s.mirror) s.mirror.style.background = bg;
+      s.mirror.style.background = bg;
     }
   }
 
