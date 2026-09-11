@@ -524,15 +524,18 @@
       }
       /* 轨道：视觉背景条，尺寸与 container 完全一致 */
       .tour-mob__track {
-        width: 4px; height: 80px;
+        position: absolute; inset: 0;     /* 完全铺满 container，永远与 range 同位 */
         background: rgba(255,255,255,0.08); border-radius: 2px;
-        position: relative; overflow: visible;
-        display: flex; flex-direction: column; justify-content: flex-end;
+        overflow: hidden;                  /* 限制 fill 不溢出圆角 */
       }
-      /* 已填充进度：从底部向上 */
+      /* 已填充进度：用 inset 控制位置，避免 left/width/height 在 writing-mode 下被污染。
+         inset-block-end:0 让 fill 贴着底部；inset-block-start 由 JS 设置百分比控制高度。
+         同时显式 width:100% 覆盖 writing-mode 默认的横向 100%。 */
       .tour-mob__fill {
-        position: absolute; left: 0; bottom: 0;
-        width: 100%; height: 0%;
+        position: absolute;
+        left: 0; right: 0; bottom: 0;      /* 横向铺满 + 贴底 */
+        height: 0%;                         /* 竖向高度，由 JS 控制 */
+        width: 100%;
         background: linear-gradient(to top, #6366f1, #a78bfa); border-radius: 2px;
         transition: height 0.08s ease;
         box-shadow: 0 0 6px rgba(99,102,241,0.6);
@@ -544,13 +547,13 @@
            - 水平方向是 block 方向，所以 width = 轨道厚度 = 4px（与 track 对齐）
          inset:0 → 绝对定位于 container（4×80px），然后 height/width 精确覆盖它。 */
       .tour-mob__range {
-        position: absolute; inset: 0;
+        position: absolute; inset: 0;       /* 完全覆盖 4×80px container，与 track 同位 */
         writing-mode: vertical-lr;
-        direction: rtl;           /* 让滑块从底部开始（低值在下） */
+        direction: rtl;                     /* 让滑块从底部开始（低值在下） */
         -webkit-appearance: none; appearance: none;
         background: transparent; cursor: pointer;
-        /* 对调宽高以匹配 vertical-lr 的轴方向：height=可拖距离, width=轨道厚 */
-        height: 80px; width: 4px;
+        width: auto; height: auto;           /* 让 inset:0 控制尺寸 = container */
+        margin: 0; padding: 0;
         z-index: 2;
       }
 
