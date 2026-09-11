@@ -665,6 +665,27 @@ export class TourController {
     // 桌面端"步" = 当前步数（纯数字）
     this.setText('tour-step-badge-dt',      String(current));
     this.setText('tour-step-badge-mob',     String(current));
+    // 进度条 fill：scaleX(0~1)
+    const pct = Math.max(0, Math.min(1, current / total));
+    this.setProgressFill('tour-progress-fill',    pct);
+    this.setProgressFill('tour-progress-fill-dt', pct);
+    // 进度条 range value：0-100，由 change 监听反推 seqIdx
+    const rangeVal = Math.round(pct * 100);
+    this.setProgressRange('tour-progress',    rangeVal);
+    this.setProgressRange('tour-progress-dt', rangeVal);
+  }
+
+  /** Step 2: 直接写 fill 的 scaleX（与 paintFill 一致的纯几何同步，无 input 耦合） */
+  private setProgressFill(id: string, pct: number): void {
+    const el = document.getElementById(id);
+    if (el) el.style.transform = `scaleX(${pct})`;
+  }
+
+  private setProgressRange(id: string, value: number): void {
+    const el = document.getElementById(id) as HTMLInputElement | null;
+    if (!el) return;
+    // 避免触发 input 事件造成循环
+    if (Number(el.value) !== value) el.value = String(value);
   }
 
   private onComplete(
