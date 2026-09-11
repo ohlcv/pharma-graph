@@ -141,10 +141,11 @@
     .tour-dt__node-name { font-size: 0.72rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: opacity 0.2s; }
     
     .tour-dt__sep { width: 1px; height: 20px; background: rgba(255,255,255,0.08); margin: 0 8px; flex-shrink: 0; }
-    /* 策略 (tour-dt__strategy) 已 display:none，但它两旁的 sep 紧贴在一起视觉上像两道杠。
-       用 :has 选择器自动隐藏紧邻隐藏兄弟的 sep（Chrome 105+/Safari 15.4+） */
-    .tour-dt__sep:has(+ .tour-dt__strategy),
-    .tour-dt__strategy + .tour-dt__sep { display: none; }
+    /* 策略 (.tour-dt__strategy) 已 display:none。
+       - sep #2（stats 和 strategy 之间）：紧邻隐藏的 strategy，视觉上紧贴 stats 边缘无意义 → 隐藏
+       - sep #3（strategy 和 params 之间）：左邻居隐藏后变成 stats 和 params 之间的唯一分隔线 → 保留
+       :has(+ .tour-dt__strategy) 匹配"后面紧跟 strategy 的 sep"，恰好命中 sep #2。 */
+    .tour-dt__sep:has(+ .tour-dt__strategy) { display: none; }
     
     .tour-dt__stats     { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
     .tour-dt__stat      { display: flex; align-items: center; gap: 4px; font-size: 0.68rem; }
