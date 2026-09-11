@@ -539,20 +539,18 @@
       }
 
       /* range input：用 writing-mode: vertical-lr 直接变竖向，不用 rotate！
-         inset:0 → 尺寸 = container = 4×80px，竖向写模式下自动变为 80px 高 × 4px 宽的竖条。
-         取消 rotate() 避免 transform-origin 的一切对齐问题。 */
+         在 vertical-lr 模式下：
+           - 书写方向是竖向（从上到下），所以 height = 可拖动长度 = 80px
+           - 水平方向是 block 方向，所以 width = 轨道厚度 = 4px（与 track 对齐）
+         inset:0 → 绝对定位于 container（4×80px），然后 height/width 精确覆盖它。 */
       .tour-mob__range {
         position: absolute; inset: 0;
-        /* writing-mode: vertical-lr 让 range 从左到右的书写变成从上到下，
-           形成竖向滑条效果。不需要任何旋转！ */
         writing-mode: vertical-lr;
         direction: rtl;           /* 让滑块从底部开始（低值在下） */
         -webkit-appearance: none; appearance: none;
         background: transparent; cursor: pointer;
-        /* 恢复横向宽度：80px = 滑条可拖动长度 */
-        width: 80px; height: unset;
-        /* 高度设为 container 高度，让滑块可点击区域延伸 */
-        min-height: 80px;
+        /* 对调宽高以匹配 vertical-lr 的轴方向：height=可拖距离, width=轨道厚 */
+        height: 80px; width: 4px;
         z-index: 2;
       }
 
