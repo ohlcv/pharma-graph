@@ -95,7 +95,7 @@ class SpeechController {
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'zh-CN';
-    utterance.rate = 1.0;
+    utterance.rate = 1.5;
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
 
