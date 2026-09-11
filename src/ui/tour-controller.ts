@@ -368,6 +368,8 @@ export class TourController {
         [desktopInterval2].filter(Boolean) as HTMLInputElement[],
         [document.getElementById('tour-interval-val-dt2')],
       ));
+      // 阻止 touchmove 冒泡，防止父容器（tour-mob__inner）把它当作滚动处理
+      mobileInterval.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: true });
     }
 
     // Bind ALL mobile depth sliders
@@ -397,6 +399,7 @@ export class TourController {
         [desktopDepth2].filter(Boolean) as HTMLInputElement[],
         [document.getElementById('tour-depth-val-dt2')],
       ));
+      mobileDepth.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: true });
     }
 
     // Initial paint so the fill heights and background gradients match defaults.
