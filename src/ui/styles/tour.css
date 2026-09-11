@@ -516,45 +516,55 @@
       #tour-depth-val, #tour-depth-val-mob2 { min-width: 28px; text-align: center; }
       .tour-mob__lbl { font-size: 0.46rem; color: rgba(226,232,240,0.28); user-select: none; letter-spacing: 0.02em; }
 
-      /* 轨道容器：relative 定位，作为 track 和 range 的共同父元素（range 用 inset:0 覆盖它） */
+      /* 轨道容器：加宽到 32px 作为触摸热区，但视觉上只露中间 4px 的细线。
+         这种"看起来细、摸起来粗"的做法是 iOS/Android 系统设置滑块的通用模式，
+         解决 4px 热区手指难以命中/拖动的问题。 */
       .tour-mob__track-container {
         position: relative;
-        /* 固定尺寸：4px 宽（竖条宽）× 80px 高（可拖动距离） */
-        width: 4px; height: 80px;
+        width: 32px; height: 80px;
       }
-      /* 轨道：视觉背景条，尺寸与 container 完全一致 */
+      /* 视觉轨道：居中显示 4px 细线，pointer-events: none 避免遮挡下面的 range */
       .tour-mob__track {
-        position: absolute; inset: 0;     /* 完全铺满 container，永远与 range 同位 */
+        position: absolute;
+        left: 50%; top: 0; bottom: 0;
+        width: 4px;
+        transform: translateX(-50%);
         background: rgba(255,255,255,0.08); border-radius: 2px;
         overflow: hidden;                  /* 限制 fill 不溢出圆角 */
+        pointer-events: none;
       }
-      /* 已填充进度：用 transform: scaleY 控制比例（transform-origin: bottom）。
-         这种方式比 height:% 更精确：scaleY 不受容器 height 变化影响，且与 thumb
-         位置计算方式完全脱钩，避免 fill 顶端穿过 thumb 中心。 */
+      /* 已填充进度：同样居中成 4px 宽，居中显示在 track 内 */
       .tour-mob__fill {
         position: absolute;
-        left: 0; right: 0; bottom: 0;      /* 横向铺满 + 贴底 */
-        width: 100%; height: 100%;          /* 占满整个 track */
+        left: 50%; bottom: 0;             /* 横向居中 + 贴底 */
+        width: 4px; height: 100%;          /* 与 track 同宽同高 */
+        transform: translateX(-50%);       /* 配合 left:50% 精确居中 */
         transform-origin: bottom center;
-        transform: scaleY(0);               /* JS 动态设置 scaleY(0~1) */
+        /* JS 动态设置 scaleY(0~1) 控制填充比例。
+           注意：上面用了 translateX(-50%) 后，再写 transform 会覆盖 translateX。
+           所以 JS 用 transformOriginTranslate 单独处理 scaleY，且要在 CSS 里覆盖。 */
         background: linear-gradient(to top, #6366f1, #a78bfa); border-radius: 2px;
         transition: transform 0.08s ease;
         box-shadow: 0 0 6px rgba(99,102,241,0.6);
       }
+      /* 取消之前的 translateX，让 JS 端能安全地只写 scaleY */
+      .tour-mob__fill { transform: translateX(-50%) scaleY(0); }
 
-      /* range input：用 writing-mode: vertical-lr 直接变竖向，不用 rotate！
+      /* range input：用 writing-mode: vertical-lr 直接变竖向，不旋转。
          在 vertical-lr 模式下：
-           - 书写方向是竖向（从上到下），所以 height = 可拖动长度 = 80px
-           - 水平方向是 block 方向，所以 width = 轨道厚度 = 4px（与 track 对齐）
-         inset:0 → 绝对定位于 container（4×80px），然后 height/width 精确覆盖它。 */
+           - height = 可拖动长度 = 80px
+           - width  = 水平方向宽度 = 32px（命中区，与 container 同宽）
+         inset:0 → 覆盖整个 32×80px container，与 track 视觉位置精确对应。 */
       .tour-mob__range {
-        position: absolute; inset: 0;       /* 完全覆盖 4×80px container，与 track 同位 */
+        position: absolute; inset: 0;       /* 完全覆盖 32×80px container */
         writing-mode: vertical-lr;
         direction: rtl;                     /* 让滑块从底部开始（低值在下） */
         -webkit-appearance: none; appearance: none;
         background: transparent; cursor: pointer;
-        width: auto; height: auto;           /* 让 inset:0 控制尺寸 = container */
+        width: auto; height: auto;
         margin: 0; padding: 0;
+        /* 显式声明 touch-action: none，不依赖父级继承，避免某些浏览器继承处理不一致 */
+        touch-action: none;
         z-index: 2;
       }
 

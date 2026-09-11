@@ -484,7 +484,9 @@ export class TourController {
       const thumbR = thumbSize / 2;
       const travel = Math.max(0, trackLen - thumbSize);
       const centerFromBottom = thumbR + pct * travel;
-      s.fill.style.transform = `scaleY(${centerFromBottom / trackLen})`;
+      // 必须保留 translateX(-50%) 来维持 4px fill 在 32px container 中的居中，
+      // 因为 CSS 已经不再用 left:0 定位了。
+      s.fill.style.transform = `translateX(-50%) scaleY(${centerFromBottom / trackLen})`;
     } else {
       // Horizontal track (desktop) — paint gradient background on all mirrors
       const bg = `linear-gradient(to right, var(--tour-accent) 0%, var(--tour-accent) ${pct * 100}%, rgba(255,255,255,0.1) ${pct * 100}%, rgba(255,255,255,0.1) 100%)`;
