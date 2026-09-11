@@ -209,7 +209,10 @@ export class DetailPanel {
 
     const sbW = (document.getElementById('sidebar')?.classList.contains('hidden') ?? true) ? 0 : SIDEBAR_W;
     const left = vpW - pW - PAD - sbW;
-    const top = Math.max(MIN_TOP, Math.round((vpH - pH) / 2));
+    // 默认位置：右上角——水平已经贴 viewport 右边缘 (PAD=8px)，垂直贴 toolbar 下方
+    // (topbar 56 + toolbar 44 = 100 + 8px 间距 = 108)。不再做垂直居中，避免面板
+    // 在小屏幕上盖住中心图，也跟用户预期"右上"一致。
+    const top = MIN_TOP;
 
     this.panel.style.right = 'auto';
     this.panel.style.left = left + 'px';
