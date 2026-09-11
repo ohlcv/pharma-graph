@@ -489,7 +489,18 @@
     
       /* 滑块区 */
       .tour-mob__sliders { display: flex; flex-direction: column; align-items: center; gap: 10px; flex-shrink: 0; }
-      .tour-mob__cell { display: flex; flex-direction: column; align-items: center; gap: 3px; position: relative; }
+      .tour-mob__cell {
+        display: flex; flex-direction: column; align-items: center; gap: 3px;
+        position: relative;
+        /* 扩大触摸热区，防止父容器滚动拦截滑块拖动 */
+        width: 48px; min-height: 64px; overflow: visible;
+        touch-action: none; user-select: none;
+      }
+      .tour-mob__cell::before {
+        content: ''; position: absolute;
+        inset: -10px; /* 透明热区扩大上下左右各10px */
+        z-index: 1; /* 确保 thumb 仍可触摸 */
+      }
       .tour-mob__val { font-size: 0.65rem; font-weight: 600; color: rgba(167,139,250,0.9); font-variant-numeric: tabular-nums; user-select: none; line-height: 1; }
       /* 固定宽度防止布局抖动（深度滑块标签长度不同） */
       #tour-depth-val, #tour-depth-val-mob2 { min-width: 32px; text-align: center; }
@@ -509,7 +520,8 @@
       .tour-mob__range::-webkit-slider-thumb {
         -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
         background: #fff; border: none;
-        box-shadow: 0 0 8px rgba(99,102,241,0.9), 0 1px 4px rgba(0,0,0,0.4); cursor: pointer;
+        box-shadow: 0 0 8px rgba(99,102,241,0.9), 0 1px 4px rgba(0,0,0,0.4);
+        cursor: pointer; position: relative; z-index: 2;
       }
       .tour-mob__range::-moz-range-thumb {
         width: 18px; height: 18px; border-radius: 50%;
