@@ -110,7 +110,6 @@ export function renderMarkdown(text: string, sourceUrl = ''): string {
   return DOMPurify.sanitize(withImages, {
     ALLOWED_TAGS: SAFE_TAGS,
     ALLOWED_ATTR: SAFE_ATTR,
-    USE_PROFILES: { html: true },
     // Block javascript: URLs even if DOMPurify would otherwise let them slip
     // through an `a[href]`. Same goes for `formaction` on inputs.
     ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z+.:]|$))/i,

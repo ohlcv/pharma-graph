@@ -866,6 +866,14 @@ export class TourEngine {
     const level = options.maxDepth ?? INFINITE_DEPTH;
     this._depthLevel = level <= 0 ? 5 : level;
     this.maxDepth = -1; // 始终无限
+    // Guard against an empty graph or a bad rootId (e.g. the pickRoot
+    // fallback returning '' when no candidate node exists). Without
+    // this, every subsequent cy.getElementById(rootId) would silently
+    // produce an empty collection and the tour would appear to run
+    // forever without ever advancing.
+    if (!rootId || !this.cy.getElementById(rootId).nonempty()) {
+      return false;
+    }
     this.onStep = options.onStep;
     this.onStepAfterCenter = options.onStepAfterCenter;
     this.onComplete = options.onComplete;
@@ -959,8 +967,11 @@ export class TourEngine {
     const node = this.cy.getElementById(target);
     if (node.empty() || node.hasClass('layer-parent')) return;
     // rewind seqIndex so visitNext's internal bookkeeping matches.
+    // Both seqIndex and currentStep clamp at 0 — currentStep is rendered
+    // to the UI as "current / total", so a negative value would produce
+    // nonsense like "step -3 / 641".
     this.seqIndex = Math.max(0, this.seqIndex - 1);
-    this.currentStep--;
+    this.currentStep = Math.max(0, this.currentStep - 1);
     this.paused = true;
     this.highlightAndFocus(target, [target], 0, this.totalSteps(), this.seqIndex, /* silent */ false);
     this.onPause?.();
@@ -1367,7 +1378,15 @@ export class TourEngine {
     let startTime: number | null = null;
 
     const animateBorder = (timestamp: number) => {
-      if (!node.cy() || node.removed() || this.pulsingNode !== node) {
+      // We cannot cancelAnimationFrame ourselves once we're already inside
+      // the callback, but we MUST clear pulseRafId so the next stop /
+      // startTourPulse call doesn't try to cancel a frame that has
+      // already fired. Without this, a node removal would leave a
+      // phantom rAF pending that keeps mutating styles on a detached
+      // element until its own next-tick termination.
+      const shouldStop =
+        !node.cy() || node.removed() || this.pulsingNode !== node;
+      if (shouldStop) {
         this.pulseRafId = null;
         return;
       }

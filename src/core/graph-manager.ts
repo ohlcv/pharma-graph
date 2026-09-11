@@ -20,9 +20,22 @@ export class GraphManager {
     const frontmatters = new Map<string, ReturnType<typeof parseFrontmatterWithWarnings>['fm']>();
     const warnings: ParseWarning[] = [];
     for (const [fp, raw] of Object.entries(this.mdFiles)) {
-      const { fm, warnings: fileWarnings } = parseFrontmatterWithWarnings(raw, fp);
-      frontmatters.set(fp, fm);
-      for (const w of fileWarnings) warnings.push(w);
+      try {
+        const { fm, warnings: fileWarnings } = parseFrontmatterWithWarnings(raw, fp);
+        frontmatters.set(fp, fm);
+        for (const w of fileWarnings) warnings.push(w);
+      } catch (err) {
+        // One bad file must not sink the entire graph (issue #14 spirit):
+        // turn hard parse errors into warnings so authors see the diagnostic
+        // in the debug panel while the rest of the graph still renders.
+        const msg = err instanceof Error ? err.message : String(err);
+        warnings.push({
+          file: fp,
+          field: 'frontmatter',
+          message: `parse failed: ${msg}`,
+          severity: 'error',
+        });
+      }
     }
     this.warnings = warnings;
 

@@ -443,7 +443,14 @@ function escHtml(s: string): string {
 }
 
 function escAttr(s: string): string {
-  return s.replace(/"/g, '&quot;');
+  // Attribute values need the same escapes as element text: & would
+  // start a character entity, < could close the tag. Keep in sync with
+  // escHtml — if you add a character there, add it here too.
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 // Sentinel placed on its own line immediately before an H2 to mark it as

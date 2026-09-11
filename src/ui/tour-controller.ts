@@ -50,6 +50,8 @@ export class TourController {
   private readonly sliders: SliderBind[] = [];
   private barToggle!: UiToggle;
   private _mounted = false;
+  private _boundClick: ((e: MouseEvent) => void) | null = null;
+  private _boundKeydown: ((e: KeyboardEvent) => void) | null = null;
 
   constructor(
     private readonly cy: cytoscape.Core,
@@ -267,7 +269,7 @@ export class TourController {
 
   private bindActions(): void {
     // Action delegation — every control carries data-tour-action.
-    document.addEventListener('click', (e) => {
+    document.addEventListener('click', this._boundClick = (e) => {
       const target = (e.target as HTMLElement).closest<HTMLElement>('[data-tour-action]');
       if (!target) return;
       const action = target.dataset['tourAction'];
@@ -285,7 +287,23 @@ export class TourController {
     // Keyboard shortcuts for the active tour. Bound on document so the
     // shortcut works regardless of where focus lives, with the standard
     // "skip if the user is typing" guard.
-    document.addEventListener('keydown', (e) => this.onTourKey(e));
+    document.addEventListener('keydown', this._boundKeydown = (e) => this.onTourKey(e));
+  }
+
+  /** Tear down the controller: remove document listeners and stop the tour.
+   *  Idempotent and safe to call multiple times. Call this on page
+   *  unmount / route change to avoid leaking document-level listeners. */
+  dispose(): void {
+    if (this._mounted && this._boundClick) {
+      document.removeEventListener('click', this._boundClick);
+    }
+    if (this._boundKeydown) {
+      document.removeEventListener('keydown', this._boundKeydown);
+    }
+    this.stop();
+    this._mounted = false;
+    this._boundClick = null;
+    this._boundKeydown = null;
   }
 
   /**

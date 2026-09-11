@@ -89,11 +89,15 @@ function parseFrontmatterRaw(raw: string): { data: Record<string, unknown>; cont
   if (!match) return { data: {}, content: trimmed };
   const yamlBlock = match[1];
   const content = match[2];
-  let data: Record<string, unknown> = {};
+  let data: Record<string, unknown>;
   try {
     data = yamlParse(yamlBlock) as Record<string, unknown> ?? {};
-  } catch {
-    // fallback: return empty data
+  } catch (err) {
+    // Surface YAML errors loudly — silently returning {} produces ghost
+    // nodes with no id/edges that look fine in the graph but corrupt
+    // cross-references. Let the parser catch this as a hard error.
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`YAML 解析失败：${msg}`);
   }
   return { data, content };
 }
