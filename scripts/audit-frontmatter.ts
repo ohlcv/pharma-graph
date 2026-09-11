@@ -2,7 +2,7 @@
 // 扫描全部 content/.md 文件的 frontmatter，生成审核打分表 docs/frontmatter-audit.md
 //
 // 检测范围：
-//   1) 基础字段分（id/label/essence/summary/edges_out/location）
+//   1) 基础字段分（id/label/fill/summary/edges_out/location）
 //   2) ADR-0001 关系方向合规（has 仅用于物理组成；层级关系一律用 isa 子→父）
 //   3) 双向 has/isa/relates 配对
 //   4) 非 book 节点缺少 isa 边（warning 级别）
@@ -23,8 +23,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { glob } from 'glob';
 import { parse as yamlParse } from 'yaml';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
-const CONTENT_DIR = path.resolve('content');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const ROOT = path.resolve(__dirname, '..');
+
+const CONTENT_DIR = path.join(ROOT, 'public/content');
 const OUTPUT_FILE = path.resolve('docs/frontmatter-audit.md');
 
 // ── Schema 值 ──────────────────────────────────────────────────────
@@ -33,7 +39,7 @@ const OUTPUT_FILE = path.resolve('docs/frontmatter-audit.md');
 // counts as a canonical value. Locally re-bind the readonly tuples under
 // their old names so the scoring branches read naturally.
 import {
-  VALID_ESSENCE,
+  VALID_FILL,
 } from "../src/parser/schema.js";
 
 const LOC_KEYS = ['book', 'part', 'chapter', 'section', 'point', 'item', 'subsection'] as const;
@@ -51,7 +57,8 @@ interface EdgeDef { target: string; type: string; reason?: string; }
 interface ParsedFM {
   id?: string;
   label?: string;
-  essence?: string;
+  fill?: string;           // replaces essence (kept for backward compat)
+  essence?: string;         // deprecated; use fill
   type?: string;
   layer?: string;
   summary?: string | { short?: string; full?: string };
@@ -104,6 +111,7 @@ function extractFrontmatter(content: string): ParsedFM {
   return {
     id: typeof fm['id'] === 'string' ? fm['id'] as string : undefined,
     label: typeof fm['label'] === 'string' ? fm['label'] as string : undefined,
+    fill: typeof fm['fill'] === 'string' ? fm['fill'] as string : undefined,
     essence: typeof fm['essence'] === 'string' ? fm['essence'] as string : undefined,
     type: typeof fm['type'] === 'string' ? fm['type'] as string : undefined,
     layer: typeof fm['layer'] === 'string' ? fm['layer'] as string : undefined,
@@ -121,7 +129,7 @@ function extractFrontmatter(content: string): ParsedFM {
 
 // ── 评分（基础字段分） ─────────────────────────────────────────────
 interface Score {
-  id: number; label: number; essence: number;
+  id: number; label: number; fill: number;
   summary: number; edges_out: number; location: number; tags: number;
 }
 
@@ -132,10 +140,10 @@ function scoreField(fm: ParsedFM, field: keyof Score): number {
     return isKebabCase(v) ? 3 : 1;
   }
   if (field === 'label') return fm.label ? 3 : 1;
-  if (field === 'essence') {
-    const v = (fm.essence ?? fm.type ?? '').toLowerCase();
+  if (field === 'fill') {
+    const v = (fm.fill ?? fm.essence ?? '').toLowerCase();
     if (!v) return 2;
-    return VALID_ESSENCE.includes(v) ? 3 : 1;
+    return VALID_FILL.includes(v) ? 3 : 1;
   }
   if (field === 'summary') {
     if (!fm.summary) return 2;
@@ -157,7 +165,7 @@ function scoreAll(fm: ParsedFM): Score {
   return {
     id: scoreField(fm, 'id'),
     label: scoreField(fm, 'label'),
-    essence: scoreField(fm, 'essence'),
+    fill: scoreField(fm, 'fill'),
     summary: scoreField(fm, 'summary'),
     edges_out: scoreField(fm, 'edges_out'),
     location: scoreField(fm, 'location'),
@@ -166,7 +174,7 @@ function scoreAll(fm: ParsedFM): Score {
 }
 
 function scoreTotal(scores: Score[]): number {
-  const keys: (keyof Score)[] = ['id', 'label', 'essence', 'summary', 'edges_out', 'location'];
+  const keys: (keyof Score)[] = ['id', 'label', 'fill', 'summary', 'edges_out', 'location'];
   let correct = 0;
   let total = 0;
   for (const key of keys) {
@@ -352,7 +360,7 @@ async function main() {
       results.push({
         relPath: rel,
         fm,
-        score: { id: 1, label: 1, essence: 2, summary: 2, edges_out: 2, location: 2, tags: 3 },
+        score: { id: 1, label: 1, fill: 2, summary: 2, edges_out: 2, location: 2, tags: 3 },
         baseIssues: ['❌ 无 frontmatter'],
         dirIssues: [],
         hasIsaOut: false,
@@ -365,9 +373,9 @@ async function main() {
 
     if (score.id === 1) baseIssues.push(`❌ id 错误：\`${fm.id ?? 'N/A'}\`（应为 kebab-case）`);
     if (score.label === 1) baseIssues.push(`❌ label 缺失`);
-    const essenceVal = fm.essence ?? fm.type ?? '';
-    if (score.essence === 1) baseIssues.push(`❌ essence/type 错误：\`${essenceVal || 'N/A'}\``);
-    if (score.essence === 2) baseIssues.push(`⚠️ essence/type 缺失`);
+    const fillVal = fm.fill ?? fm.essence ?? fm.type ?? '';
+    if (score.fill === 1) baseIssues.push(`❌ fill 错误：\`${fillVal || 'N/A'}\``);
+    if (score.fill === 2) baseIssues.push(`⚠️ fill 缺失`);
     if (score.summary === 2) baseIssues.push(`⚠️ summary 为空`);
     if (score.edges_out === 2) baseIssues.push(`⚠️ edges_out 为空`);
     if (score.location === 2) baseIssues.push(`⚠️ location 缺失`);
@@ -409,7 +417,7 @@ async function main() {
     const id = r.fm.id;
     const loc = r.fm.location ?? {};
     if (!id) continue;
-    const isBookRoot = r.fm.essence === 'book' || (lastLocationKey(loc) === 'book');
+    const isBookRoot = r.fm.fill === 'cls-structure' || (lastLocationKey(loc) === 'book');
     if (isBookRoot) continue;
     const hasIsa = r.hasIsaOut || isaInByNode.get(id) === true;
     if (!hasIsa) {
@@ -463,22 +471,22 @@ async function main() {
   let rowNo = 0;
   for (const [group, files] of groups) {
     md += `### ${group}\n\n`;
-    md += `| # | 文件 | id | essence | summary | edges | 🔁 | 完成度 |\n`;
+    md += `| # | 文件 | id | fill | summary | edges | 🔁 | 完成度 |\n`;
     md += `|---|---|---|---|---|---|---|---|\n`;
     for (const r of files) {
       rowNo++;
-      const keys: (keyof Score)[] = ['id', 'label', 'essence', 'summary', 'edges_out'];
+      const keys: (keyof Score)[] = ['id', 'label', 'fill', 'summary', 'edges_out'];
       const correct = keys.filter(k => r.score[k] === 3).length;
       const pct = Math.round((correct / keys.length) * 100);
       const idDisplay = r.score.id === 3
         ? `✅ \`${r.fm.id ?? '—'}\`` : `❌ \`${r.fm.id ?? '—'}\``;
-      const essenceVal = (r.fm.essence ?? r.fm.type ?? '—').toString();
-      const essenceDisplay = r.score.essence === 3 ? `✅ ${essenceVal}` :
-        r.score.essence === 2 ? `⚠️ —` : `❌ ${essenceVal}`;
+      const fillVal = (r.fm.fill ?? r.fm.essence ?? '—').toString();
+      const fillDisplay = r.score.fill === 3 ? `✅ ${fillVal}` :
+        r.score.fill === 2 ? `⚠️ —` : `❌ ${fillVal}`;
       const sumDisplay = r.score.summary === 3 ? `✅` : `⚠️`;
       const edgeDisplay = r.score.edges_out === 3 ? `✅` : `⚠️`;
       const dirMark = r.dirIssues.length === 0 ? `-无` : `🔁×${r.dirIssues.length}`;
-      md += `| ${rowNo} | \`${r.relPath}\` | ${idDisplay} | ${essenceDisplay} | ${sumDisplay} | ${edgeDisplay} | ${dirMark} | ${pct}% |\n`;
+      md += `| ${rowNo} | \`${r.relPath}\` | ${idDisplay} | ${fillDisplay} | ${sumDisplay} | ${edgeDisplay} | ${dirMark} | ${pct}% |\n`;
     }
     md += `\n`;
   }

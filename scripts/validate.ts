@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import { scanContentDir } from "../src/parser/content-manager.js";
 import { parseFrontmatterWithWarnings } from "../src/parser/frontmatter.js";
 import {
-  isValidEssence,
+  isValidFill,
   isValidEdgeType,
 } from "../src/parser/schema.js";
 import path from "path";
@@ -72,12 +72,12 @@ export async function validate(): Promise<void> {
     // Collect node IDs for cross-reference validation
     allIds.add(fm.id);
 
-    // Validate essence field
-    if (fm.essence && !isValidEssence(fm.essence)) {
+    // Validate fill field (replaces the deprecated essence field)
+    if (fm.fill && !isValidFill(fm.fill)) {
       errors.push({
         file: relPath,
-        field: 'essence',
-        message: `essence 值 "${fm.essence}" 不在已知类型列表中`,
+        field: 'fill',
+        message: `fill 值 "${fm.fill}" 不在已知类型列表中`,
         severity: 'warning',
       });
     }

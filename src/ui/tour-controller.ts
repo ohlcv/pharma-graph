@@ -49,6 +49,7 @@ export class TourController {
   private paused = false;
   private readonly sliders: SliderBind[] = [];
   private barToggle!: UiToggle;
+  private _mounted = false;
 
   constructor(
     private readonly cy: cytoscape.Core,
@@ -58,8 +59,10 @@ export class TourController {
 
   // ── Public API ─────────────────────────────────────────────────────────────
 
-  /** Wire up DOM once. Idempotent — safe to call after hot-reload or re-init. */
+  /** Wire up DOM. Idempotent — safe to call after hot-reload or re-init. */
   mount(): void {
+    if (this._mounted) return;
+    this._mounted = true;
     this.bindActions();
     this.bindSliders();
     this.bindStrategyToggle();
