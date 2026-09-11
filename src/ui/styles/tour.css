@@ -323,18 +323,22 @@
 
     /* 手机版外观（只在 ≤768px 生效） */
     @media (max-width: 768px) {
+      /* 移动端 z-index 层级（root stacking context 下比较）：
+         #app=1 < .tour-mob=30 < #bottom-sheet=50 < #app.sheet-open=60
+         底部面板始终盖住漫游条，漫游条始终在画布之上。 */
+      .tour-mob { z-index: 30; }
+      #bottom-sheet { z-index: 50; }
       .tour-mob.tour-visible { display: inline-flex; }
       .tour-mob {
         /* 注意：不写 display，由 JS 控制 */
         flex-direction: column;
         align-items: center;
         position: fixed;
-        /* 顶部 topbar 下方右侧 (topbar ≈ 48px)，避开底部面板的把手/展开区 */
+        /* 顶部 topbar 下方右侧，远离底部面板 */
         top: 56px; left: auto; right: 8px; bottom: auto;
-        z-index: 70;
         /* 用 fit-content 让漫游条收缩到最宽子元素，不会被背景撑大 */
         width: fit-content; min-width: 0; max-width: calc(100vw - 16px);
-        padding: 6px;
+        padding: 8px;
         border-radius: 14px;
         background: #1a1f35;
         border: 1px solid rgba(99, 102, 241, 0.25);
@@ -342,13 +346,13 @@
         touch-action: none;
         user-select: none;
         overflow: visible;
-        gap: 4px;
+        gap: 6px;
       }
     
       /* 折叠把手 */
       .tour-mob__handle {
         display: flex; align-items: center; justify-content: center;
-        padding: 4px 6px; cursor: pointer; min-height: 28px; flex-shrink: 0;
+        padding: 8px 12px; cursor: pointer; min-height: 36px; flex-shrink: 0;
         color: rgba(148,163,184,0.5); transition: color 0.15s, background 0.15s;
         touch-action: manipulation;
       }
@@ -375,14 +379,14 @@
       /* 控制按钮 */
       .tour-mob__ctrl {
         display: flex; flex-direction: column; align-items: center; justify-content: center;
-        gap: 4px; padding: 0;
+        gap: 6px; padding: 0;
       }
       .tour-mob__close {
         display: flex; align-items: center; justify-content: center;
-        padding: 3px 6px;
+        padding: 4px 8px;
         background: rgba(239,68,113,0.1); border: 1px solid rgba(239,68,113,0.3);
-        border-radius: 6px; color: #f87171; cursor: pointer; flex-shrink: 0;
-        font-size: 0.62rem; font-weight: 500; font-family: inherit;
+        border-radius: 7px; color: #f87171; cursor: pointer; flex-shrink: 0;
+        font-size: 0.66rem; font-weight: 500; font-family: inherit;
         transition: background 0.14s, border-color 0.14s, color 0.14s, box-shadow 0.14s;
         position: relative; overflow: hidden;
       }
@@ -391,14 +395,14 @@
       .tour-mob__close:active { transform: scale(0.96); box-shadow: 0 0 0 2px rgba(239,68,113,0.3); }
       .tour-mob__close > * { position: relative; z-index: 1; }
       .tour-mob__close:hover { border-color: rgba(239,68,113,0.5); box-shadow: 0 0 10px rgba(239,68,113,0.2); }
-      .tour-mob__close svg { width: 11px; height: 11px; stroke: currentColor; }
+      .tour-mob__close svg { width: 12px; height: 12px; stroke: currentColor; }
 
       .tour-mob__badge {
         display: flex; align-items: center; justify-content: center;
-        padding: 3px 6px;
+        padding: 4px 8px;
         background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.3);
-        border-radius: 6px; color: #a78bfa; cursor: pointer; flex-shrink: 0;
-        font-size: 0.62rem; font-weight: 500; font-family: inherit;
+        border-radius: 7px; color: #a78bfa; cursor: pointer; flex-shrink: 0;
+        font-size: 0.66rem; font-weight: 500; font-family: inherit;
         transition: background 0.14s, border-color 0.14s, color 0.14s, box-shadow 0.14s;
         position: relative; overflow: hidden;
       }
@@ -408,7 +412,7 @@
       .tour-mob__badge > * { position: relative; z-index: 1; }
       .tour-mob__badge:hover { background: rgba(99,102,241,0.2); border-color: rgba(99,102,241,0.5); box-shadow: 0 0 10px rgba(99,102,241,0.2); color: var(--accent); }
       .tour-mob__badge.tour-active { background: rgba(99,102,241,0.25) !important; border-color: var(--tour-accent) !important; box-shadow: 0 0 12px rgba(99,102,241,0.4); color: var(--tour-accent) !important; }
-      .tour-mob__badge svg { width: 12px; height: 12px; stroke: currentColor; }
+      .tour-mob__badge svg { width: 13px; height: 13px; stroke: currentColor; }
 
       /* 朗读按钮：active 时显示音波（默认隐藏音波，对齐桌面端行为） */
       .tour-mob__badge .speech-wave-1,
@@ -426,8 +430,8 @@
         background: rgba(255,255,255,0.05);
         border: 1px solid rgba(255,255,255,0.1);
         color: rgba(167,139,250,0.7);
-        border-radius: 6px;
-        font-size: 0.62rem; font-weight: 500; font-family: inherit;
+        border-radius: 7px;
+        font-size: 0.66rem; font-weight: 500; font-family: inherit;
         transition: background 0.14s, border-color 0.14s, color 0.14s, box-shadow 0.14s;
         position: relative; overflow: hidden;
       }
@@ -469,7 +473,7 @@
         min-width: 28px; height: 20px; padding: 0 5px;
         background: rgba(255,255,255,0.06);
         border: 1px solid rgba(99,102,241,0.25); border-radius: 5px;
-        color: rgba(226,232,240,0.85); font-size: 0.55rem; font-weight: 600;
+        color: rgba(226,232,240,0.85); font-size: 0.58rem; font-weight: 600;
         font-family: inherit; line-height: 1; cursor: pointer; outline: none;
         transition: transform 0.08s ease, border-color 0.15s ease, background 0.15s ease;
       }
@@ -479,52 +483,52 @@
         background: rgba(99,102,241,0.18);
       }
       .tour-mob__strategy-label {
-        font-size: 0.45rem; color: rgba(226,232,240,0.55); white-space: nowrap;
+        font-size: 0.46rem; color: rgba(226,232,240,0.55); white-space: nowrap;
       }
 
       /* 统计数字 */
-      .tour-mob__stats { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 2px 0; }
+      .tour-mob__stats { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 2px 0; }
       .tour-mob__stat-item { display: flex; flex-direction: column; align-items: center; gap: 1px; }
-      .tour-mob__stat-num  { font-size: 0.74rem; font-weight: 600; color: rgba(226,232,240,0.9); font-variant-numeric: tabular-nums; line-height: 1; white-space: nowrap; }
+      .tour-mob__stat-num  { font-size: 0.76rem; font-weight: 600; color: rgba(226,232,240,0.9); font-variant-numeric: tabular-nums; line-height: 1; white-space: nowrap; }
       /* 节点进度用上下两行的分数形式，紧凑 */
       .tour-mob__stat-frac { display: flex; flex-direction: column; align-items: center; gap: 1px; line-height: 1; }
-      .tour-mob__stat-frac .tour-mob__stat-num { font-size: 0.66rem; }
+      .tour-mob__stat-frac .tour-mob__stat-num { font-size: 0.68rem; }
       .tour-mob__stat-rule { width: 100%; min-width: 14px; height: 1px; background: rgba(226,232,240,0.45); }
       .tour-mob__stat-item svg { width: 10px; height: 10px; stroke: currentColor; color: rgba(226,232,240,0.55); flex-shrink: 0; }
-      .tour-mob__stat-lbl  { font-size: 0.45rem; color: rgba(226,232,240,0.28); user-select: none; letter-spacing: 0.02em; }
+      .tour-mob__stat-lbl  { font-size: 0.46rem; color: rgba(226,232,240,0.28); user-select: none; letter-spacing: 0.02em; }
     
       /* 滑块区 */
-      .tour-mob__sliders { display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; padding: 0; }
+      .tour-mob__sliders { display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; padding: 0; }
       .tour-mob__cell {
         display: flex; flex-direction: column; align-items: center; gap: 2px;
         position: relative;
         /* 扩大触摸热区，防止父容器滚动拦截滑块拖动 */
-        width: 36px; min-height: 52px;
+        width: 40px; min-height: 56px;
       }
-      .tour-mob__val { font-size: 0.6rem; font-weight: 600; color: rgba(167,139,250,0.9); font-variant-numeric: tabular-nums; user-select: none; line-height: 1; }
+      .tour-mob__val { font-size: 0.62rem; font-weight: 600; color: rgba(167,139,250,0.9); font-variant-numeric: tabular-nums; user-select: none; line-height: 1; }
       /* 固定宽度防止布局抖动（深度滑块标签长度不同） */
       #tour-depth-val, #tour-depth-val-mob2 { min-width: 28px; text-align: center; }
-      .tour-mob__lbl { font-size: 0.45rem; color: rgba(226,232,240,0.28); user-select: none; letter-spacing: 0.02em; }
+      .tour-mob__lbl { font-size: 0.46rem; color: rgba(226,232,240,0.28); user-select: none; letter-spacing: 0.02em; }
 
-      .tour-mob__track { width: 4px; height: 44px; background: rgba(255,255,255,0.08); border-radius: 2px; position: relative; overflow: visible; display: flex; flex-direction: column; justify-content: flex-end; }
+      .tour-mob__track { width: 5px; height: 48px; background: rgba(255,255,255,0.08); border-radius: 2px; position: relative; overflow: visible; display: flex; flex-direction: column; justify-content: flex-end; }
       .tour-mob__fill  { position: absolute; left: 0; bottom: 0; width: 100%; height: 0%; background: linear-gradient(to top, #6366f1, #a78bfa); border-radius: 2px; transition: height 0.08s ease; box-shadow: 0 0 6px rgba(99,102,241,0.6); }
 
       .tour-mob__range {
         position: absolute; top: 50%; left: 50%;
         transform: translateX(-50%) translateY(-50%) rotate(-90deg);
         transform-origin: center center;
-        width: 44px; height: 16px; margin: 0; padding: 0;
+        width: 48px; height: 18px; margin: 0; padding: 0;
         -webkit-appearance: none; appearance: none;
         background: transparent; cursor: pointer;
       }
       .tour-mob__range::-webkit-slider-thumb {
-        -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+        -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
         background: #fff; border: none;
         box-shadow: 0 0 8px rgba(99,102,241,0.9), 0 1px 4px rgba(0,0,0,0.4);
         cursor: pointer; position: relative;
       }
       .tour-mob__range::-moz-range-thumb {
-        width: 14px; height: 14px; border-radius: 50%;
+        width: 16px; height: 16px; border-radius: 50%;
         background: #fff; border: none;
         box-shadow: 0 0 8px rgba(99,102,241,0.9); cursor: pointer;
       }
