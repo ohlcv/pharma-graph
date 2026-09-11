@@ -715,23 +715,27 @@
           <svg viewBox="0 0 24 24"><path d="M4 17l6-6 4 4 8-9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><polyline points="17 6 22 6 22 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span class="tour-mob__stat-lbl">步</span>
         </div>
+        <!-- 节点进度：与间隔/深度（.tour-mob__cell）完全同构。
+             分数用 3 行垂直（num / rule / num），滑条复用 .tour-mob__track-container
+             （writing-mode: vertical-lr），标签复用 .tour-mob__lbl。 -->
         <div class="tour-mob__stat-item">
-          <div class="tour-mob__progress">
-            <span class="tour-mob__progress-frac">
-              <span class="tour-mob__stat-num" id="tour-count-badge-num">0</span>
-              <span class="tour-mob__progress-sep">/</span>
-              <span class="tour-mob__stat-num" id="tour-count-badge-den">0</span>
-            </span>
-            <div class="tour-mob__progress-track">
-              <div class="tour-mob__progress-fill" id="tour-progress-fill"></div>
-              <div class="tour-mob__progress-thumb" id="tour-progress-thumb"></div>
-              <input type="range" class="tour-mob__progress-range" id="tour-progress"
-                     min="0" max="100" step="1" value="0"
-                     aria-label="漫游进度，点击跳转到对应节点">
-            </div>
+          <div class="tour-mob__progress-frac">
+            <span class="tour-mob__stat-num" id="tour-count-badge-num">0</span>
+            <span class="tour-mob__stat-rule"></span>
+            <span class="tour-mob__stat-num" id="tour-count-badge-den">0</span>
           </div>
-          <svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="16" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><line x1="8" y1="11" x2="12" y2="13" stroke="currentColor" stroke-width="1.5"/><line x1="16" y1="11" x2="12" y2="13" stroke="currentColor" stroke-width="1.5"/></svg>
-          <span class="tour-mob__stat-lbl">节点</span>
+          <div class="tour-mob__track-container">
+            <div class="tour-mob__track">
+              <div class="tour-mob__fill" id="tour-progress-fill"></div>
+            </div>
+            <input type="range" class="tour-mob__range" id="tour-progress"
+                   min="0" max="100" step="1" value="0"
+                   aria-label="漫游进度，点击跳转到对应节点">
+          </div>
+          <span class="tour-mob__lbl">
+            <svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="16" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><line x1="8" y1="11" x2="12" y2="13" stroke="currentColor" stroke-width="1.5"/><line x1="16" y1="11" x2="12" y2="13" stroke="currentColor" stroke-width="1.5"/></svg>
+            节点
+          </span>
         </div>
       </div>
       <!-- 策略切换（移动端紧凑：按钮+下方标签） -->
@@ -820,27 +824,23 @@
           <span class="tour-dt__stat-label">步</span>
           <span class="tour-dt__stat-val" id="tour-step-badge-dt">1</span>
         </span>
-        <span class="tour-dt__stat">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="3.5"/><circle cx="16" cy="8" r="3.5"/><circle cx="12" cy="16" r="3.5"/><line x1="8" y1="11" x2="12" y2="13"/><line x1="16" y1="11" x2="12" y2="13"/></svg>
-          <span class="tour-dt__stat-label">节点</span>
-          <span class="tour-dt__stat-val" id="tour-progress-label-dt">0 / 0</span>
-        </span>
       </div>
       <!-- 分隔线 -->
       <div class="tour-dt__sep"></div>
-      <!-- 节点进度滑条（独立参数块，与 .tour-dt__params 同级；和间隔/深度一样横排 label + range + val/frac） -->
-      <div class="tour-dt__progress">
+      <!-- 节点进度滑条：与间隔/深度完全同构（.tour-dt__params + param-label + range + param-val）。
+           竖形分数 param-val（分子上 / 细分隔线 / 分母下），跟手机端 .tour-mob__progress-frac 一致。
+           X / Y 从 stats 里的"节点" stat-item 移除——避免重复。 -->
+      <div class="tour-dt__params">
         <span class="tour-dt__param-label">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><polyline points="12 2 12 4"/><polyline points="12 20 12 22"/><polyline points="4.93 4.93 6.34 6.34"/><polyline points="17.66 17.66 19.07 19.07"/><polyline points="2 12 4 12"/><polyline points="20 12 22 12"/></svg>
           进度
         </span>
-        <div class="tour-dt__progress-track">
-          <div class="tour-dt__progress-fill" id="tour-progress-fill-dt"></div>
-          <div class="tour-dt__progress-thumb" id="tour-progress-thumb-dt"></div>
-          <input type="range" class="tour-dt__progress-range" id="tour-progress-dt"
-                 min="0" max="100" step="1" value="0"
-                 aria-label="漫游进度，点击跳转到对应节点">
-        </div>
+        <input type="range" class="tour-dt__range" id="tour-progress-dt"
+               min="0" max="100" step="1" value="0"
+               aria-label="漫游进度，点击跳转到对应节点">
+        <!-- 桌面端进度横向分数 param-val：复用 .tour-dt__param-val 样式（跟间隔 "3s" / 深度 "∞" 同款）。
+             .tour-dt__progress-frac（竖形分数版本）已注释掉。 -->
+        <span class="tour-dt__param-val" id="tour-progress-label-dt">0 / 0</span>
       </div>
       <!-- 漫游策略选择 -->
       <div class="tour-dt__strategy">

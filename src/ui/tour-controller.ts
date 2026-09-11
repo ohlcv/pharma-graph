@@ -425,14 +425,10 @@ export class TourController {
       // 拖动时实时同步镜像 fill（仅同步 value，不触发跳转）
       if (Number(other.value) !== src.valueAsNumber) other.value = src.value;
       const pct = Math.max(0, Math.min(1, Number(src.value) / 100));
+      // 移动端 .tour-mob__fill 是 vertical-lr 模式：transform: translateX(-50%) scaleY(0~1)
+      // 桌面端 .tour-dt__range 由 paintFill 写 input background 渐变；这里只需同步 range.value
       const fillMob = document.getElementById('tour-progress-fill');
-      const fillDt  = document.getElementById('tour-progress-fill-dt');
-      const thumbMob = document.getElementById('tour-progress-thumb');
-      const thumbDt  = document.getElementById('tour-progress-thumb-dt');
-      if (fillMob) fillMob.style.transform = `scaleX(${pct})`;
-      if (fillDt)  fillDt.style.transform  = `scaleX(${pct})`;
-      if (thumbMob) thumbMob.style.left = `${pct * 100}%`;
-      if (thumbDt)  thumbDt.style.left  = `${pct * 100}%`;
+      if (fillMob) fillMob.style.transform = `translateX(-50%) scaleY(${pct})`;
     };
 
     mob.addEventListener('input',  () => onInput(mob, dt));
@@ -447,15 +443,10 @@ export class TourController {
     const mob = document.getElementById('tour-progress')    as HTMLInputElement | null;
     const dt  = document.getElementById('tour-progress-dt') as HTMLInputElement | null;
     const fillMob  = document.getElementById('tour-progress-fill');
-    const fillDt   = document.getElementById('tour-progress-fill-dt');
-    const thumbMob = document.getElementById('tour-progress-thumb');
-    const thumbDt  = document.getElementById('tour-progress-thumb-dt');
     if (mob) mob.value = '0';
     if (dt)  dt.value  = '0';
-    if (fillMob) fillMob.style.transform = 'scaleX(0)';
-    if (fillDt)  fillDt.style.transform  = 'scaleX(0)';
-    if (thumbMob) thumbMob.style.left = '0%';
-    if (thumbDt)  thumbDt.style.left  = '0%';
+    // 移动端 fill 是 vertical-lr：必须保留 translateX(-50%) 居中
+    if (fillMob) fillMob.style.transform = 'translateX(-50%) scaleY(0)';
   }
 
   /**
@@ -524,6 +515,8 @@ export class TourController {
     // Horizontal track (desktop) — paint gradient background on the desktop mirror.
     // 之前用 if/else 包住导致 s.fill 永真时 horizontal 分支永远不执行；
     // 这里改成无条件执行，只要 s.mirror 存在就给横轨画渐变。
+    // 用 var(--tour-accent) 填充已走过的部分、剩余部分用 rgba 灰色，跟手机端 .tour-mob__fill
+    // 同色调（indigo-400 = #818cf8）。
     if (s.mirror) {
       const bg = `linear-gradient(to right, var(--tour-accent) 0%, var(--tour-accent) ${pct * 100}%, rgba(255,255,255,0.1) ${pct * 100}%, rgba(255,255,255,0.1) 100%)`;
       s.mirror.style.background = bg;
@@ -673,43 +666,40 @@ export class TourController {
   }
 
   /**
-   * Update the per-step counter "N / M". The old purple progress bar + marker
-   * were removed (issue #?): the fill element routinely outgrew the desktop
-   * bar width and read as visual noise. The compact text "current / total"
-   * is enough to convey progress.
+   * Update the per-step counter "N / M".
+   * - 桌面端：横排 "X / Y" 文本（id=tour-progress-label-dt，复用 .tour-dt__param-val 样式）
+   * - 桌面端 range background：跟间隔/深度一样调 paintFill() 思路，手动写 input background 渐变
+   *   （紫色填充已走过部分 + 灰色剩余），跟间隔/深度视觉同构。
+   * - 手机端：竖形分数（分子 .tour-count-badge-num / 分母 .tour-count-badge-den）
    */
   private renderTimeline(current: number, total: number): void {
     if (total <= 0) return;
-    // 节点显示 X / Y：桌面端横排，移动端用上下两行的分数形式
-    const text = `${current} / ${total}`;
-    this.setText('tour-progress-label-dt',  text);
-    this.setText('tour-count-badge-num',   String(current));
-    this.setText('tour-count-badge-den',   String(total));
-    // 桌面端"步" = 当前步数（纯数字）
+    const pct = Math.max(0, Math.min(1, current / total));
+
+    // 桌面端进度横向分数 "X / Y"（param-val，紧贴 range 右侧，跟间隔 "3s" 同款）
+    this.setText('tour-progress-label-dt', `${current} / ${total}`);
+    // 手机端进度竖形分数（分子 / 分母）
+    this.setText('tour-count-badge-num', String(current));
+    this.setText('tour-count-badge-den', String(total));
+    // 桌面端/手机端"步" = 当前步数（纯数字）
     this.setText('tour-step-badge-dt',      String(current));
     this.setText('tour-step-badge-mob',     String(current));
-    // 进度条 fill：scaleX(0~1)
-    const pct = Math.max(0, Math.min(1, current / total));
-    this.setProgressFill('tour-progress-fill',    pct);
-    this.setProgressFill('tour-progress-fill-dt', pct);
-    this.setProgressThumb('tour-progress-thumb',    pct);
-    this.setProgressThumb('tour-progress-thumb-dt', pct);
+
+    // 手机端 fill：vertical-lr 模式 translateX(-50%) scaleY(0~1)
+    const fillMob = document.getElementById('tour-progress-fill');
+    if (fillMob) fillMob.style.transform = `translateX(-50%) scaleY(${pct})`;
+
+    // 桌面端 range background 紫色填充：复用 paintFill 的渐变公式。
+    // 进度不走 SliderBind（进度不是参数滑块，而是状态条），所以这里手动写 background。
+    const dt = document.getElementById('tour-progress-dt') as HTMLInputElement | null;
+    if (dt) {
+      const bg = `linear-gradient(to right, var(--tour-accent) 0%, var(--tour-accent) ${pct * 100}%, rgba(255,255,255,0.15) ${pct * 100}%, rgba(255,255,255,0.15) 100%)`;
+      dt.style.background = bg;
+    }
     // 进度条 range value：0-100，由 change 监听反推 seqIdx
     const rangeVal = Math.round(pct * 100);
     this.setProgressRange('tour-progress',    rangeVal);
     this.setProgressRange('tour-progress-dt', rangeVal);
-  }
-
-  /** Step 2: 直接写 fill 的 scaleX（与 paintFill 一致的纯几何同步，无 input 耦合） */
-  private setProgressFill(id: string, pct: number): void {
-    const el = document.getElementById(id);
-    if (el) el.style.transform = `scaleX(${pct})`;
-  }
-
-  /** 圆形滑块：left = pct% (0~100) */
-  private setProgressThumb(id: string, pct: number): void {
-    const el = document.getElementById(id);
-    if (el) el.style.left = `${Math.max(0, Math.min(100, pct * 100))}%`;
   }
 
   private setProgressRange(id: string, value: number): void {
@@ -737,10 +727,8 @@ export class TourController {
     this.setText('tour-count-badge-num',   '—');
     this.setText('tour-count-badge-den',   '—');
     this.setText('tour-dt-node-name',      nameLabel);
-    // The progress label was previously hardcoded to '完成' regardless of
-    // completion reason, which broke the test that asserts all count
-    // badges reset to '—'. Match it to the same dash convention.
-    this.setText('tour-progress-label-dt',  '—');
+    // 桌面端进度横向分数 idle 时也置 "—"，跟其他 stat 保持一致。
+    this.setText('tour-progress-label-dt', '—');
     this.setText('tour-step-badge-dt',     '—');
     this.setText('tour-step-badge-mob',    '—');
 

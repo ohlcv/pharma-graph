@@ -34,6 +34,8 @@ const COUNT_IDS = [
   'tour-count-badge-num',
   'tour-count-badge-den',
   'tour-progress-label-dt',
+  'tour-step-badge-dt',
+  'tour-step-badge-mob',
 ];
 
 function setupDom() {

@@ -153,76 +153,48 @@
     .tour-dt__stat-label { color: rgba(226,232,240,0.55); }
     .tour-dt__stat-val   { font-weight: 700; color: rgba(226,232,240,0.9); font-variant-numeric: tabular-nums; }
 
-    /* ── 节点进度条（桌面端）──────────────────────────────────────────────
-       独立参数块结构，跟 .tour-dt__params 一致：横排 label + track + val。
-       label 用 .tour-dt__param-label（与间隔/深度共用），分数用 .tour-dt__stat-val
-       显示在 stat 里（"节点 X / Y"）。
-       track 撑开剩余空间，宽度由父容器决定，不再写死 min/max-width。 */
-    .tour-dt__progress {
-      display: flex; align-items: center; gap: 5px;
-      flex: 1 1 auto; min-width: 80px; max-width: 220px;
-    }
-    .tour-dt__progress-track {
-      position: relative;
-      flex: 1; min-width: 60px;
-      height: 4px;
-      background: rgba(255,255,255,0.10);
-      border-radius: 2px;
-      /* overflow: visible 让 thumb（10px）能突出 track（4px）的上下边界 */
-      overflow: visible;
-    }
-    .tour-dt__progress-fill {
-      position: absolute; left: 0; top: 0; bottom: 0;
-      width: 100%;
-      transform-origin: left center;
-      transform: scaleX(0);
-      background: linear-gradient(to right, #6366f1, #a78bfa);
-      border-radius: 2px;
-      box-shadow: 0 0 6px rgba(99,102,241,0.55);
-      transition: transform 0.1s ease;
-      pointer-events: none;
-    }
-    /* 圆形滑块：跟随 fill 末端移动 (left = pct%) */
-    .tour-dt__progress-thumb {
-      position: absolute;
-      top: 50%; left: 0;
-      width: 10px; height: 10px;
-      transform: translate(-50%, -50%);
-      background: #fff;
-      border-radius: 50%;
-      box-shadow: 0 0 6px rgba(99,102,241,0.9), 0 1px 2px rgba(0,0,0,0.5);
-      pointer-events: none;
-      transition: left 0.1s ease;
-    }
-    .tour-dt__progress-range {
-      position: absolute; inset: -6px -4px;
-      width: auto; height: auto;
-      margin: 0; padding: 0;
-      background: transparent;
-      -webkit-appearance: none; appearance: none;
-      cursor: pointer;
-      opacity: 0;
-      touch-action: none;
-      z-index: 3;
-    }
-    .tour-state--idle .tour-dt__progress-fill { background: rgba(255,255,255,0.15); box-shadow: none; }
-    .tour-state--idle .tour-dt__progress-thumb { background: rgba(255,255,255,0.5); box-shadow: none; }
-    .tour-state--idle .tour-dt__progress-range { pointer-events: none; cursor: default; }
-
     .tour-dt__params      { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
     .tour-dt__param-label { display: flex; align-items: center; gap: 3px; font-size: 0.6rem; color: rgba(226,232,240,0.55); white-space: nowrap; }
     .tour-dt__param-label svg { width: 12px; height: 12px; stroke: currentColor; flex-shrink: 0; }
+    /* 参数滑块（桌面端）：thumb 12×12 + 紫色 + 阴影 + hover scale(1.2)。
+       颜色和阴影跟手机端 .tour-mob__range 同款；大小桌面端用 12px（鼠标点击无需更大触摸热区）。 */
     .tour-dt__range {
-      width: 60px; height: 3px; -webkit-appearance: none; appearance: none;
+      width: 60px; height: 4px; -webkit-appearance: none; appearance: none;
       border-radius: 2px; outline: none; cursor: pointer; background: rgba(255,255,255,0.15);
     }
     .tour-dt__range::-webkit-slider-thumb {
-      -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%;
-      background: var(--tour-accent); box-shadow: 0 0 6px rgba(99,102,241,0.5);
-      cursor: pointer; border: none; transition: transform 0.1s;
+      -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
+      background: var(--tour-accent); border: none;
+      box-shadow: 0 0 6px rgba(99,102,241,0.7), 0 1px 2px rgba(0,0,0,0.4);
+      cursor: pointer; transition: transform 0.1s; margin: 0;
     }
     .tour-dt__range::-webkit-slider-thumb:hover { transform: scale(1.2); }
-    .tour-dt__range::-moz-range-thumb { width: 10px; height: 10px; border: none; border-radius: 50%; background: var(--tour-accent); box-shadow: 0 0 6px rgba(99,102,241,0.5); cursor: pointer; }
+    .tour-dt__range::-moz-range-thumb {
+      width: 12px; height: 12px; border: none; border-radius: 50%;
+      background: var(--tour-accent);
+      box-shadow: 0 0 6px rgba(99,102,241,0.7), 0 1px 2px rgba(0,0,0,0.4);
+      cursor: pointer;
+    }
+    /* ─────────────────────────────────────────────────────────────────────────
+       节点进度竖形分数 param-val：分子上 / 细分隔线 / 分母下。
+       当前被注释——桌面端进度改用横向 "0 / 0"（复用 .tour-dt__param-val），
+       跟间隔 / 深度 "3s" / "∞" 风格统一。竖形规则保留以便未来切换。
+       ───────────────────────────────────────────────────────────────────────── */
+    /*
+    .tour-dt__progress-frac {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 2px; line-height: 1; flex-shrink: 0;
+      min-width: 18px;
+    }
+    .tour-dt__progress-frac .tour-dt__stat-num {
+      font-size: 0.62rem; font-weight: 600; color: rgba(167,139,250,0.9);
+      font-variant-numeric: tabular-nums; line-height: 1; white-space: nowrap;
+    }
+    .tour-dt__stat-rule {
+      width: 100%; min-width: 14px; height: 1px;
+      background: rgba(226,232,240,0.45);
+    }
+    */
     .tour-dt__param-val { font-size: 0.6rem; color: rgba(226,232,240,0.55); font-variant-numeric: tabular-nums; min-width: 20px; }
     /* 固定宽度防止布局抖动（深度滑块标签长度不同） */
     #tour-depth-val-dt { min-width: 24px; }
@@ -542,77 +514,13 @@
       .tour-mob__stats { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0; }
       .tour-mob__stat-item { display: flex; flex-direction: column; align-items: center; gap: 1px; }
       .tour-mob__stat-num  { font-size: 0.76rem; font-weight: 600; color: rgba(226,232,240,0.9); font-variant-numeric: tabular-nums; line-height: 1; white-space: nowrap; }
-      /* 节点进度用上下两行的分数形式，紧凑 */
-      .tour-mob__stat-frac { display: flex; flex-direction: column; align-items: center; gap: 1px; line-height: 1; }
-      .tour-mob__stat-frac .tour-mob__stat-num { font-size: 0.68rem; }
+      /* 节点进度：分子上、分母下，中间一根细分隔线（复用下面的 .tour-mob__stat-rule） */
+      .tour-mob__progress-frac { display: flex; flex-direction: column; align-items: center; gap: 2px; line-height: 1; flex-shrink: 0; }
+      .tour-mob__progress-frac .tour-mob__stat-num { font-size: 0.68rem; }
       .tour-mob__stat-rule { width: 100%; min-width: 14px; height: 1px; background: rgba(226,232,240,0.45); }
       .tour-mob__stat-item svg { width: 10px; height: 10px; stroke: currentColor; color: rgba(226,232,240,0.55); flex-shrink: 0; }
       .tour-mob__stat-lbl  { font-size: 0.46rem; color: rgba(226,232,240,0.28); user-select: none; letter-spacing: 0.02em; }
 
-      /* ── 节点进度条（垂直：分数在上、track 在下，嵌入外层 stat-item 的 column 布局）──
-         宽度 100% 让它在 stat-item 列里横向撑满（与轮次/步的 num 等宽）。 */
-      .tour-mob__progress {
-        display: flex; flex-direction: column; align-items: stretch; gap: 3px;
-        width: 100%;
-      }
-      .tour-mob__progress-frac {
-        display: flex; align-items: baseline; justify-content: center; gap: 1px;
-        font-size: 0.68rem; line-height: 1;
-        flex-shrink: 0;
-      }
-      .tour-mob__progress-frac .tour-mob__stat-num { font-size: inherit; }
-      .tour-mob__progress-sep { color: rgba(226,232,240,0.35); font-size: 0.62rem; }
-      .tour-mob__progress-track {
-        position: relative;
-        /* 父 .tour-mob__progress 改为 column 后，flex: 1 表示占满剩余垂直空间而非水平宽度，
-           所以这里改用 width: 100% 让 track 横向填满父容器（外层 stat-item 的列宽）。 */
-        width: 100%; min-width: 24px;
-        height: 4px;
-        background: rgba(255,255,255,0.10);
-        border-radius: 2px;
-        /* overflow: visible 让 thumb（10px）能突出 track（4px）的上下边界 */
-        overflow: visible;
-      }
-      .tour-mob__progress-fill {
-        position: absolute; left: 0; top: 0; bottom: 0;
-        width: 100%;
-        transform-origin: left center;
-        transform: scaleX(0);
-        background: linear-gradient(to right, #6366f1, #a78bfa);
-        border-radius: 2px;
-        box-shadow: 0 0 6px rgba(99,102,241,0.55);
-        transition: transform 0.1s ease;
-        pointer-events: none;
-      }
-      /* 圆形滑块：跟随 fill 末端移动 (left = pct%) */
-      .tour-mob__progress-thumb {
-        position: absolute;
-        top: 50%; left: 0;
-        width: 10px; height: 10px;
-        transform: translate(-50%, -50%);
-        background: #fff;
-        border-radius: 50%;
-        box-shadow: 0 0 8px rgba(99,102,241,0.9), 0 1px 2px rgba(0,0,0,0.5);
-        pointer-events: none;
-        transition: left 0.1s ease;
-      }
-      /* 罩在 fill 上方的隐形 input，只用于点击/拖动交互 */
-      .tour-mob__progress-range {
-        position: absolute; inset: -8px -6px;   /* 命中区上下各扩 8px，左右各扩 6px */
-        width: auto; height: auto;
-        margin: 0; padding: 0;
-        background: transparent;
-        -webkit-appearance: none; appearance: none;
-        cursor: pointer;
-        opacity: 0;                  /* 完全隐形，只接收事件 */
-        touch-action: none;
-        z-index: 3;
-      }
-      /* Idle / 未启动时进度条置灰、不可点 */
-      .tour-state--idle .tour-mob__progress-fill { background: rgba(255,255,255,0.15); box-shadow: none; }
-      .tour-state--idle .tour-mob__progress-thumb { background: rgba(255,255,255,0.5); box-shadow: none; }
-      .tour-state--idle .tour-mob__progress-range { pointer-events: none; cursor: default; }
-    
       /* 滑块区 */
       .tour-mob__sliders { display: flex; flex-direction: column; align-items: center; gap: 10px; flex-shrink: 0; padding: 0; }
       .tour-mob__cell {
@@ -687,23 +595,23 @@
         z-index: 2;
       }
 
-      /* 滑块圆点：声明尺寸 18×18px，不使用负 margin（上一版本 margin: -6px -8px 会让
-         视觉位置和原生声明尺寸脱钩，导致 fill 公式（基于声明尺寸 18px）和 thumb 真实
-         渲染位置不一致，pct=1 时 fill 顶端比 thumb 圆心低 ~6px）。
-         现在触摸热区由 container 加宽到 32px 来保证（见 .tour-mob__track-container）。 */
+      /* 滑块圆点：紫色 var(--tour-accent)，与桌面端 .tour-dt__range::-webkit-slider-thumb 完全一致。
+         触摸热区由 container 加宽到 32px 来保证（见 .tour-mob__track-container）。 */
       .tour-mob__range::-webkit-slider-thumb {
         -webkit-appearance: none;
         width: 18px; height: 18px; border-radius: 50%;
-        background: #fff; border: none;
+        background: var(--tour-accent); border: none;
         box-shadow: 0 0 8px rgba(99,102,241,0.9), 0 1px 4px rgba(0,0,0,0.4);
         cursor: pointer;
         margin: 0;
+        transition: transform 0.1s;
       }
+      .tour-mob__range::-webkit-slider-thumb:hover { transform: scale(1.2); }
       .tour-mob__range::-moz-range-thumb {
         width: 18px; height: 18px; border-radius: 50%;
-        background: #fff; border: none;
-        box-shadow: 0 0 8px rgba(99,102,241,0.9); cursor: pointer;
-        margin: 0;
+        background: var(--tour-accent); border: none;
+        box-shadow: 0 0 8px rgba(99,102,241,0.9), 0 1px 4px rgba(0,0,0,0.4);
+        cursor: pointer; margin: 0;
       }
       /* Firefox track 样式 */
       .tour-mob__range::-moz-range-track {
