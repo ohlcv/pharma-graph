@@ -517,10 +517,17 @@ export class TourController {
     // 这里改成无条件执行，只要 s.mirror 存在就给横轨画渐变。
     // 用 var(--tour-accent) 填充已走过的部分、剩余部分用 rgba 灰色，跟手机端 .tour-mob__fill
     // 同色调（indigo-400 = #818cf8）。
-    if (s.mirror) {
-      const bg = `linear-gradient(to right, var(--tour-accent) 0%, var(--tour-accent) ${pct * 100}%, rgba(255,255,255,0.1) ${pct * 100}%, rgba(255,255,255,0.1) 100%)`;
-      s.mirror.style.background = bg;
-    }
+    if (s.mirror) this.paintHorizontalFill(s.mirror, pct);
+  }
+
+  /**
+   * 把横轨 range 的 background 写成 "已走过的部分紫色 / 剩余部分半透白" 渐变。
+   * 桌面端进度条 + paintFill 的 mirror 都走这里——避免渐变公式重复（之前 line 696
+   * 手写的版本跟 paintFill 用 0.1 / 0.15 不一致，是隐性 bug）。
+   */
+  private paintHorizontalFill(range: HTMLElement, pct: number): void {
+    const bg = `linear-gradient(to right, var(--tour-accent) 0%, var(--tour-accent) ${pct * 100}%, rgba(255,255,255,0.15) ${pct * 100}%, rgba(255,255,255,0.15) 100%)`;
+    range.style.background = bg;
   }
 
   private bindStrategyToggle(): void {
@@ -689,13 +696,11 @@ export class TourController {
     const fillMob = document.getElementById('tour-progress-fill');
     if (fillMob) fillMob.style.transform = `translateX(-50%) scaleY(${pct})`;
 
-    // 桌面端 range background 紫色填充：复用 paintFill 的渐变公式。
-    // 进度不走 SliderBind（进度不是参数滑块，而是状态条），所以这里手动写 background。
+    // 桌面端 range background 紫色填充：复用 paintHorizontalFill —— 跟 paintFill 的
+    // mirror 渐变公式保持一致，避免桌面端"滑块走 paintFill 路径用 0.1、进度走 renderTimeline
+    // 路径用 0.15"的色值不一致 bug。
     const dt = document.getElementById('tour-progress-dt') as HTMLInputElement | null;
-    if (dt) {
-      const bg = `linear-gradient(to right, var(--tour-accent) 0%, var(--tour-accent) ${pct * 100}%, rgba(255,255,255,0.15) ${pct * 100}%, rgba(255,255,255,0.15) 100%)`;
-      dt.style.background = bg;
-    }
+    if (dt) this.paintHorizontalFill(dt, pct);
     // 进度条 range value：0-100，由 change 监听反推 seqIdx
     const rangeVal = Math.round(pct * 100);
     this.setProgressRange('tour-progress',    rangeVal);
