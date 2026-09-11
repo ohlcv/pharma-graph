@@ -516,35 +516,66 @@
       #tour-depth-val, #tour-depth-val-mob2 { min-width: 28px; text-align: center; }
       .tour-mob__lbl { font-size: 0.46rem; color: rgba(226,232,240,0.28); user-select: none; letter-spacing: 0.02em; }
 
-      /* 轨道：固定 4px 宽 + 足够长的实际高度，便于拖动 */
-      .tour-mob__track { width: 4px; height: 80px; background: rgba(255,255,255,0.08); border-radius: 2px; position: relative; overflow: visible; display: flex; flex-direction: column; justify-content: flex-end; }
-      .tour-mob__fill  { position: absolute; left: 0; bottom: 0; width: 100%; height: 0%; background: linear-gradient(to top, #6366f1, #a78bfa); border-radius: 2px; transition: height 0.08s ease; box-shadow: 0 0 6px rgba(99,102,241,0.6); }
+      /* 轨道容器：relative 定位，作为 track 和 range 的共同父元素（range 用 inset:0 覆盖它） */
+      .tour-mob__track-container {
+        position: relative;
+        /* 固定尺寸：4px 宽（竖条宽）× 80px 高（可拖动距离） */
+        width: 4px; height: 80px;
+      }
+      /* 轨道：视觉背景条，尺寸与 container 完全一致 */
+      .tour-mob__track {
+        width: 4px; height: 80px;
+        background: rgba(255,255,255,0.08); border-radius: 2px;
+        position: relative; overflow: visible;
+        display: flex; flex-direction: column; justify-content: flex-end;
+      }
+      /* 已填充进度：从底部向上 */
+      .tour-mob__fill {
+        position: absolute; left: 0; bottom: 0;
+        width: 100%; height: 0%;
+        background: linear-gradient(to top, #6366f1, #a78bfa); border-radius: 2px;
+        transition: height 0.08s ease;
+        box-shadow: 0 0 6px rgba(99,102,241,0.6);
+      }
 
-      /* range input：包裹层 container 用 relative，让 range 用 inset:0 完全覆盖它（即完全覆盖 track） */
-      .tour-mob__cell { position: relative; }
-      .tour-mob__track-container { position: relative; }
+      /* range input：用 writing-mode: vertical-lr 直接变竖向，不用 rotate！
+         inset:0 → 尺寸 = container = 4×80px，竖向写模式下自动变为 80px 高 × 4px 宽的竖条。
+         取消 rotate() 避免 transform-origin 的一切对齐问题。 */
       .tour-mob__range {
-        position: absolute;
-        /* inset: 0 让 range 完全覆盖 container/track，不依赖任何像素猜测 */
-        inset: 0;
-        /* 旋转 -90°：80px 变高（竖向滑条），4px 变宽（与 track 4px 宽对齐）*/
-        transform: rotate(-90deg);
-        transform-origin: center center;
+        position: absolute; inset: 0;
+        /* writing-mode: vertical-lr 让 range 从左到右的书写变成从上到下，
+           形成竖向滑条效果。不需要任何旋转！ */
+        writing-mode: vertical-lr;
+        direction: rtl;           /* 让滑块从底部开始（低值在下） */
         -webkit-appearance: none; appearance: none;
         background: transparent; cursor: pointer;
+        /* 恢复横向宽度：80px = 滑条可拖动长度 */
+        width: 80px; height: unset;
+        /* 高度设为 container 高度，让滑块可点击区域延伸 */
+        min-height: 80px;
         z-index: 2;
-        width: unset; height: unset;
       }
+
+      /* 滑块圆点：加大触摸热区（负 margin 超出 container 边界），便于抓取 */
       .tour-mob__range::-webkit-slider-thumb {
-        -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
+        -webkit-appearance: none;
+        width: 18px; height: 18px; border-radius: 50%;
         background: #fff; border: none;
         box-shadow: 0 0 8px rgba(99,102,241,0.9), 0 1px 4px rgba(0,0,0,0.4);
-        cursor: pointer; position: relative;
+        cursor: pointer;
+        /* 负 margin 扩大热区：上下各多 6px，左右各多 8px */
+        margin: -6px -8px;
       }
       .tour-mob__range::-moz-range-thumb {
         width: 18px; height: 18px; border-radius: 50%;
         background: #fff; border: none;
         box-shadow: 0 0 8px rgba(99,102,241,0.9); cursor: pointer;
+        margin: -6px -8px;
+      }
+      /* Firefox track 样式 */
+      .tour-mob__range::-moz-range-track {
+        width: 4px; height: 80px;
+        background: transparent;
       }
     }
 
