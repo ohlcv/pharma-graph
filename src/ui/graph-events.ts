@@ -12,6 +12,7 @@ import { TourController } from './tour-controller.js';
 import { updateStats, syncBottomSheetStats } from './graph-stats.js';
 import { clearShapeFilter } from './legend-manager.js';
 import { isBigscreen, exitBigscreen } from './bigscreen.js';
+import { onDragStart as onNeighborTugStart, onDrag as onNeighborTug, onDragEnd as onNeighborTugEnd } from './neighbor-tug.js';
 
 export interface GraphEventDeps {
   cy: cytoscape.Core;
@@ -155,10 +156,26 @@ export function initGraphEvents(deps: GraphEventDeps): void {
     // Renderer. Toggling the simplified class is meaningful only in the
     // context of cytoscape's grab/free gesture, so it's done inline here.
     setCytoscapeDragMode(cy, true);
+    // Begin the neighbor-tug gesture: snapshot 1-hop neighbours and
+    // mark them with .neighbor-tugged so the stylesheet dims them
+    // slightly while the drag is in flight.
+    const grabbed = cy.nodes(':grabbed');
+    if (grabbed.length > 0) onNeighborTugStart(grabbed[0]);
+  });
+  // Position-tracked tug: cytoscape fires `drag` (with no selector) on
+  // every mouse-move while ANY node is being dragged. We update tugged
+  // neighbour positions in lockstep so they appear to follow the cursor.
+  cy.on('drag', () => {
+    onNeighborTug();
   });
   cy.on('free', 'node', () => {
     deps.setDragging(false);
     setCytoscapeDragMode(cy, false);
+    // Snap neighbours back to their original positions with a smooth
+    // animate. Done synchronously here (not in dragfree) so the animation
+    // starts the moment the user releases, even if the OS hasn't yet
+    // fired the dragfree event for the cursor-up.
+    onNeighborTugEnd();
   });
   cy.on('dragfree', () => {
     deps.setDragging(false);

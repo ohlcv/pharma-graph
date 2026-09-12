@@ -40,6 +40,15 @@ export const CLASSES = {
   DRAGGING_SIMPLIFIED: 'dragging-simplified',
   TOUR_PATH_PREVIEW: 'tour-path-preview',
   LAYER_PARENT: 'layer-parent',
+  // ── Neighbor-tug interaction (lightweight "pull" feedback on drag) ──────────
+  // NEIGHBOR_TUGGED: added to 1-hop neighbours of a node while it is being
+  //   dragged. Drives the CSS transition that nudges neighbours a few px
+  //   toward the dragged node (release snaps them back via transition).
+  // NEIGHBOR_TUG_ORIGIN_X/Y: stored absolute coordinates each tugged neighbour
+  //   was sitting at when the drag started. The tug module writes these as
+  //   data attributes so the CSS layer can compute offsets without invoking
+  //   JS on every frame (perf: 1100-node graph must NOT animate via JS rAF).
+  NEIGHBOR_TUGGED: 'neighbor-tugged',
 } as const;
 
 // Ripple colors — single source of truth; both graph-events.ts and
@@ -375,6 +384,29 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         'line-color': '#fbbf24',
         'target-arrow-color': '#fbbf24',
         opacity: 0.85,
+      },
+    },
+    // ── Neighbor tug (drag-pull feedback) ────────────────────────────────────
+    // While a node is being dragged, its 1-hop neighbours get the
+    // `.neighbor-tugged` class added by src/ui/neighbor-tug.ts. During the
+    // drag we move them with direct `position()` writes (no animation, no
+    // rAF — cytoscape Canvas redraws them in the same frame as the dragged
+    // node, so neighbours appear to follow the cursor). On release we
+    // animate them back to their original positions via `node.animate()`
+    // to create the elastic snap-back effect.
+    //
+    // This selector only owns the visual styling — dim tugged neighbours
+    // slightly so they read as "secondary" vs. the node the user is holding.
+    // The position animation is handled in JS because cytoscape stylesheet
+    // `transition-property` doesn't include `position` in all versions.
+    {
+      selector: `.${'neighbor-tugged'}`,
+      style: {
+        opacity: 0.85,
+        'border-width': 2,
+        'transition-property': 'opacity, border-width, border-color',
+        'transition-duration': '180ms',
+        'transition-timing-function': 'ease-out',
       },
     },
   ];
