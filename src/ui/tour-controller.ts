@@ -94,11 +94,19 @@ export class TourController {
       maxDepth: this._pendingMaxDepth,
       strategy: uiState.tour.strategy,
       onStep:           (info) => this.onStep(info),
+      // 节点一进入视野（不等动画完成）就刷详情面板——之前用 onStepAfterCenter
+      // （在 cy.animate complete 回调里）会让 interval < 600ms 的快速档下，
+      // 中间某些节点的动画被 cy.stop() 取消，complete 回调不触发，面板
+      // 内容就停留在更早的节点上（用户报告"详情面板没跟着切换"）。
+      // 修复见 tour.ts:highlightAndFocus 末尾把 onStepAfterCenter 提前到
+      // !silent 分支同步触发。
       onStepAfterCenter:(info) => {
         if (!uiState.panelClosedByUser) {
           this.detailPanel.show(info.nodeId);
         }
       },
+      // 档位切换 / total 重算：只刷数字/进度条，不动 pathHistory/语音/detail panel
+      onProgress:       (info) => this.onProgress(info),
       onPause:          () => this.onEnginePause(),
       onResume:         () => this.onEngineResume(),
       onComplete:       (reason) => this.onComplete(reason),
@@ -670,6 +678,18 @@ export class TourController {
     const total = this.engine?.totalSteps() ?? info.totalToExplore;
     const step  = this.engine?.currentStepIndex() ?? info.currentStep;
     this.renderTimeline(step, total, info.totalVisited);
+  }
+
+  /** 档位切换后的进度刷新：不改 pathHistory、不语音、不重开 detail panel。
+   *  只同步数字/进度条/range value，避免触发 600ms 飞行动画或重复朗读。 */
+  private onProgress(info: TourStepInfo): void {
+    const total = this.engine?.totalSteps() ?? info.totalToExplore;
+    const step  = this.engine?.currentStepIndex() ?? info.currentStep;
+    this.renderTimeline(step, total, info.totalVisited);
+    // 节点 badge / 节点名 / 轮次也跟 onStep 同步——切档后这些数字变了，必须刷。
+    this.setText('tour-cycle-num',   String(info.cycleCount + 1));
+    this.setText('tour-cycle-num-dt', String(info.cycleCount + 1));
+    // 节点名保持不变（仍是 pulsingNode）；这里不重设，避免触发无意义 DOM 写。
   }
 
   /**

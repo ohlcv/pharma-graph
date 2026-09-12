@@ -98,6 +98,11 @@ export interface TourOptions {
   onStep?: (info: TourStepInfo) => void;
   /** Called after the pan animation completes */
   onStepAfterCenter?: (info: TourStepInfo) => void;
+  /** Called when progress metadata changes WITHOUT a real step (e.g. depth
+   *  slider change). Receives the same TourStepInfo but the controller must
+   *  treat it as "数字/进度条刷新" only — do NOT push to history, speak,
+   *  or animate. The current pulsingNode is preserved. */
+  onProgress?: (info: TourStepInfo) => void;
   /**
    * Called when the engine stops. The reason tells the controller whether
    * the user reached the configured depth (normal completion), the
@@ -792,6 +797,7 @@ export class TourEngine {
   private stopped = false;
   private onStep?: TourOptions['onStep'];
   private onStepAfterCenter?: TourOptions['onStepAfterCenter'];
+  private onProgress?: TourOptions['onProgress'];
   private onComplete?: TourOptions['onComplete'];
   private onPause?: TourOptions['onPause'];
   private onResume?: TourOptions['onResume'];
@@ -879,6 +885,7 @@ export class TourEngine {
     }
     this.onStep = options.onStep;
     this.onStepAfterCenter = options.onStepAfterCenter;
+    this.onProgress = options.onProgress;
     this.onComplete = options.onComplete;
     this.onPause = options.onPause;
     this.onResume = options.onResume;
@@ -1194,12 +1201,79 @@ export class TourEngine {
     // 档位 5 = 全部（无限漫游）
     const newLevel = depth <= 0 ? 5 : depth;
     if (newLevel !== this._depthLevel) {
+      // 档位变更：重新扫描 seq[0..seqIndex)，把 currentStep 对齐到"新档位下
+      // 已经走过的可见节点数"。否则切档后 currentStep 仍按旧档位的累加，
+      // 可能 > 新 _cachedTotalSteps，导致：
+      //   - 进度条 pct = currentStep/total 超过 1（被 Math.min 钳到 100%）
+      //   - 数字 "currentStep / total" 出现 80/50 这种分子比分母大的非法形式
+      //   - 进度条 range value 被钳到 100%，拖回 0 也跳不到正确节点
+      let visibleCount = 0;
+      for (let i = 0; i < this.seqIndex; i++) {
+        const id = this.seq[i];
+        const node = this.cy.getElementById(id);
+        if (node.empty() || node.hasClass('layer-parent')) continue;
+        if (newLevel < 5 && !isNodeInLevel(node, newLevel)) continue;
+        visibleCount++;
+      }
+      this.currentStep = visibleCount;
+      // totalVisited 跨轮累加（用户已确认），但跨档位是否仍算？保持不变。
+      // 只在 _visited 里也按新档位过滤重建一遍——否则 prev() 回到的可能是
+      // 新档位过滤掉的"不可见"节点，prev 会显示一个不在当前档位的节点。
+      // 重建规则：seq[0..seqIndex) 中通过新档位过滤的节点 id（顺序保持）。
+      const filteredVisited: string[] = [];
+      for (let i = 0; i < this.seqIndex; i++) {
+        const id = this.seq[i];
+        const node = this.cy.getElementById(id);
+        if (node.empty() || node.hasClass('layer-parent')) continue;
+        if (newLevel < 5 && !isNodeInLevel(node, newLevel)) continue;
+        filteredVisited.push(id);
+      }
+      // _visited 的最后一个是"当前激活节点"，切档后保持 pulsingNode 跟它一致；
+      // 如果原 _visited 最后一个在新档位被过滤掉了，就用 filteredVisited 的最后一个。
+      if (filteredVisited.length === 0) {
+        // 切档后没有任何可见节点被走过——保留原 _visited 以便切回原档位不丢历史；
+        // 进度数字会显示 "0 / total"，这是事实（确实没在新档位下走过）。
+      } else {
+        this._visited = filteredVisited;
+      }
       this._depthLevel = newLevel;
-      // Depth changed — the visible node count for the same seq is now
-      // different, so invalidate the cache.
       this.recomputeTotal();
+      // 通知 controller 重画：pulsingNode 不变（仍是同一个节点），但 currentStep
+      // 和 totalSteps 都变了，需要触发 onStep 让 controller 的 renderTimeline 用新值。
+      this.notifyStepForDepthChange();
     }
     this.maxDepth = -1; // 始终无限，让档位过滤单独工作
+  }
+
+  /** 档位切换后通知 controller：复用 onProgress，UI 只刷数字/进度条。
+   *  不走 highlightAndFocus，避免触发 600ms 飞行动画、不污染历史/语音。 */
+  private notifyStepForDepthChange(): void {
+    if (!this.pulsingNode || this.pulsingNode.removed()) return;
+    if (!this.onProgress) return;
+    const node = this.pulsingNode;
+    const nodeId = node.id();
+    const nodeDepth = (node.data('depth') as number) ?? 0;
+    // path：用 _visited 的最后 N 个节点 id（保持显示链路一致）
+    const path = this._visited.length > 0 ? [...this._visited] : [nodeId];
+    const pathLabels = path.map((id) => this.cy.getElementById(id).data('label') || id);
+    const total = this.totalSteps();
+    const stepInfo: TourStepInfo = {
+      nodeId,
+      label: node.data('label') || nodeId,
+      depth: nodeDepth,
+      path,
+      pathLabels,
+      layerSize: total,
+      layerIndex: this.seqIndex,
+      totalExplored: this.totalExplored,
+      totalToExplore: total,
+      currentStep: this.currentStep,
+      maxDepthReached: nodeDepth,
+      cycleCount: this.cycleCount,
+      strategyName: getStrategy(this.strategyId).label,
+      totalVisited: this.totalVisited,
+    };
+    this.onProgress(stepInfo);
   }
 
   /**
@@ -1285,6 +1359,9 @@ export class TourEngine {
           const nodeDepth = (node.data('depth') as number) ?? 0;
           this._visited.push(id);
           this.highlightAndFocus(id, [id], nodeDepth, this.totalSteps(), this.seqIndex);
+          // 单一调度源：定时器驱动下一步（之前 animate complete 也会 scheduleNext，
+          // 双源导致 cy.stop() 取消动画时回调丢失/迟到，触发竞态"卡顿"）。
+          this.scheduleNext();
           return;
         }
       }
@@ -1414,8 +1491,10 @@ export class TourEngine {
         { pan: targetPan, zoom: targetZoom, duration: 600, easing: 'ease-out-cubic' },
         {
           complete: () => {
-            this.onStepAfterCenter?.(stepInfo);
-            if (!this.stopped && !this.paused) this.scheduleNext();
+            // 不再在这里触发 onStepAfterCenter：节点一进入视野就触发（见
+            // highlightAndFocus 末尾的 !silent 分支）。之前 cy.animate 默认
+            // 不在 stop() 时触发 complete，导致 interval < 600ms 的快速档下
+            // 中间某些节点的 detail panel 从未刷新。
           },
         },
       );
@@ -1425,8 +1504,7 @@ export class TourEngine {
         { center: { eles: node }, zoom: targetZoom, duration: 600, easing: 'ease-out-cubic' },
         {
           complete: () => {
-            this.onStepAfterCenter?.(stepInfo);
-            if (!this.stopped && !this.paused) this.scheduleNext();
+            // 同上：onStepAfterCenter 已在 highlightAndFocus 触发。
           },
         },
       );
@@ -1434,6 +1512,11 @@ export class TourEngine {
 
     if (!silent) {
       this.onStep?.(stepInfo);
+      // onStepAfterCenter 改成跟 onStep 同步触发，不再等 cy.animate(600ms) 完成——
+      // 当 interval < 600ms（用户拖快滑块），下一次 visitNext 会 cy.stop() 取消
+      // 当前动画，cytoscape 默认不触发 complete 回调，结果中间某些节点的
+      // detail panel 从未刷新。详情面板应该跟"节点进入视野"绑定，不跟动画绑定。
+      this.onStepAfterCenter?.(stepInfo);
     }
   }
 

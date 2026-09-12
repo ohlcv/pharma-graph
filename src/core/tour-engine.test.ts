@@ -342,3 +342,183 @@ describe('TourEngine prev/next pause-emit contract', () => {
     engine.stop();
   });
 });
+
+// ── Bug: 档位切换 (setMaxDepth) must keep currentStep ≤ _cachedTotalSteps ──
+// 之前切档时 currentStep 不重算，导致分子比分母大 (例 80/50)、进度条 pct > 1 被钳到 100%、
+// range 拖动跳到错误节点。这些用例确保切档行为正确。
+describe('TourEngine setMaxDepth (depth-level switch)', () => {
+  /** 构造 5 个节点的 cy：2 个 cls-structure（档位1可见）+ 3 个 cls-drug 普通（档位1过滤掉） */
+  function makeDepthCy() {
+    const cy = cytoscape({ headless: true, styleEnabled: false });
+    cy.add([
+      { group: 'nodes', data: { id: 's1', fill: 'cls-structure' } },
+      { group: 'nodes', data: { id: 's2', fill: 'cls-structure' } },
+      { group: 'nodes', data: { id: 'd1', fill: 'cls-drug' } },
+      { group: 'nodes', data: { id: 'd2', fill: 'cls-drug' } },
+      { group: 'nodes', data: { id: 'd3', fill: 'cls-drug' } },
+    ]);
+    return cy;
+  }
+
+  it('switching depth from 5 → 1: currentStep recomputed to visible-only count', () => {
+    const cy = makeDepthCy();
+    const engine = new TourEngine(cy);
+    let progressCalls = 0;
+    let lastProgress: { currentStep: number; totalToExplore: number } | null = null;
+    engine.start('s1', {
+      interval: 1_000_000,
+      maxDepth: 5,
+      strategy: asStrategy('has-dfs'),
+      onStep: () => {},
+      onProgress: (info) => {
+        progressCalls++;
+        lastProgress = { currentStep: info.currentStep, totalToExplore: info.totalToExplore };
+      },
+      onComplete: () => {},
+    });
+    // 手动走 4 步（5 个节点：s1,s2,d1,d2,d3 — d3 还没走）
+    // has-dfs 是 BFS 序，但具体不重要；这里只关心 currentStep 跟 seqIndex 的关系。
+    (engine as unknown as { visitNext: () => void }).visitNext();
+    (engine as unknown as { visitNext: () => void }).visitNext();
+    (engine as unknown as { visitNext: () => void }).visitNext();
+    (engine as unknown as { visitNext: () => void }).visitNext();
+    expect(engine['currentStep']).toBe(5); // start() ++1 + 4 次 visitNext ++1
+
+    // 切档 5 → 1：visible = 2 (s1, s2)，所以 currentStep 应该重算为 2
+    progressCalls = 0;
+    engine.setMaxDepth(1);
+    expect(engine['currentStep']).toBe(2); // seq[0..4) 中通过档位 1 过滤的有 2 个
+    expect(engine['totalSteps']()).toBe(2);
+    expect(progressCalls).toBe(1); // 触发 onProgress
+    expect(lastProgress?.currentStep).toBe(2);
+    expect(lastProgress?.totalToExplore).toBe(2);
+    // 关键：currentStep ≤ totalSteps（之前会失败，因为 currentStep=5 > totalSteps=2）
+    expect(engine['currentStep']).toBeLessThanOrEqual(engine['totalSteps']());
+    engine.stop();
+  });
+
+  it('switching depth back from 1 → 5: currentStep recomputed (grows)', () => {
+    const cy = makeDepthCy();
+    const engine = new TourEngine(cy);
+    engine.start('s1', {
+      interval: 1_000_000,
+      maxDepth: 5,
+      strategy: asStrategy('has-dfs'),
+      onStep: () => {},
+      onProgress: () => {},
+      onComplete: () => {},
+    });
+    // 走 4 步
+    (engine as unknown as { visitNext: () => void }).visitNext();
+    (engine as unknown as { visitNext: () => void }).visitNext();
+    (engine as unknown as { visitNext: () => void }).visitNext();
+    (engine as unknown as { visitNext: () => void }).visitNext();
+    // 切档 5 → 1
+    engine.setMaxDepth(1);
+    expect(engine['currentStep']).toBe(2);
+    // 再切回 5
+    engine.setMaxDepth(5);
+    expect(engine['currentStep']).toBe(5); // 回到原值（5 步里所有节点都可见）
+    expect(engine['totalSteps']()).toBe(5);
+    expect(engine['currentStep']).toBeLessThanOrEqual(engine['totalSteps']());
+    engine.stop();
+  });
+
+  it('switching to the same depth is a no-op (no recompute, no onProgress fire)', () => {
+    const cy = makeDepthCy();
+    const engine = new TourEngine(cy);
+    let progressCalls = 0;
+    engine.start('s1', {
+      interval: 1_000_000,
+      maxDepth: 5,
+      strategy: asStrategy('has-dfs'),
+      onStep: () => {},
+      onProgress: () => { progressCalls++; },
+      onComplete: () => {},
+    });
+    (engine as unknown as { visitNext: () => void }).visitNext();
+    const before = engine['currentStep'];
+    engine.setMaxDepth(5); // same as current
+    expect(engine['currentStep']).toBe(before);
+    expect(progressCalls).toBe(0); // 没切档，不应触发
+    engine.stop();
+  });
+
+  it('depth 1 with no visible nodes visited yet: currentStep = 0, totalSteps = N (no crash)', () => {
+    const cy = makeDepthCy();
+    const engine = new TourEngine(cy);
+    engine.start('s1', {
+      interval: 1_000_000,
+      maxDepth: 5,
+      strategy: asStrategy('has-dfs'),
+      onStep: () => {},
+      onProgress: () => {},
+      onComplete: () => {},
+    });
+    // 不走任何步，直接切档 5 → 1
+    engine.setMaxDepth(1);
+    // seqIndex = 1（start 后已经访问了 seq[0]），但 seq[0] 是 cls-structure，档位 1 可见
+    expect(engine['currentStep']).toBe(1);
+    expect(engine['totalSteps']()).toBe(2);
+    engine.stop();
+  });
+});
+
+// ── Bug: 节点一进入视野就触发 onStepAfterCenter，不再等 cy.animate complete ──
+// 之前 onStepAfterCenter 在 cy.animate(600ms) 的 complete 回调里触发。
+// 当 interval < 600ms（用户拖快滑块），下一次 visitNext 会 cy.stop() 取消
+// 当前动画，cytoscape 默认 stop() 不触发 complete → 中间某些节点的 detail panel
+// 从未刷新。修复：把 onStepAfterCenter 移到 highlightAndFocus 的 !silent 分支。
+describe('TourEngine onStepAfterCenter firing (detail panel updates)', () => {
+  it('fires onStepAfterCenter synchronously when a node is highlighted, not after animation', () => {
+    const cy = cytoscape({ headless: true, styleEnabled: false });
+    cy.add([
+      { group: 'nodes', data: { id: 'a' } },
+      { group: 'nodes', data: { id: 'b' } },
+    ]);
+    const engine = new TourEngine(cy);
+    const afterCenterCalls: string[] = [];
+    engine.start('a', {
+      interval: 1,
+      maxDepth: 0, // instant stop — just attach listeners
+      strategy: asStrategy('has-dfs'),
+      onStep: () => {},
+      onStepAfterCenter: (info) => { afterCenterCalls.push(info.nodeId); },
+      onComplete: () => {},
+    });
+    // start() 已经为 seq[0]='a' 触发了一次 onStepAfterCenter
+    expect(afterCenterCalls).toEqual(['a']);
+    // 同步驱动 visitNext → highlightAndFocus 应该**立即**触发 onStepAfterCenter
+    // （不再等 cy.animate complete，因为 headless 下 cy.animate 的回调时序不可靠）
+    (engine as unknown as { visitNext: () => void }).visitNext();
+    expect(afterCenterCalls).toEqual(['a', 'b']);
+    engine.stop();
+  });
+
+  it('does NOT fire onStepAfterCenter when silent=true (used by prev() / jumpToNode internals)', () => {
+    const cy = cytoscape({ headless: true, styleEnabled: false });
+    cy.add([
+      { group: 'nodes', data: { id: 'a' } },
+      { group: 'nodes', data: { id: 'b' } },
+    ]);
+    const engine = new TourEngine(cy);
+    const afterCenterCalls: string[] = [];
+    engine.start('a', {
+      interval: 1,
+      maxDepth: 0,
+      strategy: asStrategy('has-dfs'),
+      onStep: () => {},
+      onStepAfterCenter: (info) => { afterCenterCalls.push(info.nodeId); },
+      onComplete: () => {},
+    });
+    expect(afterCenterCalls).toEqual(['a']);
+    // highlightAndFocus 的 silent 参数：start 内部用 silent=false，所以会触发；
+    // silent=true 时（prev() 用的 silent=false，但 jumpToNode 没用 silent 参数）应该不触发。
+    (engine as unknown as { highlightAndFocus: (id: string, path: string[], d: number, t: number, l: number, silent?: boolean) => void }).highlightAndFocus(
+      'b', ['b'], 0, 2, 1, /* silent */ true,
+    );
+    // silent=true 时不应追加
+    expect(afterCenterCalls).toEqual(['a']);
+    engine.stop();
+  });
+});
