@@ -43,27 +43,26 @@ import { CLASSES } from '../core/renderer.js';
 export const NEIGHBOR_TUG_MAX = 24;
 
 /** Per-tick friction. Higher = more drag = smoother, less overshoot.
- *  0.4 = d3-force default: produces the "elastic water" feel. We use
- *        this so the spring has noticeable lag — neighbours trail the
- *        source instead of glued to it. The downside (lag grows with
- *        drag speed → edge stretches) is bounded by MAX_TETHER_LEN
- *        below: past that distance we hard-clamp the position. */
-const VELOCITY_DECAY = 0.4;
+ *  0.4 = d3-force default (too loose for our use: neighbour lags far
+ *        behind when the user drags fast, stretching the edge).
+ *  0.6 = heavy drag, smooth follow.
+ *  0.86 ≈ critical damping for SPRING_K = 0.5 (no oscillation).
+ *
+ *  We pick 0.7: tight enough to catch up to a fast-dragged source
+ *  within a few ticks, loose enough to feel elastic. */
+const VELOCITY_DECAY = 0.7;
 
-/** Hooke spring stiffness (k). Deliberately soft: we WANT neighbours
- *  to lag behind the source for the "rubber band" feel. Edge growth
- *  is bounded separately by MAX_TETHER_LEN, so we don't need k to
- *  chase the source velocity. k=0.15 gives a 5–15 tick settling
- *  window for small movements — the original d3-force behaviour. */
-const SPRING_K = 0.15;
-
-/** Maximum length the spring can stretch before we hard-clamp the
- *  neighbour to the boundary. Prevents infinite edge growth when the
- *  user drags the source faster than the spring can catch up.
- *  Set to 3× the neighbour's origin distance from the source — far
- *  enough to feel elastic, short enough that the edge never spans
- *  the whole canvas. */
-const TETHER_STRETCH_RATIO = 3;
+/** Hooke spring stiffness (k). The spring connects each neighbour to
+ *  a "target" position:
+ *    - while dragging: target = source position + neighbour's origin offset
+ *    - while released: target = neighbour's origin position
+ *  Force per tick: -k * (current - target), applied to velocity.
+ *
+ *  Steady-state lag under constant source velocity is roughly
+ *  v_source / (k * (1 - velocityDecay)). With k=2 and decay=0.7,
+ *  a 100-units/tick source drag stabilises at ~167 unit lag —
+ *  acceptable, neighbour stays within view. */
+const SPRING_K = 2;
 
 // (MAX_TUG_DISTANCE removed — every 1-hop neighbour follows the source
 // regardless of how far it has been dragged. The spring just has to
@@ -85,11 +84,6 @@ interface TuggedNeighbor {
    *  source by the same offset that existed at grab time. */
   originX: number;
   originY: number;
-  /** Distance from source at drag-start. Used to compute the
-   *  rubber-band clamp length (originDist × TETHER_STRETCH_RATIO)
-   *  so we don't depend on source.data() being readable inside
-   *  the spring tick. */
-  originDist: number;
   /** Velocity (graph units per tick). The spring accelerates the
    *  neighbour, friction slows it. */
   vx: number;
@@ -129,14 +123,7 @@ export function onDragStart(node: cytoscape.NodeSingular): void {
   const neighbors: TuggedNeighbor[] = (candidates as cytoscape.NodeCollection).map((n) => {
     const ns = n as cytoscape.NodeSingular;
     const p = ns.position();
-    return {
-      node: ns,
-      originX: p.x,
-      originY: p.y,
-      originDist: Math.hypot(p.x - startPos.x, p.y - startPos.y),
-      vx: 0,
-      vy: 0,
-    };
+    return { node: ns, originX: p.x, originY: p.y, vx: 0, vy: 0 };
   });
 
   node.data('tugStartX', startPos.x);
@@ -242,38 +229,8 @@ function startSpringLoop(): void {
       n.vy *= 1 - VELOCITY_DECAY;
 
       // Integrate position.
-      let newX = current.x + n.vx;
-      let newY = current.y + n.vy;
-
-      // Rubber-band clamp: if the spring has stretched past
-      // TETHER_STRETCH_RATIO × origin distance, hard-clamp the
-      // neighbour onto the boundary. Without this, a fast drag
-      // leaves the spring perpetually chasing the source and the
-      // edge stretches without limit. With it, the neighbour
-      // snaps onto the tether boundary and rides along at the
-      // source's speed — visibly "tugged" by a string.
-      if (tugState.active) {
-        const maxLen = n.originDist * TETHER_STRETCH_RATIO;
-        const dx = newX - sourcePos.x;
-        const dy = newY - sourcePos.y;
-        const len = Math.hypot(dx, dy);
-        if (len > maxLen && len > 0) {
-          const k = maxLen / len;
-          newX = sourcePos.x + dx * k;
-          newY = sourcePos.y + dy * k;
-          // Cancel outward (radial) velocity so we don't oscillate
-          // against the clamp on the next tick. Tangential velocity
-          // (orbiting the source) is preserved.
-          const radialX = dx / len;
-          const radialY = dy / len;
-          const radialV = n.vx * radialX + n.vy * radialY;
-          if (radialV > 0) {
-            n.vx -= radialV * radialX;
-            n.vy -= radialV * radialY;
-          }
-        }
-      }
-
+      const newX = current.x + n.vx;
+      const newY = current.y + n.vy;
       n.node.position({ x: newX, y: newY });
 
       // Convergence check: a neighbour is at rest iff it's near its
