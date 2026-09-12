@@ -123,12 +123,9 @@ export interface TourStepInfo {
   currentStep: number;
   maxDepthReached: number;
   cycleCount: number;
-  strategyName: string;
-  /** Cumulative count of nodes actually toured (including revisits via prev()
-   *  and across cycles). Differs from totalExplored (graph node count) and from
-   *  currentStep (which resets each cycle). Powers the "步" badge so users
-   *  see total steps walked, not "steps this cycle". */
+  /** 跨轮累计已漫游节点数（只在前进方向递增，prev()/jumpToNode 回退时不减）。 */
   totalVisited: number;
+  strategyName: string;
 }
 
 // ── Strategy Interface ─────────────────────────────────────────────────────────
@@ -804,8 +801,6 @@ export class TourEngine {
   private seqIndex = 0;
   private cycleCount = 0;
   private totalExplored = 0;
-  /** 跨轮累计的漫游节点总数。跟 currentStep（每轮归零）和 _visited（被
-   *  jumpToNode 截断）都不同；这里只增不减，专门给 UI "步" badge 用。 */
   private totalVisited = 0;
   private currentStep = 0;
   private pulseRafId: number | null = null;
@@ -889,7 +884,6 @@ export class TourEngine {
     this.onResume = options.onResume;
     // panOffset is NOT reset here — it persists across tour restarts
     this.totalExplored = 0;
-    this.totalVisited = 0;
     this.currentStep = 0;
     this.cycleCount = 0;
     this._restartAttempts = 0;
@@ -942,6 +936,9 @@ export class TourEngine {
 
     // silent=false: fire onStep immediately so the detail panel appears right away
     this._visited.push(this.seq[0]);
+    // 累计步数 +1：visitNext 路径会在 ++ 之后才 highlightAndFocus，但 start 走捷径
+    // 直接渲染 seq[0]，必须自己 ++，否则步 badge 首帧会显示 0。
+    this.totalVisited++;
     this.highlightAndFocus(this.seq[0], [this.seq[0]], 0, this.totalSteps(), 1, false);
     this.scheduleNext();
     return true;
@@ -986,27 +983,58 @@ export class TourEngine {
     this.onPause?.();
   }
 
-  /** 进度条跳转：直接定位到序列第 seqIdx 个节点（0-indexed），并继续漫游。
-   *  - 不调用 pause()，因为跳转后用户希望继续自动播放
-   *  - seqIndex 推到 seqIdx+1，保证 visitNext 下次从 seqIdx+1 开始
-   *  - _visited 重建为 seq[0..seqIdx]，prev() 可正常回退
-   *  - scheduleNext() 负责触发下一次自动跳转的定时器 */
+  /** 进度条跳转：定位到第 seqIdx 个【可见节点】（0-indexed，按当前档位过滤后的顺序），
+   *  并继续漫游。
+   *  - seqIdx 在【可见步空间】—— 跟 totalSteps() / currentStepIndex() 一致。
+   *    raw seq 里大部分节点在档位过滤下不可见，所以 seqIdx 必须先反推成 raw seq 索引。
+   *  - seqIndex 设到 raw 索引 +1，保证 visitNext 下次从下一个 raw 节点开始。
+   *  - currentStep 设到 visibleIdx +1（不是 raw +1），跟 currentStepIndex() 口径一致。
+   *  - _visited 重建为 raw seq[0..rawIdx]，prev() 可正常回退。
+   *  - 不调用 pause()，因为跳转后用户希望继续自动播放。
+   *  - scheduleNext() 负责触发下一次自动跳转的定时器。 */
   jumpToNode(seqIdx: number): void {
     if (this.stopped) return;
     if (!this.seq.length) return;
-    const clamped = Math.max(0, Math.min(this.seq.length - 1, Math.floor(seqIdx)));
-    const id = this.seq[clamped];
+    const total = this._cachedTotalSteps;
+    if (total <= 0) return;
+    const visibleIdx = Math.max(0, Math.min(total - 1, Math.floor(seqIdx)));
+    // 把"第 visibleIdx 个可见节点"反推到 raw seq 索引
+    const rawIdx = this.resolveRawIndex(visibleIdx);
+    const id = this.seq[rawIdx];
     if (!id) return;
     const node = this.cy.getElementById(id);
     if (node.empty() || node.hasClass('layer-parent')) return;
     if (this.timer) { clearTimeout(this.timer); this.timer = undefined; }
-    this.seqIndex = clamped + 1;
-    this.currentStep = clamped + 1;
-    this._visited = this.seq.slice(0, clamped + 1);
+    this.seqIndex = rawIdx + 1;
+    this.currentStep = visibleIdx + 1;
+    this._visited = this.seq.slice(0, rawIdx + 1);
     const nodeDepth = (node.data('depth') as number) ?? 0;
     this.paused = false; // 让 scheduleNext 的 !t.paused 条件成立
+    // 累计步数对齐 visibleIdx+1：start() / visitNext() 都在渲染前 ++，jumpToNode 必须
+    // 走相同的节奏，否则拖完进度条后"步" badge 会远落后于进度条 X/Y。
+    // 用 Number() 包一层：防御 totalVisited 在异常路径上变成 NaN（NaN 参与 max 会传染），
+    // 一旦出现 NaN 就退回到 visibleIdx+1，避免步 badge 显示 "NaN"。
+    const safeVisited = Number.isFinite(this.totalVisited) ? this.totalVisited : 0;
+    this.totalVisited = Math.max(safeVisited, visibleIdx + 1);
     this.highlightAndFocus(id, [id], nodeDepth, this.totalSteps(), this.seqIndex, /* silent */ false);
     this.scheduleNext();
+  }
+
+  /** 把"第 visibleIdx 个可见节点"反推到 raw seq 索引。
+   *  档位 5 不过滤，visibleIdx === rawIdx；其他档位用同样的 isNodeInLevel 规则扫描。
+   *  如果没找到（理论不会发生，因为 visibleIdx < _cachedTotalSteps），兜底返回 seq 末尾。 */
+  private resolveRawIndex(visibleIdx: number): number {
+    if (this._depthLevel >= 5) return visibleIdx;
+    let count = 0;
+    for (let i = 0; i < this.seq.length; i++) {
+      const id = this.seq[i];
+      const node = this.cy.getElementById(id);
+      if (node.empty() || node.hasClass('layer-parent')) continue;
+      if (!isNodeInLevel(node, this._depthLevel)) continue;
+      if (count === visibleIdx) return i;
+      count++;
+    }
+    return this.seq.length - 1;
   }
 
   pause(): void {
@@ -1250,11 +1278,12 @@ export class TourEngine {
             }
           }
           this.currentStep++;
+          // 累计步数 +1（跨轮累加）；跟 currentStep 同步递增，prev()/jumpToNode 回退时
+          // 不减（避免在 UI 上看到"步数倒退"），靠 jumpToNode 的 Math.max 对齐回退再前进的场景。
+          this.totalVisited++;
           // Use the graph's real BFS depth (0=root/center, higher=outer layers).
           const nodeDepth = (node.data('depth') as number) ?? 0;
           this._visited.push(id);
-          // 累计步数 +1（跨轮、跨 prev() 回退再访问都不减）。
-          this.totalVisited++;
           this.highlightAndFocus(id, [id], nodeDepth, this.totalSteps(), this.seqIndex);
           return;
         }
