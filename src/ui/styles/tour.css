@@ -138,7 +138,13 @@
     
     .tour-dt__node      { display: flex; align-items: center; gap: 5px; flex-shrink: 0; padding: 0 4px; width: 120px; min-width: 120px; max-width: 120px; }
     .tour-dt__node-icon { width: 15px; height: 15px; stroke: var(--tour-accent); flex-shrink: 0; }
-    .tour-dt__node-name { font-size: 0.72rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: opacity 0.2s; }
+    .tour-dt__node-name {
+      font-size: 0.72rem; font-weight: 600; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      min-width: 0; /* flex item needs min-width:0 to allow ellipsis to take effect */
+      flex: 1 1 auto; /* fill remaining space inside fixed-width container */
+      transition: opacity 0.2s;
+    }
     
     .tour-dt__sep { width: 1px; height: 20px; background: rgba(255,255,255,0.08); margin: 0 8px; flex-shrink: 0; }
     /* 策略 (.tour-dt__strategy) 已 display:none。
@@ -326,7 +332,7 @@
     }
     .speech-wave-1,
     .speech-wave-2 {
-      opacity: 0.4;
+      opacity: 0;
       transition: opacity 0.2s;
     }
 
@@ -442,10 +448,10 @@
       .tour-mob__badge.tour-active { background: rgba(99,102,241,0.25) !important; border-color: var(--tour-accent) !important; box-shadow: 0 0 12px rgba(99,102,241,0.4); color: var(--tour-accent) !important; }
       .tour-mob__badge svg { width: 13px; height: 13px; stroke: currentColor; }
 
-      /* 朗读按钮：active 时显示音波（默认隐藏音波，对齐桌面端行为） */
+      /* 朗读按钮：active 时显示音波（默认彻底隐藏音波） */
       .tour-mob__badge .speech-wave-1,
       .tour-mob__badge .speech-wave-2 {
-        opacity: 0.35;
+        opacity: 0;
         transition: opacity 0.2s;
       }
       .tour-mob__badge.active .speech-wave-1,

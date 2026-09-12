@@ -55,10 +55,10 @@ class SpeechController {
    */
   toggle(): boolean {
     this.active = !this.active;
+    this.updateButtonState();
     if (!this.active) {
       this.stop();
     } else {
-      this.updateButtonState();
       if (!this.unlocked) {
         if (this.voicesReady) {
           this.unlockIOS();

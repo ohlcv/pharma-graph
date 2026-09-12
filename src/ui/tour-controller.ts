@@ -669,7 +669,7 @@ export class TourController {
     // 进度：current step / total steps in the sequence
     const total = this.engine?.totalSteps() ?? info.totalToExplore;
     const step  = this.engine?.currentStepIndex() ?? info.currentStep;
-    this.renderTimeline(step, total);
+    this.renderTimeline(step, total, info.totalVisited);
   }
 
   /**
@@ -679,18 +679,18 @@ export class TourController {
    *   （紫色填充已走过部分 + 灰色剩余），跟间隔/深度视觉同构。
    * - 手机端：竖形分数（分子 .tour-count-badge-num / 分母 .tour-count-badge-den）
    */
-  private renderTimeline(current: number, total: number): void {
+  private renderTimeline(current: number, total: number, cumulative: number): void {
     if (total <= 0) return;
     const pct = Math.max(0, Math.min(1, current / total));
 
     // 桌面端进度横向分数 "X / Y"（param-val，紧贴 range 右侧，跟间隔 "3s" 同款）
     this.setText('tour-progress-label-dt', `${current} / ${total}`);
-    // 手机端进度竖形分数（分子 / 分母）
+    // 手机端进度竖形分数（分子 / 分母）—— 分子仍是"轮内第几步"
     this.setText('tour-count-badge-num', String(current));
     this.setText('tour-count-badge-den', String(total));
-    // 桌面端/手机端"步" = 当前步数（纯数字）
-    this.setText('tour-step-badge-dt',      String(current));
-    this.setText('tour-step-badge-mob',     String(current));
+    // 桌面端/手机端"步" badge = 跨轮累计的漫游节点总数（不再每轮归零）
+    this.setText('tour-step-badge-dt',      String(cumulative));
+    this.setText('tour-step-badge-mob',     String(cumulative));
 
     // 手机端 fill：vertical-lr 模式 translateX(-50%) scaleY(0~1)
     const fillMob = document.getElementById('tour-progress-fill');

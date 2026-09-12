@@ -124,6 +124,11 @@ export interface TourStepInfo {
   maxDepthReached: number;
   cycleCount: number;
   strategyName: string;
+  /** Cumulative count of nodes actually toured (including revisits via prev()
+   *  and across cycles). Differs from totalExplored (graph node count) and from
+   *  currentStep (which resets each cycle). Powers the "步" badge so users
+   *  see total steps walked, not "steps this cycle". */
+  totalVisited: number;
 }
 
 // ── Strategy Interface ─────────────────────────────────────────────────────────
@@ -799,6 +804,9 @@ export class TourEngine {
   private seqIndex = 0;
   private cycleCount = 0;
   private totalExplored = 0;
+  /** 跨轮累计的漫游节点总数。跟 currentStep（每轮归零）和 _visited（被
+   *  jumpToNode 截断）都不同；这里只增不减，专门给 UI "步" badge 用。 */
+  private totalVisited = 0;
   private currentStep = 0;
   private pulseRafId: number | null = null;
   private pulsingNode: cytoscape.NodeSingular | null = null;
@@ -881,6 +889,7 @@ export class TourEngine {
     this.onResume = options.onResume;
     // panOffset is NOT reset here — it persists across tour restarts
     this.totalExplored = 0;
+    this.totalVisited = 0;
     this.currentStep = 0;
     this.cycleCount = 0;
     this._restartAttempts = 0;
@@ -1244,6 +1253,8 @@ export class TourEngine {
           // Use the graph's real BFS depth (0=root/center, higher=outer layers).
           const nodeDepth = (node.data('depth') as number) ?? 0;
           this._visited.push(id);
+          // 累计步数 +1（跨轮、跨 prev() 回退再访问都不减）。
+          this.totalVisited++;
           this.highlightAndFocus(id, [id], nodeDepth, this.totalSteps(), this.seqIndex);
           return;
         }
@@ -1333,6 +1344,7 @@ export class TourEngine {
       maxDepthReached: depth,
       cycleCount: this.cycleCount,
       strategyName: getStrategy(this.strategyId).label,
+      totalVisited: this.totalVisited,
     };
 
     // Pan the camera so this node lands at the center of the cy container.
