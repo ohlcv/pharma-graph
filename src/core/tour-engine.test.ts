@@ -522,3 +522,57 @@ describe('TourEngine onStepAfterCenter firing (detail panel updates)', () => {
     engine.stop();
   });
 });
+
+// ── Bug: setInterval should reschedule the pending timer ──
+// 之前 setInterval(ms) 只改 this.interval 但已经挂在 setTimeout 上的 timer 仍按
+// 旧 delay 触发——拖快 interval 滑块体感"画面卡 1-4 秒"。修复：立即 clearTimeout
+// 并按新 interval 重排。
+describe('TourEngine setInterval reschedules the pending timer', () => {
+  function make2Cy() {
+    const cy = cytoscape({ headless: true, styleEnabled: false });
+    cy.add([
+      { group: 'nodes', data: { id: 'a' } },
+      { group: 'nodes', data: { id: 'b' } },
+    ]);
+    return cy;
+  }
+
+  it('reschedule: changes the pending timer to use the new interval', () => {
+    const cy = make2Cy();
+    const engine = new TourEngine(cy);
+    engine.start('a', {
+      interval: 5_000, // 5s = 4.4s delay
+      maxDepth: -1, // 无限模式，否则 seq.length=2 + maxDepth=1 → 立即 onComplete
+      strategy: asStrategy('has-dfs'),
+      onStep: () => {},
+      onComplete: () => {},
+    });
+    const oldTimer = engine['timer'];
+    expect(oldTimer).toBeDefined();
+    // 拖到 1s —— 应立即 clearTimeout 旧 timer 并按 1s (= max(0, 1000-600)=400ms) 重排
+    engine.setInterval(1_000);
+    const newTimer = engine['timer'];
+    expect(newTimer).toBeDefined();
+    expect(newTimer).not.toBe(oldTimer); // 应该是新 timer，不是旧的
+    expect(engine['interval']).toBe(1_000);
+    engine.stop();
+  });
+
+  it('reschedule: no-op when stopped or paused (timer stays empty / unchanged)', () => {
+    const cy = make2Cy();
+    const engine = new TourEngine(cy);
+    engine.start('a', {
+      interval: 5_000,
+      maxDepth: 0,
+      strategy: asStrategy('has-dfs'),
+      onStep: () => {},
+      onComplete: () => {},
+    });
+    engine.stop();
+    expect(engine['timer']).toBeUndefined();
+    // stopped 状态下 setInterval 不应崩、不应建 timer
+    engine.setInterval(1_000);
+    expect(engine['timer']).toBeUndefined();
+    expect(engine['interval']).toBe(1_000);
+  });
+});

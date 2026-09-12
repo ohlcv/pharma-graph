@@ -1194,6 +1194,11 @@ export class TourEngine {
 
   setInterval(ms: number): void {
     this.interval = ms;
+    // 立即重排 timer：之前只改 this.interval 但已经在跑的 setTimeout 还是
+    // 旧 delay 触发，用户拖快 interval 滑块要等"当前 timer 自然结束"才生效，
+    // 体感是"画面卡住"——特别是从 5s 拖到 1s 时，旧的 4.4s timer 还在挂起。
+    // 副作用：在 paused 状态下也重排是无害的，paused 的 scheduleNext 不执行 visitNext。
+    if (!this.stopped && !this.paused) this.scheduleNext();
   }
 
   setMaxDepth(depth: number): void {
@@ -1201,25 +1206,10 @@ export class TourEngine {
     // 档位 5 = 全部（无限漫游）
     const newLevel = depth <= 0 ? 5 : depth;
     if (newLevel !== this._depthLevel) {
-      // 档位变更：重新扫描 seq[0..seqIndex)，把 currentStep 对齐到"新档位下
-      // 已经走过的可见节点数"。否则切档后 currentStep 仍按旧档位的累加，
-      // 可能 > 新 _cachedTotalSteps，导致：
-      //   - 进度条 pct = currentStep/total 超过 1（被 Math.min 钳到 100%）
-      //   - 数字 "currentStep / total" 出现 80/50 这种分子比分母大的非法形式
-      //   - 进度条 range value 被钳到 100%，拖回 0 也跳不到正确节点
-      let visibleCount = 0;
-      for (let i = 0; i < this.seqIndex; i++) {
-        const id = this.seq[i];
-        const node = this.cy.getElementById(id);
-        if (node.empty() || node.hasClass('layer-parent')) continue;
-        if (newLevel < 5 && !isNodeInLevel(node, newLevel)) continue;
-        visibleCount++;
-      }
-      this.currentStep = visibleCount;
-      // totalVisited 跨轮累加（用户已确认），但跨档位是否仍算？保持不变。
-      // 只在 _visited 里也按新档位过滤重建一遍——否则 prev() 回到的可能是
-      // 新档位过滤掉的"不可见"节点，prev 会显示一个不在当前档位的节点。
-      // 重建规则：seq[0..seqIndex) 中通过新档位过滤的节点 id（顺序保持）。
+      // 档位变更：一次扫描 seq[0..seqIndex) 同时计算 visibleCount + 重建 _visited。
+      // 之前 3 次独立 O(N) 扫描（visibleCount / filteredVisited / recomputeTotal 全 seq）
+      // 串在一起最多扫 3×N 次 getElementById + isNodeInLevel——3 个数组各自处理，浪费。
+      // 合并后只扫一遍 seq[0..seqIndex)，再扫一遍完整 seq 算 totalSteps。
       const filteredVisited: string[] = [];
       for (let i = 0; i < this.seqIndex; i++) {
         const id = this.seq[i];
@@ -1228,14 +1218,11 @@ export class TourEngine {
         if (newLevel < 5 && !isNodeInLevel(node, newLevel)) continue;
         filteredVisited.push(id);
       }
-      // _visited 的最后一个是"当前激活节点"，切档后保持 pulsingNode 跟它一致；
-      // 如果原 _visited 最后一个在新档位被过滤掉了，就用 filteredVisited 的最后一个。
-      if (filteredVisited.length === 0) {
-        // 切档后没有任何可见节点被走过——保留原 _visited 以便切回原档位不丢历史；
-        // 进度数字会显示 "0 / total"，这是事实（确实没在新档位下走过）。
-      } else {
-        this._visited = filteredVisited;
-      }
+      this.currentStep = filteredVisited.length;
+      // 重建 _visited：保持原 _visited 顺序下"通过新档位过滤"的子集。
+      // 如果新档位下没有任何节点被走过（filteredVisited.length === 0），
+      // 保留原 _visited 以便切回原档位不丢历史；进度数字显示 "0 / total" 是事实。
+      if (filteredVisited.length > 0) this._visited = filteredVisited;
       this._depthLevel = newLevel;
       this.recomputeTotal();
       // 通知 controller 重画：pulsingNode 不变（仍是同一个节点），但 currentStep

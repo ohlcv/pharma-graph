@@ -430,6 +430,9 @@ export class TourController {
     };
 
     const onInput = (src: HTMLInputElement, other: HTMLInputElement) => {
+      // 程序内部写入 range.value（renderTimeline / setProgressRange）会派发 input 事件，
+      // 这时候没必要再同步 fill 跟镜像——监听标志早 return 避免重复 DOM 写。
+      if (this._suppressProgressInput) return;
       // 拖动时实时同步镜像 fill（仅同步 value，不触发跳转）
       if (Number(other.value) !== src.valueAsNumber) other.value = src.value;
       const pct = Math.max(0, Math.min(1, Number(src.value) / 100));
@@ -485,19 +488,50 @@ export class TourController {
       if (primaryValueLabel) primaryValueLabel.textContent = text;
       if (mirrorValueLabel) mirrorValueLabel.textContent = text;
       if (mirror) mirror.value = primary.value;
+      // textContent + value 写都是轻量同步操作，直接写。
       this.paintFill(bind);
     };
 
-    primary.addEventListener('input', applyInput);
+    // paintFill 内部要读 layout（clientHeight）+ 写 linear-gradient background，
+    // 拖动时浏览器每个 input 事件都强制一次 reflow + repaint，会卡。
+    // 用 rAF 节流：把同一帧内的多次 paintFill 合并成一次。
+    let paintRafId: number | null = null;
+    const schedulePaint = () => {
+      if (paintRafId !== null) return;
+      paintRafId = requestAnimationFrame(() => {
+        paintRafId = null;
+        this.paintFill(bind);
+      });
+    };
+
+    primary.addEventListener('input', () => {
+      const text = format(primary.valueAsNumber);
+      if (primaryValueLabel) primaryValueLabel.textContent = text;
+      if (mirrorValueLabel) mirrorValueLabel.textContent = text;
+      if (mirror) mirror.value = primary.value;
+      schedulePaint();
+    });
     primary.addEventListener('change', () => onCommit(primary.valueAsNumber));
 
     if (mirror) {
       mirror.addEventListener('input', () => {
         primary.value = mirror.value;
-        applyInput();
+        const text = format(primary.valueAsNumber);
+        if (primaryValueLabel) primaryValueLabel.textContent = text;
+        if (mirrorValueLabel) mirrorValueLabel.textContent = text;
+        schedulePaint();
       });
       mirror.addEventListener('change', () => onCommit(mirror.valueAsNumber));
     }
+
+    // 释放时确保最后一次 paint 落地（rAF 节流可能丢了最后一帧）
+    primary.addEventListener('pointerup', () => {
+      if (paintRafId !== null) {
+        cancelAnimationFrame(paintRafId);
+        paintRafId = null;
+      }
+      this.paintFill(bind);
+    });
 
     return bind;
   }
@@ -727,11 +761,26 @@ export class TourController {
     this.setProgressRange('tour-progress-dt', rangeVal);
   }
 
+  /** 当程序内部写入 range value 时（如 renderTimeline 推进度），设这个标志，
+   *  bindProgress 的 input 监听看到标志就提前 return，不写 fill、不递归。
+   *  之前靠 `Number(other.value) !== src.valueAsNumber` 短路避免无限循环，但
+   *  每次切节点仍要同步触发 2 个 input 事件 + 4 次 value 写 + 2 次 fillMob style
+   *  写，叠加 RAF 脉冲 + cy.animate 让 1s 间隔下页面"卡顿"。 */
+  private _suppressProgressInput = false;
+
   private setProgressRange(id: string, value: number): void {
     const el = document.getElementById(id) as HTMLInputElement | null;
     if (!el) return;
-    // 避免触发 input 事件造成循环
-    if (Number(el.value) !== value) el.value = String(value);
+    // 避免触发 input 事件造成的循环 + 多余 DOM 写。
+    // HTMLInputElement.value = X 会同步派发 'input' 事件给绑定在该元素上的监听器。
+    // 我们用 _suppressProgressInput 标志让 bindProgress 的 input 监听早 return。
+    if (Number(el.value) === value) return;
+    this._suppressProgressInput = true;
+    try {
+      el.value = String(value);
+    } finally {
+      this._suppressProgressInput = false;
+    }
   }
 
   private onComplete(
