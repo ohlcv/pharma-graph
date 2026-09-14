@@ -228,6 +228,16 @@ function restoreViewport(): void {
   if (!cy || !container) return;
   _preBigscreenViewport = null;
 
+  // Stop any in-flight cy animation. Both tour.ts highlightAndFocus and
+  // focus-node.ts use cy.animate({ pan, zoom }) with durations up to
+  // 600-1200ms. If the user exited bigscreen while such an animation
+  // was still running (rare but possible — clicking through bigscreen
+  // before tour pauses complete), the animation would override our
+  // restored zoom a few frames later, producing the "zoomed out to
+  // ~3% right after exit" symptom. Stop first, then apply the
+  // snapshot.
+  cy.stop();
+
   cy.zoom(vp.zoom);
   const w = container.clientWidth;
   const h = container.clientHeight;
@@ -235,6 +245,34 @@ function restoreViewport(): void {
     x: w / 2 - vp.centerModel.x * vp.zoom,
     y: h / 2 - vp.centerModel.y * vp.zoom,
   });
+
+  // macOS-specific guard: macOS fullscreen mode is implemented as a
+  // separate Space, and the browser window is *animated* across Space
+  // boundaries (rather than resized in place like Windows/Linux). The
+  // animation fires ResizeObserver multiple times — container widths
+  // like 440→768→1024 over ~200ms — and each tick calls cy.resize().
+  // We have observed (issue: 24% → 4% zoom collapse on first bigscreen
+  // exit) that something in the cytoscape pipeline reacts to the
+  // mid-flight viewport extent and re-fits the zoom a few frames
+  // after the final resize tick. cytoscape's official behaviour is
+  // that cy.resize() doesn't touch zoom (cytoscape/cytoscape.js#1769),
+  // so the culprit is likely a project-level handler running off a
+  // viewport event or a residual animation that survives cy.stop().
+  //
+  // To make the exit deterministic on macOS, we re-assert the saved
+  // zoom for ~500ms (≈30 animation frames at 60Hz) — long enough to
+  // ride out the macOS Space-transition animation. After that we
+  // release so any genuine post-exit zoom gesture from the user
+  // (immediate scroll-wheel, click on a node, etc.) is honoured.
+  let guardFrames = 0;
+  const guard = (): void => {
+    if (++guardFrames > 5) return;
+    if (Math.abs(cy.zoom() - vp.zoom) > 1e-4) {
+      cy.zoom(vp.zoom);
+    }
+    requestAnimationFrame(guard);
+  };
+  requestAnimationFrame(guard);
 }
 
 /** Returns the current cytoscape Core instance. */
@@ -252,9 +290,16 @@ export async function enterBigscreen(): Promise<void> {
   captureSidebar();
   cancelSidebarAnimAndClear();
 
-  if (_isTourActive()) {
-    captureViewport();
-  }
+  // Snapshot the viewport (zoom + pan center in model space) so we can
+  // restore the EXACT camera state on exit. Used to be gated on
+  // _isTourActive(), which meant non-tour users lost their zoom/pan on
+  // every bigscreen round-trip — fit() would dump them back to "see all
+  // 100 nodes" instead of the 10 they'd zoomed in to. The tour case
+  // additionally calls cy.stop() to freeze any in-flight pan animation
+  // before reading extent(); for the non-tour case this is a no-op
+  // (no animation is running from this entry point) so we just call it
+  // unconditionally.
+  captureViewport();
 
   document.documentElement.classList.add('bigscreen');
   showHint();
@@ -289,9 +334,13 @@ export async function exitBigscreen(): Promise<void> {
   // "exit bigscreen looks identical to before entering bigscreen".
   // Trust the snapshot.
 
-  if (_isTourActive()) {
-    captureViewport();
-  }
+  // Same principle for the viewport: the snapshot was taken in
+  // enterBigscreen() against the PRE-bigscreen camera. Calling
+  // captureViewport() here would re-read the current (mid-bigscreen)
+  // extent, which is exactly what we DON'T want to restore. The
+  // ResizeObserver below applies the cached _preBigscreenViewport
+  // against the post-restore container size, giving us the user's
+  // original 10-node zoomed view instead of a fit-to-100-nodes view.
 
   document.documentElement.classList.remove('bigscreen');
 
@@ -307,17 +356,18 @@ export async function exitBigscreen(): Promise<void> {
 
   // ResizeObserver (registered in installResizeBridge) fires once the
   // browser has laid out the post-bigscreen dimensions; it calls
-  // cy.resize() AND, if a tour is active, applies the cached viewport
-  // snapshot. We deliberately do NOT call cy.resize() here — calling
-  // it on a still-big-screen container would measure the wrong width.
+  // cy.resize() AND applies the cached viewport snapshot
+  // (restoreViewport) for BOTH tour and non-tour paths — we always
+  // capture in enterBigscreen() now. We deliberately do NOT call
+  // cy.resize() here — calling it on a still-big-screen container
+  // would measure the wrong width.
   //
-  // For the non-tour path we want a fit-to-viewport after the resize.
-  // We can't fit now (container hasn't resized yet — calling fit here
-  // would compute pan against the bigscreen dimensions). Schedule the
-  // fit to run *after* the ResizeObserver has had its turn.
-  if (!_isTourActive()) {
-    requestAnimationFrame(() => requestAnimationFrame(() => runFitIfAvailable()));
-  }
+  // We previously scheduled a fit() for the non-tour path here. That
+  // was wrong: fit() forces every node back into the viewport, which
+  // wipes out the user's pre-bigscreen zoom (e.g. they'd zoomed in
+  // to see 10 of 100 nodes, fit would zoom out to show all 100).
+  // restoreViewport() instead re-applies the saved zoom + center, so
+  // exit bigscreen looks identical to before entering bigscreen.
 }
 
 /** Toggle bigscreen mode. */
@@ -336,18 +386,34 @@ export function registerTourController(isActive: () => boolean): void {
 }
 
 // ── Fit bridge ────────────────────────────────────────────────────────────────
+//
+// We previously exposed a one-shot _pendingFit flag here that triggered
+// fit() after a bigscreen round-trip for non-tour users. That was wrong:
+// fit() forces every node back into the viewport, which erased the user's
+// pre-bigscreen zoom (e.g. they'd zoomed in to see 10 of 100 nodes, and
+// fit() would zoom out to show all 100 on exit). The correct behaviour
+// for both tour and non-tour is to restore the pre-bigscreen zoom +
+// pan via restoreViewport() in the ResizeObserver — which already
+// runs from _preBigscreenViewport, now captured unconditionally in
+// enterBigscreen().
+//
+// _fitRenderer is kept as a public registration point in case future
+// code paths need an explicit "fit now" trigger (e.g. "reset view"
+// button). It is no longer called by the bigscreen round-trip itself.
 
-/** Calls fitGraph(renderer) if the renderer singleton is reachable at init time.
- *  Safe no-op if called before boot. */
+/** Registered fitGraph call. No-op until registerFitFn() runs at boot. */
 let _fitRenderer: (() => void) | null = null;
-
-function runFitIfAvailable(): void {
-  _fitRenderer?.();
-}
 
 /** Must be called once during boot with a callable that runs `fitGraph(renderer)`. */
 export function registerFitFn(fn: () => void): void {
   _fitRenderer = fn;
+}
+
+/** Force an immediate fit (e.g. for a future "reset view" button).
+ *  Bigscreen round-trip no longer calls this — it uses viewport
+ *  restoration instead. */
+export function fitGraphNow(): void {
+  _fitRenderer?.();
 }
 
 // ── Global listeners (idempotent) ─────────────────────────────────────────────
@@ -358,14 +424,24 @@ let _installed = false;
  * change that affects the container's width/height. We use it as the
  * single source of truth for "cy needs to resize + pan restore".
  *
- * Why this is more reliable than the old setTimeout/rAF dance:
- *  - ResizeObserver fires AFTER layout and BEFORE paint, so clientWidth
- *    and clientHeight are accurate at the moment the callback runs.
- *  - We never have to guess "how many rAFs is enough" — the spec says
- *    the callback runs at the natural resize point.
- *  - The observer handles ALL container resizes (bigscreen enter,
- *    bigscreen exit, sidebar collapse, window resize, devtools open)
- *    uniformly — no special-casing per path. */
+ * macOS fullscreen note: macOS implements fullscreen as a separate
+ * Space, and the browser window is *animated* across Space boundaries
+ * (≈200-300ms) rather than resized in place like Windows/Linux. During
+ * this transition the ResizeObserver fires roughly every animation
+ * frame with intermediate widths like 440→768→1024→1366.
+ *
+ * Each tick calls cy.resize() immediately. cytoscape's official
+ * behaviour is that cy.resize() doesn't touch zoom or pan
+ * (cytoscape/cytoscape.js#1769), so the rapid-fire resizes are
+ * harmless — they're just wasted redraws. We previously tried
+ * debouncing the resizes to 80ms to "collapse" the burst, but that
+ * made the canvas render against a stale width during the wait and
+ * produced a visible "node jump" on bigscreen entry as cytoscape
+ * re-aligned. The redraw churn is the lesser evil.
+ *
+ * Sidebar toggles never fire this observer (sidebar stays in flex
+ * flow so #cy dimensions are unchanged).
+ */
 let _cyResizeObserver: ResizeObserver | null = null;
 let _lastObservedW = 0;
 let _lastObservedH = 0;
@@ -383,18 +459,11 @@ function installResizeBridge(): void {
     if (!cy2) return;
     for (const entry of entries) {
       const { width, height } = entry.contentRect;
-      // ResizeObserver fires once on install with the current size and
-      // then on every actual change. We only react to real changes to
-      // avoid spurious cy.resize() loops during boot.
       if (width === _lastObservedW && height === _lastObservedH) continue;
       _lastObservedW = width;
       _lastObservedH = height;
 
       cy2.resize();
-      // If we have a pending viewport snapshot (we just exited
-      // bigscreen and need to restore the saved center), apply it now
-      // — the container has the new size, so the pan formula reads
-      // the right numbers.
       if (_preBigscreenViewport) {
         restoreViewport();
       }
@@ -443,11 +512,13 @@ export function initBigscreen(): void {
       } catch {
         /* private mode */
       }
-      if (!_isTourActive()) {
-        // Same deferred-fit as exitBigscreen — fit only after the
-        // ResizeObserver has resized cy to the new container size.
-        requestAnimationFrame(() => requestAnimationFrame(() => runFitIfAvailable()));
-      }
+      // Viewport restoration (zoom + pan) is handled by the
+      // ResizeObserver below via restoreViewport(), which applies the
+      // _preBigscreenViewport snapshot against the restored container
+      // size — same path as exitBigscreen(). No fit() here, on either
+      // tour or non-tour: fit() would erase the user's pre-bigscreen
+      // zoom (e.g. the 10-of-100-nodes zoom) and dump them back to a
+      // full-graph view.
     }
   });
 }
