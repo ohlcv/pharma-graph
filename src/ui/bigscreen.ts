@@ -2,7 +2,7 @@
 // Cinema / bigscreen mode: hide all chrome UI + request fullscreen.
 // Single root class is on <html> (not #app) to avoid cytoscape overlay pollution.
 
-import { cancelSidebarAnim, restoreSectionState } from './drag-manager';
+import { cancelSidebarAnimAndClear, restoreSectionState } from './drag-manager';
 
 const STORAGE_KEY = 'pharma-graph:bigscreen';
 
@@ -13,7 +13,8 @@ function hintContainer(): HTMLElement {
     el = document.createElement('div');
     el.id = 'bigscreen-hint-root';
     el.setAttribute('aria-hidden', 'true');
-    el.style.cssText = 'position:fixed;left:50%;bottom:36px;transform:translateX(-50%);z-index:200;pointer-events:none';
+    el.style.cssText =
+      'position:fixed;left:50%;bottom:36px;transform:translateX(-50%);z-index:200;pointer-events:none';
     document.body.appendChild(el);
   }
   return el;
@@ -78,7 +79,7 @@ let _preBigscreenSidebar: SidebarSnapshot | null = null;
 
 function captureSidebar(): void {
   const sidebar = document.getElementById('sidebar');
-  const btn     = document.getElementById('btn-sidebar-toggle');
+  const btn = document.getElementById('btn-sidebar-toggle');
   if (!sidebar) return;
   _preBigscreenSidebar = {
     hidden: sidebar.classList.contains('hidden'),
@@ -87,7 +88,9 @@ function captureSidebar(): void {
       document.querySelectorAll<HTMLElement>('.sidebar-section, .legend-block'),
     ).map((el) => ({
       state: el.getAttribute('data-section-state'),
-      chevronOpen: el.querySelector<HTMLElement>('.sidebar-section__chevron')?.classList.contains('open') ?? false,
+      chevronOpen:
+        el.querySelector<HTMLElement>('.sidebar-section__chevron')?.classList.contains('open') ??
+        false,
     })),
   };
 }
@@ -98,7 +101,7 @@ export function restoreSidebar(): void {
   _preBigscreenSidebar = null;
 
   const sidebar = document.getElementById('sidebar');
-  const btn     = document.getElementById('btn-sidebar-toggle');
+  const btn = document.getElementById('btn-sidebar-toggle');
 
   // Clean up any stale sidebar-overlay from an in-flight toggle animation
   // that was interrupted by bigscreen exit. Without this, the sidebar
@@ -121,7 +124,7 @@ export function restoreSidebar(): void {
   // Keep #main.sidebar-hidden in sync — see drag-manager.ts onChange.
   document.getElementById('main')?.classList.toggle('sidebar-hidden', snap.hidden);
   document.getElementById('node-panel')?.classList.toggle('sidebar-hidden-adjust', snap.hidden);
-  if (btn)     btn.classList.toggle('active', snap.btnActive);
+  if (btn) btn.classList.toggle('active', snap.btnActive);
 
   const sectionEls = document.querySelectorAll<HTMLElement>('.sidebar-section, .legend-block');
   sectionEls.forEach((el, i) => {
@@ -247,7 +250,7 @@ export async function enterBigscreen(): Promise<void> {
   if (isBigscreen()) return;
 
   captureSidebar();
-  cancelSidebarAnim();
+  cancelSidebarAnimAndClear();
 
   if (_isTourActive()) {
     captureViewport();
@@ -262,14 +265,18 @@ export async function enterBigscreen(): Promise<void> {
   // cy.resize() for us. We deliberately do NOT call cy.resize() here —
   // the observer knows the true container size at the moment it fires,
   // whereas we would have to guess via rAF/setTimeout gymnastics.
-  try { localStorage.setItem(STORAGE_KEY, '1'); } catch { /* private mode */ }
+  try {
+    localStorage.setItem(STORAGE_KEY, '1');
+  } catch {
+    /* private mode */
+  }
 }
 
 /** Exit bigscreen: remove class, exit fullscreen, remove preference. */
 export async function exitBigscreen(): Promise<void> {
   if (!isBigscreen()) return;
 
-  cancelSidebarAnim();
+  cancelSidebarAnimAndClear();
 
   // We do NOT call captureSidebar() here. The snapshot was taken at
   // enterBigscreen() time, which is the correct "before bigscreen"
@@ -431,7 +438,11 @@ export function initBigscreen(): void {
       // observer fires against the post-restore layout.
       void document.documentElement.offsetWidth;
       restoreSidebar();
-      try { localStorage.removeItem(STORAGE_KEY); } catch { /* private mode */ }
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        /* private mode */
+      }
       if (!_isTourActive()) {
         // Same deferred-fit as exitBigscreen — fit only after the
         // ResizeObserver has resized cy to the new container size.

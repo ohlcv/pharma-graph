@@ -32,11 +32,15 @@ function applySheetState(open: boolean): void {
   if (app) app.classList.toggle('sheet-open', open);
 
   if (open) {
-    sheet.addEventListener('transitionend', () => {
-      if (typeof uiState.detailPanel?.repositionCurrent === 'function') {
-        uiState.detailPanel!.repositionCurrent();
-      }
-    }, { once: true });
+    sheet.addEventListener(
+      'transitionend',
+      () => {
+        if (typeof uiState.detailPanel?.repositionCurrent === 'function') {
+          uiState.detailPanel!.repositionCurrent();
+        }
+      },
+      { once: true },
+    );
   }
   syncTourBarPosition();
 }
@@ -44,7 +48,10 @@ function applySheetState(open: boolean): void {
 export function syncTourBarPosition(): void {
   const tourBar = document.getElementById('tour-status');
   if (!tourBar) return;
-  if (window.innerWidth > 768) { tourBar.style.top = ''; tourBar.style.bottom = ''; }
+  if (window.innerWidth > 768) {
+    tourBar.style.top = '';
+    tourBar.style.bottom = '';
+  }
 }
 
 // ── Mobile sheet drag ─────────────────────────────────────────────────────────
@@ -203,12 +210,29 @@ const TOOLBAR_H = 44;
 // Header of the panel must sit below topbar(56px) + toolbar(44px) = 100px
 // so it never overlaps either bar's visual area (they have native pointer
 // capture for their own children).
-const PANEL_MIN_TOP = TOPBAR_H + TOOLBAR_H + PANEL_PAD;  // = 108px
+const PANEL_MIN_TOP = TOPBAR_H + TOOLBAR_H + PANEL_PAD; // = 108px
 
-interface PanelBounds { left: number; top: number; width: number; height: number; }
+interface PanelBounds {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
 
-let dragState: { startX: number; startY: number; startLeft: number; startTop: number; el: HTMLElement } | null = null;
-let resizeState: { startX: number; startY: number; startW: number; startH: number; el: HTMLElement } | null = null;
+let dragState: {
+  startX: number;
+  startY: number;
+  startLeft: number;
+  startTop: number;
+  el: HTMLElement;
+} | null = null;
+let resizeState: {
+  startX: number;
+  startY: number;
+  startW: number;
+  startH: number;
+  el: HTMLElement;
+} | null = null;
 
 function clampBounds(b: PanelBounds): PanelBounds {
   const vpW = window.innerWidth;
@@ -216,7 +240,7 @@ function clampBounds(b: PanelBounds): PanelBounds {
   const isMobile = vpW <= 768;
   const minW = isMobile ? 200 : PANEL_MIN_W;
   const minH = isMobile ? 120 : PANEL_MIN_H;
-  const minTop = isMobile ? PANEL_PAD : PANEL_MIN_TOP;  // mobile: no topbar/toolbar in the way
+  const minTop = isMobile ? PANEL_PAD : PANEL_MIN_TOP; // mobile: no topbar/toolbar in the way
   // Constrain size first so the left/top clamp below accounts for the actual
   // rendered width/height (panel may have been resized below its CSS default).
   const w = Math.max(minW, Math.min(b.width, vpW - PANEL_PAD * 2));
@@ -231,14 +255,30 @@ function loadPanelBounds(): PanelBounds | null {
     const raw = localStorage.getItem(PANEL_BOUNDS_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<PanelBounds>;
-    if (typeof parsed.left !== 'number' || typeof parsed.top !== 'number'
-        || typeof parsed.width !== 'number' || typeof parsed.height !== 'number') return null;
-    return clampBounds({ left: parsed.left, top: parsed.top, width: parsed.width, height: parsed.height });
-  } catch { return null; }
+    if (
+      typeof parsed.left !== 'number' ||
+      typeof parsed.top !== 'number' ||
+      typeof parsed.width !== 'number' ||
+      typeof parsed.height !== 'number'
+    )
+      return null;
+    return clampBounds({
+      left: parsed.left,
+      top: parsed.top,
+      width: parsed.width,
+      height: parsed.height,
+    });
+  } catch {
+    return null;
+  }
 }
 
 function savePanelBounds(b: PanelBounds): void {
-  try { localStorage.setItem(PANEL_BOUNDS_KEY, JSON.stringify(b)); } catch { /* ignore */ }
+  try {
+    localStorage.setItem(PANEL_BOUNDS_KEY, JSON.stringify(b));
+  } catch {
+    /* ignore */
+  }
 }
 
 /**
@@ -393,29 +433,38 @@ function stopPanelResize(): void {
 
 /** Reset persisted bounds — used when the user wants to start fresh. */
 export function clearPanelBounds(): void {
-  try { localStorage.removeItem(PANEL_BOUNDS_KEY); } catch { /* ignore */ }
+  try {
+    localStorage.removeItem(PANEL_BOUNDS_KEY);
+  } catch {
+    /* ignore */
+  }
 }
-
 
 // ── Sidebar toggle ────────────────────────────────────────────────────────────
 
 // Sidebar toggle — UiToggle owns the on/off state, persistence, and class
-// application across sidebar / button / strip. Renderer is mutated via the
-// `onChange` hook so the cytoscape instance resizes on every toggle.
+// application across sidebar / button / strip.
 let sidebarToggle: UiToggle | null = null;
-// Tracks the in-flight sidebar overlay timeout so rapid toggles can cancel
-// the previous one — prevents stale sidebar-overlay removal mid-animation.
-let sidebarAnimTimer: ReturnType<typeof setTimeout> | null = null;
 
-/** Cancel any in-flight sidebar animation timer and clean up overlay state.
- *  Called by bigscreen enter/exit to prevent stale cy.resize() calls and
- *  orphaned sidebar-overlay class during bigscreen transitions. */
+/** No-op kept for API compatibility with bigscreen.ts. Sidebar animations
+ *  no longer need cancellation because we never add transient classes
+ *  (like the old .sidebar-overlay) that would leak during a rapid toggle.
+ *  The sidebar only ever has its .hidden class which UiToggle manages. */
 export function cancelSidebarAnim(): void {
-  if (sidebarAnimTimer) { clearTimeout(sidebarAnimTimer); sidebarAnimTimer = null; }
-  document.getElementById('sidebar')?.classList.remove('sidebar-overlay');
+  // intentionally empty — see comment above.
+}
+
+/** Same as cancelSidebarAnim; the `sidebar-overlay` class no longer exists.
+ *  Kept for bigscreen.ts callers that may still import it. */
+export function cancelSidebarAnimAndClear(): void {
+  // intentionally empty — see comment above.
 }
 
 export function toggleSidebar(renderer: Renderer): void {
+  // Renderer is no longer needed here (sidebar doesn't trigger any
+  // canvas resize — see onChange comment for the why) but we keep the
+  // parameter in the public signature for API stability.
+  void renderer;
   const sidebar = document.getElementById('sidebar');
   const btn = document.getElementById('btn-sidebar-toggle');
   if (!sidebar) return;
@@ -427,46 +476,40 @@ export function toggleSidebar(renderer: Renderer): void {
       persist: window.innerWidth > 768 ? 'sidebar.hidden' : undefined,
       cssClass: 'hidden',
       applyTo: sidebar,
-      onChange: (hidden) => {
-        if (btn) btn.classList.toggle('active', !hidden);
-        // Strategy: make the sidebar position:absolute (overlay) during the
-        // 0.28s transform/opacity animation so it can slide freely above
-        // the canvas. The grid column change + cy.resize() happens either
-        // immediately (collapse — behind the still-visible sidebar) or
-        // after the animation (expand — behind the now-visible sidebar).
-        // In both cases the canvas resize is hidden behind the sidebar's
-        // opaque background, so there's no black flash or black curtain.
+      onChange: (_hidden) => {
+        if (btn) btn.classList.toggle('active', !_hidden);
+        // Animation strategy (as of #flash-fix):
+        //
+        //   The sidebar stays in flex flow at its full var(--sidebar-width)
+        //   at all times. Hiding is purely visual — `transform: translateX(100%)`
+        //   slides it off-screen, `opacity: 0` makes it invisible. Because
+        //   sidebar never leaves flex flow, #cy's dimensions are IDENTICAL
+        //   in both collapsed and expanded states.
+        //
+        //   This means:
+        //     - cy.resize() is always a no-op (same dimensions)
+        //     - cytoscape canvas never clears (canvas.width never gets reassigned)
+        //     - no "black flash" frame ever shows
+        //
+        //   The only remaining responsibilities of this handler are:
+        //     1. Mark #main with .sidebar-hidden (kept for future hooks;
+        //        the CSS rule it gated was removed because it forced #cy
+        //        to resize on every toggle).
+        //     2. Mark #node-panel with .sidebar-hidden-adjust (still affects
+        //        node panel positioning).
+        //     3. Toggle the button's "active" class for the icon swap.
+        //
+        //   There is no need for a sidebar-overlay class anymore, and no
+        //   need to defer cy.resize() with transitionend — the canvas
+        //   dimensions don't change.
         const main = document.getElementById('main');
-        const sb = document.getElementById('sidebar');
         const nodePanel = document.getElementById('node-panel');
-        if (sb) sb.classList.add('sidebar-overlay');
-        // Cancel any previous animation timer — rapid toggles would
-        // otherwise fire stale timeouts that remove sidebar-overlay
-        // mid-animation or call cy.resize() at the wrong moment.
-        if (sidebarAnimTimer) { clearTimeout(sidebarAnimTimer); sidebarAnimTimer = null; }
-
-        if (hidden) {
-          // Collapse: grid column collapses now (canvas expands behind the
-          // sidebar which is still visible at the start of the transition).
+        if (_hidden) {
           main?.classList.add('sidebar-hidden');
           nodePanel?.classList.add('sidebar-hidden-adjust');
-          renderer.getCy().resize();
-          // After the sidebar finishes sliding out, restore normal flow.
-          sidebarAnimTimer = setTimeout(() => {
-            if (sb) sb.classList.remove('sidebar-overlay');
-            sidebarAnimTimer = null;
-          }, 280);
         } else {
-          // Expand: keep grid collapsed, let the sidebar slide in as an
-          // overlay. After it's visible, expand the grid + resize canvas
-          // (the resize is hidden behind the now-opaque sidebar).
-          sidebarAnimTimer = setTimeout(() => {
-            main?.classList.remove('sidebar-hidden');
-            nodePanel?.classList.remove('sidebar-hidden-adjust');
-            renderer.getCy().resize();
-            if (sb) sb.classList.remove('sidebar-overlay');
-            sidebarAnimTimer = null;
-          }, 280);
+          main?.classList.remove('sidebar-hidden');
+          nodePanel?.classList.remove('sidebar-hidden-adjust');
         }
       },
     });
@@ -501,7 +544,9 @@ export function toggleSection(name: string): void {
 
   // Find the body element (works for both .sidebar-section__body and
   // .legend-section__body — they share the same class suffix).
-  const body = section.querySelector('.sidebar-section__body, .legend-section__body') as HTMLElement | null;
+  const body = section.querySelector(
+    '.sidebar-section__body, .legend-section__body',
+  ) as HTMLElement | null;
 
   if (nowOpen) {
     // Opening: animate max-height from 0 → measured → none
@@ -512,7 +557,9 @@ export function toggleSection(name: string): void {
       section.setAttribute('data-section-state', 'open');
       const h = body.scrollHeight;
       body.style.maxHeight = h + 'px';
-      setTimeout(() => { body.style.maxHeight = 'none'; }, SECTION_ANIM_MS);
+      setTimeout(() => {
+        body.style.maxHeight = 'none';
+      }, SECTION_ANIM_MS);
     } else {
       section.setAttribute('data-section-state', 'open');
     }
@@ -538,7 +585,9 @@ export function toggleSection(name: string): void {
 export function restoreSectionState(name: string, isOpen: boolean): void {
   const section = document.querySelector(`[data-section="${name}"]`);
   if (!section) return;
-  const body = section.querySelector('.sidebar-section__body, .legend-section__body') as HTMLElement | null;
+  const body = section.querySelector(
+    '.sidebar-section__body, .legend-section__body',
+  ) as HTMLElement | null;
   const head = section.querySelector('.sidebar-section__chevron');
 
   if (isOpen) {
@@ -561,7 +610,9 @@ export function initSectionHeights(): void {
   const sections = document.querySelectorAll<HTMLElement>('.sidebar-section, .legend-block');
   sections.forEach((section) => {
     const isOpen = section.getAttribute('data-section-state') === 'open';
-    const body = section.querySelector('.sidebar-section__body, .legend-section__body') as HTMLElement | null;
+    const body = section.querySelector(
+      '.sidebar-section__body, .legend-section__body',
+    ) as HTMLElement | null;
     if (!body) return;
     if (isOpen) {
       body.style.maxHeight = 'none';
