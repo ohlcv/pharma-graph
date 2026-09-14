@@ -36,10 +36,10 @@
   overflow: hidden; height: calc(100vh - 56px - 44px);
   position: relative; min-width: 0;
 }
-#main.sidebar-hidden #cy { flex: 1 1 auto; }
-#main.sidebar-hidden #sidebar {
-  flex: 0 0 0; width: 0; overflow: hidden; border-left: none;
-}
+/* #main.sidebar-hidden no longer collapses #sidebar's width — sidebar
+   stays at var(--sidebar-width) in flex flow at all times. See the
+   comment on #sidebar in components.css for the rationale (avoiding
+   canvas resize that would clear the cytoscape surface). */
 
 /* ── Canvas ─────────────────────────────────────────────────────────────── */
 #cy {
