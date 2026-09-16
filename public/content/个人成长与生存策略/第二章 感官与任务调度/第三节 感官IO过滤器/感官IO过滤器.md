@@ -16,6 +16,9 @@ summary:
     【问题背景】感官通路缺少自动丢包，全部信号送入主处理器造成算力耗尽。
     【解决思路】在信息进入大脑前，使用外部硬件过滤刺激。
 edges_out:
+  - target: feat-sensory-task-management-p1-02
+    type: part_of
+    reason: 属于感官与任务管理系统总论
   - target: feat-light-control-p1-02-03
     type: contains
     reason: 包含光线管控
