@@ -91,6 +91,18 @@ export interface TourCompleteInfo {
   maxAttempts: number;
 }
 
+/** Payload for onRootOutOfLevel — fired when the engine auto-upgrades the
+ *  depth level because rootId's fill type doesn't match the requested
+ *  level. Controllers should surface a UI hint ("auto-upgraded to L5")
+ *  and optionally resync the depth slider to the new level. */
+export interface RootOutOfLevelInfo {
+  rootId: string;
+  /** The level the user originally requested (1-5). */
+  requestedLevel: number;
+  /** The level the engine upgraded to (always 5 for now). */
+  upgradedLevel: number;
+}
+
 export interface TourOptions {
   interval: number;
   maxDepth: number;
@@ -113,6 +125,11 @@ export interface TourOptions {
   onComplete?: (info: TourCompleteInfo) => void;
   onPause?: () => void;
   onResume?: () => void;
+  /** Called when the engine auto-upgraded the depth level because rootId's
+   *  fill type doesn't match the requested level (e.g. picked a drug at L1
+   *  structure-only). The UI should surface this so the user isn't confused
+   *  by a sudden jump to "comprehensive" mode. */
+  onRootOutOfLevel?: (info: RootOutOfLevelInfo) => void;
 }
 
 export interface TourStepInfo {
@@ -801,6 +818,7 @@ export class TourEngine {
   private onComplete?: TourOptions['onComplete'];
   private onPause?: TourOptions['onPause'];
   private onResume?: TourOptions['onResume'];
+  private onRootOutOfLevel?: TourOptions['onRootOutOfLevel'];
 
   // Pre-computed sequence
   private seq: string[] = [];
@@ -889,6 +907,7 @@ export class TourEngine {
     this.onComplete = options.onComplete;
     this.onPause = options.onPause;
     this.onResume = options.onResume;
+    this.onRootOutOfLevel = options.onRootOutOfLevel;
     // panOffset is NOT reset here — it persists across tour restarts
     this.totalExplored = 0;
     this.currentStep = 0;
@@ -917,6 +936,7 @@ export class TourEngine {
     // cls-sga-y2-01-07 produces a tour that starts there and walks its
     // subtree, not the entire 641-node graph.
     this.applyRootScope();
+
     // applyRootScope re-computes the cached total only when seq actually
     // changes (i.e. when rootId sliced the seq). If rootId was empty /
     // already seq[0] the seq is unchanged, so we still need a one-time
@@ -936,7 +956,38 @@ export class TourEngine {
     // is running. (Can happen when the user picks a node whose fill type
     // doesn't match the current depth slider, e.g. a drug under "structure
     // only" mode.)
-    if (this.seq.length === 0 || this._cachedTotalSteps === 0) {
+    if (this.seq.length === 0) {
+      this.stop();
+      return false;
+    }
+
+    // ── Auto-upgrade depth level if root is filtered out ──
+    // When the user picks a leaf node (drug, summary, mnemonic) at a low
+    // depth level (e.g. L1 = structure only), the subtree is non-empty
+    // (root itself is in seq) but every node gets filtered by isNodeInLevel.
+    // Without this guard the tour would start with totalSteps=0 and bail.
+    //
+    // Decision: if the root node itself doesn't match the current level,
+    // silently upgrade to L5 (comprehensive). Notify via onRootOutOfLevel
+    // so the UI can show "auto-upgraded to L5".
+    const rootNodeForLevel = this.cy.getElementById(rootId);
+    if (
+      this._depthLevel < 5 &&
+      this._cachedTotalSteps === 0 &&
+      !rootNodeForLevel.empty() &&
+      !isNodeInLevel(rootNodeForLevel, this._depthLevel)
+    ) {
+      const requestedLevel = this._depthLevel;
+      this._depthLevel = 5;
+      this.recomputeTotal();
+      this.onRootOutOfLevel?.({
+        rootId,
+        requestedLevel,
+        upgradedLevel: this._depthLevel,
+      });
+    }
+
+    if (this._cachedTotalSteps === 0) {
       this.stop();
       return false;
     }
@@ -1285,15 +1336,24 @@ export class TourEngine {
   }
 
   /**
-   * Scope `this.seq` to the subtree rooted at `this._rootId`.
-   * Called both from `start()` (one-time setup) and from the restart path
-   * so that every loop cycle still begins from the same selected node.
+   * Scope `this.seq` to rootId's DOWN subtree, preserving the strategy's
+   * natural forward order when possible. Called both from `start()` and
+   * from the restart path so every loop cycle still begins from the
+   * same selected node.
    *
-   * Uses pure position-based slicing on the strategy's existing sequence: find
-   * where rootId appears in the full DFS order and drop everything before it.
-   * This is robust regardless of graph edge directions, avoids collecting
-   * ancestors/descendants via BFS, and guarantees the tour goes FORWARD from
-   * rootId (not backward toward book-y2) even when the graph has upstream edges.
+   * ── DESIGN ──
+   * Edges go child → parent (parts_of / instance_of / subclass_of).
+   *   - For rootId X, the teaching tour should visit X first, then every
+   *     descendant of X, in some parent-first order.
+   *   - .incomers(node) returns X's children; BFS via incomers from X
+   *     collects exactly that subtree.
+   *   - The strategy's DFS has already produced a parent-first order for
+   *     the whole graph. We reuse its ordering for descendants it has
+   *     already collected (FAST PATH). Any descendants it missed get
+   *     appended at the end.
+   *
+   * This gives a parent-first "root → leaves" walk regardless of where
+   * rootId sits in the original tree (root, middle, leaf).
    */
   private applyRootScope(): void {
     const rootId = this._rootId;
@@ -1301,19 +1361,66 @@ export class TourEngine {
       return;
     }
 
-    // Find rootId's position in the strategy's full DFS order
+    const rootNode = this.cy.getElementById(rootId);
+
+    // Defensive fallback: if rootId doesn't resolve, just prepend it.
+    if (rootNode.empty()) {
+      this.seq = [rootId, ...this.seq.filter((id) => id !== rootId)];
+      this.recomputeTotal();
+      return;
+    }
+
+    // 1) Compute rootId's descendant subtree via DOWN-only BFS.
+    //    Edge semantics: source (child) → target (parent). So incomers()
+    //    returns children. BFS via incomers gives exactly the descendants.
+    const subtree = new Set<string>([rootId]);
+    const subQueue: string[] = [rootId];
+    while (subQueue.length > 0) {
+      const current = subQueue.shift()!;
+      const currentNode = this.cy.getElementById(current);
+      if (currentNode.empty()) continue;
+      for (const child of currentNode.incomers('node')) {
+        const cid = child.id();
+        if (!subtree.has(cid)) {
+          subtree.add(cid);
+          subQueue.push(cid);
+        }
+      }
+    }
+
+    // 2) FAST PATH — if rootId is in seq and DFS collected all descendants,
+    //    keep that natural order. Append missing descendants at the tail.
     const idx = this.seq.indexOf(rootId);
     if (idx >= 0) {
-      // Drop everything before rootId — this is the "skip to minute 30" logic.
-      // The strategy's own DFS already determines the forward traversal order,
-      // so we just restart from rootId's position and go forward.
-      this.seq = this.seq.slice(idx);
-    } else {
-      // rootId not in seq (shouldn't happen, but handle defensively)
-      this.seq = [rootId, ...this.seq.filter((id) => id !== rootId)];
+      const inSeqDescendants: string[] = [];
+      for (const id of this.seq) {
+        if (id !== rootId && subtree.has(id)) inSeqDescendants.push(id);
+      }
+      const missing: string[] = [];
+      for (const id of subtree) {
+        if (id !== rootId && !this.seq.includes(id)) missing.push(id);
+      }
+      this.seq = [rootId, ...inSeqDescendants, ...missing];
+      this.recomputeTotal();
+      return;
     }
-    // seq changed (length and contents); refresh the cached visit count
-    // so totalSteps() returns an accurate value without re-scanning.
+
+    // 3) FALLBACK — rootId itself not in seq (strategy skipped it). Build
+    //    a parent-first order from the subtree using incomers recursively.
+    const ordered: string[] = [];
+    const visited = new Set<string>();
+    const visitDown = (nodeId: string): void => {
+      if (visited.has(nodeId)) return;
+      visited.add(nodeId);
+      ordered.push(nodeId);
+      const n = this.cy.getElementById(nodeId);
+      if (n.empty()) return;
+      for (const child of n.incomers('node')) {
+        if (subtree.has(child.id())) visitDown(child.id());
+      }
+    };
+    visitDown(rootId);
+    this.seq = ordered;
     this.recomputeTotal();
   }
 
