@@ -10,7 +10,7 @@ tags:
   - 前置条件
   - 开启条件
 summary:
-  short:
+  short: null
   full: |
     【必须全部满足，才启动模式B】
     (1) 这件事会影响你的现实利益，结果重要。
