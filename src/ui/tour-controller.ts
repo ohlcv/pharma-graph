@@ -819,7 +819,11 @@ export class TourController {
     const isString = typeof info === 'string';
     const reason: 'depth-reached' | 'no-more-restarts' | 'no-root' = isString ? info : info.reason;
     // Legacy tests pass a string; the engine always passes TourCompleteInfo.
-    const maxAttempts: number = isString ? 3 : info.maxAttempts;
+    // 引擎现在 maxAttempts = Infinity（A 方案：去掉硬上限），UI 显示时降级为 "∞"。
+    // 不要硬编码 3，让数据从引擎传过来。
+    const rawMax = isString ? 3 : info.maxAttempts;
+    const maxAttemptsLabel: number | string = !Number.isFinite(rawMax) ? '∞' : rawMax;
+    const maxAttempts: number = rawMax;
     const exhausted = reason === 'no-more-restarts';
     const badge = exhausted ? '⏹' : '\u2713';
     const nameLabel = exhausted ? '已停止' : '完成';
@@ -835,8 +839,9 @@ export class TourController {
     // If the tour exhausted itself, surface a title so the bar reads
     // "已停止 · 已试 N 轮" instead of just "已停止". Use the engine's
     // reported maxAttempts — never hardcode the cap here.
+    // A 方案：maxAttempts 为 Infinity 时显示 "∞"，不再硬编码 3。
     if (exhausted) {
-      const label = `已停止 · 已试 ${maxAttempts} 轮`;
+      const label = `已停止 · 已试 ${maxAttemptsLabel} 轮`;
       this.setText('tour-dt-node-name',   label);
       this.setText('tour-dt-node-name2', label);
     }
@@ -846,7 +851,7 @@ export class TourController {
     // would be too noisy.
     this.announceStatus(
       exhausted
-        ? `漫游已停止 · 已试 ${maxAttempts} 轮`
+        ? `漫游已停止 · 已试 ${maxAttemptsLabel} 轮`
         : '漫游已完成',
     );
 

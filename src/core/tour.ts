@@ -420,10 +420,15 @@ function normalizeSeq(cy: cytoscape.Core, seq: string[]): string[] {
 }
 
 /**
- * 引擎硬上限：任何策略重启次数都不能超过这个值。
+ * 引擎硬上限：原本是任何策略重启次数都不能超过这个值。
  * `shouldRestart` 钩子可以让策略主动选择更早停止，但不能让策略调大上限。
+ *
+ * 当前设为 Number.POSITIVE_INFINITY：A 方案——真的无限循环。
+ * 只由策略自己的 shouldRestart 钩子决定是否停止（默认 true）。
+ * 硬上限本来是给"忘了主动停止会一直跑"的兜底，但更合理的是上层做空闲超时检测。
+ * 修改这里只影响 visitNext() 的判断、不会改变策略语义。
  */
-const MAX_RESTART_ATTEMPTS = 3;
+const MAX_RESTART_ATTEMPTS = Number.POSITIVE_INFINITY;
 
 /** 默认漫游间隔（毫秒） */
 const DEFAULT_INTERVAL_MS = 3000;
@@ -1467,8 +1472,9 @@ export class TourEngine {
         this._restartAttempts++;
         // 策略钩子：通知策略本次重启（策略可在这里记录日志或更新内部状态）
         this._hooks.onRestartAttempt?.(this._restartAttempts, this.cy);
+        // 硬上限已设为 Infinity，所以这里不再用 < MAX_RESTART_ATTEMPTS 判断——
+        // 完全交给策略的 shouldRestart 钩子决定是否继续。
         if (
-          this._restartAttempts < MAX_RESTART_ATTEMPTS &&
           strategyAllowsRestart(getStrategy(this.getStrategyId()), this._restartAttempts, this.cy)
         ) {
           const strategy = getStrategy(this.getStrategyId());
