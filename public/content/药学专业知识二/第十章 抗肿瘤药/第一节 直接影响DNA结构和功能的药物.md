@@ -1,7 +1,9 @@
 ---
 data:
   id: sec-dna-drug-y2-10-01
-  label: 第一节 直接影响DNA结构和功能的药物
+  label: |
+    第一节
+    直接影响DNA结构和功能的药物
   essence: module
   location:
     book: 药学专业知识二
