@@ -130,6 +130,15 @@ export interface TourOptions {
    *  structure-only). The UI should surface this so the user isn't confused
    *  by a sudden jump to "comprehensive" mode. */
   onRootOutOfLevel?: (info: RootOutOfLevelInfo) => void;
+  /**
+   * 体系边界：跨体系隔离的节点白名单。
+   *
+   * - 选中节点（或 fallback）所属体系根的 strict descendants 集合
+   * - applyRootScope 在 BFS rootId 的 descendants 时，会用此 Set 过滤——
+   *   不在此集合内的子孙被排除，避免把"另一部电视剧的节点"混进漫游序列
+   * - 不传 / 空集合 = 不隔离（保留原有行为）
+   */
+  universeNodeIds?: Set<string>;
 }
 
 export interface TourStepInfo {
@@ -848,6 +857,10 @@ export class TourEngine {
   /** The starting node selected by the user. Persists across restart cycles
    *  so that cycle 2 still begins from the same subtree as cycle 1. */
   private _rootId: string = '';
+  /** 体系边界白名单：applyRootScope() 在 BFS rootId 的 descendants 时
+   *  用它过滤跨体系节点。start() 里从 TourOptions.universeNodeIds 赋值，
+   *  restart 路径会复用同一份（不允许在中间变更）。空集合 = 不过滤。 */
+  private _universeNodeIds: Set<string> = new Set();
   /**
    * Stack of nodes the tour has actually visited (emitted via onStep),
    * in chronological order. Used by prev() to reliably step backward
@@ -931,6 +944,10 @@ export class TourEngine {
     // Remember the root so subsequent restarts can re-scope the tour to the
     // same subtree instead of jumping back to book-y2.
     this._rootId = rootId;
+    // Remember the universe boundary so subsequent restarts keep the same
+    // cross-universe isolation (don't suddenly mix in nodes from another
+    // 体系). Empty set = no isolation (legacy behavior preserved).
+    this._universeNodeIds = options.universeNodeIds ?? new Set<string>();
 
     // If a rootId was specified, scope the tour to that node's reachable
     // subgraph — otherwise pickRoot would be ignored because the strategy's
@@ -1368,12 +1385,19 @@ export class TourEngine {
    */
   private applyRootScope(): void {
     const rootId = this._rootId;
-    if (!rootId || this.seq[0] === rootId) {
+    if (!rootId) {
       return;
     }
 
-    const rootNode = this.cy.getElementById(rootId);
+    // 没指定 universe（legacy 行为）：strategy 自己已经按 rootId 起点排好了 seq，
+    // 我们相信它的顺序，不重排、不截断——保持所有节点可访问。
+    if (this._universeNodeIds.size === 0) {
+      return;
+    }
 
+    // 指定了 universe：filter seq 保留 universe 内的节点。
+    // pickRoot() 通常让 universe = rootId subtree，这一步等价于"seq 取 rootId 子树"。
+    const rootNode = this.cy.getElementById(rootId);
     // Defensive fallback: if rootId doesn't resolve, just prepend it.
     if (rootNode.empty()) {
       this.seq = [rootId, ...this.seq.filter((id) => id !== rootId)];
@@ -1381,58 +1405,9 @@ export class TourEngine {
       return;
     }
 
-    // 1) Compute rootId's descendant subtree via DOWN-only BFS.
-    //    Edge semantics: source (child) → target (parent). So incomers()
-    //    returns children. BFS via incomers gives exactly the descendants.
-    const subtree = new Set<string>([rootId]);
-    const subQueue: string[] = [rootId];
-    while (subQueue.length > 0) {
-      const current = subQueue.shift()!;
-      const currentNode = this.cy.getElementById(current);
-      if (currentNode.empty()) continue;
-      for (const child of currentNode.incomers('node')) {
-        const cid = child.id();
-        if (!subtree.has(cid)) {
-          subtree.add(cid);
-          subQueue.push(cid);
-        }
-      }
-    }
-
-    // 2) FAST PATH — if rootId is in seq and DFS collected all descendants,
-    //    keep that natural order. Append missing descendants at the tail.
-    const idx = this.seq.indexOf(rootId);
-    if (idx >= 0) {
-      const inSeqDescendants: string[] = [];
-      for (const id of this.seq) {
-        if (id !== rootId && subtree.has(id)) inSeqDescendants.push(id);
-      }
-      const missing: string[] = [];
-      for (const id of subtree) {
-        if (id !== rootId && !this.seq.includes(id)) missing.push(id);
-      }
-      this.seq = [rootId, ...inSeqDescendants, ...missing];
-      this.recomputeTotal();
-      return;
-    }
-
-    // 3) FALLBACK — rootId itself not in seq (strategy skipped it). Build
-    //    a parent-first order from the subtree using incomers recursively.
-    const ordered: string[] = [];
-    const visited = new Set<string>();
-    const visitDown = (nodeId: string): void => {
-      if (visited.has(nodeId)) return;
-      visited.add(nodeId);
-      ordered.push(nodeId);
-      const n = this.cy.getElementById(nodeId);
-      if (n.empty()) return;
-      for (const child of n.incomers('node')) {
-        if (subtree.has(child.id())) visitDown(child.id());
-      }
-    };
-    visitDown(rootId);
-    this.seq = ordered;
+    this.seq = this.seq.filter((id) => this._universeNodeIds.has(id));
     this.recomputeTotal();
+    return;
   }
 
   private visitNext(): void {

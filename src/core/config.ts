@@ -745,3 +745,18 @@ export const FILL_BORDER_HINTS: Record<string, string> = {
 export const FILL_BORDER_DEFAULT = '#9ca3af';
 
 export const DEFAULT_LAYOUT = 'euler';
+
+// ── Universe roots ──────────────────────────────────────────────────────────
+// 知识图谱的"体系根"——漫游引擎的体系边界判定锚点。
+// 通过父链回溯（边方向：子→父）命中任一根节点，即可判定该节点所属体系。
+//
+// 单一来源（Single Source of Truth）：
+//   - tour-controller 用它做 detectUniverseRoot()
+//   - 后续 universe 隔离、跨体系路由都基于此常量
+//
+// 新增体系：在 frontmatter 创建体系根节点后，加一行 id 即可。
+//   示例：'sum-third-universe'、'concept-domain-X'
+export const UNIVERSE_ROOTS: ReadonlySet<string> = new Set<string>([
+  'concept-exam-system',       // 体系一：执业药师考试（4 本教材）
+  'sum-neurodiversity-p1',     // 体系二：神经多样性与生存策略
+]);

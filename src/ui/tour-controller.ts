@@ -28,6 +28,7 @@ import { uiState, registerTourBarToggle } from './state.js';
 import { UiToggle } from './ui-toggle.js';
 import { showToast } from './ui-helpers.js';
 import { speechController } from './speech.js';
+import { UNIVERSE_ROOTS } from '../core/config.js';
 
 const SEARCH_INPUT_DEBOUNCE_MS = 220;
 
@@ -86,13 +87,17 @@ export class TourController {
     }
     // 新一次漫游 = 新的用户意图，面板跟随恢复
     uiState.panelClosedByUser = false;
-    const rootId = this.pickRoot();
+    const { rootId, universeNodeIds } = this.pickRoot();
     this.engine = new TourEngine(this.cy);
     const ok = this.engine.start(rootId, {
       interval: this.currentInterval(),
       // 传递档位（5=全部），TourEngine 内部会处理为无限模式
       maxDepth: this._pendingMaxDepth,
       strategy: uiState.tour.strategy,
+      // 体系边界：跨体系隔离。tour.ts 的 applyRootScope 会用这个 Set
+      // 过滤 BFS 后代——保证选 y2 节点后只跑体系一的节点，
+      // 选 sum-neurodiversity 后只跑体系二的节点。
+      universeNodeIds,
       onStep:           (info) => this.onStep(info),
       // 节点一进入视野（不等动画完成）就刷详情面板——之前用 onStepAfterCenter
       // （在 cy.animate complete 回调里）会让 interval < 600ms 的快速档下，
@@ -201,17 +206,96 @@ export class TourController {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  private pickRoot(): string {
+  /**
+   * 沿父链（边方向：子→父，所以父是 outgoers）BFS 回溯到任一体系根。
+   * - 兼容多父节点（遍历所有 outgoers）
+   * - 防环（seen 集合）
+   * - 命中 UNIVERSE_ROOTS 立即返回
+   * - 走完整条父链都没命中 → 返回 null（理论上不存在）
+   */
+  private detectUniverseRoot(node: cytoscape.NodeSingular): string | null {
+    const queue: string[] = [node.id()];
+    const seen = new Set<string>();
+    while (queue.length > 0) {
+      const curId = queue.shift()!;
+      if (seen.has(curId)) continue;
+      seen.add(curId);
+      if (UNIVERSE_ROOTS.has(curId)) return curId;
+      const parents = this.cy.getElementById(curId).outgoers('node');
+      parents.forEach((p: cytoscape.NodeSingular) => { queue.push(p.id()); });
+    }
+    return null;
+  }
+
+  /**
+   * 取某个节点及其 strict descendants 的全集（沿 edges 走，不是 compound children）。
+   * 用法：
+   *   - universe 隔离：传体系根 id → 该体系的 strict descendants（沿 part_of 边向下走）
+   *   - 悬空节点 fallback：传悬空节点本身 id → 它自己的 strict descendants
+   *
+   * 实现要点：
+   *   - cytoscape 的 `.descendants()` / `.children()` 只对 compound parent 起作用；
+   *     我们这里节点用 part_of / subclass_of 边表达"父子"关系，节点本身不是
+   *     compound parent，所以 .descendants() 在所有"普通"节点上都返回空。
+   *   - 正确做法：沿 incomers('node') BFS——边方向是 source=child, target=parent，
+   *     所以 parent.incomers('node') = children（任何 incoming edge 指向 parent
+   *     的子节点）。outgoers('node') 反而是 parent，不能用。
+   */
+  private getStrictDescendants(nodeId: string): Set<string> {
+    const set = new Set<string>([nodeId]);
+    const queue: string[] = [nodeId];
+    while (queue.length > 0) {
+      const cur = queue.shift()!;
+      const node = this.cy.getElementById(cur);
+      if (node.empty()) continue;
+      // incomers('node'): 沿 incoming edges 找到的所有 node 邻居
+      // 在 source=child, target=parent 的图里 = children（descendants）
+      node.incomers('node').forEach((child: cytoscape.NodeSingular) => {
+        if (!set.has(child.id())) {
+          set.add(child.id());
+          queue.push(child.id());
+        }
+      });
+    }
+    return set;
+  }
+
+  /**
+   * 返回值：rootId = BFS 起点（选中节点 或 book-y2 fallback）
+   *        universeRootId = 该节点所属体系根（决定"这是哪部电视剧"）
+   *        universeNodeIds = 该体系根的严格后代集合（跨体系隔离边界）
+   */
+  private pickRoot(): { rootId: string; universeRootId: string | null; universeNodeIds: Set<string> } {
     // 注意：选中节点用 .selected-node class（不是 .node-selected，也不是 cytoscape 的 :selected）
     const sel = this.cy.nodes('.selected-node').not('.layer-parent');
+    let candidateId: string;
+
     if (sel.length > 0) {
-      return sel[0].id();
+      candidateId = sel[0].id();
+    } else {
+      candidateId = this.pickDefaultRoot();
     }
 
-    // 没有选中节点时，按优先级挑"教材入口"作为起点：
-    //   1. id 以 'book-' 开头的 structure 节点（书本根入口）
-    //   2. fill='cls-structure' 且 id 不是子章节（如 'sec-'、'ch-'）的入口
-    //   3. 都没找到时 fallback 到 degree 最高的节点
+    // 体系判定：选中节点（或 fallback 节点） → 父链 BFS → 命中任一体系根
+    const candidateNode = this.cy.getElementById(candidateId);
+    const universeRootId = candidateNode.nonempty() ? this.detectUniverseRoot(candidateNode) : null;
+
+    // universe 边界 = rootId 的 strict descendants（含 rootId 自身）
+    //   - 语义"两部电视剧不混播"：seq 必须只含 rootId 子树里的节点，
+    //     所以 universe 直接由 rootId 决定就够了。
+    //   - 这统一了三种情况（命中体系根 / 选中节点 / 悬空节点）：
+    //     universeNodeIds 都是同一个值——rootId 子树。
+    const universeNodeIds = this.getStrictDescendants(candidateId);
+
+    return { rootId: candidateId, universeRootId, universeNodeIds };
+  }
+
+  /**
+   * 没选中节点时，挑一个默认 rootId（按 book 优先级 / structure / degree fallback）。
+   * 这是 pickRoot() 的子步骤——把"挑默认根"和"算 universe"拆开，
+   * 各自独立好测试。
+   */
+  private pickDefaultRoot(): string {
     const books = this.cy.nodes('[id ^= "book-"]').not('.layer-parent');
     if (books.length > 0) {
       // 按书籍优先级排序：药二(y2) → 药综(y3) → 药一(y1) → 法规(y4)
