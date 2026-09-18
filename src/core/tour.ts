@@ -1072,15 +1072,21 @@ export class TourEngine {
     this.currentStep = visibleIdx + 1;
     this._visited = this.seq.slice(0, rawIdx + 1);
     const nodeDepth = (node.data('depth') as number) ?? 0;
-    this.paused = false; // 让 scheduleNext 的 !t.paused 条件成立
     // 累计步数对齐 visibleIdx+1：start() / visitNext() 都在渲染前 ++，jumpToNode 必须
     // 走相同的节奏，否则拖完进度条后"步" badge 会远落后于进度条 X/Y。
     // 用 Number() 包一层：防御 totalVisited 在异常路径上变成 NaN（NaN 参与 max 会传染），
     // 一旦出现 NaN 就退回到 visibleIdx+1，避免步 badge 显示 "NaN"。
     const safeVisited = Number.isFinite(this.totalVisited) ? this.totalVisited : 0;
     this.totalVisited = Math.max(safeVisited, visibleIdx + 1);
+    // 关键：只有引擎在 auto-play（running，非 paused）时才 unpause + 启动下一次漫游。
+    // 如果引擎处于 paused 状态（用户手动暂停），jumpToNode 只负责跳到节点 + 停在
+    // 那里，不触发 auto-play——这样暂停→拖进度条不会导致自动播放。
+    const wasRunning = !this.paused && !this.stopped;
     this.highlightAndFocus(id, [id], nodeDepth, this.totalSteps(), this.seqIndex, /* silent */ false);
-    this.scheduleNext();
+    if (wasRunning) {
+      this.paused = false;
+      this.scheduleNext();
+    }
   }
 
   /** 把"第 visibleIdx 个可见节点"反推到 raw seq 索引。

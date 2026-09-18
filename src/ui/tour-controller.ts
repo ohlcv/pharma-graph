@@ -138,8 +138,16 @@ export class TourController {
     // paused (the engine's onPause was skipped on the 2nd call, leaving
     // the controller stale). Reading `isPaused()` here keeps the source
     // of truth on the engine — Bug: resume-after-paused-prev was a no-op.
-    if (this.engine.isPaused()) this.engine.resume();
-    else                        this.engine.pause();
+    if (this.engine.isPaused()) {
+      this.engine.resume();
+    } else {
+      this.engine.pause();
+    }
+    // 同步 this.paused 到引擎的实际状态（在 onEnginePause/Resume 回调触发前）。
+    // 这样暂停→拖进度条时 jumpToNode 看到的是 engine.paused=true，不会 auto-play。
+    // onEnginePause/Resume 里也会设一次（同步操作），setRunningUI 也会再执行一次，
+    // 但两次是幂等的，不会造成问题。
+    this.paused = this.engine.isPaused();
     // The engine fires onPause/onResume synchronously, which updates
     // `this.paused` + setRunningUI() via onEnginePause/Resume. No need
     // to mutate flags here.
@@ -417,9 +425,10 @@ export class TourController {
     if (!mob || !dt) return;
 
     const onChange = (src: HTMLInputElement, other: HTMLInputElement) => {
-      // Idle 兜底：CSS 已经 pointer-events: none，但拖动可能在 release 时
-      // 才触发 change 事件，所以这里再判一次
-      if (!this.engine || !this.running) return;
+      // 不再检查 !this.running——漫游中调节进度条是合法操作（会跳到对应节点，
+      // 如果引擎正在 auto-play，下一个 scheduleNext 会从新位置开始计时）。
+      // 也不检查 !this.paused——暂停中调节进度条后保持暂停状态。
+      if (!this.engine || (!this.running && !this.paused)) return;
       const total = this.engine.totalSteps();
       if (total <= 0) return;
       const pct = Math.max(0, Math.min(100, Number(src.value))) / 100;
