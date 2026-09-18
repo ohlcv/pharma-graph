@@ -46,7 +46,7 @@ export function initMusicPlayer(): void {
   function setPlaying(v: boolean) {
     playing = v;
     const musicLabel = document.getElementById('music-label');
-    if (musicLabel) musicLabel.textContent = v ? '暂停' : '播放';
+    if (musicLabel) musicLabel.textContent = v ? '暂停' : '音乐';
     const toggle = (b: HTMLElement | null, ip: HTMLElement | null, ipa: HTMLElement | null) => {
       if (!b || !ip || !ipa) return;
       b.classList.toggle('active', v);
