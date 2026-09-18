@@ -1,6 +1,7 @@
 ---
 id: mem-ppi-mnemonic1-y2-04-01
-label: 可生啦，快批(P)假
+label: |
+  可生啦，快批(P)假
 fill: cls-mnemonic
 location:
   book: 药学专业知识二
@@ -10,9 +11,10 @@ tags:
   - 口诀
   - 质子泵抑制剂
 summary:
-  short:
+  short: |
+    **可生啦**快**批(P)假**（质子泵抑制剂）
   full: |
-    可生啦，快批(P)假
+    质子泵抑制剂：**奥美拉唑**、**泮托拉唑**、**兰索拉唑**、**雷贝拉唑**、**艾司奥美拉唑**。抑制H+/K+-ATP酶，**不可逆**抑制胃酸分泌，**清晨**服用效果最佳（早餐前30~60分钟）。
 edges_out:
   - target: cls-ppi-y2-04-01
     type: part_of

@@ -1,7 +1,6 @@
 ---
-
-id: mem-抑制AMPA型谷氨酸受体-y2-01-02
-label: 抑制AMPA型谷氨酸受体口诀
+id: mem-ampa-y2-01-02
+label: AMPA-吡仑帕奈
 fill: cls-mnemonic
 
 location:
@@ -11,14 +10,15 @@ location:
   item: 分类与代表药品-作用机制与代表药品-抑制兴奋性-抑制AMPA型谷氨酸受体
 
 tags:
-  - 抑制AMPA型谷氨酸受体
-
   - 口诀
-
   - 抗癫痫发作药
+  - 抑制AMPA型谷氨酸受体
+  - 吡仑帕奈
 
 summary:
-  short: 
+  short: AM**PA**，**吡**仑**帕**奈
+  full: |
+    抗癫痫药，抑制谷氨酸受体，**A**M**PA**，**吡**仑**帕**奈。
 
 edges_out:
   - target: cls-ampa-y2-01-02
