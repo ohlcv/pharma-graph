@@ -24,7 +24,7 @@ if (typeof globalThis.requestAnimationFrame !== 'function') {
 
 import { describe, it, expect, vi } from 'vitest';
 import cytoscape from 'cytoscape';
-import { TourEngine, asStrategy, registerStrategy, unregisterStrategy, TourCompleteInfo } from './tour.js';
+import { TourEngine, asStrategy, registerStrategy, unregisterStrategy, TourCompleteInfo, getStrategy } from './tour.js';
 
 /** Single-node graph — sufficient for onComplete reason-routing tests that
  *  never advance the tour. */
@@ -574,5 +574,120 @@ describe('TourEngine setInterval reschedules the pending timer', () => {
     engine.setInterval(1_000);
     expect(engine['timer']).toBeUndefined();
     expect(engine['interval']).toBe(1_000);
+  });
+});
+
+/**
+ * has-dfs 防环爆栈回归测试（之前 console 报 "Maximum call stack size exceeded"
+ * at collectTree:663）—— 数据若有环（自环 A→A / 二元环 A→B→A / 三元环 A→B→C→A），
+ * 不应让整个漫游崩掉；应剪枝跳过环分支并降级输出"环外可访问节点"。
+ *
+ * 验证 4 点：
+ *   1. 不抛 RangeError（不被爆栈）
+ *   2. 返回的 seq 不含重复 id（visited 仍生效）
+ *   3. console.warn 被调用 1 次（环信号未丢失）
+ *   4. 环外的可达节点仍能 emit（不会因为 1 个环让整棵子树被丢弃）
+ */
+describe('has-dfs buildSequence cycle defense', () => {
+  /** A simple helper: get has-dfs via getStrategy() */
+  function seqOf(cy: cytoscape.Core): string[] {
+    return getStrategy('has-dfs').buildSequence(cy);
+  }
+
+  /** warn spy — returns the spy so callers can assert on it */
+  function spyWarn(): ReturnType<typeof vi.spyOn> {
+    return vi.spyOn(console, 'warn').mockImplementation(() => {});
+  }
+
+  function makeEmptyCy() {
+    return cytoscape({ headless: true, styleEnabled: true });
+  }
+
+  it('survives a self-loop on a structure node (A→A)', () => {
+    const cy = makeEmptyCy();
+    cy.add([
+      // 自环：A 是 structure，A.part_of 自己 —— 构造有环的 part_of 边
+      { group: 'nodes', data: { id: 'A', fill: 'cls-structure' } },
+      { group: 'nodes', data: { id: 'B', fill: 'cls-structure', edges_out: [{ type: 'part_of', target: 'A' }] } },
+    ]);
+    // 现在故意给 A 加一个 part_of 自环（罕见但真实会出现的脏数据）
+    cy.getElementById('A').data('edges_out', [{ type: 'part_of', target: 'A' }]);
+
+    const warn = spyWarn();
+    let seq: string[];
+    expect(() => { seq = seqOf(cy); }).not.toThrow();
+    expect(seq!).toContain('A');
+    expect(seq!).toContain('B');
+    expect(new Set(seq!).size).toBe(seq!.length); // 无重复
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('survives a 2-cycle (A part_of B, B part_of A)', () => {
+    const cy = makeEmptyCy();
+    cy.add([
+      { group: 'nodes', data: { id: 'A', fill: 'cls-structure' } },
+      { group: 'nodes', data: { id: 'B', fill: 'cls-structure' } },
+    ]);
+    cy.getElementById('A').data('edges_out', [{ type: 'part_of', target: 'B' }]);
+    cy.getElementById('B').data('edges_out', [{ type: 'part_of', target: 'A' }]);
+
+    const warn = spyWarn();
+    let seq: string[];
+    expect(() => { seq = seqOf(cy); }).not.toThrow();
+    expect(seq!).toContain('A');
+    expect(seq!).toContain('B');
+    expect(new Set(seq!).size).toBe(seq!.length);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('survives a 3-cycle (A→B→C→A) plus an unrelated tree', () => {
+    const cy = makeEmptyCy();
+    cy.add([
+      { group: 'nodes', data: { id: 'A', fill: 'cls-structure' } },
+      { group: 'nodes', data: { id: 'B', fill: 'cls-structure' } },
+      { group: 'nodes', data: { id: 'C', fill: 'cls-structure' } },
+      // 环：A part_of B, B part_of C, C part_of A
+      // 与此同时 C 还有另一个独立子节点 D（环外可达）
+    ]);
+    cy.getElementById('A').data('edges_out', [{ type: 'part_of', target: 'B' }]);
+    cy.getElementById('B').data('edges_out', [{ type: 'part_of', target: 'C' }]);
+    cy.getElementById('C').data('edges_out', [{ type: 'part_of', target: 'A' }]);
+    cy.add({
+      group: 'nodes',
+      data: { id: 'D', fill: 'cls-drug', edges_out: [{ type: 'part_of', target: 'A' }] },
+    });
+
+    const warn = spyWarn();
+    let seq: string[];
+    expect(() => { seq = seqOf(cy); }).not.toThrow();
+    expect(seq!).toContain('A');
+    expect(seq!).toContain('B');
+    expect(seq!).toContain('C');
+    expect(seq!).toContain('D'); // 环外的节点仍被访问到（关键）
+    expect(new Set(seq!).size).toBe(seq!.length);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('warn is rate-limited to 3 messages even with many cycles', () => {
+    const cy = makeEmptyCy();
+    // 5 个自环结构节点
+    const ids = ['s1', 's2', 's3', 's4', 's5'];
+    for (const id of ids) {
+      cy.add({ group: 'nodes', data: { id, fill: 'cls-structure' } });
+      cy.getElementById(id).data('edges_out', [{ type: 'part_of', target: id }]);
+    }
+
+    const warn = spyWarn();
+    seqOf(cy);
+    // 至少 1 次，但 ≤ 3 次（rate limit）
+    const cycleWarns = warn.mock.calls.filter((c) =>
+      String(c[0] ?? '').includes('[tour.has-dfs] cycle detected'),
+    );
+    expect(cycleWarns.length).toBeGreaterThan(0);
+    expect(cycleWarns.length).toBeLessThanOrEqual(3);
+    warn.mockRestore();
   });
 });

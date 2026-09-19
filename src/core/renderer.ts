@@ -113,7 +113,8 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
   // 关键设计：
   //   - 原 border 保持 solid 2px，节点轮廓始终清晰可见
   //   - outline 负责外围视觉效果：solid 呼吸 = "光晕"，dashed 流动 = "流光"
-  //   - ghost 三层叠加，模糊边缘保持一致
+  //   注：cytoscape 没有 'ghost' / 'ghost-scale' 等样式属性；之前 4 行是无效死代码，
+  //       已删除。光晕完全由 outline-width / outline-opacity 的呼吸动画驱动。
   const glowStrokeRule = {
     selector: `node[stroke = "glow"]`,
     style: {
@@ -128,21 +129,15 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
       'outline-style': 'solid' as cytoscape.Css.LineStyle,
       'outline-opacity': 0.35,
       'outline-offset': 4,
-      // ── ghost 三层叠加（模拟模糊光晕）────────────────────────────────────
-      'ghost': true,
-      'ghost-offset-x': 0,
-      'ghost-offset-y': 0,
-      'ghost-opacity': 0.28,
-      'ghost-scale': 1,
       // ── 过渡 ─────────────────────────────────────────────────────────────
-      'transition-property': 'border-color, outline-color, outline-opacity, ghost-opacity, border-width, outline-width',
+      'transition-property': 'border-color, outline-color, outline-opacity, border-width, outline-width',
       'transition-duration': 400,
       'transition-timing-function': 'ease-in-out',
     },
   };
 
   // glow 的 subtreeRoot 颜色规则（动态生成）
-  //   glow 节点：覆盖 border-color + outline-color + ghost-opacity（光晕更亮）
+  //   glow 节点：覆盖 border-color + outline-color（光晕更亮）
   const glowSubtreeRules = Object.entries(subtreeColorMap)
     .filter(([, color]) => color !== '#9ca3af') // 跳过无色/透明
     .flatMap(([rootId, color]) => [
@@ -151,7 +146,6 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         style: {
           'border-color': color,
           'outline-color': color,
-          'ghost-opacity': 0.35, // 子树色节点的光晕稍亮一些
         },
       },
     ]);
@@ -522,10 +516,9 @@ export class Renderer {
   /**
    * 为所有 stroke=glow 节点启动呼吸动画（rAF 驱动）。
    *
-   * Glow 呼吸动画（outline + ghost）：
-   *   ghost-opacity: 0.18 ↔ 0.38（正弦曲线，最柔和）
-   *   outline-opacity: 0.25 ↔ 0.45（正弦曲线，与 ghost 同步但幅度不同）
-   *   outline-width:  5   ↔ 8  （正弦曲线，"光晕在胀缩"的视觉感）
+   * Glow 呼吸动画（仅 outline）：
+   *   outline-opacity: 0.25 ↔ 0.45（正弦曲线）
+   *   outline-width:   5   ↔ 8（正弦曲线，"光晕在胀缩"的视觉感）
    *   一个呼吸周期 ≈ 2.4s（沉稳庄重）
    */
   private startGlowAnimations(): void {
@@ -545,7 +538,7 @@ export class Renderer {
 
       glowPhase = (glowPhase + dt / glowBreathPeriod) % 1;
       const sine = Math.sin(glowPhase * 2 * Math.PI); // -1..1
-      glowNodes.style('ghost-opacity', 0.28 + 0.10 * sine);
+      // 注：原代码还有 'ghost-opacity' 0.28+0.10*sine —— 删了，cytoscape 没这个属性。
       glowNodes.style('outline-opacity', 0.35 + 0.10 * sine);
       glowNodes.style('outline-width', 6.5 + 1.5 * sine);
 

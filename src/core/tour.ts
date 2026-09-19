@@ -657,48 +657,74 @@ registerStrategy({
     // FILL_VISIT_ORDER 已在模块顶部统一定义；这里直接用
     // （has-dfs 与 topo-prereq 之前各写一份导致漂移风险）。
 
-    // 收集所有 structure 节点（树根/入口）
+    // 收集所有 structure 节点（树根/入口）—— DFS 的种子节点
     const allStructures = nodes.filter((n) => (n.data('fill') as string) === 'cls-structure');
-    const collectTree = (parentId: string) => {
-      for (const k of children.get(parentId) ?? []) collectTree(k.id());
-    };
 
     // 每次调用 sort 时重置，避免 HMR/多次调用时累加
     const result: string[] = [];
     const visited = new Set<string>();
+    /**
+     * DFS 递归栈上的"灰色节点"集合——区分于全局 `visited`：
+     *   - `visited`：已经 emit 到 result 的节点（防重复 push，跨调用持久）
+     *   - `walking`：当前 DFS 调用栈上正在展开的节点（防环——同一节点在同一 DFS 路径
+     *     上第二次进入时直接剪枝，否则 part_of 自环 / A→B→A 会无限递归爆栈）
+     * 环一旦命中，打 console.warn 一次并跳过——而不是让爆栈把整个漫游崩掉。
+     * 数据污染的根因通常在 build-graph / 用户的 .md frontmatter，待后续 DEBUG 文档分析。
+     */
+    const walking = new Set<string>();
+    let cycleWarned = 0;
+    const warnCycle = (id: string) => {
+      // 限流：环可能很多，避免淹没控制台
+      if (cycleWarned >= 3) return;
+      cycleWarned++;
+      console.warn(
+        `[tour.has-dfs] cycle detected at "${id}". ` +
+          `Skipping this DFS branch to avoid stack overflow. ` +
+          `Inspect build-graph / frontmatter.part_of for the loop.`,
+      );
+    };
 
-    // DFS：fill-order 顺序遍历子节点；visited 防重；递归所有子节点以确保树完整遍历
+    // DFS：fill-order 顺序遍历子节点；visited 防 push 重复；walking 防栈溢出
     const dfsChildren = (parentId: string) => {
-      for (const fill of FILL_VISIT_ORDER) {
-        const kids = (children.get(parentId) ?? []).filter(
-          (k) => (k.data('fill') as string) === fill,
-        );
-        for (const k of kids) {
+      // 已经在当前 DFS 路径上 → 环，剪枝
+      if (walking.has(parentId)) {
+        warnCycle(parentId);
+        return;
+      }
+      walking.add(parentId);
+      try {
+        for (const fill of FILL_VISIT_ORDER) {
+          const kids = (children.get(parentId) ?? []).filter(
+            (k) => (k.data('fill') as string) === fill,
+          );
+          for (const k of kids) {
+            if (!visited.has(k.id())) {
+              visited.add(k.id());
+              result.push(k.id());
+            }
+            dfsChildren(k.id());
+          }
+        }
+        // 其他所有类型（非 FILL_VISIT_ORDER 中列出的新 fill 值）
+        for (const k of (children.get(parentId) ?? []).filter(
+          (k) => !FILL_VISIT_ORDER.includes((k.data('fill') ?? '') as typeof FILL_VISIT_ORDER[number]),
+        )) {
           if (!visited.has(k.id())) {
             visited.add(k.id());
             result.push(k.id());
           }
           dfsChildren(k.id());
         }
-      }
-      // 其他所有类型（非 FILL_VISIT_ORDER 中列出的新 fill 值）
-      for (const k of (children.get(parentId) ?? []).filter(
-        (k) => !FILL_VISIT_ORDER.includes((k.data('fill') ?? '') as typeof FILL_VISIT_ORDER[number]),
-      )) {
-        if (!visited.has(k.id())) {
-          visited.add(k.id());
-          result.push(k.id());
-        }
-        dfsChildren(k.id());
+      } finally {
+        walking.delete(parentId); // 离开当前 DFS 路径时清理，允许兄弟分支再访问
       }
     };
 
     // ── 第一步：structure 节点作为根入口 ────────────────────────────────
     // 1. 所有 structure 节点（cls-structure = 书籍/章/节入口）
-    for (const s of allStructures) collectTree(s.id());
-
-    // 2. structure 排序：
-    //   - 先按 book 顺序，再按 location key
+    //    按 book 顺序 + location key 排序，然后 emit + DFS 子树
+    //    —— 之前有一个 collectTree 死循环调用（line 660-664）已被删除：它不写 result、
+    //    不查 visited，纯浪费栈空间；一旦 children 有环就直接 RangeError: stack overflow。
     const sortedStructures = allStructures.sort((a, b) => {
       const ba = getBookOrder(a), bb = getBookOrder(b);
       if (ba !== bb) return ba - bb;
