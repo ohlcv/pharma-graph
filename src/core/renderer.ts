@@ -665,8 +665,13 @@ export class Renderer {
     this.currentLayoutInstance?.stop();
     const layoutInstance = this.cy.layout(base as unknown as cytoscape.LayoutOptions);
     layoutInstance.run();
-    // Re-resolve after layout settles — nodes may have shifted to overlapping positions
-    this.resolveOverlaps();
+    // Re-resolve after layout settles — nodes may have shifted to overlapping
+    // positions once the physical animation has converged. With `animate: true`
+    // (the default for euler / cose), layoutInstance.run() returns immediately
+    // while the layout is still animating, so we MUST wait for `layoutstop`
+    // before reading node positions — otherwise resolveOverlaps would snapshot
+    // transient mid-flight positions and produce wrong overlap groups.
+    this.cy.once('layoutstop', () => this.resolveOverlaps());
   }
 
   currentLayoutName(): string {

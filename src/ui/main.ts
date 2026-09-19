@@ -150,16 +150,17 @@ async function boot(): Promise<void> {
     },
   );
 
-  // 加载完成 → 跑一次最终的布局（之前 streaming 期间用的临时圆周位置）
-  finishStreamingLayout();
+  // 加载完成 → 跑一次最终的布局（之前 streaming 期间用的临时圆周位置）。
+  // 胶囊的 phase='done' 触发由 finishStreamingLayout 内部负责：
+  //   - ≥ 80 节点：等 euler 的 layoutstop（物理收敛完成后）
+  //   - < 80 节点：100ms 后立刻触发（不跑 euler）
+  finishStreamingLayout({ loaded: lastBatchCount, total: totalExpected });
 
   if (uiState.renderer) {
     const cy = uiState.renderer.getCy();
     updateStats(cy);
     syncBottomSheetStats(cy);
   }
-
-  updateLoadingIndicator({ phase: 'done', loaded: lastBatchCount, total: totalExpected, message: '准备就绪' });
 
   // 启动徽章 + 侧栏 + 各种 UI
   const badgeDot = document.getElementById('badge-dot');
@@ -279,8 +280,8 @@ function initGraphFromManager(
   initDebugOverlay(uiState.renderer);
 
   // Streaming 期间的初始 zoom——用 0.08 让用户能看到"全图概貌"，
-  // 节点从中心爆出时整体框架已铺开。等 finishStreamingLayout 跑完 euler 后
-  // 再 fitGraphAnimated 到精确的全图 zoom。
+  // 节点从中心爆出时整体框架已铺开。boot 完之后**不再动摄像头**——
+  // euler 让节点收敛到哪里，镜头就停在哪里。
   cy.zoom(0.08);
   cy.center();
 
@@ -305,79 +306,51 @@ function initGraphFromManager(
 }
 
 /**
- * Animate-fit so the final "load complete" transition doesn't snap.
- * Cytoscape's `fit()` jumps the camera in one frame; we instead use
- * `animate()` to glide the camera from its current zoom/center to the
- * full-graph extents over ~700ms.
- *
- * `minZoom` is the minimum "see the whole graph" zoom — cytoscape can
- * otherwise compute a tiny zoom on huge graphs that makes the graph
- * disappear into noise.
- */
-function fitGraphAnimated(cy: cytoscape.Core): void {
-  const bb = cy.elements().boundingBox();
-  if (bb.w === 0 || bb.h === 0) return;
-
-  const containerW = cy.width();
-  const containerH = cy.height();
-  const padding = 80;
-  const rawZoom = Math.min(
-    (containerW - padding * 2) / bb.w,
-    (containerH - padding * 2) / bb.h,
-  );
-  // cap at 1.0 (don't zoom in past 100%) and at minZoom 0.08 (don't
-  // zoom out so far that the graph becomes a speck).
-  const targetZoom = Math.max(0.08, Math.min(1.0, rawZoom));
-  const cx = bb.x1 + bb.w / 2;
-  const cy_ = bb.y1 + bb.h / 2;
-
-  cy.animate({
-    center: { x: cx, y: cy_ },
-    zoom: targetZoom,
-    duration: 700,
-    easing: 'ease-out-cubic',
-  });
-}
-
-/**
  * After the manifest finishes, kick off the euler force-directed layout
- * once. We DON'T snap to the final layout — euler is allowed to run its
- * full animation so users see nodes drift from their "cosmic" positions
- * into the organic, topology-aware structure. This is the "gravity" phase
- * of the cosmic metaphor: things that "want to be" connected pull toward
- * each other; lone nodes get pushed apart.
+ * once. Euler is allowed to run its full animation so users see nodes
+ * drift from their "cosmic" positions into the organic, topology-aware
+ * structure. This is the "gravity" phase of the cosmic metaphor: things
+ * that "want to be" connected pull toward each other; lone nodes get
+ * pushed apart.
  *
- * Layout timing:
- *   euler animate:'end' = physical convergence + 600ms interpolation.
- *   resolveOverlaps inside runLayout() then nudges any overlapping nodes.
- *   So we delay fitGraphAnimated a bit past layoutstop (1.2s) to let all
- *   of that settle, otherwise fit uses a stale boundingBox.
+ * We deliberately do NOT touch the camera afterwards — euler lets nodes
+ * settle where they settle, and the user sees exactly the final state
+ * with no forced reframe. `cy.stop` cancels any in-flight position
+ * animations from earlier "飞出去" bursts so euler owns the motion
+ * without two systems fighting each other.
+ *
+ * This function ALSO owns the loading pill's fade-out trigger — the pill
+ * disappears *after* euler's physical convergence finishes, so the
+ * "大爆炸 / 100%" celebration is the last thing the user sees before the
+ * graph enters its stable rest state. For small graphs (< 80 nodes) where
+ * euler is skipped, the pill still fades out on a 100ms tick so we don't
+ * strand it on screen.
  */
-function finishStreamingLayout(): void {
+function finishStreamingLayout(counts: { loaded: number; total: number }): void {
   if (!uiState.renderer) return;
   const cy = uiState.renderer.getCy();
   const nodeCount = cy.nodes().length;
 
-  // 太少的节点（比如缓存命中只有 100 个以下）就别折腾 euler 了，
-  // 直接 fit 视图——euler 在小图上反而会乱抖。
+  // 太少的节点（比如缓存命中只有 100 个以下）就别折腾 euler 了——
+  // 小图上 euler 会乱抖，反而比初始环带位置更难看。直接保留 streaming
+  // 期间 halton 序列铺出来的环带作为最终位置；胶囊也按原时机正常淡出。
   if (nodeCount < 80) {
-    setTimeout(() => fitGraphAnimated(cy), 100);
+    setTimeout(() => updateLoadingIndicator({ phase: 'done', ...counts, message: '准备就绪' }), 100);
     return;
   }
 
-  // 取消任何 in-flight 节点位置动画（之前批次的"飞出去"动画还没完），
-  // 让 euler 接管位置计算。避免两个动画系统互相拉扯。
   cy.stop(undefined, true);
   cy.elements().removeClass('entering');
 
-  // 触发 euler 布局（用 animate:true 让 euler 自己跑位置动画，
+  // 触发 euler 布局（用 animate:true 让 euler 自己跑位置动画；
   // 我们手动接管入场动画——不要 runLayout 自己的 stagger，避免双层动画打架）
   uiState.renderer.runLayout(DEFAULT_LAYOUT, { animate: true, randomize: false }, { skipEntering: true });
 
-  // 等 layoutstop + 600ms 收敛动画 + 重叠解决完成后再 fit
+  // 等 euler 的 600ms 物理收敛动画 + layoutstop 触发之后再让胶囊淡出。
+  // 这样视觉上就是"节点漂到位 → 胶囊庆祝 → 淡出"，最后用户看到的稳定态
+  // 不再被动画打断。
   cy.once('layoutstop', () => {
-    // 再等 800ms 让 euler 的 600ms 动画 + resolveOverlaps 完成
-    setTimeout(() => fitGraphAnimated(cy), 800);
+    updateLoadingIndicator({ phase: 'done', ...counts, message: '准备就绪' });
   });
 }
 
