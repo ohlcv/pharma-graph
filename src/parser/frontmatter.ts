@@ -185,6 +185,10 @@ export function parseFrontmatterWithWarnings(
 
   const rawSummary = fm['summary'] as Record<string, unknown> | string | undefined;
   let shortSummary: string | undefined;
+  // summary 字段：支持两种布局
+  //   1) summary: { short: ..., full: ... }     —— 嵌套
+  //   2) full: ... 与 summary 平级             —— 顶层 full（兼容旧版本）
+  // 同时存在时，summary.full 优先（更明确的归属）
   let fullSummary: string | undefined;
 
   if (typeof rawSummary === 'object' && rawSummary !== null) {
@@ -192,6 +196,11 @@ export function parseFrontmatterWithWarnings(
     fullSummary = getField(rawSummary as Record<string, unknown>, 'full');
   } else if (typeof rawSummary === 'string') {
     shortSummary = rawSummary.trim();
+  }
+
+  // 回退：summary.full 未提供时，接受顶层 full（与 summary 平级）
+  if (fullSummary === undefined) {
+    fullSummary = getField(fm, 'full');
   }
 
   // summary 派生字段：优先 short，否则 full

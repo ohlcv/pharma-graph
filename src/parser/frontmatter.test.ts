@@ -3,8 +3,31 @@
 // both required-field validation, edges_out extraction, location, and tags.
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
 import { parseFrontmatter, parseFrontmatterWithWarnings } from './frontmatter.js';
 import { DEFAULT_EDGE_TYPE, EDGE_TYPES } from '../core/edge-types.js';
+
+describe('real-file regression', () => {
+  it('reads fullSummary from a migrated A-layout file (top-level full)', () => {
+    // 趋同进化 is one of the migrated nodes whose full lives at the top level.
+    // Verifies the new fallback path actually surfaces the content.
+    const path = '/Users/meow/.tmp/should-not-exist.md';
+    const fallbackPath = '/Users/meow/Desktop/Project/pharma-graph/public/content/个人成长与生存策略/第一章 认知底色/趋同进化：相同选择压力下不同起点收敛到同一终点.md';
+    let raw: string;
+    try {
+      raw = readFileSync(path, 'utf-8');
+    } catch {
+      raw = readFileSync(fallbackPath, 'utf-8');
+    }
+    const fm = parseFrontmatter(raw, fallbackPath);
+    expect(fm.id).toBe('concept-convergent-evolution-p1-01-02');
+    expect(fm.shortSummary).toBeTruthy();
+    // Either layout should now surface a non-trivial fullSummary.
+    expect(fm.fullSummary).toBeTruthy();
+    expect(fm.fullSummary!.length).toBeGreaterThan(1000);
+  });
+});
+
 
 describe('parseFrontmatter', () => {
   it('parses top-level keys with required fields', () => {
@@ -181,6 +204,45 @@ summary:
 body`;
     const fm2 = parseFrontmatter(raw2, 'h2.md');
     expect(fm2.summary).toBe('只有完整');
+  });
+
+  it('accepts top-level full (legacy layout, sibling of summary)', () => {
+    // Layout A: `full` lives at the top level, next to `summary: { short: ... }`.
+    // Old files were migrated this way; the parser must accept both layouts
+    // (B = summary.full here, A = top-level full below).
+    const raw = `---
+id: pharm-6c
+label: top-level-full
+summary:
+  short: 简短
+full: |-
+  【核心命题】
+  长描述的第一行。
+    缩进的子句。
+  第二段。
+---
+
+body`;
+    const fm = parseFrontmatter(raw, 'h3.md');
+    expect(fm.shortSummary).toBe('简短');
+    expect(fm.summary).toBe('简短');
+    expect(fm.fullSummary).toBe('【核心命题】\n长描述的第一行。\n  缩进的子句。\n第二段。');
+  });
+
+  it('prefers summary.full over top-level full when both present', () => {
+    // When both layouts coexist (one was migrated, one was kept), the more
+    // explicit `summary.full` wins to avoid silent data loss in either direction.
+    const raw = `---
+id: pharm-6d
+label: both-full
+summary:
+  full: nested 版本
+full: top 版本
+---
+
+body`;
+    const fm = parseFrontmatter(raw, 'h4.md');
+    expect(fm.fullSummary).toBe('nested 版本');
   });
 
   it('handles BOM at file start', () => {
