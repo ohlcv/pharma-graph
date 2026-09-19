@@ -137,6 +137,16 @@
 
 <div id="app">
 
+  <!-- ── Loading indicator (corner, non-blocking) ──────────────────────────── -->
+  <!-- 不阻塞图谱渲染：内容流式到达时节点会"生长"出来，呼吸灯+进度仅作辅助指示。
+       加载完成后 fade 消失，绿色呼吸灯恢复常态。 -->
+  <div id="loading-indicator" class="loading-indicator">
+    <div class="loading-dot"></div>
+    <span class="loading-label" id="loading-label">准备中…</span>
+    <span class="loading-count" id="loading-count"></span>
+    <span class="loading-percent" id="loading-percent"></span>
+  </div>
+
   <!-- ── Top bar ──────────────────────────────────────────────────────── -->
   <header class="topbar">
     <div class="topbar__logo">

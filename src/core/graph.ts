@@ -68,6 +68,11 @@ export interface NodeData {
     *  builder, debug panels) can reason about parent/child semantics
     *  without having to reverse-walk cytoscape's edge store. */
   edges_out?: Array<{ id?: string; type: string; target: string; reason?: string }>;
+  /** Optional preset position for the cytoscape element. When set, the
+   *  'preset' layout (or layoutless init) honors it directly. Used by the
+   *  streaming loader to scatter partial-data nodes on a spiral/circle
+   *  before the final euler layout settles everything in one pass. */
+  position?: { x: number; y: number };
 }
 
 export interface EdgeData {

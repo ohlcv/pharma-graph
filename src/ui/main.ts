@@ -36,7 +36,10 @@ import { LAYOUTS, DEFAULT_LAYOUT } from '../core/config.js';
 import { brandCarousel } from './carousel.js';
 import { uiState } from './state.js';
 import { logInfo } from './logger.js';
-import { loadContent } from '../core/content-loader.js';
+import {
+  loadContentStreaming,
+  type LoadProgress,
+} from '../core/optimized-content-loader.js';
 import { installDispatcher, dispatchAction } from './action-dispatcher.js';
 import { updateStats, syncBottomSheetStats } from './graph-stats.js';
 import { fitGraph, randomize, syncLayoutDisplay, setCurrentLayout, restoreBsAdvancedPrefs } from './layout-manager.js';
@@ -62,173 +65,569 @@ import { installDebugBridge } from './debug-bridge.js';
 
 let tourController: TourController;
 
+// ── Loading Indicator (corner pill) ───────────────────────────────────────────
+
+function updateLoadingIndicator(progress: LoadProgress): void {
+  const indicator = document.getElementById('loading-indicator');
+  const label = document.getElementById('loading-label');
+  const count = document.getElementById('loading-count');
+  const percent = document.getElementById('loading-percent');
+
+  if (!indicator) return;
+
+  if (progress.phase === 'done') {
+    indicator.classList.add('complete');
+    if (label) label.textContent = '大爆炸';
+    if (count) count.textContent = '';
+    if (percent) percent.textContent = '100%';
+    // Fade-out & remove after a short celebration
+    setTimeout(() => {
+      indicator.classList.add('hidden');
+      setTimeout(() => {
+        indicator.style.display = 'none';
+      }, 600);
+    }, 800);
+    return;
+  }
+
+  if (label) {
+    if (progress.phase === 'manifest') label.textContent = '获取内容';
+    else if (progress.phase === 'content') label.textContent = progress.message;
+    else if (progress.phase === 'graph') label.textContent = '构建图谱';
+    else if (progress.phase === 'render') label.textContent = '渲染画布';
+  }
+
+  if (count) {
+    if (progress.phase === 'content' && progress.total > 0) {
+      count.textContent = `${progress.loaded} / ${progress.total}`;
+    } else {
+      count.textContent = '';
+    }
+  }
+
+  if (percent) {
+    if (progress.phase === 'content' && progress.total > 0) {
+      const pct = Math.min(99, Math.round((progress.loaded / progress.total) * 100));
+      percent.textContent = `${pct}%`;
+    } else if (progress.phase === 'manifest') {
+      percent.textContent = '';
+    } else {
+      percent.textContent = '';
+    }
+  }
+}
+
 // ── Boot ───────────────────────────────────────────────────────────────────────
 
 async function boot(): Promise<void> {
-  const { files: mdFiles } = await loadContent();
-  const graphManager = new GraphManager(mdFiles as Record<string, string>);
+  // 1) 创建 GraphManager（先于 manifest 完成，初始为空）
+  const graphManager = new GraphManager({} as Record<string, string>);
+
+  // 2) 流式加载内容：每收到一批 .md 就立即增量构建图谱塞进 cytoscape
+  //    让用户看到"节点一颗颗长出来"的渐进动画，而不是等全部加载完才显示。
+  let lastBatchCount = 0;
+  let totalExpected = 0;
+  const collectedFiles: Record<string, string> = {};
+
+  await loadContentStreaming(
+    updateLoadingIndicator,
+    (batchFiles, _loaded, total) => {
+      // 累积已加载文件
+      Object.assign(collectedFiles, batchFiles);
+      totalExpected = total;
+      lastBatchCount = Object.keys(collectedFiles).length;
+
+      // 增量构建图谱（GraphManager 现在支持增量 add）
+      graphManager.addFiles(batchFiles);
+
+      // 在第一批到达时就初始化 cytoscape（而不是等全部加载完）
+      if (!uiState.renderer) {
+        initGraphFromManager(graphManager, collectedFiles);
+      } else {
+        // 已经初始化过 → 增量添加新节点到 cytoscape
+        appendBatchToGraph(batchFiles, graphManager, collectedFiles);
+      }
+    },
+  );
+
+  // 加载完成 → 跑一次最终的布局（之前 streaming 期间用的临时圆周位置）
+  finishStreamingLayout();
+
+  if (uiState.renderer) {
+    const cy = uiState.renderer.getCy();
+    updateStats(cy);
+    syncBottomSheetStats(cy);
+  }
+
+  updateLoadingIndicator({ phase: 'done', loaded: lastBatchCount, total: totalExpected, message: '准备就绪' });
+
+  // 启动徽章 + 侧栏 + 各种 UI
+  const badgeDot = document.getElementById('badge-dot');
+  if (badgeDot) badgeDot.classList.remove('topbar__badge-dot--loading');
+
+  brandCarousel.start();
+
+  const sidebar = document.getElementById('sidebar');
+  const sidebarBtn = document.getElementById('btn-sidebar-toggle');
+  const nodePanel = document.getElementById('node-panel');
+  if (sidebar && sidebarBtn)
+    sidebarBtn.classList.toggle('active', !sidebar.classList.contains('hidden'));
+  if (nodePanel && sidebar)
+    nodePanel.classList.toggle('sidebar-hidden-adjust', sidebar.classList.contains('hidden'));
+
+  initSheetDrag();
+  initPanelDrag();
+  initPanelResize();
+  initSectionHeights();
+  initKeyboardShortcuts();
+  initSearchUI(uiState.renderer!.getCy(), uiState.highlight!, uiState.search!, uiState.detailPanel!);
+  initResizeHandler();
+  initMusicPlayer();
+  initBigscreen();
+  installDispatcher();
+  registerAppActions(uiState.renderer!, uiState.highlight!, uiState.detailPanel!);
+  installDebugBridge(uiState.renderer!);
+  showOnboardingTip();
+
+  // 诊断 dump：所有被静默 skip 的边 + parser warnings + 数据计数，
+  // 用户在 console 里看 `__graphDiag` 就能看见全貌。
+  // 不阻塞 UI，纯调试。
+  queueMicrotask(() => dumpDiag(graphManager));
+  void lastBatchCount;
+}
+
+/**
+ * Initialize cytoscape + event handlers from the current graph state.
+ * Called once when the first batch arrives. We DO NOT run a full layout
+ * here — subsequent batches will keep streaming in, and we'd rather let
+ * the cosmic-expansion positioning handle growth naturally than re-fit
+ * everything once. After the manifest finishes we just set the initial
+ * zoom so the user can see the whole galaxy.
+ */
+function initGraphFromManager(
+  graphManager: GraphManager,
+  collectedFiles: Record<string, string>,
+): void {
   const data = graphManager.build();
-  // Issue #31: pipeline diagnostic. Gated by `import.meta.env.DEV`
-  // via `logInfo` so production users don't see graph-build state
-  // dumped to their console. The original inline comments said
-  // "Remove once the missing-edges bug is confirmed resolved"; the
-  // bug is long resolved, but we kept the diagnostic for future
-  // debugging and gate it instead of deleting it.
+
   logInfo('graph build:', {
-    mdFiles: Object.keys(mdFiles).length,
+    mdFiles: Object.keys(collectedFiles).length,
     nodes: data.nodes.length,
     edges: data.edges.length,
-    sampleEdge: data.edges[0],
   });
-
-  // Issue #14: surface parser warnings that the browser used to swallow
-  // silently. The CLI validate.ts reports the same warnings, so authors
-  // see consistent feedback regardless of which surface they used.
-  if (graphManager.warnings.length > 0) {
-    const errors = graphManager.warnings.filter((w) => w.severity === 'error');
-    const warns = graphManager.warnings.filter((w) => w.severity === 'warning');
-    void errors; void warns;
-  }
 
   const container = document.getElementById('cy');
   if (!container) throw new Error('#cy container not found');
 
-  try {
-    uiState.renderer = new Renderer({
-      container,
-      data,
-      // §12.4: 走 config.ts 的 DEFAULT_LAYOUT = 'euler' 单点真相
-      layoutName: DEFAULT_LAYOUT,
-      layoutConfigs: LAYOUTS,
-    });
-    uiState.highlight = new HighlightEngine(uiState.renderer.getCy());
-    registerFitFn(() => fitGraph(uiState.renderer!));
-    registerCyAccessor(() => uiState.renderer!.getCy());
-    // Issue #31: same DEV-gated diagnostic as the graph-build log.
-    logInfo('cy after render:', {
-      nodes: uiState.renderer.getCy().nodes().length,
-      edges: uiState.renderer.getCy().edges().length,
-    });
+  uiState.renderer = new Renderer({
+    container,
+    data, // 第一批不需要预设位置：appendBatchToGraph 的动画会处理
+    layoutName: 'preset', // 不在构造时跑 layout
+    layoutConfigs: LAYOUTS,
+  });
 
-    // §12.6: Renderer constructor calls cytoscape.layout() directly without
-    // going through layout-manager, so the DOM surfaces that show the current
-    // layout name still display whatever was hardcoded in index.html.
-    // Sync once at bootstrap so first paint shows the DEFAULT_LAYOUT, not 'COSE'.
-    syncLayoutDisplay(DEFAULT_LAYOUT);
-    setCurrentLayout(DEFAULT_LAYOUT);
-    restoreBsAdvancedPrefs();
+  uiState.highlight = new HighlightEngine(uiState.renderer.getCy());
+  registerFitFn(() => fitGraph(uiState.renderer!));
+  registerCyAccessor(() => uiState.renderer!.getCy());
 
-    uiState.detailPanel = new DetailPanel(uiState.renderer.getCy(), uiState.highlight, {
-      onNodeClick: (nodeId) => {
-        const node = uiState.renderer!.getCy().getElementById(nodeId);
-        if (!node.empty()) {
-          uiState.highlight!.highlightNode(nodeId);
-          uiState.detailPanel!.show(nodeId, true); // 用户从面板内点击邻居节点
-          uiState.renderer!.getCy().animate({
-            center: { eles: node },
-            zoom: 1.5,
-            duration: 400,
-            easing: 'ease-out-cubic',
-          });
-        }
+  syncLayoutDisplay(DEFAULT_LAYOUT);
+  setCurrentLayout(DEFAULT_LAYOUT);
+  restoreBsAdvancedPrefs();
+
+  uiState.detailPanel = new DetailPanel(uiState.renderer.getCy(), uiState.highlight, {
+    onNodeClick: (nodeId) => {
+      const node = uiState.renderer!.getCy().getElementById(nodeId);
+      if (!node.empty()) {
+        uiState.highlight!.highlightNode(nodeId);
+        uiState.detailPanel!.show(nodeId, true);
+        uiState.renderer!.getCy().animate({
+          center: { eles: node },
+          zoom: 1.5,
+          duration: 400,
+          easing: 'ease-out-cubic',
+        });
+      }
+    },
+    onClose: () => {
+      uiState.highlight!.reset();
+    },
+  });
+
+  uiState.search = new Search(uiState.renderer.getCy(), uiState.highlight);
+  const cy = uiState.renderer.getCy();
+
+  tourController = new TourController(cy, uiState.renderer, uiState.detailPanel!);
+  tourController.mount();
+  registerTourController(() => tourController.isRunning() || tourController.isPaused());
+
+  initGraphEvents({
+    cy,
+    renderer: uiState.renderer,
+    highlight: uiState.highlight!,
+    detailPanel: uiState.detailPanel!,
+    spawnNodeRipple,
+    setPrevSelectedNode,
+    showZoomIndicator,
+    isDebugOverlayActive: () => debugOverlayActive,
+    updateForensicPanel,
+    tourController,
+    setDragging: (d) => {
+      uiState.isDragging = d;
+    },
+  });
+
+  initDebugOverlay(uiState.renderer);
+
+  // Streaming 期间的初始 zoom——用 0.08 让用户能看到"全图概貌"，
+  // 节点从中心爆出时整体框架已铺开。等 finishStreamingLayout 跑完 euler 后
+  // 再 fitGraphAnimated 到精确的全图 zoom。
+  cy.zoom(0.08);
+  cy.center();
+
+  // 第一批节点也走"从中心爆出来"动画，保证统一观感
+  // （appendBatchToGraph 已经处理了 init 后的批次，但 init 时的批次还没经过动画）
+  cy.nodes().forEach((n, i) => {
+    if (n.empty()) return;
+    const angle = halton(i, 2) * Math.PI * 2;
+    const ringRadius = 50 + halton(i, 3) * 280;
+    n.position({ x: 0, y: 0 });
+    n.addClass('entering');
+    n.animate({
+      position: {
+        x: Math.cos(angle) * ringRadius,
+        y: Math.sin(angle) * ringRadius,
       },
-      onClose: () => {
-        uiState.highlight!.reset();
-      },
+      duration: 520,
+      easing: 'ease-out-cubic',
     });
+    setTimeout(() => n.removeClass('entering'), 100 + i * 10);
+  });
+}
 
-    uiState.search = new Search(uiState.renderer.getCy(), uiState.highlight);
-    const cy = uiState.renderer.getCy();
+/**
+ * Animate-fit so the final "load complete" transition doesn't snap.
+ * Cytoscape's `fit()` jumps the camera in one frame; we instead use
+ * `animate()` to glide the camera from its current zoom/center to the
+ * full-graph extents over ~700ms.
+ *
+ * `minZoom` is the minimum "see the whole graph" zoom — cytoscape can
+ * otherwise compute a tiny zoom on huge graphs that makes the graph
+ * disappear into noise.
+ */
+function fitGraphAnimated(cy: cytoscape.Core): void {
+  const bb = cy.elements().boundingBox();
+  if (bb.w === 0 || bb.h === 0) return;
 
-    // TourController must exist before initGraphEvents — the canvas-tap
-    // handler reads its `isRunning` / `isPaused` synchronously. Constructing
-    // it first fixes the boot-time race that issue #11 flagged: a tap on
-    // the canvas between initGraphEvents and the original (later) tour
-    // assignment used to dereference `undefined`.
-    tourController = new TourController(cy, uiState.renderer, uiState.detailPanel!);
-    tourController.mount();
-    registerTourController(() => tourController.isRunning() || tourController.isPaused());
+  const containerW = cy.width();
+  const containerH = cy.height();
+  const padding = 80;
+  const rawZoom = Math.min(
+    (containerW - padding * 2) / bb.w,
+    (containerH - padding * 2) / bb.h,
+  );
+  // cap at 1.0 (don't zoom in past 100%) and at minZoom 0.08 (don't
+  // zoom out so far that the graph becomes a speck).
+  const targetZoom = Math.max(0.08, Math.min(1.0, rawZoom));
+  const cx = bb.x1 + bb.w / 2;
+  const cy_ = bb.y1 + bb.h / 2;
 
-    initGraphEvents({
-      cy,
-      renderer: uiState.renderer,
-      highlight: uiState.highlight!,
-      detailPanel: uiState.detailPanel!,
-      spawnNodeRipple,
-      setPrevSelectedNode,
-      showZoomIndicator,
-      isDebugOverlayActive: () => debugOverlayActive,
-      updateForensicPanel,
-      tourController,
-      setDragging: (d) => {
-        uiState.isDragging = d;
-      },
-      // Issue #19: `setDragMode` was removed from GraphEventDeps.
-      // cytoscape drag-mode styling now happens inline in graph-events.ts,
-      // where it's coupled to the grab/free/dragfree event bindings.
-    });
+  cy.animate({
+    center: { x: cx, y: cy_ },
+    zoom: targetZoom,
+    duration: 700,
+    easing: 'ease-out-cubic',
+  });
+}
 
-    // 初始缩放：只显示节点和边的关系结构，不求看清全貌或节点细节
-    // 必须监听 layoutstop 才能覆盖 euler 的 fit:true（布局完成后摄像头重置）
-    // 0.08 = 8% 缩放，能看到节点之间的边走向，但看不清节点标签
-    let initialZoomSet = false;
-    const setInitialZoom = () => {
-      if (initialZoomSet) return;
-      initialZoomSet = true;
-      cy.off('layoutstop', setInitialZoom);
-      cy.zoom(0.08);
-      cy.center();
-    };
-    cy.on('layoutstop', setInitialZoom);
-    // 万一布局已经跑完了（euler 动画很快），直接设
-    setInitialZoom();
+/**
+ * After the manifest finishes, kick off the euler force-directed layout
+ * once. We DON'T snap to the final layout — euler is allowed to run its
+ * full animation so users see nodes drift from their "cosmic" positions
+ * into the organic, topology-aware structure. This is the "gravity" phase
+ * of the cosmic metaphor: things that "want to be" connected pull toward
+ * each other; lone nodes get pushed apart.
+ *
+ * Layout timing:
+ *   euler animate:'end' = physical convergence + 600ms interpolation.
+ *   resolveOverlaps inside runLayout() then nudges any overlapping nodes.
+ *   So we delay fitGraphAnimated a bit past layoutstop (1.2s) to let all
+ *   of that settle, otherwise fit uses a stale boundingBox.
+ */
+function finishStreamingLayout(): void {
+  if (!uiState.renderer) return;
+  const cy = uiState.renderer.getCy();
+  const nodeCount = cy.nodes().length;
 
-    initDebugOverlay(uiState.renderer);
-    updateStats(cy);
-    syncBottomSheetStats(cy);
-
-    const badgeDot = document.getElementById('badge-dot');
-    if (badgeDot) badgeDot.classList.remove('topbar__badge-dot--loading');
-
-    brandCarousel.start();
-
-    const sidebar = document.getElementById('sidebar');
-    const sidebarBtn = document.getElementById('btn-sidebar-toggle');
-    const nodePanel = document.getElementById('node-panel');
-    if (sidebar && sidebarBtn)
-      sidebarBtn.classList.toggle('active', !sidebar.classList.contains('hidden'));
-    if (nodePanel && sidebar)
-      nodePanel.classList.toggle('sidebar-hidden-adjust', sidebar.classList.contains('hidden'));
-
-    initSheetDrag();
-    initPanelDrag();
-    initPanelResize();
-    initSectionHeights();
-  } catch (err) {
-    const n = document.getElementById('stat-nodes');
-    const e = document.getElementById('stat-edges');
-    if (n) n.textContent = 'error';
-    if (e) e.textContent = (err as Error).message;
+  // 太少的节点（比如缓存命中只有 100 个以下）就别折腾 euler 了，
+  // 直接 fit 视图——euler 在小图上反而会乱抖。
+  if (nodeCount < 80) {
+    setTimeout(() => fitGraphAnimated(cy), 100);
     return;
   }
 
-  // These init functions need cy — only proceed if renderer was created successfully.
-  initKeyboardShortcuts();
-  initSearchUI(uiState.renderer.getCy(), uiState.highlight!, uiState.search!, uiState.detailPanel!);
-  initResizeHandler();
-  initMusicPlayer();
+  // 取消任何 in-flight 节点位置动画（之前批次的"飞出去"动画还没完），
+  // 让 euler 接管位置计算。避免两个动画系统互相拉扯。
+  cy.stop(undefined, true);
+  cy.elements().removeClass('entering');
 
-  // Install bigscreen mode keyboard + fullscreen listeners.
-  initBigscreen();
+  // 触发 euler 布局（用 animate:true 让 euler 自己跑位置动画，
+  // 我们手动接管入场动画——不要 runLayout 自己的 stagger，避免双层动画打架）
+  uiState.renderer.runLayout(DEFAULT_LAYOUT, { animate: true, randomize: false }, { skipEntering: true });
 
-  // Install the document-level click dispatcher once (idempotent).
-  installDispatcher();
-  // Wire every data-action="..." button to its handler.
-  registerAppActions(uiState.renderer, uiState.highlight!, uiState.detailPanel!);
-  // Console-only debug bridge.
-  installDebugBridge(uiState.renderer);
+  // 等 layoutstop + 600ms 收敛动画 + 重叠解决完成后再 fit
+  cy.once('layoutstop', () => {
+    // 再等 800ms 让 euler 的 600ms 动画 + resolveOverlaps 完成
+    setTimeout(() => fitGraphAnimated(cy), 800);
+  });
+}
 
-  showOnboardingTip();
+/**
+ * Append a batch of newly-arrived nodes to the already-rendered graph.
+ * "Cosmic expansion" model — every new batch pushes existing nodes a bit
+ * further from the origin (like the universe expanding as new matter is
+ * added) and places new nodes on the outer ring. The result reads as
+ * continuous outward growth instead of a "load → snap" transition.
+ *
+ * Edges that connect already-present nodes appear naturally because they
+ * were created earlier in the streaming order; we don't re-layout.
+ */
+function appendBatchToGraph(
+  batchFiles: Record<string, string>,
+  graphManager: GraphManager,
+  _collected: Record<string, string>,
+): void {
+  if (!uiState.renderer) return;
+
+  const cy = uiState.renderer.getCy();
+  const data = graphManager.build();
+
+  // Get only the new nodes/edges (those not yet in cy)
+  const existingNodeIds = new Set<string>();
+  for (const n of cy.nodes()) existingNodeIds.add(n.id());
+  const existingEdgeIds = new Set<string>();
+  for (const e of cy.edges()) existingEdgeIds.add(e.id());
+
+  const ENTERING = uiState.renderer.CLASSES_ENTERING;
+
+  const newNodeEls = data.nodes
+    .filter((n) => !existingNodeIds.has(n.id))
+    .map((n) => ({
+      group: 'nodes' as const,
+      data: {
+        id: n.id,
+        label: n.label || n.id,
+        fill: n.fill,
+        stroke: n.stroke,
+        shape: n.shape,
+        depth: n.depth,
+        subtreeRoot: n.subtreeRoot,
+        shortSummary: n.shortSummary,
+        fullSummary: n.fullSummary,
+        summary: n.summary,
+        location: n.location,
+        tags: n.tags ?? [],
+        body: n.body,
+        weight: n.weight ?? 60,
+        edges_out: n.edges_out ?? [],
+      },
+    }));
+
+  // 不再因为本批只有边没新节点而提前 return —— 边连接之前已存在的节点是合法且常见的。
+  // 不过完全没有节点也没有边的时候（空 batch）就早退，避免无意义的 work。
+
+  // 收集所有"已知"的节点 id（用于过滤边）——包括：
+  //   1. 已存在于 cy 的节点（之前的批次加进来的）
+  //   2. 当前 batch 的新节点
+  // 边可能引用这两种任意一种。之前的 bug 是只检查 (2)，导致引用之前
+  // 批次节点的边被错误地过滤掉，连接性丢失。
+  const allKnownIds = new Set<string>(existingNodeIds);
+  data.nodes.forEach((n) => allKnownIds.add(n.id));
+
+  const newEdgeEls = data.edges
+    .filter((e) => !existingEdgeIds.has(e.id) && allKnownIds.has(e.source) && allKnownIds.has(e.target))
+    .map((e, idx) => ({
+      group: 'edges' as const,
+      data: {
+        id: e.id ?? `edge-${idx}`,
+        source: e.source,
+        target: e.target,
+        edgeType: e.type,
+        reason: e.reason,
+      },
+    }));
+
+  // 大爆炸：从中心 (0,0) 向外扩散。新节点直接落在 halton 序列
+  // 指定的位置上（从原点 animate 飞过去），不挤压已有节点。
+  const existingNodes = cy.nodes();
+  const existingCount = existingNodes.length;
+
+  // 容错：即使上面 filter 漏掉了 dangling edge（比如某节点解析失败但有边引用），
+  // cytoscape 在 batch 里遇到 nonexistent source 会抛错并中断整个 add。
+  // 我们对节点和边分别 try/catch，单独失败不影响整体。
+  cy.batch(() => {
+    if (newNodeEls.length > 0) {
+      try {
+        cy.add(newNodeEls);
+      } catch (err) {
+        console.warn('[appendBatchToGraph] failed to add nodes:', err);
+      }
+      newNodeEls.forEach((el) => {
+        const node = cy.getElementById(el.data.id);
+        if (!node.empty()) node.addClass(ENTERING);
+      });
+    }
+  });
+
+  // 边单独 add，失败的边计入诊断（不阻断整批）。
+  // 多次刷新看到的同一个 dangling edge 计数累加，便于发现真正的根因
+  // ——比如某个 frontmatter 没解析成功，导致 source 节点缺失。
+  const diag = ensureDiag();
+  for (const el of newEdgeEls) {
+    try {
+      cy.add(el);
+      const edge = cy.getElementById(el.data.id);
+      if (!edge.empty()) edge.addClass(ENTERING);
+    } catch (err) {
+      diag.skippedEdges.push({
+        id: el.data.id,
+        source: el.data.source,
+        target: el.data.target,
+        err: String(err),
+      });
+      if (diag.skippedEdges.length <= 5) {
+        console.warn('[appendBatchToGraph] skipped dangling edge', el.data.id, '→', err);
+      }
+    }
+  }
+
+  // 同时暴露"被 filter 过滤掉的边"——这些边两端都是 known 节点但因为
+  // existingEdgeIds 已经包含而跳过，这种情况是正常的（边已加过），
+  // 但 filter 因为两端不是 allKnownIds 而丢的边——那些是真正缺失的。
+  const trulyDangling = data.edges.filter(
+    (e) =>
+      !existingEdgeIds.has(e.id) &&
+      !allKnownIds.has(e.source) &&
+      !allKnownIds.has(e.target), // 双端都不在 known 里——纯 dangling
+  );
+  if (trulyDangling.length > 0) {
+    diag.filteredDangling.push(...trulyDangling.map((e) => ({ id: e.id, source: e.source, target: e.target })));
+  }
+
+  // 1. 新节点从原点 (0,0) 飞出到 halton 序列指定的目标位置。
+  //    halton 索引是全局的（base 2/3），保证不管分批到达多少次，
+  //    整体节点分布都均匀不重叠。
+  newNodeEls.forEach((el, i) => {
+    const node = cy.getElementById(el.data.id);
+    if (node.empty()) return;
+
+    // 全局唯一索引（在总集中的位置）
+    const globalIdx = existingCount + i;
+    const angle = halton(globalIdx, 2) * Math.PI * 2;
+    const ringRadius = 50 + halton(globalIdx, 3) * 280;
+
+    // 先放原点，然后 animate 到目标（视觉上就是"从中心爆出来"）
+    node.position({ x: 0, y: 0 });
+    node.animate({
+      position: {
+        x: Math.cos(angle) * ringRadius,
+        y: Math.sin(angle) * ringRadius,
+      },
+      duration: 520,
+      easing: 'ease-out-cubic',
+    });
+  });
+
+  // 2. 节点 + 边的渐入（在动画开始后立即开始，节点到位时刚好可见）
+  newNodeEls.forEach((el, i) => {
+    const node = cy.getElementById(el.data.id);
+    if (node.empty()) return;
+    setTimeout(() => node.removeClass(ENTERING), 100 + i * 10);
+  });
+  newEdgeEls.forEach((el, i) => {
+    const edge = cy.getElementById(el.data.id);
+    if (edge.empty()) return;
+    setTimeout(() => edge.removeClass(ENTERING), 200 + i * 6);
+  });
+}
+
+/**
+ * 诊断汇总：把所有被静默 skip 的边、被 filter 过滤掉的 dangling edge、
+ * parser warnings 都收集到 window.__graphDiag 上。调试时一行命令就能看清
+ * 整张图到底哪些边丢了、为什么丢。比"容错吞错 + 一片寂静"靠谱得多。
+ */
+interface GraphDiag {
+  skippedEdges: Array<{ id: string; source: string; target: string; err: string }>;
+  filteredDangling: Array<{ id: string; source: string; target: string }>;
+  parserWarnings: unknown[];
+  nodesInCy: number;
+  nodesInData: number;
+  edgesInCy: number;
+  edgesInData: number;
+}
+
+function ensureDiag(): GraphDiag {
+  const w = window as unknown as { __graphDiag?: GraphDiag };
+  if (!w.__graphDiag) {
+    w.__graphDiag = {
+      skippedEdges: [],
+      filteredDangling: [],
+      parserWarnings: [],
+      nodesInCy: 0,
+      nodesInData: 0,
+      edgesInCy: 0,
+      edgesInData: 0,
+    };
+  }
+  return w.__graphDiag;
+}
+
+function dumpDiag(graphManager?: GraphManager): void {
+  const diag = ensureDiag();
+  if (graphManager) {
+    diag.parserWarnings = graphManager.warnings;
+  }
+  if (uiState.renderer) {
+    const cy = uiState.renderer.getCy();
+    diag.nodesInCy = cy.nodes().length;
+    diag.edgesInCy = cy.edges().length;
+    const data = graphManager?.getData();
+    if (data) {
+      diag.nodesInData = data.nodes.length;
+      diag.edgesInData = data.edges.length;
+    }
+  }
+  // 用 console.table 把 parserWarnings 单独列出来（默认 console.info
+  // 折叠了，table 会展开）。其它字段用 group 输出。
+  if (diag.parserWarnings.length > 0) {
+    // eslint-disable-next-line no-console
+    console.table(diag.parserWarnings);
+  }
+  // eslint-disable-next-line no-console
+  console.info('[graphDiag] summary:', {
+    nodesInCy: diag.nodesInCy,
+    nodesInData: diag.nodesInData,
+    edgesInCy: diag.edgesInCy,
+    edgesInData: diag.edgesInData,
+    skippedEdges: diag.skippedEdges.length,
+    filteredDangling: diag.filteredDangling.length,
+    parserWarnings: diag.parserWarnings.length,
+  });
+}
+
+/**
+ * Halton sequence — low-discrepancy quasi-random number in [0,1).
+ * Beats pure random because points never cluster.
+ */
+function halton(index: number, base: number): number {
+  let f = 1;
+  let r = 0;
+  let i = index;
+  while (i > 0) {
+    f /= base;
+    r += f * (i % base);
+    i = Math.floor(i / base);
+  }
+  return r;
 }
 
 // ── Thin glue: keyboard shortcuts + resize handler + onboarding tip ──────────

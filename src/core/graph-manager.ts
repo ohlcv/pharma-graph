@@ -1,18 +1,52 @@
 // src/core/graph-manager.ts
 // Browser entry — loads Markdown via Vite glob, parses frontmatter, and
 // hands off to the shared buildGraph helper.
+//
+// Supports incremental `addFiles()` so callers can stream content
+// into the builder (used by the streaming loader in
+// src/core/optimized-content-loader.ts) and re-run build() to get
+// an up-to-date GraphData without re-parsing what's already cached.
 
 import { GraphData } from './graph.js';
 import { parseFrontmatterWithWarnings, type ParseWarning } from '../parser/frontmatter.js';
 import { buildGraph } from './build-graph.js';
 
 export class GraphManager {
+  private mdFiles: Record<string, string>;
   private data: GraphData | null = null;
   /** Last-set of parser warnings emitted during build(). Callers can read
    *  this after build() to surface a toast / debug panel (issue #14). */
   public warnings: ParseWarning[] = [];
 
-  constructor(private mdFiles: Record<string, string>) {}
+  constructor(mdFiles: Record<string, string> = {}) {
+    this.mdFiles = mdFiles;
+  }
+
+  /**
+   * Add a batch of file → content pairs and invalidate the cache so
+   * the next `build()` re-runs the graph builder on the union.
+   *
+   * Returns true if any new file was added (used by the streaming
+   * caller to decide whether to schedule a graph append).
+   */
+  addFiles(batch: Record<string, string>): boolean {
+    let added = false;
+    for (const [fp, raw] of Object.entries(batch)) {
+      if (!(fp in this.mdFiles)) {
+        this.mdFiles[fp] = raw;
+        added = true;
+      }
+    }
+    if (added) {
+      this.data = null; // force rebuild
+    }
+    return added;
+  }
+
+  /** Number of files currently loaded — used by the loader progress UI. */
+  fileCount(): number {
+    return Object.keys(this.mdFiles).length;
+  }
 
   build(): GraphData {
     if (this.data) return this.data;

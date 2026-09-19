@@ -1,3 +1,57 @@
+/* ── Non-blocking loading indicator (corner) ─────────────────────────────────
+   Positioned bottom-center, low-key pill with breathing dot.
+   The graph *renders in real time* as content streams in — this
+   indicator is just a passive status badge that fades when done. */
+.loading-indicator {
+  position: fixed;
+  bottom: 18px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 7px 14px 7px 11px;
+  background: rgba(12, 18, 34, 0.78);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  color: var(--text-2);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+  pointer-events: none;
+}
+.loading-indicator.hidden {
+  opacity: 0;
+  transform: translateX(-50%) translateY(12px);
+}
+.loading-indicator .loading-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--yellow);
+  box-shadow: 0 0 10px var(--yellow), 0 0 18px rgba(234, 179, 8, 0.35);
+  animation: dot-pulse 1.4s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.loading-indicator.complete .loading-dot {
+  background: var(--green);
+  box-shadow: 0 0 10px var(--green), 0 0 18px rgba(52, 211, 153, 0.35);
+  animation: dot-pulse 3s ease-in-out infinite;
+}
+.loading-indicator.complete {
+  transition: opacity 0.5s ease-out 0.6s, transform 0.5s ease-out 0.6s;
+}
+.loading-label { letter-spacing: 0.04em; }
+.loading-count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 6ch; text-align: left;
+}
+.loading-percent {
+  color: var(--text);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 4ch; text-align: right;
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    shared.css — Global Animations · Utility Classes
    ══════════════════════════════════════════════════════════════════════════ */

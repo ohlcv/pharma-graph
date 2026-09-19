@@ -1,12 +1,151 @@
 import { defineConfig, type Plugin } from 'vite';
-import { readdir, writeFile, stat, mkdir } from 'node:fs/promises';
+import { readdir, writeFile, stat, mkdir, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, relative, sep, posix } from 'node:path';
+import { parse as yamlParse } from 'yaml';
 
 const CONTENT_DIR = 'public/content';
 const PUBLIC_DIR = 'public';
 const MANIFEST_FILENAME = 'content-manifest.json';
 const SITEMAP_FILENAME = 'sitemap.xml';
+const GRAPH_DATA_FILENAME = 'graph-data.json';
+
+/**
+ * Frontmatter parser for build-time use — delegates to the `yaml` package
+ * so we get the same fidelity as the runtime parser in src/parser/frontmatter.ts.
+ */
+function parseFrontmatter(raw: string): {
+  id?: string;
+  label?: string;
+  fill?: string;
+  edges_out?: Array<{ target: string; type: string; reason?: string }>;
+  [key: string]: unknown;
+} | null {
+  const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!match) return null;
+
+  try {
+    const parsed = yamlParse(match[1]) as Record<string, unknown> | null;
+    if (!parsed || typeof parsed !== 'object') return null;
+
+    // Support both root-level fields and `data:` nested block (new schema)
+    const data = parsed['data'];
+    const source = (data && typeof data === 'object' && !Array.isArray(data))
+      ? { ...parsed, ...(data as Record<string, unknown>) }
+      : parsed;
+
+    return source as {
+      id?: string;
+      label?: string;
+      fill?: string;
+      edges_out?: Array<{ target: string; type: string; reason?: string }>;
+      [key: string]: unknown;
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build pre-generated graph data JSON at build time.
+ * This allows the browser to skip parsing 1000+ markdown files.
+ */
+async function buildGraphData(): Promise<void> {
+  const root = process.cwd();
+  const contentRoot = join(root, CONTENT_DIR);
+  const publicRoot = join(root, PUBLIC_DIR);
+  if (!existsSync(contentRoot)) return;
+
+  const entries: Array<{ rel: string; abs: string }> = [];
+
+  async function walk(dir: string): Promise<void> {
+    const items = await readdir(dir);
+    for (const name of items) {
+      const abs = join(dir, name);
+      const s = await stat(abs);
+      if (s.isDirectory()) {
+        await walk(abs);
+      } else if (name.endsWith('.md')) {
+        const rel = relative(contentRoot, abs).split(sep).join(posix.sep);
+        entries.push({ rel, abs });
+      }
+    }
+  }
+
+  await walk(contentRoot);
+
+  // Parse all files and build graph data
+  const nodes: Array<{
+    id: string;
+    label: string;
+    rel: string;
+    edges_out?: Array<{ target: string; type: string; reason?: string }>;
+  }> = [];
+  const edges: Array<{ id: string; source: string; target: string; type: string; reason?: string }> = [];
+
+  // First pass: collect all node IDs
+  const nodeDataMap = new Map<string, { id: string; label: string; rel: string; edges_out?: Array<{ target: string; type: string; reason?: string }> }>();
+
+  for (const entry of entries) {
+    try {
+      const raw = await readFile(entry.abs, 'utf-8');
+      const fm = parseFrontmatter(raw);
+
+      if (!fm?.id) continue;
+
+      nodeDataMap.set(fm.id as string, {
+        id: fm.id as string,
+        label: (fm.label as string) ?? (fm.id as string),
+        rel: entry.rel,
+        edges_out: fm.edges_out as Array<{ target: string; type: string; reason?: string }> | undefined,
+      });
+    } catch (err) {
+      console.warn(`[buildGraphData] Failed to parse ${entry.rel}:`, err);
+    }
+  }
+
+  // Second pass: build nodes and edges
+  for (const node of nodeDataMap.values()) {
+    nodes.push(node);
+
+    if (node.edges_out && Array.isArray(node.edges_out)) {
+      for (const edge of node.edges_out) {
+        if (!nodeDataMap.has(edge.target)) continue; // Skip dangling edges
+        edges.push({
+          id: `${node.id}||${edge.target}||${edge.type}`,
+          source: node.id,
+          target: edge.target,
+          type: edge.type,
+          reason: edge.reason,
+        });
+      }
+    }
+  }
+
+  // Deduplicate edges
+  const seenEdges = new Set<string>();
+  const uniqueEdges = edges.filter((e) => {
+    if (seenEdges.has(e.id)) return false;
+    seenEdges.add(e.id);
+    return true;
+  });
+
+  const graphData = {
+    version: 2,
+    generated: new Date().toISOString(),
+    stats: { nodes: nodes.length, edges: uniqueEdges.length },
+    nodes,
+    edges: uniqueEdges,
+  };
+
+  await writeFile(
+    join(publicRoot, GRAPH_DATA_FILENAME),
+    JSON.stringify(graphData),
+    'utf-8',
+  );
+
+  console.log(`[buildGraphData] Generated graph-data.json: ${nodes.length} nodes, ${uniqueEdges.length} edges`);
+}
 
 /**
  * Escape XML special characters for sitemap <loc> / <lastmod> text nodes.
@@ -130,12 +269,14 @@ function contentManifestPlugin(): Plugin {
     apply: () => true,
     async buildStart() {
       await buildManifest();
+      await buildGraphData();
     },
     async handleHotUpdate(ctx) {
       // Re-emit the manifest whenever a markdown file changes — keeps dev
       // in sync without a full server restart.
       if (ctx.file.endsWith('.md')) {
         await buildManifest();
+        await buildGraphData();
       }
     },
   };

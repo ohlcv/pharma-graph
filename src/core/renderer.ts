@@ -500,7 +500,7 @@ export class Renderer {
       } as unknown as { name: string },
       minZoom,
       maxZoom,
-      wheelSensitivity: 3.0,
+      // wheelSensitivity: 3.0  // 默认 1.0 即可（cytoscape 不推荐自定义）
       boxSelectionEnabled: true,
       autounselectify: false,
       autoungrabify: false,
@@ -509,7 +509,14 @@ export class Renderer {
     };
     this.cy = cytoscape(cyOptions);
 
-    this.runLayout(layoutName);
+    // Skip automatic layout when caller passes 'preset' (streaming boot
+    // path): cytoscape's preset layout just keeps the position we set
+    // on the element, which is exactly what we want before the streaming
+    // manifest finishes. The final layout is kicked explicitly from main.ts
+    // via `finishStreamingLayout()` so all nodes settle at once.
+    if (layoutName !== 'preset') {
+      this.runLayout(layoutName);
+    }
     this.startGlowAnimations();
   }
 
@@ -580,7 +587,14 @@ export class Renderer {
     return this.cy;
   }
 
-  runLayout(name: string, overrides?: Record<string, unknown>): void {
+  /** CSS class name for the entering-animation fade-in (used by main.ts
+   *  streaming loader to mark newly-streamed nodes so they fade in
+   *  progressively). Mirrors `CLASSES.ENTERING` from internal state. */
+  get CLASSES_ENTERING(): string {
+    return CLASSES.ENTERING;
+  }
+
+  runLayout(name: string, overrides?: Record<string, unknown>, opts?: { skipEntering?: boolean }): void {
     this.currentLayout = name;
     const preset = this.layoutConfigs[name]?.cytoscape;
     const base = preset ? { ...preset } : {};
@@ -589,28 +603,64 @@ export class Renderer {
     // 强制关闭 fit：所有布局都不自动 fit，完全由 main.ts 的 setInitialZoom
     // 和用户手动操作（适应/F键）控制摄像头，防止布局的 fit:true 覆盖 zoom。
     (base as Record<string, unknown>).fit = false;
+    // 默认打开 animate：让 euler/cose 等模拟退火布局走平滑过渡，
+    // 而不是把节点瞬间贴到收敛位置造成"啪"地一下全到位。
+    (base as Record<string, unknown>).animate = true;
 
     const nodes = this.cy.nodes().not(`.${CLASSES.LAYER_PARENT}`);
+    const nodeCount = nodes.length;
 
-    nodes.addClass(CLASSES.ENTERING);
-    this.cy.edges().addClass(CLASSES.ENTERING);
+    // `skipEntering` — 给流式加载完结路径用：
+    // 因为 streaming 期间已经手动给节点做了"从原点飞出"动画，
+    // 此时再叠加 stagger 渐入会和 euler 的位置动画打架。
+    if (opts?.skipEntering) {
+      // 不做进入动画，只跑布局
+    } else if (nodeCount > 500) {
+      // 性能优化：当节点数量超过 500 时，简化入场动画
+      // 减少 setTimeout 调用次数，避免大量定时器开销
+      const batchSize = 50;
+      const batches = Math.ceil(nodeCount / batchSize);
 
-    nodes.forEach((node: cytoscape.NodeSingular, i: number) => {
-      const delay = 80 + i * 16;
+      nodes.addClass(CLASSES.ENTERING);
+      this.cy.edges().addClass(CLASSES.ENTERING);
+
+      for (let b = 0; b < batches; b++) {
+        const batchDelay = b * 100;
+        setTimeout(() => {
+          const start = b * batchSize;
+          const end = Math.min(start + batchSize, nodeCount);
+          const batch = nodes.slice(start, end);
+          batch.removeClass(CLASSES.ENTERING);
+        }, batchDelay);
+      }
+
+      // 边在所有节点之后延迟出现
+      const totalEdgeDelay = batches * 100 + 300;
       setTimeout(() => {
-        node.removeClass(CLASSES.ENTERING);
-      }, delay + 300);
-    });
+        this.cy.edges().removeClass(CLASSES.ENTERING);
+      }, totalEdgeDelay);
+    } else {
+      // 小图谱保持原有精细动画
+      nodes.addClass(CLASSES.ENTERING);
+      this.cy.edges().addClass(CLASSES.ENTERING);
 
-    const edgeDelay = 80 + nodes.length * 16 + 150;
-    this.cy.edges().forEach((edge: cytoscape.EdgeSingular, i: number) => {
-      setTimeout(
-        () => {
-          edge.removeClass(CLASSES.ENTERING);
-        },
-        edgeDelay + i * 10 + 200,
-      );
-    });
+      nodes.forEach((node: cytoscape.NodeSingular, i: number) => {
+        const delay = 80 + i * 16;
+        setTimeout(() => {
+          node.removeClass(CLASSES.ENTERING);
+        }, delay + 300);
+      });
+
+      const edgeDelay = 80 + nodeCount * 16 + 150;
+      this.cy.edges().forEach((edge: cytoscape.EdgeSingular, i: number) => {
+        setTimeout(
+          () => {
+            edge.removeClass(CLASSES.ENTERING);
+          },
+          edgeDelay + i * 10 + 200,
+        );
+      });
+    }
 
     this.currentLayoutInstance?.stop();
     const layoutInstance = this.cy.layout(base as unknown as cytoscape.LayoutOptions);
@@ -690,6 +740,9 @@ export class Renderer {
             color: FILL_CONFIG[n.fill ?? '']?.background ?? FILL_CONFIG['']?.background ?? '#f9fafb',
             colorDark: FILL_CONFIG[n.fill ?? '']?.backgroundDark ?? FILL_CONFIG['']?.backgroundDark ?? '#94a3b8',
           },
+          // Pass through preset position so the 'preset' layout / layoutless
+          // init can scatter streaming-arrived nodes without overlapping.
+          ...(n.position ? { position: n.position } : {}),
         };
       }),
       ...data.edges
