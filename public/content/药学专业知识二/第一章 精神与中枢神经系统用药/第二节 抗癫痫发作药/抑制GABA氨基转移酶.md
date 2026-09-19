@@ -27,7 +27,7 @@ edges_out:
     reason: 增强GABA抑制性的具体机制
 
   - target: drug-vigabatrin-y2-01-02
-    type: has_instance
+    type: instance_of
     reason: 抑制GABA氨基转移酶的代表药物
 
 ---

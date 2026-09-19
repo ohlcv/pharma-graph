@@ -27,7 +27,7 @@ edges_out:
     reason: 增强GABA抑制性的具体机制
 
   - target: drug-tiagabine-y2-01-02
-    type: has_instance
+    type: instance_of
     reason: 抑制GABA转运体-1的代表药物
 
 ---
