@@ -17,13 +17,15 @@
 //   - debug-bridge.ts    → installDebugBridge
 //
 // ============================================================================
-// Safari / 微信 WKWebView 旧内核兼容：polyfill 必须放在**所有业务 import 之前**
-//   覆盖对象：Safari ≤ 15.3 / iOS ≤ 15.3 / 微信内置浏览器旧版 WKWebView
-//   否则会因 ??=、&&=、Object.hasOwn、Array.prototype.at、structuredClone、
-//   regex d-flag 等语法直接 SyntaxError → 入口 type=module 完全不执行 → 白屏
+// Polyfill strategy:
+//   • Modern browsers (Safari ≥15.4 / iOS ≥15.4): zero polyfill, native ES2019
+//   • Legacy browsers (Safari <15 / iOS <15): handled by @vitejs/plugin-legacy
+//     which generates a separate ES5 bundle with only the polyfills those
+//     specific browsers actually lack. This replaces the old "full core-js/stable"
+//     import that penalised every modern device.
+//   • regenerator-runtime: included in the legacy bundle for async/await support
+//     in environments that don't support it natively (iOS <15 / Safari <15).
 // ============================================================================
-import 'core-js/stable';
-import 'regenerator-runtime/runtime.js';
 
 import './styles/index.css';
 import type cytoscape from 'cytoscape';
