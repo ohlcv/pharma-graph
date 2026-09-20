@@ -27,15 +27,33 @@
   --accent2-soft: rgba(6, 182, 212, 0.16);
   --text:        #f1f5f9;
   --text-2:      #94a3b8;
-  --text-3:      #cbd5e1;             /* NEW — placeholder / weak labels */
-  --muted:       #64748b;  /* slate-500 — was slate-600 (~4.1:1, below AA on bg); raised to clear 4.5:1 */
+  --text-3:      #cbd5e1;             /* placeholder / weak labels */
+  --muted:       #64748b;             /* slate-500 — was slate-600 (~4.1:1, below AA on bg); raised to clear 4.5:1 */
   --green:       #34d399;
   --yellow:      #fbbf24;
-  --amber:       #f59e0b;             /* NEW — warning / pending state */
+  --amber:       #f59e0b;             /* warning / pending state */
   --red:         #f87171;
   --blue:        #60a5fa;
   --purple:      #a78bfa;
-  --pink:        #f472b6;             /* NEW — edge category accent */
+  --pink:        #f472b6;             /* edge category accent */
+
+  /* ── Ambient / halo — derived from accent/accent2 so they always stay in sync */
+  --halo-indigo:   rgba(129, 140, 248, 0.22);
+  --halo-cyan:     rgba(6, 182, 212, 0.16);
+  --halo-indigo-strong: rgba(129, 140, 248, 0.35);
+  --halo-cyan-strong:   rgba(6, 182, 212, 0.28);
+
+  /* ── Scrollbar */
+  --scrollbar-thumb:  rgba(99, 102, 241, 0.45);
+  --scrollbar-hover:   rgba(99, 102, 241, 0.70);
+
+  /* ── Debug palette */
+  --debug-red:    #f87171;
+  --debug-green:  #4ade80;
+  --debug-yellow: #fbbf24;
+  --debug-purple: #c084fc;
+
+  /* ── Easing tokens */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-out:    cubic-bezier(0.4, 0, 0.2, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
@@ -63,8 +81,8 @@ html, body {
 ::-webkit-scrollbar-track     { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg,
-    rgba(99,102,241,0.40) 0%,
-    rgba(6,182,212,0.35) 100%);
+    var(--accent) 0%,
+    var(--accent2) 100%);
   border-radius: 6px;
   border: 2px solid transparent;
   background-clip: padding-box;
@@ -72,21 +90,21 @@ html, body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg,
-    rgba(99,102,241,0.65) 0%,
+    rgba(129,140,248,0.65) 0%,
     rgba(6,182,212,0.55) 100%);
   background-clip: padding-box;
   border: 2px solid transparent;
 }
 ::-webkit-scrollbar-thumb:active {
   background: linear-gradient(180deg,
-    rgba(99,102,241,0.85) 0%,
+    rgba(129,102,241,0.85) 0%,
     rgba(6,182,212,0.75) 100%);
   background-clip: padding-box;
   border: 2px solid transparent;
 }
 #sidebar::-webkit-scrollbar   { width: 8px; }
-* { scrollbar-width: thin; scrollbar-color: rgba(99,102,241,0.45) transparent; }
-*:hover { scrollbar-color: rgba(99,102,241,0.70) transparent; }
+* { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
+*:hover { scrollbar-color: var(--scrollbar-hover) transparent; }
 
 /* Screen-reader-only utility (issue #29): visually hidden but readable
    by assistive tech. Used by aria-live regions for tour + search

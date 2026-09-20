@@ -78,7 +78,7 @@
 .tour-state--paused  #bs-tour-icon-stop { display: none; }
 
 /* The compact mobile-bar play/pause button mirrors the same logic. */
-.tour-state--idle    .tour-mob__badge { background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.4); }
+.tour-state--idle    .tour-mob__badge { background: rgba(129,140,248,0.18); border-color: rgba(129,140,248,0.4); }
 .tour-state--running .tour-mob__badge,
 .tour-state--paused  .tour-mob__badge { background: rgba(168,85,247,0.18); border-color: rgba(168,85,247,0.4); }
 
@@ -91,7 +91,7 @@
 .tour-state--running #btn-tour,
 .tour-state--paused  #btn-tour,
 .tour-state--running #bs-btn-tour,
-.tour-state--paused  #bs-btn-tour { background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.45); color: var(--accent); }
+.tour-state--paused  #bs-btn-tour { background: rgba(129,140,248,0.18); border-color: rgba(129,140,248,0.45); color: var(--accent); }
 
     /* ─────────────────────────────────────────────────────────────────────────
        桌面版 .tour-dt
@@ -178,14 +178,14 @@
       -webkit-appearance: none;
       width: var(--thumb-size); height: var(--thumb-size); border-radius: 50%;
       background: var(--tour-accent); border: none; margin: 0;
-      box-shadow: var(--thumb-glow, 0 0 6px rgba(99,102,241,0.7), 0 1px 2px rgba(0,0,0,0.4));
+      box-shadow: var(--thumb-glow, 0 0 6px rgba(129,140,248,0.7), 0 1px 2px rgba(0,0,0,0.4));
       cursor: pointer; transition: transform 0.1s;
     }
     .tour-dt__range::-webkit-slider-thumb:hover { transform: scale(1.2); }
     .tour-dt__range::-moz-range-thumb {
       width: var(--thumb-size); height: var(--thumb-size); border: none; border-radius: 50%;
       background: var(--tour-accent);
-      box-shadow: var(--thumb-glow, 0 0 6px rgba(99,102,241,0.7), 0 1px 2px rgba(0,0,0,0.4));
+      box-shadow: var(--thumb-glow, 0 0 6px rgba(129,140,248,0.7), 0 1px 2px rgba(0,0,0,0.4));
       cursor: pointer;
     }
     /* ─────────────────────────────────────────────────────────────────────────
@@ -218,8 +218,8 @@
     .tour-dt__strategy { display: none !important; }
     .tour-mob__strategy { display: none !important; }
     .tour-dt__select {
-      background: rgba(99,102,241,0.08);
-      border: 1px solid rgba(99,102,241,0.3);
+      background: rgba(129,140,248,0.08);
+      border: 1px solid rgba(129,140,248,0.3);
       border-radius: 8px;
       color: rgba(226,232,240,0.9);
       font-size: 0.62rem;
@@ -239,14 +239,14 @@
       letter-spacing: 0.01em;
     }
     .tour-dt__select:hover {
-      border-color: rgba(99,102,241,0.6);
-      background-color: rgba(99,102,241,0.15);
+      border-color: rgba(129,140,248,0.6);
+      background-color: rgba(129,140,248,0.15);
       color: #c4b5fd;
     }
     .tour-dt__select:focus {
       border-color: var(--tour-accent);
-      box-shadow: 0 0 0 2px rgba(99,102,241,0.25);
-      background-color: rgba(99,102,241,0.15);
+      box-shadow: 0 0 0 2px rgba(129,140,248,0.25);
+      background-color: rgba(129,140,248,0.15);
     }
     .tour-dt__select option { background: #1e2340; color: rgba(226,232,240,0.9); }
 
@@ -254,7 +254,7 @@
     @keyframes strategyFlash {
       0%   { border-color: #34d399; box-shadow: 0 0 0 2px rgba(52,211,153,0.35); color: #6ee7b7; background-color: rgba(52,211,153,0.12); }
       60%  { border-color: #34d399; box-shadow: 0 0 0 2px rgba(52,211,153,0.2);  color: #6ee7b7; background-color: rgba(52,211,153,0.08); }
-      100% { border-color: rgba(99,102,241,0.3); box-shadow: none; color: rgba(226,232,240,0.9); background-color: rgba(99,102,241,0.08); }
+      100% { border-color: rgba(129,140,248,0.3); box-shadow: none; color: rgba(226,232,240,0.9); background-color: rgba(129,140,248,0.08); }
     }
     @keyframes hintPulse {
       0%, 100% { opacity: 1; }
@@ -292,7 +292,7 @@
     .tour-dt__btn:active::after { opacity: 0.2; transform: scale(0.97); }
     .tour-dt__btn > * { position: relative; z-index: 1; }
     .tour-dt__btn:hover  { background: rgba(255,255,255,0.07); border-color: var(--border-hi); color: var(--text); }
-    .tour-dt__btn:active { transform: scale(0.96); box-shadow: 0 0 0 2px rgba(99,102,241,0.3); }
+    .tour-dt__btn:active { transform: scale(0.96); box-shadow: 0 0 0 2px rgba(129,140,248,0.3); }
     .tour-dt__btn--prev,
     .tour-dt__btn--next {
       padding: 5px 7px;
@@ -301,13 +301,13 @@
     }
     .tour-dt__btn--prev:hover,
     .tour-dt__btn--next:hover {
-      background: rgba(99,102,241,0.12);
-      border-color: rgba(99,102,241,0.35);
+      background: rgba(129,140,248,0.12);
+      border-color: rgba(129,140,248,0.35);
       color: #a78bfa;
     }
-    .tour-dt__btn--play  { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.4); color: #a78bfa; }
-    .tour-dt__btn--play:hover  { background: rgba(99,102,241,0.2); border-color: var(--tour-accent); box-shadow: 0 0 12px rgba(99,102,241,0.25); }
-    .tour-dt__btn--play.active { background: rgba(99,102,241,0.25); border-color: var(--tour-accent); box-shadow: 0 0 12px rgba(99,102,241,0.4), 0 0 0 2px rgba(99,102,241,0.2); }
+    .tour-dt__btn--play  { background: rgba(129,140,248,0.15); border-color: rgba(129,140,248,0.4); color: #a78bfa; }
+    .tour-dt__btn--play:hover  { background: rgba(129,140,248,0.2); border-color: var(--tour-accent); box-shadow: 0 0 12px rgba(129,140,248,0.25); }
+    .tour-dt__btn--play.active { background: rgba(129,140,248,0.25); border-color: var(--tour-accent); box-shadow: 0 0 12px rgba(129,140,248,0.4), 0 0 0 2px rgba(129,140,248,0.2); }
     .tour-dt__btn--close:hover { background: rgba(239,68,68,0.1); border-color: rgba(239,68,113,0.3); color: #f87171; }
 
     /* 朗读按钮 */
@@ -324,16 +324,7 @@
       color: var(--text);
     }
     .tour-dt__btn--speech.active {
-      color: #a78bfa;
-    }
-    .tour-dt__btn--speech.active .speech-wave-1,
-    .tour-dt__btn--speech.active .speech-wave-2 {
-      opacity: 1;
-    }
-    .speech-wave-1,
-    .speech-wave-2 {
-      opacity: 0;
-      transition: opacity 0.2s;
+      color: var(--accent);
     }
 
     .tour-dt__btn svg { width: 14px; height: 14px; flex-shrink: 0; }
@@ -373,7 +364,7 @@
         border-radius: 14px;
         background: #1a1f35;
         border: 1px solid rgba(99, 102, 241, 0.25);
-        box-shadow: 0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(99,102,241,0.12);
+        box-shadow: 0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(129,140,248,0.12);
         touch-action: none;
         user-select: none;
         overflow: visible;
@@ -433,7 +424,7 @@
       .tour-mob__badge {
         display: flex; align-items: center; justify-content: center;
         padding: 6px 10px; margin: 4px 0;
-        background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.3);
+        background: rgba(129,140,248,0.12); border: 1px solid rgba(129,140,248,0.3);
         border-radius: 7px; color: #a78bfa; cursor: pointer; flex-shrink: 0;
         font-size: 0.66rem; font-weight: 500; font-family: inherit;
         touch-action: manipulation;
@@ -442,22 +433,12 @@
       }
       .tour-mob__badge::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, var(--accent), var(--accent2)); opacity: 0; transition: opacity 0.14s; }
       .tour-mob__badge:hover::after { opacity: 0.12; }
-      .tour-mob__badge:active { transform: scale(0.96); box-shadow: 0 0 0 2px rgba(99,102,241,0.3); }
+      .tour-mob__badge:active { transform: scale(0.96); box-shadow: 0 0 0 2px rgba(129,140,248,0.3); }
       .tour-mob__badge > * { position: relative; z-index: 1; }
-      .tour-mob__badge:hover { background: rgba(99,102,241,0.2); border-color: rgba(99,102,241,0.5); box-shadow: 0 0 10px rgba(99,102,241,0.2); color: var(--accent); }
-      .tour-mob__badge.tour-active { background: rgba(99,102,241,0.25) !important; border-color: var(--tour-accent) !important; box-shadow: 0 0 12px rgba(99,102,241,0.4); color: var(--tour-accent) !important; }
+      .tour-mob__badge:hover { background: rgba(129,140,248,0.2); border-color: rgba(129,140,248,0.5); box-shadow: 0 0 10px rgba(129,140,248,0.2); color: var(--accent); }
+      .tour-mob__badge.tour-active { background: rgba(129,140,248,0.25) !important; border-color: var(--tour-accent) !important; box-shadow: 0 0 12px rgba(129,140,248,0.4); color: var(--tour-accent) !important; }
       .tour-mob__badge svg { width: 13px; height: 13px; stroke: currentColor; }
 
-      /* 朗读按钮：active 时显示音波（默认彻底隐藏音波） */
-      .tour-mob__badge .speech-wave-1,
-      .tour-mob__badge .speech-wave-2 {
-        opacity: 0;
-        transition: opacity 0.2s;
-      }
-      .tour-mob__badge.active .speech-wave-1,
-      .tour-mob__badge.active .speech-wave-2 {
-        opacity: 1;
-      }
       .tour-mob__badge--prev,
       .tour-mob__badge--next {
         padding: 5px 8px; margin: 4px 0;
@@ -474,8 +455,8 @@
       .tour-mob__badge--next::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, var(--accent), var(--accent2)); opacity: 0; transition: opacity 0.14s; }
       .tour-mob__badge--prev:hover,
       .tour-mob__badge--next:hover {
-        background: rgba(99,102,241,0.15);
-        border-color: rgba(99,102,241,0.4);
+        background: rgba(129,140,248,0.15);
+        border-color: rgba(129,140,248,0.4);
         color: #a78bfa;
       }
       .tour-mob__badge--prev:active,
@@ -507,7 +488,7 @@
         display: inline-flex; align-items: center; justify-content: center;
         height: auto; min-width: 40px; min-height: 24px; padding: 4px 8px;
         background: rgba(255,255,255,0.06);
-        border: 1px solid rgba(99,102,241,0.25); border-radius: 5px;
+        border: 1px solid rgba(129,140,248,0.25); border-radius: 5px;
         color: rgba(226,232,240,0.85); font-size: 0.62rem; font-weight: 600;
         font-family: inherit; line-height: 1; cursor: pointer; outline: none;
         /* 父容器 touch-action: none 会延迟 click，这里强制 manipulation 恢复即时响应 */
@@ -516,8 +497,8 @@
       }
       .tour-mob__strategy-toggle:active { transform: scale(0.96); }
       .tour-mob__strategy-toggle.strategy-switched {
-        border-color: rgba(99,102,241,0.85);
-        background: rgba(99,102,241,0.18);
+        border-color: rgba(129,140,248,0.85);
+        background: rgba(129,140,248,0.18);
       }
       .tour-mob__strategy-label {
         font-size: 0.46rem; color: rgba(226,232,240,0.55); white-space: nowrap;
@@ -585,7 +566,7 @@
            所以 JS 用 transformOriginTranslate 单独处理 scaleY，且要在 CSS 里覆盖。 */
         background: linear-gradient(to top, #6366f1, #a78bfa); border-radius: 2px;
         transition: transform 0.08s ease;
-        box-shadow: 0 0 6px rgba(99,102,241,0.6);
+        box-shadow: 0 0 6px rgba(129,140,248,0.6);
       }
       /* 取消之前的 translateX，让 JS 端能安全地只写 scaleY */
       .tour-mob__fill { transform: translateX(-50%) scaleY(0); }
@@ -612,7 +593,7 @@
          大小 18×18（触摸热区），box-shadow 0.9/4px（更亮的发光感）。 */
       .tour-mob__range {
         --thumb-size: 18px;
-        --thumb-glow: 0 0 8px rgba(99,102,241,0.9), 0 1px 4px rgba(0,0,0,0.4);
+        --thumb-glow: 0 0 8px rgba(129,140,248,0.9), 0 1px 4px rgba(0,0,0,0.4);
       }
       .tour-mob__range::-webkit-slider-thumb {
         -webkit-appearance: none;

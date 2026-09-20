@@ -21,8 +21,8 @@
      (The third central vignette was removed — it just darkened the
      middle of the canvas without adding rhythm.) */
   background:
-    radial-gradient(ellipse 120% 80% at 12% -5%, rgba(129,140,248,0.22) 0%, transparent 65%),
-    radial-gradient(ellipse 100% 70% at 88% 95%, rgba(6,182,212,0.16) 0%, transparent 60%);
+    radial-gradient(ellipse 120% 80% at 12% -5%, var(--halo-indigo) 0%, transparent 65%),
+    radial-gradient(ellipse 100% 70% at 88% 95%, var(--halo-cyan) 0%, transparent 60%);
   mix-blend-mode: screen;
   pointer-events: none; z-index: -1;
 }
@@ -60,11 +60,11 @@
   font-weight: 700; padding: 1px 3px; border-radius: 3px;
   white-space: nowrap; border: 1px solid rgba(255,255,255,0.2); line-height: 1.4;
 }
-.debug-badge--selected  { background: rgba(99,102,241,1);    color: #fff; }
-.debug-badge--dimmed    { background: rgba(239,68,68,0.9);   color: #fff; }
-.debug-badge--sel-node  { background: rgba(34,197,94,1);     color: #fff; }
-.debug-badge--highlight { background: rgba(251,191,36,0.9);  color: #000; }
-.debug-badge--hovered   { background: rgba(168,85,247,1);    color: #fff; }
+.debug-badge--selected  { background: var(--accent);   color: #fff; }
+.debug-badge--dimmed    { background: var(--debug-red);  color: #fff; }
+.debug-badge--sel-node  { background: var(--debug-green); color: #fff; }
+.debug-badge--highlight { background: var(--debug-yellow); color: #000; }
+.debug-badge--hovered   { background: var(--debug-purple); color: #fff; }
 .debug-badge--none      { background: rgba(100,116,139,0.5); color: #fff; }
 
 #debug-panel {
@@ -196,10 +196,10 @@
   border-radius: 6px; padding: 4px 4px;
 }
 .dbg-stat__val { font-size: 14px; font-weight: 700; }
-.dbg-stat__val--accent  { color: #818cf8; }
-.dbg-stat__val--red     { color: #f87171; }
-.dbg-stat__val--green   { color: #4ade80; }
-.dbg-stat__val--yellow  { color: #fbbf24; }
+.dbg-stat__val--accent  { color: var(--accent); }
+.dbg-stat__val--red     { color: var(--debug-red); }
+.dbg-stat__val--green   { color: var(--debug-green); }
+.dbg-stat__val--yellow  { color: var(--debug-yellow); }
 .dbg-stat__key { font-size: 9px; color: #64748b; }
 
 .dbg-filter { font-size: 10px; color: #94a3b8; word-break: break-all; font-family: 'Fira Code', monospace; }

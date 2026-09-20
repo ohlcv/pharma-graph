@@ -142,7 +142,7 @@
 .legend-edge-row:focus-visible,
 .bs-chip:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--accent), 0 0 0 5px rgba(99, 102, 241, 0.22);
+  box-shadow: 0 0 0 2px var(--accent), 0 0 0 5px rgba(129,140,248,0.22);
 }
 
 /* ── Reduced-motion accommodation ──────────────────────────────────────────
