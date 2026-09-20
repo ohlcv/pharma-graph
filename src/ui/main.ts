@@ -133,6 +133,10 @@ async function boot(): Promise<void> {
   // already running independently — start() just kicks off the word cycle.
   brandCarousel.start();
 
+  // Email card needs no graph state — wire it before loading starts so the
+  // meow word is always interactive, even while the big-bang is in progress.
+  initBadgeEmailCard();
+
   // 2) 流式加载内容：每收到一批 .md 就立即增量构建图谱塞进 cytoscape
   //    让用户看到"节点一颗颗长出来"的渐进动画，而不是等全部加载完才显示。
   let lastBatchCount = 0;
@@ -186,7 +190,6 @@ async function boot(): Promise<void> {
   initSectionHeights();
   initResizeHandler();
   initMusicPlayer();
-  initBadgeEmailCard();
   showOnboardingTip();
 
   // 诊断 dump：所有被静默 skip 的边 + parser warnings + 数据计数，
