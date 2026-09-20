@@ -137,6 +137,17 @@ async function boot(): Promise<void> {
   // meow word is always interactive, even while the big-bang is in progress.
   initBadgeEmailCard();
 
+  // All panel/sheet drag, resize, section-height, and music-player init functions
+  // touch only DOM nodes that exist from the first byte of index.html. They can
+  // safely run before loading completes — dragging the sheet while the graph is
+  // still streaming is a legitimate and useful interaction.
+  initSheetDrag();
+  initPanelDrag();
+  initPanelResize();
+  initSectionHeights();
+  initMusicPlayer();
+  showOnboardingTip();
+
   // 2) 流式加载内容：每收到一批 .md 就立即增量构建图谱塞进 cytoscape
   //    让用户看到"节点一颗颗长出来"的渐进动画，而不是等全部加载完才显示。
   let lastBatchCount = 0;
@@ -184,13 +195,9 @@ async function boot(): Promise<void> {
 
   // (sidebar active-state sync moved into initGraphFromManager — see above)
 
-  initSheetDrag();
-  initPanelDrag();
-  initPanelResize();
-  initSectionHeights();
+  // initResizeHandler() stays after the await — it calls fitGraph(uiState.renderer!)
+  // which requires the Cytoscape instance to exist.
   initResizeHandler();
-  initMusicPlayer();
-  showOnboardingTip();
 
   // 诊断 dump：所有被静默 skip 的边 + parser warnings + 数据计数，
   // 用户在 console 里看 `__graphDiag` 就能看见全貌。
