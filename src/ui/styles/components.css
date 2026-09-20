@@ -20,7 +20,13 @@
   backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-bottom: 1px solid var(--border); height: 56px;
   display: flex; align-items: center; gap: 0; padding: 0;
-  position: relative; z-index: 10;
+  /* Topbar is the highest persistent chrome — anything it contains (the
+   * email card now, future dropdowns/menus) must paint above the toolbar
+   * (z-index 25) and the layout-switcher menu (z-index 30). 50 puts us
+   * clear of those but still below the mobile bottom sheet (50) and the
+   * node-detail overlay (100), which is the right precedence: floating
+   * UI panels > permanent chrome > canvas. */
+  position: relative; z-index: 50;
 }
 .topbar__logo {
   display: flex; align-items: center; gap: 10px;
@@ -175,18 +181,11 @@
  * only — no click handler — so it never competes with anything. Touch
  * devices never get the hover state (the JS opts in via pointer:fine), so
  * the card stays hidden on phones/tablets and never gets stranded visible.
- *
- * Positioning: the card is `position: fixed` and JS recomputes its top/
- * left on every hover so it tracks the "meow" word even as the layout
- * shifts (search-input expanding on focus, etc.). We deliberately don't
- * keep it anchored inside .topbar__badge, because .topbar creates its own
- * stacking context (z-index:10 + position:relative) which would otherwise
- * pin the card below any high-z fixed element (#debug-panel at 9999, toast
- * stack, overlays). Fixed + JS-driven positioning is the only way to
- * guarantee "always on top".
  * ═══════════════════════════════════════════════════════════════════════ */
 .badge-email-card {
-  position: fixed;
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;                       /* anchor to the right edge of the capsule so it doesn't clip off-screen on narrow viewports */
   display: inline-flex; align-items: center; gap: 8px;
   padding: 8px 12px; border-radius: 12px;
   background: rgba(20, 14, 36, 0.82);
@@ -206,11 +205,7 @@
   transform: translateY(-6px) scale(0.97);
   transform-origin: top right;
   transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0.28s;
-  /* z-index 100000 beats everything in this app: #debug-panel (9999),
-   * .toast (likely ≥9000), FAB (100), sheets/overlays, etc. Fixed
-   * positioning gets us out of .topbar's stacking context (z:10) so we
-   * compete at the root, where 100000 wins. */
-  z-index: 100000;
+  z-index: 1000;
 }
 .badge-email-card.is-visible {
   opacity: 1;
@@ -222,7 +217,7 @@
 }
 .badge-email-card__arrow {
   position: absolute;
-  top: -5px; left: var(--arrow-x, 18px);   /* x set by JS so it always lands under the meow glyph, not the right edge */
+  top: -5px; right: 18px;       /* arrow roughly under the "meow" word, give or take per font */
   width: 10px; height: 10px;
   background: rgba(20, 14, 36, 0.82);
   border-left: 1px solid rgba(167, 139, 250, 0.35);

@@ -26,7 +26,8 @@ import 'core-js/stable';
 import 'regenerator-runtime/runtime.js';
 
 import './styles/index.css';
-import { Renderer } from '../core/renderer.js';
+import type cytoscape from 'cytoscape';
+import { Renderer, formatNodeLabel } from '../core/renderer.js';
 import { GraphManager } from '../core/graph-manager.js';
 import { TourController } from './tour-controller.js';
 import { HighlightEngine } from './highlight-engine.js';
@@ -123,6 +124,15 @@ async function boot(): Promise<void> {
   // 1) 创建 GraphManager（先于 manifest 完成，初始为空）
   const graphManager = new GraphManager({} as Record<string, string>);
 
+  // Brand carousel starts immediately — it has zero dependencies on graph
+  // state and only touches the #carousel-text DOM node, which has been in
+  // index.html from the start. Letting the carousel sit idle during the
+  // loading wait made the topbar feel frozen; the carousel should keep
+  // rolling the whole time and only the *dot's* colour is supposed to be
+  // tied to the loading phase. The "by meow" mark and its CSS shimmer are
+  // already running independently — start() just kicks off the word cycle.
+  brandCarousel.start();
+
   // 2) 流式加载内容：每收到一批 .md 就立即增量构建图谱塞进 cytoscape
   //    让用户看到"节点一颗颗长出来"的渐进动画，而不是等全部加载完才显示。
   let lastBatchCount = 0;
@@ -156,38 +166,27 @@ async function boot(): Promise<void> {
   //   - < 80 节点：100ms 后立刻触发（不跑 euler）
   finishStreamingLayout({ loaded: lastBatchCount, total: totalExpected });
 
-  if (uiState.renderer) {
-    const cy = uiState.renderer.getCy();
-    updateStats(cy);
-    syncBottomSheetStats(cy);
-  }
+  // Stats + bottom-sheet counters are kept current by the `cy.on('add')`
+  // listener installed in initGraphFromManager — it fires for every batch
+  // streaming pumps in and for the initial cy.add() inside initGraphFromManager
+  // itself, so we don't need to refresh here. `cy.on('layoutstop')` covers
+  // the post-euler refresh too.
 
   // 启动徽章 + 侧栏 + 各种 UI
+  // Only the dot's colour is gated on loading completion — carousel words
+  // and "by meow" are now running from the top of boot(). See comment there.
   const badgeDot = document.getElementById('badge-dot');
   if (badgeDot) badgeDot.classList.remove('topbar__badge-dot--loading');
 
-  brandCarousel.start();
-
-  const sidebar = document.getElementById('sidebar');
-  const sidebarBtn = document.getElementById('btn-sidebar-toggle');
-  const nodePanel = document.getElementById('node-panel');
-  if (sidebar && sidebarBtn)
-    sidebarBtn.classList.toggle('active', !sidebar.classList.contains('hidden'));
-  if (nodePanel && sidebar)
-    nodePanel.classList.toggle('sidebar-hidden-adjust', sidebar.classList.contains('hidden'));
+  // (sidebar active-state sync moved into initGraphFromManager — see above)
 
   initSheetDrag();
   initPanelDrag();
   initPanelResize();
   initSectionHeights();
-  initKeyboardShortcuts();
-  initSearchUI(uiState.renderer!.getCy(), uiState.highlight!, uiState.search!, uiState.detailPanel!);
   initResizeHandler();
   initMusicPlayer();
-  initBigscreen();
-  installDispatcher();
-  registerAppActions(uiState.renderer!, uiState.highlight!, uiState.detailPanel!);
-  installDebugBridge(uiState.renderer!);
+  initBadgeEmailCard();
   showOnboardingTip();
 
   // 诊断 dump：所有被静默 skip 的边 + parser warnings + 数据计数，
@@ -279,6 +278,44 @@ function initGraphFromManager(
 
   initDebugOverlay(uiState.renderer);
 
+  // ── Wire up app-wide interactions the moment the graph is live, NOT
+  //     after streaming finishes. ─────────────────────────────────────────
+  // The streaming loader runs `initGraphFromManager` synchronously as soon
+  // as the first batch arrives (so nodes appear to "grow" into view); only
+  // later does `boot()` resume after `await loadContentStreaming(...)`.
+  // Until now, installDispatcher / registerAppActions / initKeyboardShortcuts
+  // / initBigscreen / installDebugBridge / initSearchUI were all called
+  // after that await — meaning the moment a user could tap a node (via
+  // graph-events.ts, which IS wired up here) they could open the detail
+  // panel, but every `data-action` button (close ×, sidebar toggle,
+  // bigscreen, toolbar layouts, …) and every keyboard shortcut was dead
+  // until streaming fully completed. Symptom: "I opened detail during
+  // streaming, can't close it, can't fullscreen, can't hide sidebar."
+  //
+  // Every dependency these need (uiState.renderer / highlight / detailPanel
+  // / search / tourController / registerFitFn / registerCyAccessor) is
+  // already initialised above. `installDispatcher` is idempotent, and
+  // `initBigscreen` has its own rAF retry if cy isn't ready yet.
+  // Sidebar toggle button's initial active state — read the sidebar DOM
+  // synchronously so the toggle reflects reality the moment the graph
+  // appears. Deferring this to after `await loadContentStreaming` meant
+  // users who set sidebar hidden by default would see a stale-active
+  // toggle button until streaming finished.
+  const sidebar = document.getElementById('sidebar');
+  const sidebarBtn = document.getElementById('btn-sidebar-toggle');
+  const nodePanel = document.getElementById('node-panel');
+  if (sidebar && sidebarBtn)
+    sidebarBtn.classList.toggle('active', !sidebar.classList.contains('hidden'));
+  if (nodePanel && sidebar)
+    nodePanel.classList.toggle('sidebar-hidden-adjust', sidebar.classList.contains('hidden'));
+
+  installDispatcher();
+  registerAppActions(uiState.renderer, uiState.highlight!, uiState.detailPanel!);
+  initKeyboardShortcuts();
+  initBigscreen();
+  installDebugBridge(uiState.renderer);
+  initSearchUI(uiState.renderer.getCy(), uiState.highlight!, uiState.search!, uiState.detailPanel!);
+
   // Streaming 期间的初始 zoom——用 0.08 让用户能看到"全图概貌"，
   // 节点从中心爆出时整体框架已铺开。boot 完之后**不再动摄像头**——
   // euler 让节点收敛到哪里，镜头就停在哪里。
@@ -342,16 +379,83 @@ function finishStreamingLayout(counts: { loaded: number; total: number }): void 
   cy.stop(undefined, true);
   cy.elements().removeClass('entering');
 
-  // 触发 euler 布局（用 animate:true 让 euler 自己跑位置动画；
-  // 我们手动接管入场动画——不要 runLayout 自己的 stagger，避免双层动画打架）
-  uiState.renderer.runLayout(DEFAULT_LAYOUT, { animate: true, randomize: false }, { skipEntering: true });
+  // The completion callback is bound by Renderer to the specific Euler
+  // layout instance created below — not to the global cy event bus. A stale
+  // layoutstop from any earlier / interrupted layout therefore cannot make
+  // the pill disappear while this Euler instance is still arranging nodes.
+  uiState.renderer.runLayout(
+    DEFAULT_LAYOUT,
+    { animate: true, randomize: false },
+    {
+      skipEntering: true,
+      onLayoutStop: () => {
+        waitForGraphToSettle(cy, () => {
+          updateLoadingIndicator({ phase: 'done', ...counts, message: '准备就绪' });
+        });
+      },
+    },
+  );
+}
 
-  // 等 euler 的 600ms 物理收敛动画 + layoutstop 触发之后再让胶囊淡出。
-  // 这样视觉上就是"节点漂到位 → 胶囊庆祝 → 淡出"，最后用户看到的稳定态
-  // 不再被动画打断。
-  cy.once('layoutstop', () => {
-    updateLoadingIndicator({ phase: 'done', ...counts, message: '准备就绪' });
-  });
+/**
+ * Wait until the graph is visibly still before declaring loading complete.
+ *
+ * Cytoscape's `layoutstop` describes a layout lifecycle event, not a paint
+ * guarantee. We therefore sample node positions on animation frames and
+ * require 250ms with no movement (and no Cytoscape animation in progress).
+ * This makes the loading pill's disappearance follow the user's perception:
+ * nodes settle first; only then may the pill celebrate and fade.
+ */
+function waitForGraphToSettle(cy: cytoscape.Core, onSettled: () => void): void {
+  const quietForMs = 250;
+  const timeoutMs = 25_000;
+  const epsilon = 0.01;
+  const startedAt = performance.now();
+  let quietSince = startedAt;
+  let previous = new Map<string, { x: number; y: number }>();
+
+  const sampleHasMoved = (): boolean => {
+    let moved = previous.size !== cy.nodes().length;
+    const current = new Map<string, { x: number; y: number }>();
+
+    cy.nodes().forEach((node) => {
+      const position = node.position();
+      const old = previous.get(node.id());
+      if (!old || Math.abs(position.x - old.x) > epsilon || Math.abs(position.y - old.y) > epsilon) {
+        moved = true;
+      }
+      current.set(node.id(), position);
+    });
+
+    previous = current;
+    return moved;
+  };
+
+  const poll = (): void => {
+    const now = performance.now();
+    const moving = cy.animated() || cy.nodes().animated() || sampleHasMoved();
+
+    if (moving) quietSince = now;
+
+    if (now - quietSince >= quietForMs) {
+      onSettled();
+      return;
+    }
+
+    // Euler itself has a 20s simulation ceiling. Keep the UI recoverable if a
+    // third-party layout or browser bug leaves an animation flag stuck.
+    if (now - startedAt >= timeoutMs) {
+      console.warn('[loader] graph did not become still within 25s; completing loading indicator');
+      onSettled();
+      return;
+    }
+
+    requestAnimationFrame(poll);
+  };
+
+  // Start after at least one paint, so the snapshot observes the real final
+  // layout frame rather than the synchronous `layoutstop` call stack.
+  requestAnimationFrame(() => requestAnimationFrame(poll));
 }
 
 /**
@@ -388,7 +492,7 @@ function appendBatchToGraph(
       group: 'nodes' as const,
       data: {
         id: n.id,
-        label: n.label || n.id,
+        label: formatNodeLabel(n.label) || n.id,
         fill: n.fill,
         stroke: n.stroke,
         shape: n.shape,
@@ -667,5 +771,80 @@ function showOnboardingTip(): void {
 // Suppress unused import warning — dispatchAction is the public programmatic
 // API for keyboard shortcuts / tests / future plugins.
 void dispatchAction;
+
+/**
+ * Wire the "meow" word to a hover-revealed email card.
+ *
+ * Design notes:
+ *   - 300ms open delay avoids flicker when the cursor merely sweeps past.
+ *   - 120ms close delay prevents the card from snapping shut the instant the
+ *     cursor drifts 1px off the "meow" word.
+ *   - pointer:fine gate keeps touch devices from ever showing the card
+ *     (they can't hover and a stuck-open card would be a permanent artifact).
+ *   - Keyboard users (focus via Tab) get the same 300ms delay for parity
+ *     with hover; Escape dismisses.
+ *   - All animations are CSS-driven; JS only flips one class.
+ */
+function initBadgeEmailCard(): void {
+  const trigger = document.getElementById('badge-meow');
+  const card = document.getElementById('badge-email-card');
+  if (!trigger || !card) return;
+
+  // Skip wiring entirely on coarse pointers (touch). The card stays
+  // visibility:hidden forever — no DOM overhead, no accidental flash.
+  const coarse = window.matchMedia('(pointer: coarse)').matches;
+  if (coarse) return;
+
+  const OPEN_DELAY_MS = 300;
+  const CLOSE_DELAY_MS = 120;
+  let openTimer: number | undefined;
+  let closeTimer: number | undefined;
+
+  const open = () => {
+    if (closeTimer !== undefined) {
+      window.clearTimeout(closeTimer);
+      closeTimer = undefined;
+    }
+    if (card.classList.contains('is-visible')) return;
+    openTimer = window.setTimeout(() => {
+      card.classList.add('is-visible');
+      card.setAttribute('aria-hidden', 'false');
+      openTimer = undefined;
+    }, OPEN_DELAY_MS);
+  };
+
+  const close = () => {
+    if (openTimer !== undefined) {
+      window.clearTimeout(openTimer);
+      openTimer = undefined;
+    }
+    if (!card.classList.contains('is-visible')) return;
+    closeTimer = window.setTimeout(() => {
+      card.classList.remove('is-visible');
+      card.setAttribute('aria-hidden', 'true');
+      closeTimer = undefined;
+    }, CLOSE_DELAY_MS);
+  };
+
+  trigger.addEventListener('mouseenter', open);
+  trigger.addEventListener('mouseleave', close);
+  // If the cursor enters the card itself (e.g. to read the address without
+  // it vanishing mid-read), keep it open. mouseleave on the card re-arms close.
+  card.addEventListener('mouseenter', () => {
+    if (closeTimer !== undefined) {
+      window.clearTimeout(closeTimer);
+      closeTimer = undefined;
+    }
+  });
+  card.addEventListener('mouseleave', close);
+
+  // Keyboard parity: Tab focuses the word (we already added tabindex/role),
+  // Escape dismisses.
+  trigger.addEventListener('focus', open);
+  trigger.addEventListener('blur', close);
+  trigger.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') (trigger as HTMLElement).blur();
+  });
+}
 
 void boot();
