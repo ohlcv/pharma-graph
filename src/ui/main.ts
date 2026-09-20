@@ -457,9 +457,9 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
  * nodes settle first; only then may the pill celebrate and fade.
  */
 function waitForGraphToSettle(cy: cytoscape.Core, onSettled: () => void): void {
-  const quietForMs = 250;
+  const quietForMs = 500;
   const timeoutMs = 60_000;
-  const epsilon = 0.01;
+  const epsilon = 1.0;
   const startedAt = performance.now();
   let quietSince = startedAt;
   let previous = new Map<string, { x: number; y: number }>();
