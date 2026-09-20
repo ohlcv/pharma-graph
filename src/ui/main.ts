@@ -743,10 +743,32 @@ function initKeyboardShortcuts(): void {
 }
 
 function initResizeHandler(): void {
+  // 进入 / 退出大屏会切换浏览器全屏，浏览器随后会派发 window resize。
+  // 退出时 <html>.bigscreen 已被同步移除，所以下面 150ms 防抖回调里
+  // isBigscreen() 已经是 false —— 如果照常 fitGraph，就会把 bigscreen.ts
+  // 刚恢复好的「进入前缩放 + 平移」覆盖成"适应全图"，表现为退出后缩放变到最小。
+  // 因此：全屏切换后的一小段时间内，resize 不再触发 fit（cy 尺寸同步由
+  // bigscreen.ts 的 ResizeObserver 负责）。
+  //
+  // 注意判断放在防抖回调里（而不是 resize 事件里）：不同浏览器里
+  // resize 和 fullscreenchange 谁先谁后不固定，回调执行时两者都已发生。
+  const FULLSCREEN_RESIZE_GRACE_MS = 1000;
+  let suppressFitUntil = 0;
+  document.addEventListener('fullscreenchange', () => {
+    suppressFitUntil = performance.now() + FULLSCREEN_RESIZE_GRACE_MS;
+  });
+
   window.addEventListener('resize', () => {
+    // macOS 的全屏是动画切换 Space，会连续触发一串 resize（约 0.5s）。
+    // 已经处在"全屏切换窗口"内时，每来一次 resize 就把窗口往后顺延，
+    // 保证最后一次防抖回调仍然落在窗口里。
+    const now = performance.now();
+    if (now < suppressFitUntil) suppressFitUntil = Math.max(suppressFitUntil, now + 500);
+
     if (uiState.resizeTimer) clearTimeout(uiState.resizeTimer);
     uiState.resizeTimer = setTimeout(() => {
-      if (!isBigscreen()) { fitGraph(uiState.renderer!); }
+      const fullscreenTransition = performance.now() < suppressFitUntil;
+      if (!isBigscreen() && !fullscreenTransition) { fitGraph(uiState.renderer!); }
       syncTourBarPosition();
     }, 150);
   });

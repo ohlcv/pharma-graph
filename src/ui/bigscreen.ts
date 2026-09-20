@@ -226,7 +226,10 @@ function restoreViewport(): void {
   const cy = _getCy();
   const container = cy?.container();
   if (!cy || !container) return;
-  _preBigscreenViewport = null;
+  // NOTE: the snapshot is intentionally NOT cleared here. It must survive
+  // the ENTER transition (where the first resize tick used to consume it)
+  // so that EXIT still has the pre-bigscreen camera to go back to. It is
+  // released by armSettle() once the exit transition has settled.
 
   // Stop any in-flight cy animation. Both tour.ts highlightAndFocus and
   // focus-node.ts use cy.animate({ pan, zoom }) with durations up to
@@ -245,34 +248,54 @@ function restoreViewport(): void {
     x: w / 2 - vp.centerModel.x * vp.zoom,
     y: h / 2 - vp.centerModel.y * vp.zoom,
   });
+}
 
-  // macOS-specific guard: macOS fullscreen mode is implemented as a
-  // separate Space, and the browser window is *animated* across Space
-  // boundaries (rather than resized in place like Windows/Linux). The
-  // animation fires ResizeObserver multiple times — container widths
-  // like 440→768→1024 over ~200ms — and each tick calls cy.resize().
-  // We have observed (issue: 24% → 4% zoom collapse on first bigscreen
-  // exit) that something in the cytoscape pipeline reacts to the
-  // mid-flight viewport extent and re-fits the zoom a few frames
-  // after the final resize tick. cytoscape's official behaviour is
-  // that cy.resize() doesn't touch zoom (cytoscape/cytoscape.js#1769),
-  // so the culprit is likely a project-level handler running off a
-  // viewport event or a residual animation that survives cy.stop().
-  //
-  // To make the exit deterministic on macOS, we re-assert the saved
-  // zoom for ~500ms (≈30 animation frames at 60Hz) — long enough to
-  // ride out the macOS Space-transition animation. After that we
-  // release so any genuine post-exit zoom gesture from the user
-  // (immediate scroll-wheel, click on a node, etc.) is honoured.
-  let guardFrames = 0;
-  const guard = (): void => {
-    if (++guardFrames > 5) return;
-    if (Math.abs(cy.zoom() - vp.zoom) > 1e-4) {
-      cy.zoom(vp.zoom);
-    }
-    requestAnimationFrame(guard);
-  };
-  requestAnimationFrame(guard);
+// ── Transition window ────────────────────────────────────────────────────────
+//
+// Entering / leaving bigscreen changes the container size in several steps
+// (CSS height change, then the browser's fullscreen switch — on macOS an
+// animated Space transition that fires many resize ticks over ~0.5s).
+// Restoring the camera on only the FIRST tick used to (a) consume the
+// snapshot on ENTER, so EXIT had nothing to restore, and (b) compute the
+// pan against an intermediate container size on EXIT.
+//
+// So: while a transition is "open", EVERY container resize tick re-applies
+// the snapshot against the current size. The window closes SETTLE_MS after
+// the last tick. On exit it also releases the snapshot.
+type ViewportTransition = 'enter' | 'exit' | null;
+let _transition: ViewportTransition = null;
+let _settleTimer: ReturnType<typeof setTimeout> | null = null;
+let _guardRaf = 0;
+const SETTLE_MS = 400;
+
+function armSettle(): void {
+  if (_settleTimer) clearTimeout(_settleTimer);
+  _settleTimer = setTimeout(() => {
+    _settleTimer = null;
+    if (_transition === 'exit') _preBigscreenViewport = null;
+    _transition = null;
+  }, SETTLE_MS);
+}
+
+function beginViewportTransition(kind: 'enter' | 'exit'): void {
+  _transition = kind;
+  armSettle();
+  if (kind === 'exit' && !_guardRaf) {
+    _guardRaf = requestAnimationFrame(guardTick);
+  }
+}
+
+/** During EXIT only: if anything (a stray animation, a late fit) moves the
+ *  zoom away from the snapshot before the transition settles, put it back.
+ *  Runs until the window closes (previously a fixed 5 frames ≈ 83ms, far
+ *  shorter than the 500ms its comment promised). */
+function guardTick(): void {
+  _guardRaf = 0;
+  const vp = _preBigscreenViewport;
+  if (_transition !== 'exit' || !vp) return;
+  const cy = _getCy();
+  if (cy && Math.abs(cy.zoom() - vp.zoom) > 1e-4) restoreViewport();
+  _guardRaf = requestAnimationFrame(guardTick);
 }
 
 /** Returns the current cytoscape Core instance. */
@@ -300,10 +323,12 @@ export async function enterBigscreen(): Promise<void> {
   // (no animation is running from this entry point) so we just call it
   // unconditionally.
   captureViewport();
+  beginViewportTransition('enter');
 
   document.documentElement.classList.add('bigscreen');
   showHint();
   await tryFullscreen(document.documentElement);
+  armSettle(); // keep the window open until the fullscreen resize ticks have landed
 
   // ResizeObserver (registered in installResizeBridge) fires once the
   // browser has laid out the new fullscreen dimensions; it will call
@@ -321,6 +346,7 @@ export async function enterBigscreen(): Promise<void> {
 export async function exitBigscreen(): Promise<void> {
   if (!isBigscreen()) return;
 
+  beginViewportTransition('exit');
   cancelSidebarAnimAndClear();
 
   // We do NOT call captureSidebar() here. The snapshot was taken at
@@ -352,6 +378,7 @@ export async function exitBigscreen(): Promise<void> {
   restoreSidebar();
 
   await tryExitFullscreen();
+  armSettle(); // keep the window open until the fullscreen-exit resize ticks have landed
   dismissHint();
 
   // ResizeObserver (registered in installResizeBridge) fires once the
@@ -464,8 +491,11 @@ function installResizeBridge(): void {
       _lastObservedH = height;
 
       cy2.resize();
-      if (_preBigscreenViewport) {
+      // Only inside an open enter/exit transition — never while the user is
+      // navigating inside bigscreen, or after the transition has settled.
+      if (_transition && _preBigscreenViewport) {
         restoreViewport();
+        armSettle();
       }
     }
   });
@@ -498,6 +528,7 @@ export function initBigscreen(): void {
   // restoration is handled by the ResizeObserver installed above.
   document.addEventListener('fullscreenchange', () => {
     if (!document.fullscreenElement && isBigscreen()) {
+      beginViewportTransition('exit');
       // We do NOT captureSidebar() here either — see exitBigscreen()
       // for the same rationale: the snapshot was taken at
       // enterBigscreen() time and must be the source of truth.
