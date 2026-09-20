@@ -17,6 +17,18 @@
 // stylesheet 级联算出来（子树色 / fill 兜底色 / glow 的固定紫），覆盖层
 // 只是"读"，不重新判断一遍取色逻辑——边框色只有一处数据源。
 //
+// 强调层（第二张 canvas，z-index 4）
+// ────────────────────────────────────────────────────────────────────────────
+// 选中的节点（class `selected-node`）画一团"强光"：从节点边缘向外扩散的亮晕 +
+// 一圈带 shadowBlur 的亮边，颜色读节点当前 border-color（即主题辅色）。
+// 漫游时当前节点额外带 class `tour-pulsing`，强光按 1Hz 起伏——这取代了原来
+// tour.ts 里每帧 `node.style({border-width, border-color})` 的 rAF 脉冲：那种写法
+// 每帧都把 cytoscape 整张画布标脏，漫游期间等于一个 60fps 满帧重绘的常驻任务。
+// 现在漫游脉冲和选中强光都画在这张层上，cytoscape 一次都不重画。
+//
+// 为什么单独一张 canvas：基础光晕层在节点很多时会停帧（画一张静态图就停），
+// 而强调层要一直动，只画寥寥几个节点，成本是 O(选中数)，和图规模无关。
+//
 // 视觉上：
 //   glow — 贴着节点真实形状的实心光晕：按节点形状外扩，径向渐变从中心到
 //          边缘淡出，明暗随呼吸。六边形节点就是六边形光晕。
@@ -25,6 +37,7 @@
 
 import type cytoscape from 'cytoscape';
 import { getNodeOutline, polygonPerimeter, pointAtPerimeterDistance, type Point } from './node-shape-outline.js';
+import { readThemeColors } from './theme-colors.js';
 
 export interface GlowOverlayOptions {
   /** 传给 cytoscape 的那个 container（覆盖层会作为它的子元素插入）。 */
@@ -64,7 +77,14 @@ interface RenderedNode {
 type Halo = RenderedNode;
 type FlowRing = RenderedNode;
 
-/** `#rrggbb` / `rgb(...)` → `rgba(r,g,b,a)`。解析失败时回退到给定 alpha 的靛蓝。 */
+/** 强调层：漫游脉冲一个周期（毫秒），与旧的 1Hz 边框脉冲一致。 */
+const EMPH_PULSE_PERIOD_MS = 1000;
+/** 强光向外扩散的范围，相对节点半宽/半高的比例（基础光晕是 0.75）。 */
+const EMPH_SPREAD = 1.3;
+/** 同时画强光的节点数上限（正常只有 1~2 个，防止有人一次选中上百个）。 */
+const EMPH_MAX_NODES = 24;
+
+/** `#rrggbb` / `rgb(...)` → `rgba(r,g,b,a)`。解析失败时回退到当前主题的主色。 */
 function withAlpha(color: string, alpha: number): string {
   const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color.trim());
   if (hex) {
@@ -75,6 +95,9 @@ function withAlpha(color: string, alpha: number): string {
   }
   const rgb = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i.exec(color.trim());
   if (rgb) return `rgba(${rgb[1]}, ${rgb[2]}, ${rgb[3]}, ${alpha})`;
+  // 解析失败：用当前主题主色兜底；主色本身也解析不了时才落到写死的靛蓝（防递归）。
+  const fallback = readThemeColors().accent;
+  if (fallback !== color) return withAlpha(fallback, alpha);
   return `rgba(129, 140, 248, ${alpha})`;
 }
 
@@ -94,6 +117,18 @@ export class GlowOverlay {
   private readonly maxAnimatedNodes: number;
 
   private rafId: number | null = null;
+  private redrawTimer: number | null = null;
+
+  // 强调层（选中强光 / 漫游脉冲），见文件头说明。
+  private readonly emphCanvas: HTMLCanvasElement;
+  private readonly emphCtx: CanvasRenderingContext2D | null;
+  private emphRaf: number | null = null;
+  private emphStartedAt = 0;
+  private emphLastDrawAt = 0;
+  private emphNodes: cytoscape.NodeCollection | null = null;
+  private emphDirty = true;
+  private emphLastDirty: { x: number; y: number; w: number; h: number } | null = null;
+  private readonly reducedMotion: boolean;
   private lastDrawAt = 0;
   private startedAt = 0;
 
@@ -113,8 +148,19 @@ export class GlowOverlay {
   private readonly onVisibility = (): void => {
     // 页面切到后台时停掉 rAF（浏览器通常会自己节流，但显式停更省电，
     // 也避免回到前台时 dt 出现一个巨大的跳变）。
-    if (document.hidden) this.pause();
-    else this.resume();
+    if (document.hidden) {
+      this.pause();
+      this.pauseEmphasis();
+    } else {
+      this.resume();
+      this.ensureEmphLoop();
+    }
+  };
+  private readonly onEmphChange = (): void => {
+    // 大量节点批量加减 class 时这里会被调用上千次，所以只能是 O(1)：
+    // 置脏 + 确保循环在跑，真正的集合查询留到下一帧、且一帧只做一次。
+    this.emphDirty = true;
+    this.ensureEmphLoop();
   };
   private readonly onGraphChange = (): void => {
     // 流式加载会分批 cy.add()，新来的 glow/flow 节点必须被纳入。
@@ -170,6 +216,21 @@ export class GlowOverlay {
 
     this.ctx = this.canvas.getContext('2d');
 
+    this.reducedMotion = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    this.emphCanvas = document.createElement('canvas');
+    this.emphCanvas.setAttribute('data-glow-emphasis', '');
+    Object.assign(this.emphCanvas.style, {
+      position: 'absolute',
+      left: '0',
+      top: '0',
+      width: '100%',
+      height: '100%',
+      pointerEvents: 'none',
+      zIndex: '4', // 在基础光晕层（3）之上
+    } as Partial<CSSStyleDeclaration>);
+    container.appendChild(this.emphCanvas);
+    this.emphCtx = this.emphCanvas.getContext('2d');
+
     this.syncSize();
     if (typeof ResizeObserver !== 'undefined') {
       this.resizeObserver = new ResizeObserver(() => this.syncSize());
@@ -178,6 +239,9 @@ export class GlowOverlay {
 
     document.addEventListener('visibilitychange', this.onVisibility);
     this.cy.on('add remove', this.onGraphChange);
+    this.cy.on('class select unselect add remove', this.onEmphChange);
+    // 构造时可能已经有选中的节点（例如重建覆盖层）。
+    this.ensureEmphLoop();
   }
 
   // ── 生命周期 ──────────────────────────────────────────────────────────────
@@ -213,6 +277,8 @@ export class GlowOverlay {
   stop(): void {
     this.pause();
     this.clearAll();
+    this.pauseEmphasis();
+    this.clearEmph();
   }
 
   /** 图数据变了（比如 render() 整体换图）时调用。 */
@@ -220,19 +286,43 @@ export class GlowOverlay {
     this.nodesDirty = true;
   }
 
+  /**
+   * 样式变了（典型：切主题，节点 border-color 换了）后调用，让光晕按新颜色重画。
+   *
+   * 颜色是每帧从节点 border-color 现读的，所以不用改绘制逻辑，只需要保证
+   * 会再画：视口内节点过多时覆盖层画完一帧静态图就停帧（见 draw()），
+   * 这里把它重新唤醒。cytoscape 的 border-color 有 200ms 过渡，停帧时容易
+   * 停在过渡中途的颜色，所以过渡走完后再补画一次。
+   */
+  redraw(): void {
+    this.resume();
+    if (this.redrawTimer !== null) window.clearTimeout(this.redrawTimer);
+    this.redrawTimer = window.setTimeout(() => {
+      this.redrawTimer = null;
+      this.resume();
+    }, 260);
+  }
+
   destroy(): void {
     this.pause();
+    if (this.redrawTimer !== null) {
+      window.clearTimeout(this.redrawTimer);
+      this.redrawTimer = null;
+    }
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     // cy 可能已经被 destroy 了，off() 在那之后调用是安全的 no-op，
     // 但包一层以防万一。
+    this.pauseEmphasis();
     try {
       this.cy.off('add remove', this.onGraphChange);
+      this.cy.off('class select unselect add remove', this.onEmphChange);
     } catch {
       /* cy 已销毁 */
     }
     this.canvas.remove();
+    this.emphCanvas.remove();
   }
 
   // ── 绘制 ──────────────────────────────────────────────────────────────────
@@ -251,7 +341,10 @@ export class GlowOverlay {
     this.dpr = dpr;
     this.canvas.width = Math.round(w * dpr);
     this.canvas.height = Math.round(h * dpr);
+    this.emphCanvas.width = this.canvas.width;
+    this.emphCanvas.height = this.canvas.height;
     this.lastDirty = null; // 尺寸变了，上一帧的脏矩形作废
+    this.emphLastDirty = null;
   }
 
   private readonly tick = (now: number): void => {
@@ -265,6 +358,154 @@ export class GlowOverlay {
   };
 
   /** elapsedMs：从 start() 起经过的毫秒数，用来分别推算呼吸相位和旋转角度。 */
+  // ── 强调层：选中强光 / 漫游脉冲 ───────────────────────────────────────────
+
+  /** 确保强调层的 rAF 循环在跑。没有选中节点时循环会在下一帧自己停掉。 */
+  private ensureEmphLoop(): void {
+    if (this.emphRaf !== null || !this.emphCtx || document.hidden) return;
+    this.emphStartedAt = performance.now();
+    this.emphLastDrawAt = 0;
+    this.emphRaf = requestAnimationFrame(this.emphTick);
+  }
+
+  private pauseEmphasis(): void {
+    if (this.emphRaf !== null) {
+      cancelAnimationFrame(this.emphRaf);
+      this.emphRaf = null;
+    }
+  }
+
+  private readonly emphTick = (now: number): void => {
+    this.emphRaf = requestAnimationFrame(this.emphTick);
+    if (now - this.emphLastDrawAt < this.frameInterval) return;
+    this.emphLastDrawAt = now;
+    this.drawEmphasis(now - this.emphStartedAt);
+  };
+
+  private clearEmph(): void {
+    this.emphCtx?.clearRect(0, 0, this.emphCanvas.width, this.emphCanvas.height);
+    this.emphLastDirty = null;
+  }
+
+  private clearEmphLast(): void {
+    const ctx = this.emphCtx;
+    if (!ctx) return;
+    const d = this.emphLastDirty;
+    if (!d) {
+      ctx.clearRect(0, 0, this.emphCanvas.width, this.emphCanvas.height);
+      return;
+    }
+    ctx.clearRect(d.x * this.dpr, d.y * this.dpr, d.w * this.dpr, d.h * this.dpr);
+  }
+
+  /**
+   * 给选中的节点画强光。
+   *  - 亮晕：径向渐变从节点边缘略靠内处出发向外扩散，边缘处最亮，形状贴合节点轮廓。
+   *  - 亮边：一圈沿轮廓的描边，带 shadowBlur，是"强光"的核心。
+   *  - 起伏：普通选中随基础呼吸周期轻微起伏；漫游当前节点（class tour-pulsing）
+   *          按 1Hz 起伏、幅度更大；系统开了"减少动态效果"则保持恒定亮度。
+   * 颜色读节点当前的 border-color（选中态由样式表给出主题辅色）。
+   */
+  private drawEmphasis(elapsedMs: number): void {
+    const ctx = this.emphCtx;
+    if (!ctx) return;
+
+    if (this.emphDirty || !this.emphNodes) {
+      this.emphNodes = this.cy.nodes('.selected-node').not('.layer-parent');
+      this.emphDirty = false;
+    }
+
+    this.clearEmphLast();
+
+    const nodes = this.emphNodes;
+    if (!nodes || nodes.length === 0) {
+      this.emphLastDirty = null;
+      this.pauseEmphasis();
+      return;
+    }
+
+    const w = this.cssWidth;
+    const h = this.cssHeight;
+    const dpr = this.dpr;
+    const TWO_PI = Math.PI * 2;
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    ctx.save();
+    ctx.scale(dpr, dpr);
+
+    let drawn = 0;
+    nodes.forEach((n: cytoscape.NodeSingular) => {
+      if (drawn >= EMPH_MAX_NODES) return;
+      if (n.removed() || !n.visible()) return;
+      const p = n.renderedPosition();
+      if (!p) return;
+      const halfW = n.renderedOuterWidth() / 2;
+      const halfH = n.renderedOuterHeight() / 2;
+      const maxHalf = Math.max(halfW, halfH);
+      if (maxHalf < 2) return;
+
+      const pulsing = n.hasClass('tour-pulsing');
+      const breath = this.reducedMotion
+        ? 0.5
+        : 0.5 + 0.5 * Math.sin((elapsedMs / (pulsing ? EMPH_PULSE_PERIOD_MS : this.glowPeriodMs)) * TWO_PI);
+      const intensity = pulsing ? 0.55 + 0.45 * breath : 0.82 + 0.18 * breath;
+      const spread = EMPH_SPREAD * (pulsing ? 0.85 + 0.25 * breath : 1);
+      const outerR = maxHalf * (1 + spread);
+      const blur = (14 + 8 * intensity) * dpr;
+      const reach = outerR + blur / dpr;
+
+      if (p.x + reach < 0 || p.x - reach > w || p.y + reach < 0 || p.y - reach > h) return;
+
+      const color = (n.style('border-color') as string) || readThemeColors().accent2;
+
+      // ① 亮晕：从节点边缘略靠内处向外淡出。
+      const g = ctx.createRadialGradient(p.x, p.y, maxHalf * 0.85, p.x, p.y, outerR);
+      g.addColorStop(0, withAlpha(color, 0.6 * intensity));
+      g.addColorStop(0.18, withAlpha(color, 0.5 * intensity));
+      g.addColorStop(0.5, withAlpha(color, 0.2 * intensity));
+      g.addColorStop(1, withAlpha(color, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      this.traceOutline(ctx, p.x, p.y, getNodeOutline(n.style('shape') as string | undefined, halfW * (1 + spread), halfH * (1 + spread)));
+      ctx.fill();
+
+      // ② 亮边：沿轮廓一圈描边 + shadowBlur。shadowBlur 是设备像素，不受 scale 影响，所以乘 dpr。
+      ctx.save();
+      ctx.shadowColor = withAlpha(color, 0.95);
+      ctx.shadowBlur = blur;
+      ctx.strokeStyle = withAlpha(color, 0.55 + 0.4 * intensity);
+      ctx.lineWidth = pulsing ? 2 + 1.5 * breath : 2.5;
+      ctx.beginPath();
+      this.traceOutline(ctx, p.x, p.y, getNodeOutline(n.style('shape') as string | undefined, halfW + 1.5, halfH + 1.5));
+      ctx.stroke();
+      ctx.restore();
+
+      drawn++;
+      if (p.x - reach < minX) minX = p.x - reach;
+      if (p.y - reach < minY) minY = p.y - reach;
+      if (p.x + reach > maxX) maxX = p.x + reach;
+      if (p.y + reach > maxY) maxY = p.y + reach;
+    });
+
+    ctx.restore();
+
+    if (drawn === 0) {
+      this.emphLastDirty = null;
+      return;
+    }
+    const pad = 2;
+    this.emphLastDirty = {
+      x: minX - pad,
+      y: minY - pad,
+      w: maxX - minX + pad * 2,
+      h: maxY - minY + pad * 2,
+    };
+  }
+
   private draw(elapsedMs: number): void {
     const ctx = this.ctx;
     if (!ctx) return;
@@ -465,7 +706,7 @@ export class GlowOverlay {
         shape: n.style('shape') as string | undefined,
         // 颜色直接读 cytoscape 渲染出来的 border-color——子树色 / fill 兜底 /
         // glow 固定紫，取色逻辑只在 renderer.ts 的 stylesheet 里维护这一份。
-        color: (n.style('border-color') as string) || '#818cf8',
+        color: (n.style('border-color') as string) || readThemeColors().accent,
       });
     });
 

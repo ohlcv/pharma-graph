@@ -24,6 +24,7 @@ import {
   getBorderEffect,
 } from './config.js';
 import { GlowOverlay } from './glow-overlay.js';
+import { readThemeColors, themeKey } from './theme-colors.js';
 
 cytoscape.use(coseBilkent);
 cytoscape.use(dagre);
@@ -108,6 +109,9 @@ export const CLASSES = {
   DRAGGING_SIMPLIFIED: 'dragging-simplified',
   TOUR_PATH_PREVIEW: 'tour-path-preview',
   LAYER_PARENT: 'layer-parent',
+  // TOUR_PULSING: 漫游当前节点。呼吸强光由 glow-overlay.ts 的强调层绘制，
+  //   不再用 rAF 每帧改 cytoscape 样式（那会让整张画布 60fps 重绘）。
+  TOUR_PULSING: 'tour-pulsing',
   // ── Neighbor-tug interaction (lightweight "pull" feedback on drag) ──────────
   // NEIGHBOR_TUGGED: added to 1-hop neighbours of a node while it is being
   //   dragged. Drives the CSS transition that nudges neighbours a few px
@@ -119,14 +123,15 @@ export const CLASSES = {
   NEIGHBOR_TUGGED: 'neighbor-tugged',
 } as const;
 
-// Ripple colors — single source of truth; both graph-events.ts and
-// anim-pulse.ts import from here so one edit propagates everywhere.
+// Ripple fallback colors — used only when a node/edge carries no color of its
+// own (graph-events.ts normally passes the node's fill / the edge type's color).
+// Getters, not constants: they follow the active theme (accent / accent2).
 export const RIPPLE_COLORS = {
-  NODE: '#818cf8',   // indigo-400, matches the default node color
-  EDGE: '#fbbf24',   // amber-400, matches highlighted-edge line color
-} as const;
+  get NODE(): string { return readThemeColors().accent; },
+  get EDGE(): string { return readThemeColors().accent2; },
+};
 
-// ── Stylesheet (computed once at module load) ───────────────────────────────────
+// ── Stylesheet (built per Renderer, and again on theme change / new subtree) ────
 
 // 视觉层级（从上到下依次展开）：
 //   ① 节点基础样式（默认椭圆、权重决定大小、文字底对齐）
@@ -140,6 +145,11 @@ export const RIPPLE_COLORS = {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) => any[] = (maxDepth, subtreeColorMap) => {
+  // 交互状态色跟主题走（canvas 样式表写不了 var()，所以在这里读出来）：
+  //   accent  → 悬停、glow 兜底；accent2 → 选中 / 高亮 / 脉冲 / 高亮边 / 路径预览。
+  // 节点填充、子树边框、边类型色是语义色，保持固定。
+  const { accent, accent2 } = readThemeColors();
+
   // Default fill when a fill has no explicit color mapping (safety net;
   // every fill defined in config.ts has its own color, so this only fires
   // for legacy/missing values).
@@ -196,7 +206,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
   const glowStrokeRule = {
     selector: `node[stroke = "glow"]`,
     style: {
-      'border-color': '#818cf8',
+      'border-color': accent,
       'border-width': 2,
       'border-style': 'solid' as cytoscape.Css.LineStyle,
       'border-opacity': 1,
@@ -418,7 +428,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
       style: {
         opacity: 1,
         'border-width': 3,
-        'border-color': '#818cf8',
+        'border-color': accent,
       },
     },
     {
@@ -426,7 +436,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
       style: {
         opacity: 1,
         'border-width': 4,
-        'border-color': '#fbbf24',
+        'border-color': accent2,
       },
     },
     {
@@ -440,8 +450,8 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
       style: {
         opacity: 1,
         width: 2.5,
-        'line-color': '#fbbf24',
-        'target-arrow-color': '#fbbf24',
+        'line-color': accent2,
+        'target-arrow-color': accent2,
         'text-background-color': 'rgba(15,17,23,0.85)',
         'text-background-shape': 'roundrectangle',
         'text-background-padding': '2px 4px',
@@ -455,7 +465,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
       selector: '.pulse',
       style: {
         'border-width': 2.5,
-        'border-color': '#fbbf24',
+        'border-color': accent2,
       },
     },
     {
@@ -481,8 +491,8 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
       selector: '.tour-path-preview',
       style: {
         width: 2,
-        'line-color': '#fbbf24',
-        'target-arrow-color': '#fbbf24',
+        'line-color': accent2,
+        'target-arrow-color': accent2,
         opacity: 0.85,
       },
     },
@@ -561,6 +571,9 @@ export class Renderer {
   // stroke=glow 的呼吸光晕 + stroke=flow 的旋转光弧，都画在这一张独立
   // 覆盖层 canvas 上，不参与 cytoscape 的重绘管线。详见 glow-overlay.ts。
   private glowOverlay: GlowOverlay | null = null;
+  // 上一次套用样式表时的主题色指纹 + 监听 <html> 主题切换的观察器。
+  private appliedThemeKey = '';
+  private themeObserver: MutationObserver | null = null;
   // Whether the WebGL renderer is enabled (opt-in via RendererOptions.webgl).
   private useWebgl: boolean = false;
 
@@ -632,6 +645,8 @@ export class Renderer {
       //   motionBlur: false,
     };
     this.cy = cytoscape(cyOptions);
+    this.appliedThemeKey = themeKey();
+    this.observeTheme();
 
     // Skip automatic layout when caller passes 'preset' (streaming boot
     // path): cytoscape's preset layout just keeps the position we set
@@ -666,6 +681,46 @@ export class Renderer {
     this.stopGlowAnimations();
     this.glowOverlay = new GlowOverlay({ container, cy: this.cy });
     this.glowOverlay.start();
+  }
+
+  /**
+   * 监听 <html> 上 data-theme（或 theme-x class）的变化，切主题时自动重建样式表。
+   * 这样切换主题的入口仍然只是改 <html data-theme="…">，别的模块不需要知道。
+   * 只认主题相关的变化：bigscreen / tour-state 等 class 的切换不会触发重建。
+   */
+  private observeTheme(): void {
+    if (typeof MutationObserver === 'undefined' || typeof document === 'undefined') return;
+    const themeClass = (s: string | null): string => /\btheme-[a-z]\b/.exec(s ?? '')?.[0] ?? '';
+    const root = document.documentElement;
+    this.themeObserver = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        const changed =
+          m.attributeName === 'data-theme' ||
+          (m.attributeName === 'class' && themeClass(m.oldValue) !== themeClass(root.className));
+        if (changed) {
+          this.refreshTheme();
+          return;
+        }
+      }
+    });
+    this.themeObserver.observe(root, {
+      attributes: true,
+      attributeFilter: ['data-theme', 'class'],
+      attributeOldValue: true,
+    });
+  }
+
+  /**
+   * 主题色变了就重建样式表并让光晕覆盖层重画；没变什么都不做。
+   * 切主题时由观察器自动调用，也可以手动调（比如动态改了 --accent）。
+   */
+  refreshTheme(): void {
+    if (this.cy.destroyed()) return;
+    const key = themeKey();
+    if (key === this.appliedThemeKey) return;
+    this.appliedThemeKey = key;
+    this.cy.style(STYLESHEET(this.maxDepth, this.subtreeColorMap));
+    this.glowOverlay?.redraw();
   }
 
   /**
@@ -785,6 +840,8 @@ export class Renderer {
   }
 
   destroy(): void {
+    this.themeObserver?.disconnect();
+    this.themeObserver = null;
     this.stopGlowAnimations();
     this.cy.destroy();
   }

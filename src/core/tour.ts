@@ -867,7 +867,6 @@ export class TourEngine {
   private totalExplored = 0;
   private totalVisited = 0;
   private currentStep = 0;
-  private pulseRafId: number | null = null;
   private pulsingNode: cytoscape.NodeSingular | null = null;
   private strategyId: TourStrategy = 'has-dfs' as TourStrategy;
   /** 当前策略的钩子（start 时从策略 def 注入）。TourEngine 在各阶段检查，有则用。 */
@@ -1627,41 +1626,23 @@ export class TourEngine {
     }
   }
 
+  /**
+   * 漫游当前节点的呼吸强光。
+   *
+   * 原实现用 rAF 每帧 `node.style({border-width, border-color})`：每次写样式都会把
+   * cytoscape 整张画布标脏，漫游期间等于一个 60fps 满帧重绘的常驻任务（1000+ 节点）。
+   * 现在只加/去一个 class（`tour-pulsing`），起伏动画由 glow-overlay.ts 的强调层
+   * 在独立 canvas 上画，颜色是主题辅色（样式表 `.selected-node` 的 border-color）。
+   */
   private startTourPulse(node: cytoscape.NodeSingular): void {
     this.pulsingNode = node;
-    let startTime: number | null = null;
-
-    const animateBorder = (timestamp: number) => {
-      // We cannot cancelAnimationFrame ourselves once we're already inside
-      // the callback, but we MUST clear pulseRafId so the next stop /
-      // startTourPulse call doesn't try to cancel a frame that has
-      // already fired. Without this, a node removal would leave a
-      // phantom rAF pending that keeps mutating styles on a detached
-      // element until its own next-tick termination.
-      const shouldStop =
-        !node.cy() || node.removed() || this.pulsingNode !== node;
-      if (shouldStop) {
-        this.pulseRafId = null;
-        return;
-      }
-      if (startTime === null) startTime = timestamp;
-      const t = (timestamp - startTime) / 1000;
-      const pulse = (Math.sin(t * Math.PI * 2) + 1) / 2;
-      node.style({
-        'border-width': 2.5 + pulse * 2,
-        'border-color': `rgba(251,191,36,${0.5 + pulse * 0.5})`,
-      });
-      this.pulseRafId = requestAnimationFrame(animateBorder);
-    };
-    this.pulseRafId = requestAnimationFrame(animateBorder);
+    node.addClass('tour-pulsing');
   }
 
   private stopTourPulse(): void {
-    if (this.pulseRafId !== null) {
-      cancelAnimationFrame(this.pulseRafId);
-      this.pulseRafId = null;
-    }
     if (this.pulsingNode && !this.pulsingNode.removed()) {
+      this.pulsingNode.removeClass('tour-pulsing');
+      // 兜底：清掉可能残留的内联边框样式，回到样式表里 .selected-node 的主题色。
       this.pulsingNode.style({ 'border-width': null, 'border-color': null });
     }
     this.pulsingNode = null;
