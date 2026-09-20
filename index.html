@@ -8,10 +8,8 @@
     裸域 → www 跳转兜底：防止用户直接访问 https://pharma.ac.cn/ （不带 www）
     时因 DNS / 服务器监听 / TLS 证书未覆盖而白屏或超时。
     必须放在 <head> 最前面，任何其他资源（CSS、JS、图片）加载之前执行。
-    注：这只能救回「TCP 已握手但渲染到了我们这段 HTML」的场景。
-    当前（2026-08-28）的核心问题是：根域 pharma.ac.cn 的 A 记录指向的
-    216.198.79.1 根本不监听 80/443 端口，因此必须在 DNS/Vercel 侧修复
-    （见仓库操作清单）。此脚本为双重保险。
+    注：这只能救回「TCP 已握手但渲染到了我们这段 HTML」的场景；
+    根域名本身无法连通的问题仍需在 DNS / 托管侧解决，此脚本仅作兜底。
   -->
   <script>
     (function () {
@@ -24,6 +22,11 @@
       }
     })();
   </script>
+
+  <!-- 深色主题：地址栏底色 + 原生控件配色 + 首屏底色（index.css 由 JS 引入前避免白屏闪一下） -->
+  <meta name="theme-color" content="#020617">
+  <meta name="color-scheme" content="dark">
+  <style>html{background:#020617;color-scheme:dark}</style>
 
   <!-- ── Primary SEO ───────────────────────────────────────────── -->
   <title>药学知识图谱 - 执业药师备考学习可视化</title>
@@ -41,7 +44,7 @@
   <meta property="og:description"  content="药学家族关系星图：交互式药学知识图谱，覆盖药剂学、药理学、药物化学、药动学、临床用药等执业药师考试核心学科，支持节点搜索、关系推理、漫游学习与多种布局探索，系统化梳理药物关系脉络。">
   <meta property="og:site_name"    content="药学家族关系星图">
   <meta property="og:locale"       content="zh_CN">
-  <meta property="og:image"        content="https://www.pharma.ac.cn/images/药学知识拓扑.png">
+  <meta property="og:image"        content="https://www.pharma.ac.cn/images/%E8%8D%AF%E5%AD%A6%E7%9F%A5%E8%AF%86%E6%8B%93%E6%89%91.png">
   <meta property="og:image:type"   content="image/png">
   <meta property="og:image:alt"    content="药学知识拓扑 — 药一 · 药二 · 药综三大模块关系图">
 
@@ -49,7 +52,7 @@
   <meta name="twitter:card"        content="summary_large_image">
   <meta name="twitter:title"       content="药学知识图谱 | 执业药师备考可视化学习">
   <meta name="twitter:description" content="药学家族关系星图：交互式药学知识图谱，覆盖药剂学/药理学/药物化学/药动学/临床用药，支持节点搜索、关系推理、漫游学习与多种布局探索。">
-  <meta name="twitter:image"       content="https://www.pharma.ac.cn/images/药学知识拓扑.png">
+  <meta name="twitter:image"       content="https://www.pharma.ac.cn/images/%E8%8D%AF%E5%AD%A6%E7%9F%A5%E8%AF%86%E6%8B%93%E6%89%91.png">
   <meta name="twitter:image:alt"   content="药学知识拓扑图">
 
   <!-- SVG Favicon: 苯环六角图腾（蓝青渐变）——内联 data URI 兜底，浏览器标签页无网络时也能显示 -->
@@ -688,7 +691,7 @@
     <div class="tour-mob__inner" id="tour-status-inner">
       <!-- 控制按钮 -->
       <div class="tour-mob__ctrl">
-        <button class="tour-mob__close" id="tour-close-btn" data-tour-action="stop">
+        <button class="tour-mob__close" id="tour-close-btn" data-tour-action="stop" title="退出漫游" aria-label="退出漫游">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>
@@ -696,10 +699,17 @@
         </button>
         <button class="tour-mob__badge" id="tour-speech-btn-mob" data-tour-action="toggle-speech"
                 title="开启朗读" aria-label="开启朗读" aria-pressed="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <!-- 关闭状态：喇叭 + × -->
+          <svg id="tour-speech-icon-off-mob" class="spk-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
             <line x1="23" y1="9" x2="17" y2="15"/>
             <line x1="17" y1="9" x2="23" y2="15"/>
+          </svg>
+          <!-- 开启状态：喇叭 + 声波 -->
+          <svg id="tour-speech-icon-on-mob" class="spk-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
           </svg>
         </button>
         <button class="tour-mob__badge tour-mob__badge--prev" data-tour-action="prev" title="上一个">
@@ -707,7 +717,7 @@
             <polyline points="15 18 9 12 15 6"/>
           </svg>
         </button>
-        <button class="tour-mob__badge" id="tour-badge-btn" data-tour-action="toggle-pause">
+        <button class="tour-mob__badge" id="tour-badge-btn" data-tour-action="toggle-pause" title="播放 / 暂停漫游" aria-label="播放 / 暂停漫游">
           <svg id="tour-badge-play" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><polygon points="9,7 17,12 9,17" fill="currentColor"/></svg>
           <svg id="tour-badge-pause" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><rect x="7" y="6" width="3.5" height="12" fill="currentColor"/><rect x="13.5" y="6" width="3.5" height="12" fill="currentColor"/></svg>
         </button>
@@ -822,10 +832,17 @@
         <span class="tour-dt__node-name" id="tour-dt-node-name">—</span>
         <button class="tour-dt__btn tour-dt__btn--speech" data-tour-action="toggle-speech"
                 id="tour-speech-btn-dt" title="开启朗读" aria-label="开启朗读" aria-pressed="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <!-- 关闭状态：喇叭 + × -->
+          <svg id="tour-speech-icon-off-dt" class="spk-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
             <line x1="23" y1="9" x2="17" y2="15"/>
             <line x1="17" y1="9" x2="23" y2="15"/>
+          </svg>
+          <!-- 开启状态：喇叭 + 声波 -->
+          <svg id="tour-speech-icon-on-dt" class="spk-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
           </svg>
         </button>
       </div>

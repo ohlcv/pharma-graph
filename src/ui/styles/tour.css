@@ -326,6 +326,21 @@
       color: var(--accent);
     }
 
+    /* 朗读图标（和音乐按钮同样是两个 SVG）：关闭 = 喇叭 + ×（.spk-off），开启 = 喇叭 + 声波（.spk-on）。
+       "开启" 同时识别 .active / .tour-active / aria-pressed="true"，
+       不依赖 JS 具体切哪一个；桌面版和手机版共用。 */
+    [data-tour-action="toggle-speech"] .spk-on { display: none; }
+    [data-tour-action="toggle-speech"]:is(.active, .tour-active, [aria-pressed="true"]) .spk-off { display: none; }
+    [data-tour-action="toggle-speech"]:is(.active, .tour-active, [aria-pressed="true"]) .spk-on  { display: inline; }
+    .tour-dt__btn--speech[aria-pressed="true"] { color: var(--accent); }
+    /* 手机版按钮开启时的高亮（原先没有对应样式） */
+    .tour-mob__badge[data-tour-action="toggle-speech"]:is(.active, [aria-pressed="true"]) {
+      background: rgba(var(--accent-rgb), 0.25);
+      border-color: var(--tour-accent);
+      box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.4);
+      color: var(--tour-accent);
+    }
+
     .tour-dt__btn svg { width: 14px; height: 14px; flex-shrink: 0; }
     
     /* ─────────────────────────────────────────────────────────────────────────
