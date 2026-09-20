@@ -21,7 +21,7 @@
   border-radius: 999px;
   font-size: 0.72rem;
   color: var(--text-2);
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
   transition: opacity 0.5s ease-out, transform 0.5s ease-out;
   pointer-events: none;
@@ -120,7 +120,7 @@
 /* ── Keyboard key badge ─────────────────────────────────────────────────── */
 .key {
   display: inline-flex; align-items: center; justify-content: center;
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-mono);
   font-size: 0.58rem; font-weight: 700;
   color: var(--text-2); background: var(--border);
   border: 1px solid var(--border-hi); border-bottom-width: 2px;

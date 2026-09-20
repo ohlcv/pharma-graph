@@ -213,6 +213,14 @@
       --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
       --dur-fast:    150ms;
       --dur-normal:  250ms;
+
+      /* ── Typography ────────────────────────────────────────────────
+         --font-display：几何无衬线，用于标题 / logo（中文回退到系统黑体）
+         --font-mono：等宽，用于数字 / 计数 / 参数值 */
+      --font-display: 'Space Grotesk', 'PingFang SC', 'Microsoft YaHei UI',
+                      'Microsoft YaHei', 'Noto Sans SC', system-ui, sans-serif;
+      --font-mono:    'Space Mono', 'SF Mono', 'Fira Code', 'Cascadia Code',
+                      ui-monospace, 'Menlo', 'Consolas', monospace;
     }
     
     html, body {
