@@ -46,7 +46,7 @@ import {
 import { detectDeviceCapability } from '../core/device-capability.js';
 import { installDispatcher, dispatchAction } from './action-dispatcher.js';
 import { updateStats, syncBottomSheetStats } from './graph-stats.js';
-import { fitGraph, randomize, syncLayoutDisplay, setCurrentLayout, restoreBsAdvancedPrefs } from './layout-manager.js';
+import { fitGraph, randomize, syncLayoutDisplay, setCurrentLayout, restoreBsAdvancedPrefs, renderLayoutParams } from './layout-manager.js';
 import { initBigscreen, registerFitFn, registerTourController, registerCyAccessor, isBigscreen } from './bigscreen.js';
 import { initGraphEvents } from './graph-events.js';
 import { initSheetDrag, initPanelDrag, initPanelResize, syncTourBarPosition, initSectionHeights } from './drag-manager.js';
@@ -324,6 +324,16 @@ function initGraphFromManager(
     });
     setTimeout(() => n.removeClass('entering'), 100 + i * 10);
   });
+
+  // ── Populate sidebar the moment the graph is ready — not after layout settles.
+  // stats (node/edge/selected/highlighted + essence/edge legend) are accurate as
+  // soon as cy.add() has populated the registry; layout params are a pure
+  // function of layout name and have nothing to do with physics.  This makes
+  // the sidebar show live data during the Euler animation rather than freezing
+  // until layoutstop fires.
+  updateStats(cy);
+  syncBottomSheetStats(cy);
+  renderLayoutParams(DEFAULT_LAYOUT);
 }
 
 /**

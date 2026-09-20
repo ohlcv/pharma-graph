@@ -261,7 +261,7 @@ for (const n of data.nodes) {
       data_ && typeof data_ === 'object' && !Array.isArray(data_)
         ? { ...parsed, ...(data_ as Record<string, unknown>) }
         : parsed;
-    const fmLabel = source?.['label'] as string | undefined;
+    const fmLabel = (source?.['label'] as string | undefined)?.trim();
     if (fmLabel && fmLabel !== n.label) {
       labelMismatch++;
       if (labelMismatchExamples.length < 5) {
