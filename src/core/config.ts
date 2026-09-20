@@ -39,13 +39,15 @@ export const SHAPE_BY_OWL2: Record<Exclude<ShapeType, 'auto'>, cytoscape.Css.Nod
 export const STROKE_CONFIG: Record<StrokeType, {
   color: string;
   lineStyle: 'solid' | 'dashed';
-  effect?: 'glow';
+  effect?: 'glow' | 'flow';
   description: string;
 }> = {
   auto:     { color: 'inherit', lineStyle: 'solid', description: 'subtreeRoot 色（无则走 fill fallback）' },
   fallback: { color: 'inherit', lineStyle: 'solid', description: 'fill 兜底边框色（FILL_BORDER_HINTS[fill]）' },
   glow:     { color: '#818cf8', lineStyle: 'solid', effect: 'glow',
-    description: 'subtreeRoot 色 + outline solid 外圈呼吸 + ghost 三层模糊光晕' },
+    description: '固定光晕紫（有子树时被子树色覆盖）+ 呼吸脉冲光晕' },
+  flow:     { color: 'inherit', lineStyle: 'solid', effect: 'flow',
+    description: '边框色走 auto 同一套取色逻辑（子树色/fill 兜底）+ 绕节点旋转的流动光弧' },
 };
 
 // ── Fill → 形状 + 背景色配置 ────────────────────────────────────────────────
@@ -233,8 +235,8 @@ export function getBorderStyle(stroke: string | undefined): 'solid' | 'dashed' {
   return 'solid';
 }
 
-/** 获取 stroke 的特效（glow）*/
-export function getBorderEffect(stroke: string | undefined): 'glow' | undefined {
+/** 获取 stroke 的特效（glow/flow）*/
+export function getBorderEffect(stroke: string | undefined): 'glow' | 'flow' | undefined {
   if (stroke) {
     const cfg = STROKE_CONFIG[stroke as StrokeType];
     return cfg?.effect;

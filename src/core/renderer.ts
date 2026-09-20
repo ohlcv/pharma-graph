@@ -22,6 +22,7 @@ import {
   getBorderStyle,
   getBorderEffect,
 } from './config.js';
+import { GlowOverlay } from './glow-overlay.js';
 
 cytoscape.use(coseBilkent);
 cytoscape.use(dagre);
@@ -145,11 +146,24 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
 
   // ── Fill 规则 — 形状 + 背景色 ───────────────────────────────────────────────
   // fill 是领域顶层类，决定默认形状、背景色。
+  //
+  // 背景从纯色改成径向渐变：FILL_CONFIG 里本来就有 background（亮）和
+  // backgroundDark（暗）一对颜色，中心用亮色、边缘落到暗色，节点立刻有体积感，
+  // 不再是一片死板的色块。配色没有新增，只是把已有的两个值用起来。
+  //
+  // 性能：渐变是静态样式，cytoscape 的元素纹理缓存会把每个节点的绘制结果
+  // 缓存成一张小位图，同形状同大小同配色的节点共用，所以 1000+ 节点下
+  // 增量很小 —— 但这是"很小"不是"零"，上线前用 trace 量一次。
+  // 想回退就删掉下面三行 background-* ，留 background-color 即可。
   const fillRules = Object.entries(FILL_CONFIG).map(([fill, cfg]) => ({
     selector: `node[fill = "${fill}"]`,
     style: {
       shape: cfg.shape as cytoscape.Css.NodeShape,
       'background-color': cfg.background,
+      'background-fill': 'radial-gradient',
+      'background-gradient-stop-colors': `${cfg.background} ${cfg.background} ${cfg.backgroundDark}`,
+      // 内 55% 保持纯亮色，外圈才开始压暗 —— 避免整个节点都灰扑扑的。
+      'background-gradient-stop-positions': '0% 55% 100%',
       'border-width': 2,
     },
   }));
@@ -167,59 +181,46 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
   // stroke 显式声明时覆盖 fill/subtreeRoot 的默认边框色。
   // stroke = auto（默认）：边框色由 subtreeRoot 或 depth 自动决定。
   
-  // stroke = glow：光晕效果
+  // stroke = glow：呼吸光晕
   //
-  // 实现方案：
-  //   Layer 1 — 节点 border solid 2px（轮廓清晰）
-  //   Layer 2 — outline solid 外层光晕（outline-offset 4，呼吸脉冲动画）
-  //   Layer 3 — ghost 外层光晕：ghost-offset 10，opacity 0.18
-  //   Layer 4 — ghost 最外模糊：ghost-offset 18，opacity 0.1
-  //   动画：outline-width + outline-opacity 呼吸脉冲（rAF 驱动）
+  // 分工：
+  //   stylesheet（这里）— 节点本体的 border，静态，参与 cytoscape 的纹理
+  //                       缓存，零逐帧成本。
+  //   glow-overlay.ts    — 外围呼吸的弥散光 + flow 的旋转光弧，画在独立
+  //                       canvas 上，颜色直接读这里渲染出来的 border-color，
+  //                       不需要额外的 outline 层。
   //
-  // 关键设计：
-  //   - 原 border 保持 solid 2px，节点轮廓始终清晰可见
-  //   - outline 负责外围视觉效果：solid 呼吸 = "光晕"，dashed 流动 = "流光"
-  //   注：cytoscape 没有 'ghost' / 'ghost-scale' 等样式属性；之前 4 行是无效死代码，
-  //       已删除。光晕完全由 outline-width / outline-opacity 的呼吸动画驱动。
+  // 原来这里还有一圈单独的 outline（静态描边），和 border、覆盖层的呼吸光晕
+  // 叠在一起等于同一个节点画了三层边——视觉冗余，删掉，只留 border 一层。
   const glowStrokeRule = {
     selector: `node[stroke = "glow"]`,
     style: {
-      // ── 节点本身边框（solid，保证轮廓清晰）────────────────────────────────
       'border-color': '#818cf8',
       'border-width': 2,
       'border-style': 'solid' as cytoscape.Css.LineStyle,
       'border-opacity': 1,
-      // ── outline 外圈（近处有清晰边缘）──────────────────────────────────────
-      'outline-color': '#818cf8',
-      'outline-width': 6,
-      'outline-style': 'solid' as cytoscape.Css.LineStyle,
-      'outline-opacity': 0.35,
-      'outline-offset': 4,
-      // ── 过渡 ─────────────────────────────────────────────────────────────
-      'transition-property': 'border-color, outline-color, outline-opacity, border-width, outline-width',
-      'transition-duration': 400,
+      'transition-property': 'border-color',
+      'transition-duration': 200,
       'transition-timing-function': 'ease-in-out',
     },
   };
 
-  // glow 的 subtreeRoot 颜色规则（动态生成）
-  //   glow 节点：覆盖 border-color + outline-color（光晕更亮）
+  // glow 的 subtreeRoot 颜色规则（动态生成）：有子树时覆盖固定的光晕紫。
   const glowSubtreeRules = Object.entries(subtreeColorMap)
     .filter(([, color]) => color !== '#9ca3af') // 跳过无色/透明
     .flatMap(([rootId, color]) => [
       {
         selector: `node[stroke = "glow"][subtreeRoot = "${rootId}"]`,
-        style: {
-          'border-color': color,
-          'outline-color': color,
-        },
+        style: { 'border-color': color },
       },
     ]);
 
-  // Fill 边框色 fallback — stroke='auto' 或 'fallback' 时按 fill 取色
+  // Fill 边框色 fallback — stroke='auto'/'flow' 或 'fallback' 时按 fill 取色
   //   - stroke='fallback'：不论有无 subtreeRoot，直接用 fill 兜底色
-  //   - stroke='auto' + 无 subtreeRoot：用 fill 兜底色
-  //   - stroke='auto' + 有 subtreeRoot：subtreeRoot 色优先（见下面的 subtreeColorMap 规则）
+  //   - stroke='auto'/'flow' + 无 subtreeRoot：用 fill 兜底色
+  //   - stroke='auto'/'flow' + 有 subtreeRoot：subtreeRoot 色优先（见下面的 subtreeColorMap 规则）
+  //   flow 和 auto 共用同一套取色规则——flow 的边框色本来就该等于这个节点
+  //   "本应该有"的边框色，只是外面多一圈旋转的光弧，取色逻辑没有理由分叉。
   const fillBorderRules = [
     // ① 节点有合法 fill → 用 FILL_BORDER_HINTS[fill]
     ...Object.entries(FILL_BORDER_HINTS)
@@ -231,7 +232,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
     ...Object.entries(FILL_BORDER_HINTS)
       .filter(([, color]) => color && color !== 'transparent')
       .map(([fill, color]) => ({
-        selector: `node[fill = "${fill}"][!subtreeRoot][stroke = "auto"]`,
+        selector: `node[fill = "${fill}"][!subtreeRoot][stroke = "auto"], node[fill = "${fill}"][!subtreeRoot][stroke = "flow"]`,
         style: { 'border-color': color, 'border-width': 2 },
       })),
     // ② 兜底：节点连 fill 都没有 → 用 FILL_BORDER_DEFAULT
@@ -240,7 +241,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
       style: { 'border-color': FILL_BORDER_DEFAULT, 'border-width': 2 },
     },
     {
-      selector: `node[!fill][!subtreeRoot][stroke = "auto"]`,
+      selector: `node[!fill][!subtreeRoot][stroke = "auto"], node[!fill][!subtreeRoot][stroke = "flow"]`,
       style: { 'border-color': FILL_BORDER_DEFAULT, 'border-width': 2 },
     },
   ];
@@ -290,6 +291,11 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         'text-background-color': 'rgba(15,17,23,0.82)',
         'text-background-shape': 'roundrectangle',
         'text-background-padding': '3px',
+        // 1000+ 节点最大的单项绘制开销是标签：每个节点一段文字 + 一个圆角
+        // 背景矩形。缩小到屏幕字号小于 9px 时 cytoscape 直接跳过整个标签的
+        // 绘制（连背景矩形一起），全图俯视时的重绘成本能掉一大截。
+        // 反正那个尺寸下也已经看不清字了。
+        'min-zoomed-font-size': 9,
         'border-width': 1,
         'border-color': '#475569',
         'background-color': FILL_DEFAULT,
@@ -315,13 +321,15 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
     glowStrokeRule,
     // ③.b glow 的 subtreeRoot 颜色（覆盖上面的默认色）
     ...glowSubtreeRules,
-    // ③.c 显式 stroke 覆盖（stroke=auto 走 subtreeRoot，glow 由上面规则处理）
-    // ④ fill 边框色 fallback（stroke=auto 且无 subtreeRoot 时由 fill 决定）
+    // ③.c 显式 stroke 覆盖（stroke=auto/flow 走 subtreeRoot，glow 由上面规则处理）
+    // ④ fill 边框色 fallback（stroke=auto/flow 且无 subtreeRoot 时由 fill 决定）
     ...fillBorderRules,
-    // ④.b subtree 边框色（stroke=auto 时生效，优先于 depth）
+    // ④.b subtree 边框色（stroke=auto/flow 时生效，优先于 depth）
     ...Object.entries(subtreeColorMap).map(([rootId, color]) => ({
-      // stroke=auto 时由 subtreeRoot 色接管（包括 fill 兜底的 auto）
-      selector: `node[subtreeRoot = "${rootId}"][stroke = "auto"]`,
+      // stroke=auto/flow 时由 subtreeRoot 色接管（包括 fill 兜底的情形）。
+      // flow 和 auto 拿同一个颜色源——flow 只是外面多一圈旋转光弧，边框本身
+      // 该是什么色不该因为多了个动效就分叉出第二套取色逻辑。
+      selector: `node[subtreeRoot = "${rootId}"][stroke = "auto"], node[subtreeRoot = "${rootId}"][stroke = "flow"]`,
       style: { 'border-color': color },
     })),
     // 虚拟层父节点
@@ -516,9 +524,9 @@ export class Renderer {
   private currentLayoutInstance: cytoscape.Layouts | null = null;
   private maxDepth: number;
   private subtreeColorMap: Record<string, string> = {};
-  // rAF handle for the glow animation loop; null when not running.
-  // Stored on the instance so destroy() can cancel it.
-  private glowRafId: number | null = null;
+  // stroke=glow 的呼吸光晕 + stroke=flow 的旋转光弧，都画在这一张独立
+  // 覆盖层 canvas 上，不参与 cytoscape 的重绘管线。详见 glow-overlay.ts。
+  private glowOverlay: GlowOverlay | null = null;
   // Whether the WebGL renderer is enabled (opt-in via RendererOptions.webgl).
   private useWebgl: boolean = false;
 
@@ -579,6 +587,15 @@ export class Renderer {
       autoungrabify: false,
       // 将 devicePixelRatio 限制在 2 以内，避免高分屏上 Canvas 像素过多导致内存占用过高
       pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+      // 注：textureOnViewport / hideEdgesOnViewport 曾经开过，已经关掉。
+      // 二者会在拖动/缩放期间把画面冻结成手势开始那一刻的静态截图（边也
+      // 直接不画），松手才补一次完整重绘 —— 代价是手势中新进入视野的节点
+      // 和所有的边都会消失，观感比省下的那点重绘成本更糟。1000+ 节点还没
+      // 到必须用这个换流畅度的规模（官方建议是几千往上、已经明显卡顿时再
+      // 开）。如果以后节点数上去了确实卡，再按需打开：
+      //   textureOnViewport: true,
+      //   hideEdgesOnViewport: true,
+      //   motionBlur: false,
     };
     this.cy = cytoscape(cyOptions);
 
@@ -590,52 +607,39 @@ export class Renderer {
     if (layoutName !== 'preset') {
       this.runLayout(layoutName);
     }
-    this.startGlowAnimations();
+    this.startGlowAnimations(container);
   }
 
   /**
-   * 为所有 stroke=glow 节点启动呼吸动画（rAF 驱动）。
+   * 启动 stroke=glow / stroke=flow 节点的动效覆盖层。
    *
-   * Glow 呼吸动画（仅 outline）：
-   *   outline-opacity: 0.25 ↔ 0.45（正弦曲线）
-   *   outline-width:   5   ↔ 8（正弦曲线，"光晕在胀缩"的视觉感）
-   *   一个呼吸周期 ≈ 2.4s（沉稳庄重）
+   * 原实现是一个 rAF 循环，每帧对 `cy.nodes('[stroke="glow"]')` 调
+   * `.style('outline-width', ...)`。它有两个问题：
+   *
+   *   1. 不动。集合是构造时快照一次的，而流式加载路径下构造时图还是空的
+   *      （layoutName === 'preset'），`length === 0` 直接 return，rAF 根本没起来。
+   *      即使起来了，后续 `cy.add()` 进来的节点也不在那个快照里。
+   *   2. 就算修好也不能用。改任何元素的样式都会让 cytoscape 整张画布失效，
+   *      于是 1000+ 节点会被 60fps 无限重绘 —— 一个永久占满主线程的任务。
+   *
+   * 现在改为独立覆盖层 canvas + 自己的 rAF，完全绕开 cytoscape 的重绘。
+   * glow 的呼吸光晕和 flow 的旋转光弧都由同一个 GlowOverlay 实例负责，
+   * 颜色统一读该节点当前渲染出来的 border-color——所以边框色的取色逻辑
+   * 只在 stylesheet 那一处维护，覆盖层不重复判断子树/fill 兜底。
    */
-  private startGlowAnimations(): void {
+  private startGlowAnimations(container: HTMLElement): void {
     if (!this.cy) return;
     this.stopGlowAnimations();
-
-    const glowNodes = this.cy.nodes('[stroke = "glow"]');
-    if (glowNodes.length === 0) return;
-
-    const glowBreathPeriod = 2400; // ms，一个完整呼吸周期
-    let glowPhase = 0; // 0..1，对应 0..2π
-    let lastTimestamp = 0;
-
-    const tick = (timestamp: number) => {
-      const dt = lastTimestamp === 0 ? 16 : Math.min(timestamp - lastTimestamp, 50);
-      lastTimestamp = timestamp;
-
-      glowPhase = (glowPhase + dt / glowBreathPeriod) % 1;
-      const sine = Math.sin(glowPhase * 2 * Math.PI); // -1..1
-      // 注：原代码还有 'ghost-opacity' 0.28+0.10*sine —— 删了，cytoscape 没这个属性。
-      glowNodes.style('outline-opacity', 0.35 + 0.10 * sine);
-      glowNodes.style('outline-width', 6.5 + 1.5 * sine);
-
-      this.glowRafId = requestAnimationFrame(tick);
-    };
-
-    this.glowRafId = requestAnimationFrame(tick);
+    this.glowOverlay = new GlowOverlay({ container, cy: this.cy });
+    this.glowOverlay.start();
   }
 
   /**
-   * 停止呼吸动画（在 destroy() 里调用，避免 rAF 在 cytoscape 销毁后继续跑）。
+   * 停止 glow/flow 覆盖层（在 destroy() 里调用，避免 rAF 在 cytoscape 销毁后继续跑）。
    */
   private stopGlowAnimations(): void {
-    if (this.glowRafId !== null) {
-      cancelAnimationFrame(this.glowRafId);
-      this.glowRafId = null;
-    }
+    this.glowOverlay?.destroy();
+    this.glowOverlay = null;
   }
 
   // ── Public API ──────────────────────────────────────────────────────────────
@@ -644,7 +648,8 @@ export class Renderer {
     this.cy.elements().remove();
     this.cy.add(this.buildElements(data));
     this.runLayout(layoutName ?? this.currentLayout);
-    this.startGlowAnimations();
+    // 覆盖层自己会监听 add/remove，这里只需要让它立刻重新查询集合。
+    this.glowOverlay?.refresh();
   }
 
   destroy(): void {
@@ -803,7 +808,7 @@ export class Renderer {
         //   - fill 也没 defaultStroke（如兜底节点）→ 'auto'
         //
         // 用户填 stroke="auto" 就是显式表达"我要 auto"，不应再被 fill.defaultStroke 覆盖。
-        const userStroke = (n.stroke === 'auto' || n.stroke === 'glow')
+        const userStroke = (n.stroke === 'auto' || n.stroke === 'glow' || n.stroke === 'flow')
           ? n.stroke
           : (n.stroke as string | undefined); // 兼容未来扩展值，原样传递
         const effectiveStroke = userStroke
