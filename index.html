@@ -316,7 +316,7 @@
     </div>
 
     <!-- ── Desktop sidebar ───────────────────────────────────────────── -->
-    <aside id="sidebar">
+    <aside id="sidebar" class="glass-edge">
 
       <!-- 图例说明 -->
       <div class="sidebar-section" data-section="types" data-section-state="open">
@@ -452,7 +452,7 @@
          uses the viewport as containing block — will-change:transform
          on #cy would otherwise trap fixed descendants inside #main,
          causing overflow:hidden to clip the panel and break drag.)  -->
-  <div id="node-panel" class="node-panel" role="dialog" aria-label="节点详情">
+  <div id="node-panel" class="node-panel glass-edge" role="dialog" aria-label="节点详情">
     <div class="node-panel__header" id="node-panel-header">
       <span class="node-panel__title">节点详情</span>
       <div class="node-panel__tabs" role="tablist" aria-label="详情面板标签">
@@ -501,7 +501,7 @@
     </svg>
   </div>
 
-  <div id="bottom-sheet" class="bottom-sheet" role="dialog" aria-label="控制面板">
+  <div id="bottom-sheet" class="bottom-sheet glass-edge" role="dialog" aria-label="控制面板">
 
     <!-- ── Drag handle ─────────────────────────────────────── -->
     <div class="bs-drag-handle" aria-hidden="true">

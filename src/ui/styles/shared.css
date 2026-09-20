@@ -58,6 +58,30 @@
   min-width: 4ch; text-align: right;
 }
 
+/* ── Glass dashboard edge — 1px gradient border (bright top-left → dark
+ *    bottom-right) that reads like a lit glass bezel. Reuses the same
+ *    content-box mask trick as .topbar__badge::before so it respects
+ *    border-radius and stays a crisp hairline. ─────────────────────────── */
+.glass-edge {
+  position: relative;
+}
+.glass-edge::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg,
+    rgba(255,255,255,0.24) 0%,
+    rgba(255,255,255,0.06) 45%,
+    rgba(0,0,0,0.34) 100%);
+  -webkit-mask: linear-gradient(#fff,#fff) content-box, linear-gradient(#fff,#fff) content-box;
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff,#fff) content-box, linear-gradient(#fff,#fff) content-box;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
 
 @keyframes dot-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }

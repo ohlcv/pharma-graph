@@ -421,7 +421,7 @@
   width: var(--sidebar-width);
   background: rgba(12, 18, 34, 0.7);
   backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border-left: 1px solid var(--border); overflow-y: auto;
+  overflow-y: auto;
   display: flex; flex-direction: column;
   transform: translateX(0); opacity: 1;
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
@@ -726,7 +726,7 @@
   position: fixed; top: 72px; right: calc(var(--sidebar-width) + 16px); left: auto; z-index: 30;
   width: 360px; max-width: min(360px, calc(100vw - 24px));
   max-height: calc(100vh - 96px);
-  background: rgba(10, 14, 28, 0.90); border-radius: 14px; border: 1px solid rgba(var(--accent-rgb), 0.18);
+  background: rgba(10, 14, 28, 0.90); border-radius: 14px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.05) inset, 0 0 40px rgba(var(--accent-rgb), 0.06);
   display: flex; flex-direction: column; overflow: hidden;
   visibility: hidden; opacity: 0; pointer-events: none;
@@ -1057,7 +1057,7 @@
    * the previous transparent rgba(12,18,34,0.30). */
   background-color: rgba(12, 18, 34, 0.97);
   border-radius: 22px 22px 0 0;
-  box-shadow: 0 -10px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06) inset;
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
   z-index: 50;
   max-height: calc(88dvh - env(safe-area-inset-bottom, 0px));
   overflow-y: auto; touch-action: none; flex-direction: column;
@@ -1367,4 +1367,3 @@ html.bigscreen .node-panel { z-index: 40; right: 16px; }
 /* Icon state: make the expand icon visible when not in bigscreen. */
 
 }
-
