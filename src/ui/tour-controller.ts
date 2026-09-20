@@ -406,6 +406,11 @@ export class TourController {
       document.removeEventListener('keydown', this._boundKeydown);
     }
     this.stop();
+    // 取消挂起的 start-hint 刷新帧，避免 dispose 之后还回调进已销毁的 cy
+    if (this.startHintRaf) {
+      cancelAnimationFrame(this.startHintRaf);
+      this.startHintRaf = 0;
+    }
     this._mounted = false;
     this._boundClick = null;
     this._boundKeydown = null;
@@ -732,21 +737,41 @@ export class TourController {
     });
   }
 
+  /**
+   * 把同一帧内的所有 hint 刷新请求合并成一次。
+   *
+   * 性能：updateStartHint() 里的 `.selected-node` 是 class 选择器，Cytoscape
+   * 对它没有索引，每次都要遍历全部节点。一次 highlightNode() 会产生几百次
+   * select/unselect/class 事件（resetClasses、dimUnhighlightedNodes、
+   * dimUnhighlightedEdges 都是成批加减 class），如果每次都同步扫全图就是
+   * O(N²) —— 实测在几百节点的图上单次点击要 337ms。合并到 rAF 之后，
+   * 一帧最多扫一次。
+   */
+  private startHintRaf = 0;
+
+  private scheduleStartHint(): void {
+    if (this.startHintRaf) return;
+    this.startHintRaf = requestAnimationFrame(() => {
+      this.startHintRaf = 0;
+      this.updateStartHint();
+    });
+  }
+
   /** 监听节点选中/取消选中，动态显示/隐藏"从这里开始"提示 */
   private bindSelectionHint(): void {
     // 初始化时立即检查一次当前选中状态
     this.updateStartHint();
 
     // 监听 cytoscape 的 select/unselect 事件（highlightNode 会调用 node.select()）
-    this.cy.on('select', 'node', () => { this.updateStartHint(); });
-    this.cy.on('unselect', 'node', () => { this.updateStartHint(); });
+    this.cy.on('select', 'node', () => { this.scheduleStartHint(); });
+    this.cy.on('unselect', 'node', () => { this.scheduleStartHint(); });
 
-    // 也监听 class 变化（某些操作可能只改 class）
-    this.cy.on('class', 'node', () => {
-      // 一旦检测到 selected-node 出现，下一次 updateStartHint 就会打诊断
-      (window as unknown as { __tourDiag?: boolean }).__tourDiag = true;
-      this.updateStartHint();
-    });
+    // 原来这里还有一个 cy.on('class', 'node', ...)。Cytoscape 的 `class`
+    // 事件不区分是哪个 class 变了，所以 dimmed / highlighted / hovered /
+    // dragging-simplified 的每一次增删都会触发它 —— 一次点击就是几百次。
+    // 而真正会改变 hint 状态的只有 .selected-node，它由 highlightNode()
+    // 设置，之后 graph-events 会显式调用 refreshStartHintFromHighlight()。
+    // 所以这个监听器是纯冗余，删除。
   }
 
   /**
@@ -757,7 +782,7 @@ export class TourController {
    * a `tap` handler, so we trigger the refresh explicitly.
    */
   public refreshStartHintFromHighlight(): void {
-    this.updateStartHint();
+    this.scheduleStartHint();
   }
 
   // ── Engine callbacks ───────────────────────────────────────────────────────
@@ -982,15 +1007,15 @@ export class TourController {
     const root = document.documentElement;
     root.classList.remove('tour-state--idle', 'tour-state--running', 'tour-state--paused');
     root.classList.add(`tour-state--${state}`);
-    this.updateStartHint();
+    this.scheduleStartHint();
   }
 
   /** idle + 选中非父层节点 → 显示"从这里开始"提示 */
   private updateStartHint(): void {
     // 注意：选中节点用 .selected-node class（不是 .node-selected，也不是 cytoscape 的 :selected）
+    // 先判断 isIdle 再查图：漫游进行中时 show 一定是 false，没必要扫全图。
     const isIdle = !this.running && !this.paused;
-    const hasSelection = this.cy.nodes('.selected-node').not('.layer-parent').length > 0;
-    const show = isIdle && hasSelection;
+    const show = isIdle && this.cy.nodes('.selected-node').not('.layer-parent').length > 0;
     const hintDt = document.getElementById('tour-start-hint-dt');
     const hintMob = document.getElementById('tour-start-hint');
     hintDt?.classList.toggle('show', show);

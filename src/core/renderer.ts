@@ -297,8 +297,13 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         'background-blacken': 0,
         shape: 'ellipse',
         'text-events': 'yes',
-        'transition-property': 'opacity, border-color, border-width, background-color',
-        'transition-duration': '280ms',
+        // 只过渡 opacity。原来还过渡 border-color / border-width /
+        // background-color：一次 highlightNode 会同时改动几百个节点，
+        // 每多一个过渡属性就多一路逐帧插值，rendererAnimationStep 会占满
+        // 主线程（实测约占单次点击卡顿的一半）。边框和填充色瞬时切换，
+        // 视觉上几乎察觉不到，明暗变化仍然是渐变的。
+        'transition-property': 'opacity',
+        'transition-duration': '180ms',
         'transition-timing-function': 'ease-out',
       },
     },
@@ -347,9 +352,11 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         'arrow-scale': 0.7,
         opacity: 0.85,
         'haystack-radius': 0,
-        'transition-property': 'line-color, opacity, width, target-arrow-color',
-        'transition-duration': '400ms',
-        'transition-timing-function': 'ease-out',
+        // 边不做过渡。边的数量通常比节点多一个量级，而 `.dimmed` 会同时
+        // 改 line-color / line-opacity / target-arrow-color —— 几千条边
+        // 同时插值是主线程被打满的主要来源之一。边的明暗只是背景信息，
+        // 瞬时切换可以接受。
+        'transition-duration': 0,
       },
     },
     // 边类型样式

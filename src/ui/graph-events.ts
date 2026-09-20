@@ -81,6 +81,11 @@ export function initGraphEvents(deps: GraphEventDeps): void {
     }
     const prev = deps.highlight.highlightNode(node.id());
     deps.setPrevSelectedNode(prev.prevNodeId, prev.prevNodeName);
+    // `.selected-node` is added by highlightNode(); the tour bar's generic
+    // `class` listener used to catch that, but it fired for every class
+    // change on every node (O(N²)). Now we tell it explicitly — the call is
+    // coalesced into one rAF on the controller side.
+    deps.tourController.refreshStartHintFromHighlight();
     deps.detailPanel.show(node.id(), true); // 用户手动点击节点
     updateStats(cy);
     syncBottomSheetStats(cy);
@@ -114,6 +119,7 @@ export function initGraphEvents(deps: GraphEventDeps): void {
       clearShapeFilter();
       deps.highlight.reset();
       deps.detailPanel.close();
+      deps.tourController.refreshStartHintFromHighlight();
       // Tapping the empty canvas while a tour is active stops the tour.
       // 但如果点击目标是漫游条内部元素（如滑块、按钮），则不停止漫游。
       // 检查 originalEvent.target 是否是漫游条相关元素
@@ -150,12 +156,15 @@ export function initGraphEvents(deps: GraphEventDeps): void {
     node.connectedEdges().removeClass('tour-path-preview');
   });
 
+  // Whether the simplified-visual class is currently applied. Tracked so a
+  // plain tap never pays for it: cytoscape fires `grab`/`free` for a tap on a
+  // node too, not just for a real drag, and `setCytoscapeDragMode` touches a
+  // class on EVERY node. Flipping it on grab meant a single click cost two
+  // full-graph class sweeps (plus the listener storm each sweep triggers).
+  let dragModeOn = false;
+
   cy.on('grab', 'node', () => {
     deps.setDragging(true);
-    // Issue #19: was `deps.setDragMode(true)`, a passthrough to
-    // Renderer. Toggling the simplified class is meaningful only in the
-    // context of cytoscape's grab/free gesture, so it's done inline here.
-    setCytoscapeDragMode(cy, true);
     // Begin the neighbor-tug gesture: snapshot 1-hop neighbours and
     // mark them with .neighbor-tugged so the stylesheet dims them
     // slightly while the drag is in flight.
@@ -166,11 +175,22 @@ export function initGraphEvents(deps: GraphEventDeps): void {
   // every mouse-move while ANY node is being dragged. We update tugged
   // neighbour positions in lockstep so they appear to follow the cursor.
   cy.on('drag', () => {
+    // Issue #19: was `deps.setDragMode(true)`, a passthrough to Renderer.
+    // Toggling the simplified class is meaningful only while a node is
+    // actually moving, so it's done inline here — and only once the first
+    // `drag` arrives, which is what distinguishes a drag from a tap.
+    if (!dragModeOn) {
+      dragModeOn = true;
+      setCytoscapeDragMode(cy, true);
+    }
     onNeighborTug();
   });
   cy.on('free', 'node', () => {
     deps.setDragging(false);
-    setCytoscapeDragMode(cy, false);
+    if (dragModeOn) {
+      setCytoscapeDragMode(cy, false);
+      dragModeOn = false;
+    }
     // Snap neighbours back to their original positions with a smooth
     // animate. Done synchronously here (not in dragfree) so the animation
     // starts the moment the user releases, even if the OS hasn't yet
@@ -179,7 +199,12 @@ export function initGraphEvents(deps: GraphEventDeps): void {
   });
   cy.on('dragfree', () => {
     deps.setDragging(false);
-    setCytoscapeDragMode(cy, false);
+    // `free` already reset drag mode; doing it again here was a second
+    // redundant full-graph class sweep.
+    if (dragModeOn) {
+      setCytoscapeDragMode(cy, false);
+      dragModeOn = false;
+    }
     updateStats(cy);
     syncBottomSheetStats(cy);
   });
