@@ -73,14 +73,14 @@ function starPoints(halfW: number, halfH: number): Point[] {
   return pts;
 }
 
-/** 书签/标签形：左侧一个尖角，其余是矩形。 */
+/** 书签/标签形：右侧一个尖角（朝右），其余是矩形。 */
 function tagPoints(halfW: number, halfH: number): Point[] {
   return [
-    { x: -halfW, y: 0 },
-    { x: -halfW * 0.4, y: -halfH },
-    { x: halfW, y: -halfH },
-    { x: halfW, y: halfH },
-    { x: -halfW * 0.4, y: halfH },
+    { x: halfW, y: 0 },
+    { x: halfW * 0.4, y: -halfH },
+    { x: -halfW, y: -halfH },
+    { x: -halfW, y: halfH },
+    { x: halfW * 0.4, y: halfH },
   ];
 }
 

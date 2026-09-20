@@ -13,8 +13,9 @@
  *  - glow：呼吸光晕（静态边框 + 覆盖层画的脉动光晕，颜色固定为光晕紫，
  *    有子树时被子树色覆盖）
  *  - flow：边框色沿用 auto 的取色逻辑（子树色/fill 兜底），效果是一段
- *    绕节点旋转的流动光弧 */
-export type StrokeType = 'auto' | 'glow' | 'fallback' | 'flow';
+ *    绕节点旋转的流动光弧
+ *  - double：双线边框，取色沿用 auto（子树色/fill 兜底） */
+export type StrokeType = 'auto' | 'glow' | 'fallback' | 'flow' | 'double';
 
 /** OWL2 实体类型枚举（shape 取值）
  *  每个类型对应一个固定的 Cytoscape 几何形状（见 SHAPE_BY_OWL2）

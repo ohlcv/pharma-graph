@@ -38,7 +38,7 @@ export const SHAPE_BY_OWL2: Record<Exclude<ShapeType, 'auto'>, cytoscape.Css.Nod
 
 export const STROKE_CONFIG: Record<StrokeType, {
   color: string;
-  lineStyle: 'solid' | 'dashed';
+  lineStyle: 'solid' | 'dashed' | 'double';
   effect?: 'glow' | 'flow';
   description: string;
 }> = {
@@ -48,7 +48,16 @@ export const STROKE_CONFIG: Record<StrokeType, {
     description: '固定光晕紫（有子树时被子树色覆盖）+ 呼吸脉冲光晕' },
   flow:     { color: 'inherit', lineStyle: 'solid', effect: 'flow',
     description: '边框色走 auto 同一套取色逻辑（子树色/fill 兜底）+ 绕节点旋转的流动光弧' },
+  double:   { color: 'inherit', lineStyle: 'double',
+    description: '同 auto 取色（子树色/fill 兜底）+ 双线边框' },
 };
+
+/**
+ * md 的 `stroke` 与 `FILL_CONFIG[fill].defaultStroke` 的合并方式：
+ *  - 'coexist'（默认）：并存——defaultStroke 始终生效，md 填的 stroke 在其上叠加
+ *  - 'override'：覆盖——md 填了 stroke 时，defaultStroke 不再生效，只保留 md 的效果
+ */
+export const STROKE_MERGE_MODE: 'coexist' | 'override' = 'coexist';
 
 // ── Fill → 形状 + 背景色配置 ────────────────────────────────────────────────
 //
@@ -87,7 +96,7 @@ export const FILL_CONFIG: Record<string, {
     shape: 'round-pentagon',
     background: '#fae8e3',         // 柔奶杏粉
     backgroundDark: '#f5d0c5',
-    defaultStroke: 'auto',
+    defaultStroke: 'glow',
     label: '组织结构',
     description: '书/篇/章/节入口',
   },
@@ -97,7 +106,7 @@ export const FILL_CONFIG: Record<string, {
     shape: 'octagon',
     background: '#ffe4b5',         // 柔莫兰迪黄
     backgroundDark: '#ffcc80',
-    defaultStroke: 'auto',
+    defaultStroke: 'glow',
     label: '药物分类',
     description: '粗分类/细分类/亚类',
   },
@@ -107,7 +116,7 @@ export const FILL_CONFIG: Record<string, {
     shape: 'ellipse',
     background: '#dbeafe',         // 柔天空蓝
     backgroundDark: '#bfdbfe',
-    defaultStroke: 'auto',
+    defaultStroke: 'glow',
     label: '药物',
     description: '具体药物（重点+普通）',
   },
@@ -117,7 +126,7 @@ export const FILL_CONFIG: Record<string, {
     shape: 'diamond',
     background: '#fce7f3',         // 柔樱花粉
     backgroundDark: '#fbcfe8',
-    defaultStroke: 'auto',
+    defaultStroke: 'glow',
     label: '疾病',
     description: '疾病/症状/综合征',
   },
@@ -127,7 +136,7 @@ export const FILL_CONFIG: Record<string, {
     shape: 'round-triangle',
     background: '#d1fae5',         // 柔薄荷绿
     backgroundDark: '#a7f3d0',
-    defaultStroke: 'auto',
+    defaultStroke: 'glow',
     label: '生物实体',
     description: '靶点/受体/酶/转运体/基因',
   },
@@ -137,7 +146,7 @@ export const FILL_CONFIG: Record<string, {
     shape: 'star',
     background: '#cffafe',         // 柔湖青
     backgroundDark: '#a5f3fc',
-    defaultStroke: 'auto',
+    defaultStroke: 'glow',
     label: '作用特点',
     description: '作用特点/临床用药评价/选药原则',
   },
@@ -147,7 +156,7 @@ export const FILL_CONFIG: Record<string, {
     shape: 'round-hexagon',
     background: '#ffe4e6',         // 柔玫瑰粉
     backgroundDark: '#fecdd3',
-    defaultStroke: 'auto',
+    defaultStroke: 'glow',
     label: '不良反应',
     description: '典型不良反应/禁忌/毒性',
   },
@@ -157,7 +166,7 @@ export const FILL_CONFIG: Record<string, {
     shape: 'round-rectangle',
     background: '#e0e7ff',         // 柔雾紫蓝
     backgroundDark: '#c7d2fe',
-    defaultStroke: 'auto',
+    defaultStroke: 'glow',
     label: '概念',
     description: '定义性概念/总论/术语',
   },
@@ -167,7 +176,7 @@ export const FILL_CONFIG: Record<string, {
     shape: 'bottom-round-rectangle',
     background: '#fef9c3',         // 柔麦穗黄
     backgroundDark: '#fef08a',
-    defaultStroke: 'auto',
+    defaultStroke: 'glow',
     label: '总结',
     description: '节内总结/跨节大总结/表格',
   },
@@ -177,7 +186,7 @@ export const FILL_CONFIG: Record<string, {
     shape: 'tag',
     background: '#fed7aa',         // 柔蜜桃橙
     backgroundDark: '#fdba74',
-    defaultStroke: 'auto',
+    defaultStroke: 'glow',
     label: '口诀',
     description: '记忆口诀/顺口溜',
   },
@@ -227,7 +236,7 @@ export function getBorderColor(
 }
 
 /** 获取 stroke 的线型（solid/dashed）*/
-export function getBorderStyle(stroke: string | undefined): 'solid' | 'dashed' {
+export function getBorderStyle(stroke: string | undefined): 'solid' | 'dashed' | 'double' {
   if (stroke) {
     const cfg = STROKE_CONFIG[stroke as StrokeType];
     if (cfg) return cfg.lineStyle;

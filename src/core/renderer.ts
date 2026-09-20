@@ -17,6 +17,7 @@ import {
   FILL_BORDER_HINTS,
   FILL_BORDER_DEFAULT,
   STROKE_CONFIG,
+  STROKE_MERGE_MODE,
   SHAPE_BY_OWL2,
   getBorderColor,
   getBorderStyle,
@@ -215,6 +216,17 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
       },
     ]);
 
+  // stroke = double：双线边框。取色完全沿用 auto（子树色/fill 兜底），
+  // 只把线型改成 double 并加粗到足够看清两条线。
+  const doubleStrokeRule = {
+    selector: `node[stroke = "double"]`,
+    style: {
+      'border-style': 'double' as cytoscape.Css.LineStyle,
+      'border-width': 4,
+      'border-color': FILL_BORDER_DEFAULT,
+    },
+  };
+
   // Fill 边框色 fallback — stroke='auto'/'flow' 或 'fallback' 时按 fill 取色
   //   - stroke='fallback'：不论有无 subtreeRoot，直接用 fill 兜底色
   //   - stroke='auto'/'flow' + 无 subtreeRoot：用 fill 兜底色
@@ -243,6 +255,17 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
     {
       selector: `node[!fill][!subtreeRoot][stroke = "auto"], node[!fill][!subtreeRoot][stroke = "flow"]`,
       style: { 'border-color': FILL_BORDER_DEFAULT, 'border-width': 2 },
+    },
+    // double 复用 auto 的取色逻辑，这里只补颜色——宽度/线型由 doubleStrokeRule 决定。
+    ...Object.entries(FILL_BORDER_HINTS)
+      .filter(([, color]) => color && color !== 'transparent')
+      .map(([fill, color]) => ({
+        selector: `node[fill = "${fill}"][!subtreeRoot][stroke = "double"]`,
+        style: { 'border-color': color },
+      })),
+    {
+      selector: `node[!fill][!subtreeRoot][stroke = "double"]`,
+      style: { 'border-color': FILL_BORDER_DEFAULT },
     },
   ];
 
@@ -321,6 +344,8 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
     glowStrokeRule,
     // ③.b glow 的 subtreeRoot 颜色（覆盖上面的默认色）
     ...glowSubtreeRules,
+    // ③.d double 边框样式（颜色由 fill/subtree 规则补齐）
+    doubleStrokeRule,
     // ③.c 显式 stroke 覆盖（stroke=auto/flow 走 subtreeRoot，glow 由上面规则处理）
     // ④ fill 边框色 fallback（stroke=auto/flow 且无 subtreeRoot 时由 fill 决定）
     ...fillBorderRules,
@@ -329,7 +354,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
       // stroke=auto/flow 时由 subtreeRoot 色接管（包括 fill 兜底的情形）。
       // flow 和 auto 拿同一个颜色源——flow 只是外面多一圈旋转光弧，边框本身
       // 该是什么色不该因为多了个动效就分叉出第二套取色逻辑。
-      selector: `node[subtreeRoot = "${rootId}"][stroke = "auto"], node[subtreeRoot = "${rootId}"][stroke = "flow"]`,
+      selector: `node[subtreeRoot = "${rootId}"][stroke = "auto"], node[subtreeRoot = "${rootId}"][stroke = "flow"], node[subtreeRoot = "${rootId}"][stroke = "double"]`,
       style: { 'border-color': color },
     })),
     // 虚拟层父节点
@@ -909,18 +934,14 @@ export class Renderer {
     const nodeIds = new Set(data.nodes.map((n) => n.id));
     return [
       ...data.nodes.map((n) => {
-        // stroke 字段解析（stroke 是**全量覆盖层**，与 fill 平行独立）：
-        //   - 节点 stroke 字段有显式值（'auto'/'glow'）→ 直接用
-        //   - 节点 stroke 字段为空（undefined/null/字段缺失）→ 用 fill.defaultStroke 兜底
-        //   - fill 也没 defaultStroke（如兜底节点）→ 'auto'
-        //
-        // 用户填 stroke="auto" 就是显式表达"我要 auto"，不应再被 fill.defaultStroke 覆盖。
-        const userStroke = (n.stroke === 'auto' || n.stroke === 'glow' || n.stroke === 'flow')
-          ? n.stroke
-          : (n.stroke as string | undefined); // 兼容未来扩展值，原样传递
-        const effectiveStroke = userStroke
-          ?? (n.fill && FILL_CONFIG[n.fill]?.defaultStroke)
-          ?? 'auto';
+        // stroke 字段解析：
+        //   - effectiveStroke 决定"边框本体"（线型/颜色）：md 填了就用 md，否则用 defaultStroke
+        //   - defaultStroke 是否同时驱动覆盖层特效，由 STROKE_MERGE_MODE 控制：
+        //       coexist（默认）→ 单独存 defaultStroke，glow/flow 特效与 md 的 stroke 并存
+        //       override        → 不存 defaultStroke，md 的 stroke 完全接管
+        const userStroke = n.stroke;
+        const defaultStroke = (n.fill && FILL_CONFIG[n.fill]?.defaultStroke) ?? 'auto';
+        const effectiveStroke = userStroke ?? defaultStroke;
 
         // 注：cytoscape stylesheet 中用 stroke="glow" 规则直接控制光晕的
         // border / outline / ghost 属性，无需额外的 class。
@@ -933,6 +954,7 @@ export class Renderer {
             // 语义层（基于 OWL2）
             fill: n.fill,
             stroke: effectiveStroke,
+            ...(STROKE_MERGE_MODE === 'coexist' ? { defaultStroke } : {}),
             shape: n.shape,
             depth: n.depth,
             subtreeRoot: n.subtreeRoot,
