@@ -790,16 +790,73 @@ function initBadgeEmailCard(): void {
   const card = document.getElementById('badge-email-card');
   if (!trigger || !card) return;
 
-  // Skip wiring entirely on coarse pointers (touch). The card stays
-  // visibility:hidden forever — no DOM overhead, no accidental flash.
+  // Mobile / touch devices have no hover: tap-toggle instead. Desktop keeps
+  // the hover-revealed UX with 300ms / 120ms delays.
   const coarse = window.matchMedia('(pointer: coarse)').matches;
-  if (coarse) return;
-
   const OPEN_DELAY_MS = 300;
   const CLOSE_DELAY_MS = 120;
   let openTimer: number | undefined;
   let closeTimer: number | undefined;
 
+  const cancelTimers = () => {
+    if (openTimer !== undefined) {
+      window.clearTimeout(openTimer);
+      openTimer = undefined;
+    }
+    if (closeTimer !== undefined) {
+      window.clearTimeout(closeTimer);
+      closeTimer = undefined;
+    }
+  };
+
+  const showCard = () => {
+    cancelTimers();
+    if (card.classList.contains('is-visible')) return;
+    card.classList.add('is-visible');
+    card.setAttribute('aria-hidden', 'false');
+  };
+  const hideCard = () => {
+    cancelTimers();
+    if (!card.classList.contains('is-visible')) return;
+    card.classList.remove('is-visible');
+    card.setAttribute('aria-hidden', 'true');
+  };
+
+  if (coarse) {
+    // Mobile: tap meow to toggle. Tap anywhere else (or the card itself) to
+    // close. Listening on document with capture so we always beat the
+    // canvas / cytoscape event handlers for the first tap on the meow word
+    // itself (toggle on, not open-then-immediately-close).
+    const onDocPointerDown = (e: PointerEvent) => {
+      const target = e.target as Node | null;
+      if (target && (trigger.contains(target) || card.contains(target))) {
+        // Tap on trigger or card → toggle.
+        if (target && trigger.contains(target)) {
+          if (card.classList.contains('is-visible')) hideCard();
+          else showCard();
+        }
+        // Tap on the card body itself → leave open (no toggle).
+      } else {
+        // Tap anywhere else → close if open.
+        hideCard();
+      }
+    };
+    document.addEventListener('pointerdown', onDocPointerDown, true);
+    // Keyboard parity still works on mobile (Bluetooth keyboard etc.).
+    trigger.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (card.classList.contains('is-visible')) hideCard();
+        else showCard();
+      } else if (e.key === 'Escape') {
+        hideCard();
+        (trigger as HTMLElement).blur();
+      }
+    });
+    return;
+  }
+
+  // Desktop: hover-revealed with debounced open/close + keyboard parity.
   const open = () => {
     if (closeTimer !== undefined) {
       window.clearTimeout(closeTimer);
@@ -828,8 +885,7 @@ function initBadgeEmailCard(): void {
 
   trigger.addEventListener('mouseenter', open);
   trigger.addEventListener('mouseleave', close);
-  // If the cursor enters the card itself (e.g. to read the address without
-  // it vanishing mid-read), keep it open. mouseleave on the card re-arms close.
+  // Hovering the card itself keeps it open.
   card.addEventListener('mouseenter', () => {
     if (closeTimer !== undefined) {
       window.clearTimeout(closeTimer);
@@ -838,8 +894,6 @@ function initBadgeEmailCard(): void {
   });
   card.addEventListener('mouseleave', close);
 
-  // Keyboard parity: Tab focuses the word (we already added tabindex/role),
-  // Escape dismisses.
   trigger.addEventListener('focus', open);
   trigger.addEventListener('blur', close);
   trigger.addEventListener('keydown', (e) => {
