@@ -8,7 +8,7 @@ import { Renderer } from '../core/renderer.js';
 import { HighlightEngine } from './highlight-engine.js';
 import { LAYOUTS, DEFAULT_LAYOUT } from '../core/config.js';
 import { pulseSelection } from './anim-pulse.js';
-import { cancel as cancelNeighborTug } from './neighbor-tug.js';
+import { cancel as cancelForceDrag } from '../core/force-drag.js';
 import { forEachStatic } from './dom-cache.js';
 
 // ── Current layout state ────────────────────────────────────────────────────────
@@ -88,11 +88,14 @@ export function runLayout(name: string, renderer: Renderer): void {
   if (paramsBlock?.classList.contains('open')) {
     renderBsLayoutParams(name);
   }
-  // If a neighbor-tug gesture was in flight (user dragged a node and then
-  // hit a layout-switch hotkey), reset it before the layout repositions
-  // every node. Otherwise the tug's animating neighbours would teleport
-  // mid-snap to wherever the new layout puts them, producing a visual jolt.
-  cancelNeighborTug();
+  // If a force-drag gesture was in flight (user dragged a node and then
+  // hit a layout-switch hotkey), abort it before the layout repositions
+  // every node. Otherwise the simulation's tick would overwrite the new
+  // layout positions frame-by-frame, producing a visible fight between
+  // the two systems. (Note: `cy.on('layoutstart', …)` in graph-events.ts
+  // also calls this, so direct `renderer.runLayout` callers are covered
+  // by this explicit call too.)
+  cancelForceDrag();
   renderer.runLayout(name);
 }
 

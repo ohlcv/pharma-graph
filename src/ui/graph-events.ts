@@ -12,7 +12,12 @@ import { TourController } from './tour-controller.js';
 import { updateStats, syncBottomSheetStats } from './graph-stats.js';
 import { clearShapeFilter } from './legend-manager.js';
 import { isBigscreen, exitBigscreen } from './bigscreen.js';
-import { onDragStart as onNeighborTugStart, onDrag as onNeighborTug, onDragEnd as onNeighborTugEnd } from './neighbor-tug.js';
+import {
+  onDragStart as forceDragStart,
+  onDrag as forceDrag,
+  onDragEnd as forceDragEnd,
+  cancel as cancelForceDrag,
+} from '../core/force-drag.js';
 
 export interface GraphEventDeps {
   cy: cytoscape.Core;
@@ -165,15 +170,14 @@ export function initGraphEvents(deps: GraphEventDeps): void {
 
   cy.on('grab', 'node', () => {
     deps.setDragging(true);
-    // Begin the neighbor-tug gesture: snapshot 1-hop neighbours and
-    // mark them with .neighbor-tugged so the stylesheet dims them
-    // slightly while the drag is in flight.
+    // Begin the force-drag gesture: defer building the simulation until the
+    // first drag event, so a plain tap never pays for a BFS + d3-force setup.
     const grabbed = cy.nodes(':grabbed');
-    if (grabbed.length > 0) onNeighborTugStart(grabbed[0]);
+    if (grabbed.length > 0) forceDragStart(grabbed);
   });
-  // Position-tracked tug: cytoscape fires `drag` (with no selector) on
-  // every mouse-move while ANY node is being dragged. We update tugged
-  // neighbour positions in lockstep so they appear to follow the cursor.
+  // Position-tracked force-drag: cytoscape fires `drag` (with no selector) on
+  // every mouse-move while ANY node is being dragged. The d3-force simulation
+  // pinned to the grabbed nodes then pulls neighbours along via edge springs.
   cy.on('drag', () => {
     // Issue #19: was `deps.setDragMode(true)`, a passthrough to Renderer.
     // Toggling the simplified class is meaningful only while a node is
@@ -183,7 +187,7 @@ export function initGraphEvents(deps: GraphEventDeps): void {
       dragModeOn = true;
       setCytoscapeDragMode(cy, true);
     }
-    onNeighborTug();
+    forceDrag();
   });
   cy.on('free', 'node', () => {
     deps.setDragging(false);
@@ -191,12 +195,17 @@ export function initGraphEvents(deps: GraphEventDeps): void {
       setCytoscapeDragMode(cy, false);
       dragModeOn = false;
     }
-    // Snap neighbours back to their original positions with a smooth
-    // animate. Done synchronously here (not in dragfree) so the animation
-    // starts the moment the user releases, even if the OS hasn't yet
-    // fired the dragfree event for the cursor-up.
-    onNeighborTugEnd();
+    // Release the grabbed nodes from the cursor. The simulation keeps
+    // running with the dropped positions pinned and decays naturally
+    // (~1s after release); we drop it synchronously here so the settling
+    // starts the moment the user releases, even if `dragfree` hasn't
+    // fired yet.
+    forceDragEnd();
   });
+  // Any layout start (manual switch, hotkey, programmatic) must abort
+  // an in-flight force-drag session — otherwise the simulation's tick
+  // would overwrite the new layout's positions frame-by-frame.
+  cy.on('layoutstart', () => cancelForceDrag());
   cy.on('dragfree', () => {
     deps.setDragging(false);
     // `free` already reset drag mode; doing it again here was a second
