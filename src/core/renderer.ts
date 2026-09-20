@@ -27,6 +27,72 @@ cytoscape.use(coseBilkent);
 cytoscape.use(dagre);
 cytoscape.use(euler);
 
+// ── Label auto-wrap utilities ───────────────────────────────────────────────────
+
+/**
+ * Auto-wrap label for node display.
+ *
+ * Priority (first match wins):
+ *   1. '｜' — explicit YAML block scalar separator
+ *   2. '第X章' / '第X节' followed by space and more text
+ *   3. ASCII '|' — pipe char followed by text
+ *   4. Punctuation breakpoints — Chinese/ASCII separators
+ *   5. Long text truncation (≥28 chars → first line only, ellipsis)
+ *
+ * Two-line split lets the chapter/section ordinal ("第一节") sit on its own
+ * line above the rest of the label. Returns unchanged if no pattern fires.
+ */
+export function formatNodeLabel(label: string): string {
+  // 1. Explicit block scalar separator (｜ — fullwidth U+FF5C)
+  const pipeIdx = label.indexOf('｜');
+  if (pipeIdx !== -1) {
+    const first = label.slice(0, pipeIdx).trim();
+    const rest = label.slice(pipeIdx + 1).trim();
+    return `${first}\n${rest}`;
+  }
+
+  // 2. Chapter/section ordinal followed by a space and more content
+  //    e.g. "第一节 镇咳药" → "第一节\n镇咳药"
+  const ordinalMatch = label.match(/^(第[一二三四五六七八九十百零\d]+[章节])\s+(.+)$/);
+  if (ordinalMatch) {
+    return `${ordinalMatch[1]}\n${ordinalMatch[2]}`;
+  }
+
+  // 3. ASCII pipe (manual notation)
+  const asciiPipe = label.indexOf('|');
+  if (asciiPipe !== -1) {
+    const first = label.slice(0, asciiPipe).trim();
+    const rest = label.slice(asciiPipe + 1).trim();
+    if (first && rest) return `${first}\n${rest}`;
+  }
+
+  // 4. Punctuation breakpoints — split at the last separator
+  //    Chinese: ，、；：？！…—
+  //    ASCII:   ,;:?!...-
+  const BREAK_CHARS = '，、；：？！…—、,;:?!…-';
+  let splitIdx = -1;
+  for (let i = label.length - 1; i >= 0; i--) {
+    if (BREAK_CHARS.includes(label[i])) {
+      splitIdx = i;
+      break;
+    }
+  }
+  if (splitIdx !== -1) {
+    const first = label.slice(0, splitIdx).trim();
+    const rest = label.slice(splitIdx + 1).trim();
+    if (first && rest) return `${first}\n${rest}`;
+  }
+
+  // 5. Long text truncation (≥28 chars → keep first 25 + ellipsis)
+  //    e.g. "笨蛋儿子坐着三轮去西洋；天长地久很浮夸"
+  //         → "笨蛋儿子坐着三轮去西洋；天长…"
+  if (label.length >= 28) {
+    return label.slice(0, 25) + '…';
+  }
+
+  return label;
+}
+
 // ── CSS class name constants — exposed for external modules ─────────────────────
 
 export const CLASSES = {
@@ -594,7 +660,11 @@ export class Renderer {
     return CLASSES.ENTERING;
   }
 
-  runLayout(name: string, overrides?: Record<string, unknown>, opts?: { skipEntering?: boolean }): void {
+  runLayout(
+    name: string,
+    overrides?: Record<string, unknown>,
+    opts?: { skipEntering?: boolean; onLayoutStop?: () => void },
+  ): void {
     this.currentLayout = name;
     const preset = this.layoutConfigs[name]?.cytoscape;
     const base = preset ? { ...preset } : {};
@@ -664,7 +734,6 @@ export class Renderer {
 
     this.currentLayoutInstance?.stop();
     const layoutInstance = this.cy.layout(base as unknown as cytoscape.LayoutOptions);
-    layoutInstance.run();
     this.currentLayoutInstance = layoutInstance;
     // Re-resolve after layout settles — nodes may have shifted to overlapping
     // positions once the physical animation has converged. With `animate: true`
@@ -675,11 +744,17 @@ export class Renderer {
     //
     // Listen on the layout INSTANCE rather than `cy` so this callback is bound
     // 1:1 to the just-launched layout. If the user switches layouts mid-flight,
-    // the *previous* instance was never given this listener (line above this
-    // comment overwrites `currentLayoutInstance` before any new listener is
-    // attached), so its stop() emits layoutstop into the void — no stale
-    // resolveOverlaps based on interrupted positions.
-    layoutInstance.one('layoutstop', () => this.resolveOverlaps());
+    // the stopped instance may still emit layoutstop, but the identity check
+    // below ignores it — no stale resolveOverlaps or completion callback.
+    layoutInstance.one('layoutstop', () => {
+      // A newer layout may have replaced this one while it was running.
+      // Ignore the old instance's stop event: it must not settle the loading
+      // state or overwrite overlap data for the active layout.
+      if (this.currentLayoutInstance !== layoutInstance) return;
+      this.resolveOverlaps();
+      opts?.onLayoutStop?.();
+    });
+    layoutInstance.run();
   }
 
   currentLayoutName(): string {
@@ -734,7 +809,7 @@ export class Renderer {
         return {
           data: {
             id: n.id,
-            label: n.label || n.id,
+            label: formatNodeLabel(n.label) || n.id,
             // 语义层（基于 OWL2）
             fill: n.fill,
             stroke: effectiveStroke,

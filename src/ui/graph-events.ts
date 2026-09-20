@@ -187,6 +187,16 @@ export function initGraphEvents(deps: GraphEventDeps): void {
   cy.on('select', () => { updateStats(cy); syncBottomSheetStats(cy); });
   cy.on('unselect', () => { updateStats(cy); syncBottomSheetStats(cy); });
 
+  // Keep stats + bottom-sheet counters in sync while streaming is still
+  // pumping batches through `cy.add()`. Without this hook the counters stay
+  // stuck at "0" until boot() resumes after `await loadContentStreaming()` —
+  // the loading pill in the corner tells users "30 / 50" but the stats bar
+  // keeps showing 0/0, which reads as a broken UI. `add` fires for both the
+  // initial `cy.add()` inside initGraphFromManager and every batch in
+  // appendBatchToGraph; both `updateStats` and `syncBottomSheetStats` are
+  // debounced so we won't thrash when a batch adds hundreds of nodes at once.
+  cy.on('add', () => { updateStats(cy); syncBottomSheetStats(cy); });
+
   cy.on('zoom', () => {
     const zoom = cy.zoom();
     if (zoom < 0.02) cy.zoom(0.02);

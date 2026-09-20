@@ -99,7 +99,7 @@ async function fetchWithStreaming(
       phase: 'content',
       loaded: completed,
       total,
-      message: '加载知识节点',
+      message: '加载节点',
     });
 
     if (completed % batchSize === 0 || completed === total) {
