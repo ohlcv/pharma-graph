@@ -58,28 +58,35 @@
   min-width: 4ch; text-align: right;
 }
 
-/* ── Glass dashboard edge — 1px gradient border (bright top-left → dark
- *    bottom-right) that reads like a lit glass bezel. Reuses the same
- *    content-box mask trick as .topbar__badge::before so it respects
- *    border-radius and stays a crisp hairline. ─────────────────────────── */
+/* ── Glass dashboard edge — 1px gradient hairline (bright top-left → dark
+ *    bottom-right) that reads like a lit glass bezel and follows
+ *    border-radius natively.
+ *
+ *    Implemented as the panel's OWN layered background rather than an
+ *    ::before overlay: #sidebar / #bottom-sheet are overflow:auto scroll
+ *    containers, and an absolutely positioned child (::before included)
+ *    scrolls away with their content — the ring detaches from the visible
+ *    edges as soon as the panel scrolls. The element's own background is
+ *    anchored to its border/padding boxes and never scrolls.
+ *
+ *    Panels pass their tint through --glass-bg; the tint fills the
+ *    padding box and the gradient only shows through the 1px transparent
+ *    border band. ─────────────────────────────────────────────────────── */
 .glass-edge {
-  position: relative;
-}
-.glass-edge::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(135deg,
-    rgba(255,255,255,0.24) 0%,
-    rgba(255,255,255,0.06) 45%,
-    rgba(0,0,0,0.34) 100%);
-  -webkit-mask: linear-gradient(#fff,#fff) content-box, linear-gradient(#fff,#fff) content-box;
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#fff,#fff) content-box, linear-gradient(#fff,#fff) content-box;
-  mask-composite: exclude;
-  pointer-events: none;
+  border: 1px solid transparent;
+  /* Two image layers (background-color is NOT a layer, so it cannot take
+     the second clip value): solid panel tint clipped to padding-box,
+     gradient ring clipped to border-box — the ring only shows through the
+     1px transparent border band. */
+  background-image:
+    linear-gradient(var(--glass-bg, rgba(12, 18, 34, 0.9)),
+                    var(--glass-bg, rgba(12, 18, 34, 0.9))),
+    linear-gradient(135deg,
+      rgba(255,255,255,0.24) 0%,
+      rgba(255,255,255,0.06) 45%,
+      rgba(0,0,0,0.34) 100%);
+  background-clip: padding-box, border-box;
+  background-origin: padding-box, border-box;
 }
 
 
