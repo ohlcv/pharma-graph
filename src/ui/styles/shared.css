@@ -1,3 +1,9 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   shared.css — Global Animations · Utility Classes
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@layer shared {
+
 /* ── Non-blocking loading indicator (corner) ─────────────────────────────────
    Positioned bottom-center, low-key pill with breathing dot.
    The graph *renders in real time* as content streams in — this
@@ -27,7 +33,7 @@
 .loading-indicator .loading-dot {
   width: 8px; height: 8px; border-radius: 50%;
   background: var(--yellow);
-  box-shadow: 0 0 10px var(--yellow), 0 0 18px rgba(234, 179, 8, 0.35);
+  box-shadow: 0 0 10px var(--yellow), 0 0 18px rgba(251, 191, 36, 0.35);
   animation: dot-pulse 1.4s ease-in-out infinite;
   flex-shrink: 0;
 }
@@ -52,11 +58,6 @@
   min-width: 4ch; text-align: right;
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
-   shared.css — Global Animations · Utility Classes
-   ══════════════════════════════════════════════════════════════════════════ */
-
-@layer shared {
 
 @keyframes dot-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
@@ -142,7 +143,7 @@
 .legend-edge-row:focus-visible,
 .bs-chip:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--accent), 0 0 0 5px rgba(129,140,248,0.22);
+  box-shadow: 0 0 0 2px var(--accent), 0 0 0 5px rgba(var(--accent-rgb), 0.22);
 }
 
 /* ── Reduced-motion accommodation ──────────────────────────────────────────

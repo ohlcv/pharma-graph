@@ -2,33 +2,167 @@
    base.css — Reset · CSS Variables · Scrollbar
    ══════════════════════════════════════════════════════════════════════════ */
 
+/* 建议在入口 CSS 最前面统一声明层顺序（这里只是提醒，按你实际的层名写）：
+   @layer base, components, utilities;
+   这样层优先级由声明顺序决定，不会被未分层的样式意外覆盖。 */
+
 @layer base {
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ::selection 只支持纯色背景，不支持 gradient，所以用 accent 单色 */
 ::selection {
-  background: linear-gradient(135deg, rgba(99,102,241,0.45) 0%, rgba(6,182,212,0.40) 100%);
+  background-color: rgba(var(--accent-rgb), 0.45);
   color: #f1f5f9;
   text-shadow: 0 0 1px rgba(0,0,0,0.4);
 }
-::-moz-selection { background: rgba(99,102,241,0.45); color: #f1f5f9; }
 
+/* ════════════════════════════════════════════════════════════════════════════
+   THEME — single source of truth for color story.
+   Switch by setting <html data-theme="A|B|C|D"> or class on root.
+   Default: C (Aurora · 极光 淡紫 + 冷青). 想换默认主题：把 `:root,` 挪到对应主题的选择器上。
+
+   A — Cold deep space   冷深空      deep indigo + ice cyan     (tech / Linear)
+   B — Nebula            星云紫      violet #a78bfa + amber      (Hubble deep field)
+   C — Aurora            极光        deep indigo + cold cyan + lilac (Apple starfield)
+   D — Cold-warm clash   冷暖对撞    deep blue + warm amber/orange (NASA Orion / stellar)
+
+   Components only ever reference --accent / --accent2 / --halo-* — never raw
+   hex — so theme swap is mechanical.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* B — Nebula — 星云紫 + 暗金 */
+:root[data-theme="B"],
+:root.theme-b {
+  --accent:      #a78bfa;             /* violet-400 — 星云核 */
+  --accent-rgb:  167, 139, 250;
+  --accent-soft: rgba(167, 139, 250, 0.16);
+  --accent-glow: rgba(167, 139, 250, 0.28);
+  --accent-light:     #c4b5fd;   /* accent 的浅色版：hover / 高亮文字 */
+  --accent-light-rgb: 196, 181, 253;
+
+  --accent2:     #fbbf24;             /* amber-400 — 暗金 / 恒星内核 */
+  --accent2-rgb: 251, 191, 36;
+  --accent2-soft: rgba(251, 191, 36, 0.18);
+
+  --halo-accent:      rgba(167, 139, 250, 0.22);
+  --halo-accent2:     rgba(251, 191, 36, 0.16);
+  --halo-accent-strong:  rgba(167, 139, 250, 0.35);
+  --halo-accent2-strong: rgba(251, 191, 36, 0.28);
+
+  --scrollbar-thumb:  rgba(167, 139, 250, 0.45);
+  --scrollbar-hover:  rgba(167, 139, 250, 0.70);
+
+  /* ── Stat indicator colors — four distinct hues, track the theme ────── */
+  --stat-nodes:       #a78bfa;   /* 紫罗兰 — 主色 */
+  --stat-edges:       #fbbf24;   /* 暗金   — 辅色 */
+  --stat-selected:    #60a5fa;   /* 蓝     — 冷色补 */
+  --stat-highlighted: #34d399;   /* 绿     — 冷色补 */
+}
+
+/* A — Cold deep space — 冷深空（靛蓝 + 冰青）*/
+:root[data-theme="A"],
+:root.theme-a {
+  --accent:      #818cf8;
+  --accent-rgb:  129, 140, 248;
+  --accent-soft: rgba(129, 140, 248, 0.16);
+  --accent-glow: rgba(129, 140, 248, 0.28);
+  --accent-light:     #a5b4fc;
+  --accent-light-rgb: 165, 180, 252;
+
+  --accent2:     #06b6d4;
+  --accent2-rgb: 6, 182, 212;
+  --accent2-soft: rgba(6, 182, 212, 0.16);
+
+  --halo-accent:      rgba(129, 140, 248, 0.22);
+  --halo-accent2:     rgba(6, 182, 212, 0.16);
+  --halo-accent-strong:  rgba(129, 140, 248, 0.35);
+  --halo-accent2-strong: rgba(6, 182, 212, 0.28);
+
+  /* 与 --accent 同色（原为 99,102,241，和其他主题不一致） */
+  --scrollbar-thumb:  rgba(129, 140, 248, 0.45);
+  --scrollbar-hover:  rgba(129, 140, 248, 0.70);
+
+  /* ── Stat indicator colors — four distinct hues, track the theme ────── */
+  --stat-nodes:       #818cf8;   /* 靛蓝 — 主色 */
+  --stat-edges:       #06b6d4;   /* 冰青 — 辅色 */
+  --stat-selected:    #f472b6;   /* 粉   — 拉开与靛蓝的色相（原 #a78bfa 太近） */
+  --stat-highlighted: #34d399;   /* 绿   — 辅色邻近 */
+}
+
+/* Default = C (Aurora) — 极光（深靛 + 冷青 + 淡紫）*/
+:root,
+:root[data-theme="C"],
+:root.theme-c {
+  --accent:      #c4b5fd;             /* violet-300 — lighter aurora */
+  --accent-rgb:  196, 181, 253;
+  --accent-soft: rgba(196, 181, 253, 0.18);
+  --accent-glow: rgba(196, 181, 253, 0.32);
+  --accent-light:     #ddd6fe;
+  --accent-light-rgb: 221, 214, 254;
+
+  --accent2:     #67e8f9;             /* cyan-300 — cold cyan */
+  --accent2-rgb: 103, 232, 249;
+  --accent2-soft: rgba(103, 232, 249, 0.18);
+
+  --halo-accent:      rgba(196, 181, 253, 0.24);
+  --halo-accent2:     rgba(103, 232, 249, 0.18);
+  --halo-accent-strong:  rgba(196, 181, 253, 0.38);
+  --halo-accent2-strong: rgba(103, 232, 249, 0.30);
+
+  --scrollbar-thumb:  rgba(196, 181, 253, 0.45);
+  --scrollbar-hover:  rgba(196, 181, 253, 0.70);
+
+  /* ── Stat indicator colors — four distinct hues, track the theme ────── */
+  --stat-nodes:       #c4b5fd;   /* 淡紫 — 主色 */
+  --stat-edges:       #67e8f9;   /* 冷青 — 辅色 */
+  --stat-selected:    #60a5fa;   /* 蓝   — 冷色补 */
+  --stat-highlighted: #34d399;   /* 绿   — 冷色补 */
+}
+
+/* D — Cold-warm clash — 冷暖对撞（深冷蓝 + 暖橙）*/
+:root[data-theme="D"],
+:root.theme-d {
+  --accent:      #60a5fa;             /* blue-400 — cold stellar */
+  --accent-rgb:  96, 165, 250;
+  --accent-soft: rgba(96, 165, 250, 0.16);
+  --accent-glow: rgba(96, 165, 250, 0.28);
+  --accent-light:     #93c5fd;
+  --accent-light-rgb: 147, 197, 253;
+
+  --accent2:     #f97316;             /* orange-500 — warm planet glow */
+  --accent2-rgb: 249, 115, 22;
+  --accent2-soft: rgba(249, 115, 22, 0.18);
+
+  --halo-accent:      rgba(96, 165, 250, 0.22);
+  --halo-accent2:     rgba(249, 115, 22, 0.16);
+  --halo-accent-strong:  rgba(96, 165, 250, 0.35);
+  --halo-accent2-strong: rgba(249, 115, 22, 0.28);
+
+  --scrollbar-thumb:  rgba(96, 165, 250, 0.45);
+  --scrollbar-hover:  rgba(96, 165, 250, 0.70);
+
+  /* ── Stat indicator colors — four distinct hues, track the theme ────── */
+  --stat-nodes:       #60a5fa;   /* 蓝 — 主色 */
+  --stat-edges:       #f97316;   /* 橙 — 辅色 */
+  --stat-selected:    #a78bfa;   /* 紫 — 冷色补 */
+  --stat-highlighted: #34d399;   /* 绿 — 拉开与橙/金的区分（原 #fbbf24 太近） */
+}
+
+/* Structural tokens — theme-independent */
 :root {
+  color-scheme: dark;                 /* 原生表单控件、滚动条、选择菜单跟随暗色 */
+
   --bg:          #020617;
   --bg-sub:      #0c1222;
   --panel:       #0c1222;
   --panel-alt:   #0f172a;
   --border:      #1e2d45;
   --border-hi:   #2d3f5a;
-  --accent:      #818cf8;             /* raised from #6366f1 — brighter on dark panels */
-  --accent-soft: rgba(129, 140, 248, 0.16);  /* pre-baked 16% for hover halos */
-  --accent-glow: rgba(129, 140, 248, 0.28);
-  --accent2:     #06b6d4;
-  --accent2-soft: rgba(6, 182, 212, 0.16);
   --text:        #f1f5f9;
-  --text-2:      #94a3b8;
-  --text-3:      #cbd5e1;             /* placeholder / weak labels */
-  --muted:       #64748b;             /* slate-500 — was slate-600 (~4.1:1, below AA on bg); raised to clear 4.5:1 */
+  --text-2:      #94a3b8;             /* 次级文字 */
+  --text-3:      #cbd5e1;             /* 比 --text-2 更亮的次级文字（注意：并非"更弱"） */
+  --muted:       #7f8ea3;             /* 在 --bg / --panel 上约 5.5:1，满足 AA 小字 4.5:1 */
   --green:       #34d399;
   --yellow:      #fbbf24;
   --amber:       #f59e0b;             /* warning / pending state */
@@ -36,16 +170,6 @@
   --blue:        #60a5fa;
   --purple:      #a78bfa;
   --pink:        #f472b6;             /* edge category accent */
-
-  /* ── Ambient / halo — derived from accent/accent2 so they always stay in sync */
-  --halo-indigo:   rgba(129, 140, 248, 0.22);
-  --halo-cyan:     rgba(6, 182, 212, 0.16);
-  --halo-indigo-strong: rgba(129, 140, 248, 0.35);
-  --halo-cyan-strong:   rgba(6, 182, 212, 0.28);
-
-  /* ── Scrollbar */
-  --scrollbar-thumb:  rgba(99, 102, 241, 0.45);
-  --scrollbar-hover:   rgba(99, 102, 241, 0.70);
 
   /* ── Debug palette */
   --debug-red:    #f87171;
@@ -66,45 +190,44 @@ html, body {
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
-  font-family: 'Microsoft YaHei UI', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+  font-family: 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC',
+               'Noto Sans SC', 'Segoe UI', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-/* ── Scrollbar — wider, gradient, with active state ─────────────────────
-   Webkit/Blink and Firefox both get a 3-stop gradient instead of a
-   flat slate. Active class `is-scrolling` is toggled by JS in
-   scrollable containers (see components.css) to deepen the thumb so
-   the user knows where they are. */
+/* ── Scrollbar — gradient thumb, deepens on hover / active ──────────────
+   默认半透明 → hover 加深 → active 最深。
+   Chrome 121+ 只要设置了标准的 scrollbar-width / scrollbar-color，就会忽略
+   ::-webkit-scrollbar 的自定义样式，所以标准属性只给不支持 webkit 滚动条的
+   浏览器（Firefox）用，见下方 @supports。 */
 ::-webkit-scrollbar {
   width: 10px; height: 10px;
 }
-::-webkit-scrollbar-track     { background: transparent; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg,
-    var(--accent) 0%,
-    var(--accent2) 100%);
+  background-image: linear-gradient(180deg,
+    rgba(var(--accent-rgb), 0.45) 0%,
+    rgba(var(--accent2-rgb), 0.40) 100%);
+  background-clip: padding-box;
   border-radius: 6px;
   border: 2px solid transparent;
-  background-clip: padding-box;
-  transition: background 0.2s ease;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg,
-    rgba(129,140,248,0.65) 0%,
-    rgba(6,182,212,0.55) 100%);
-  background-clip: padding-box;
-  border: 2px solid transparent;
+  background-image: linear-gradient(180deg,
+    rgba(var(--accent-rgb), 0.70) 0%,
+    rgba(var(--accent2-rgb), 0.60) 100%);
 }
 ::-webkit-scrollbar-thumb:active {
-  background: linear-gradient(180deg,
-    rgba(129,102,241,0.85) 0%,
-    rgba(6,182,212,0.75) 100%);
-  background-clip: padding-box;
-  border: 2px solid transparent;
+  background-image: linear-gradient(180deg,
+    rgba(var(--accent-rgb), 0.90) 0%,
+    rgba(var(--accent2-rgb), 0.80) 100%);
 }
-#sidebar::-webkit-scrollbar   { width: 8px; }
-* { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
-*:hover { scrollbar-color: var(--scrollbar-hover) transparent; }
+#sidebar::-webkit-scrollbar { width: 8px; }
+
+@supports not selector(::-webkit-scrollbar) {
+  * { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
+  *:hover { scrollbar-color: var(--scrollbar-hover) transparent; }
+}
 
 /* Screen-reader-only utility (issue #29): visually hidden but readable
    by assistive tech. Used by aria-live regions for tour + search
@@ -123,15 +246,11 @@ html, body {
   clip-path: inset(50%);
 }
 
-/* ── Focus ring — double-layer (outer indigo / inner cyan) ─────────────
-   `:focus-visible` so mouse clicks don't show a ring, only Tab nav.
-   Two-stop outline so the eye reads this as a "ring of the brand"
-   rather than a generic blue. We deliberately avoid `box-shadow`
-   here because many components already use it for hover glows. */
+/* ── Focus ring — uses theme accent so it tracks the color story ──────── */
 :focus-visible {
-  outline: 2px solid rgba(99,102,241,0.95);
+  outline: 2px solid rgba(var(--accent-rgb), 0.95);
   outline-offset: 2px;
 }
 :focus:not(:focus-visible) { outline: none; }
 
-}
+} /* end @layer base */

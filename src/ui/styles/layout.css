@@ -21,8 +21,8 @@
      (The third central vignette was removed — it just darkened the
      middle of the canvas without adding rhythm.) */
   background:
-    radial-gradient(ellipse 120% 80% at 12% -5%, var(--halo-indigo) 0%, transparent 65%),
-    radial-gradient(ellipse 100% 70% at 88% 95%, var(--halo-cyan) 0%, transparent 60%);
+    radial-gradient(ellipse 120% 80% at 12% -5%, var(--halo-accent) 0%, transparent 65%),
+    radial-gradient(ellipse 100% 70% at 88% 95%, var(--halo-accent2) 0%, transparent 60%);
   mix-blend-mode: screen;
   pointer-events: none; z-index: -1;
 }
@@ -91,12 +91,12 @@
 }
 #debug-toggle {
   display: flex; align-items: center; gap: 8px; width: 100%;
-  background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.3);
+  background: rgba(192, 132, 252, 0.12); border: 1px solid rgba(192, 132, 252, 0.3);
   border-radius: 6px; padding: 6px 10px; font-size: 0.7rem;
   font-family: inherit; color: var(--muted); cursor: pointer; text-align: left;
 }
-#debug-toggle:hover  { background: rgba(99,102,241,0.25); border-color: rgba(99,102,241,0.5); color: var(--text); }
-#debug-toggle.active { background: rgba(99,102,241,0.3);  border-color: #6366f1; color: #a5b4fc; }
+#debug-toggle:hover  { background: rgba(192, 132, 252, 0.25); border-color: rgba(192, 132, 252, 0.5); color: var(--text); }
+#debug-toggle.active { background: rgba(192, 132, 252, 0.3);  border-color: var(--debug-purple); color: #d8b4fe; }
 
 /* ── Forensic panel ──────────────────────────────────────────────────── */
 .dbg-header {
@@ -131,12 +131,12 @@
   display: inline-flex; align-items: center; justify-content: center;
 }
 .dbg-header__copy:hover {
-  background: rgba(99,102,241,0.18);
-  border-color: rgba(99,102,241,0.45);
-  color: #c7d2fe;
+  background: rgba(192, 132, 252, 0.18);
+  border-color: rgba(192, 132, 252, 0.45);
+  color: #d8b4fe;
 }
 .dbg-header__copy:focus-visible {
-  outline: 2px solid #a5b4fc;
+  outline: 2px solid var(--debug-purple);
   outline-offset: 1px;
 }
 .dbg-header__close:hover {
@@ -153,8 +153,8 @@
 .dbg-section__label { font-size: 9px; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
 
 .dbg-node-card {
-  background: rgba(99,102,241,0.08);
-  border: 1px solid rgba(99,102,241,0.2);
+  background: rgba(192, 132, 252, 0.08);
+  border: 1px solid rgba(192, 132, 252, 0.2);
   border-radius: 6px; padding: 6px 8px;
 }
 .dbg-node-card--muted {
@@ -211,7 +211,7 @@
 .dbg-rules-table__td--type  { color: #818cf8; }
 .dbg-rules-table__td--shape { color: #67e8f9; }
 .dbg-rules-table__td--w     { color: #fbbf24; }
-.dbg-rules-table__tr--active td { background: rgba(99,102,241,0.1); }
+.dbg-rules-table__tr--active td { background: rgba(192, 132, 252, 0.1); }
 .dbg-rules-table__count { font-size: 9px; color: #475569; margin-top: 4px; text-align: right; }
 
 .dbg-conflict {
@@ -255,13 +255,13 @@
   animation: toast-in 0.3s cubic-bezier(0.34, 1.4, 0.64, 1) both;
   pointer-events: auto;
 }
-.toast--info    { border-color: rgba(99, 102, 241, 0.4); }
+.toast--info    { border-color: rgba(var(--accent-rgb), 0.4); }
 .toast--success { border-color: rgba(52, 211, 153, 0.4); }
 .toast--error   { border-color: rgba(248, 113, 113, 0.4); }
 .toast__dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .toast--info    .toast__dot { background: var(--accent); }
-.toast--success .toast__dot { background: #34d399; }
-.toast--error   .toast__dot { background: #f87171; }
+.toast--success .toast__dot { background: var(--green); }
+.toast--error   .toast__dot { background: var(--red); }
 
 /* ── Zoom indicator ─────────────────────────────────────────────────────── */
 .zoom-indicator {
