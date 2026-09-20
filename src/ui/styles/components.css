@@ -90,17 +90,53 @@
   display: inline-flex; align-items: center; gap: 8px;
   margin-left: auto; margin-right: 16px; flex-shrink: 1; min-width: 0;
   padding: 6px 14px 6px 10px; border-radius: 20px; border: 1px solid transparent;
-  background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(168,85,247,0.1));
+  /* Faint glass — keep the alpha low (≤4%) so backdrop-filter blur actually
+   * shows through to the topbar gradient beneath. The previous 15%/10% was
+   * too opaque and made the blur effect invisible. */
+  background: rgba(255,255,255,0.03);
+  /* Top inner highlight + soft outer glow: makes the shell feel "lit from
+   * above" instead of flat. Inner highlight is a 1px white inset shadow;
+   * outer glow is the same purple family the border sweep uses, so the
+   * capsule and its moving border share one color story. */
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    inset 0 -1px 0 rgba(0,0,0,0.25),
+    0 0 16px rgba(139,92,246,0.18);
   position: relative; font-size: 0.72rem; font-weight: 600;
   letter-spacing: 0.04em; color: transparent; text-shadow: none; backdrop-filter: blur(8px);
+  /* Subtle elevation on hover — keeps the capsule inviting without
+   * breaking the quiet permanent-decor feel. */
+  transition: box-shadow 0.35s ease, background 0.35s ease;
 }
+.topbar__badge:hover {
+  background: rgba(255,255,255,0.05);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.12),
+    inset 0 -1px 0 rgba(0,0,0,0.25),
+    0 0 22px rgba(139,92,246,0.32);
+}
+/* Diagonal light sweep on the border — the "streamer" you asked for.
+ * Gradient is ~4× wider than the element so the bright violet→pink stripe
+ * slides across the perimeter and fades before re-entering; background-size
+ * is set in % to keep this resolution-independent. Same palette as the
+ * .badge-meow text shimmer so the shell and the word breathe in one tone. */
 .topbar__badge::before {
   content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
-  background: linear-gradient(135deg, rgba(139,92,246,0.5), rgba(168,85,247,0.2));
+  background: linear-gradient(110deg,
+    rgba(139,92,246,0.15)  0%,
+    rgba(168,85,247,0.55) 22%,
+    rgba(236,72,153,0.85) 38%,
+    rgba(168,85,247,0.55) 54%,
+    rgba(139,92,246,0.15) 76%,
+    rgba(139,92,246,0.15) 100%);
+  background-size: 300% 100%;
   -webkit-mask: linear-gradient(#fff,#fff) content-box, linear-gradient(#fff,#fff) content-box;
   -webkit-mask-composite: xor;
   mask: linear-gradient(#fff,#fff) content-box, linear-gradient(#fff,#fff) content-box;
-  mask-composite: exclude; pointer-events: none;
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: badge-border-sweep 6s linear infinite;
+  will-change: background-position;
 }
 .topbar__badge-dot {
   width: 8px; height: 8px; border-radius: 50%; background: var(--green);
@@ -108,7 +144,11 @@
   animation: dot-pulse 3s ease-in-out infinite; flex-shrink: 0; filter: brightness(1.2);
 }
 .topbar__badge-dot--loading { background: var(--yellow); box-shadow: 0 0 10px var(--yellow), 0 0 20px rgba(234,179,8,0.3); }
-.badge-by   { color: rgba(139,92,246,0.75); font-weight: 400; font-size: 0.68rem; letter-spacing: 0.08em; text-shadow: none; }
+/* "by" sits between the carousel word and "meow" — kept low-contrast so the
+ * word and the italic gradient get all the attention. Same purple family
+ * but lower alpha and lighter weight, with extra letter-spacing so it reads
+ * as a tiny breathing pause rather than competing text. */
+.badge-by   { color: rgba(167,139,250,0.55); font-weight: 300; font-size: 0.64rem; letter-spacing: 0.14em; text-transform: uppercase; text-shadow: none; }
 .badge-meow {
   font-style: italic; font-weight: 800; color: var(--accent); font-size: 0.76rem;
   background: linear-gradient(90deg, rgba(168,85,247,1) 0%, rgba(236,72,153,1) 20%, rgba(139,92,246,1) 40%, rgba(168,85,247,0.7) 60%, rgba(236,72,153,1) 80%, rgba(168,85,247,1) 100%);
@@ -130,6 +170,100 @@
   will-change: background-position;
   -webkit-will-change: background-position;
 }
+/* ═══════════════════════════════════════════════════════════════════════
+ * Email card — revealed when the user hovers the "meow" word. Pure hover
+ * only — no click handler — so it never competes with anything. Touch
+ * devices never get the hover state (the JS opts in via pointer:fine), so
+ * the card stays hidden on phones/tablets and never gets stranded visible.
+ *
+ * Positioning: the card is `position: fixed` and JS recomputes its top/
+ * left on every hover so it tracks the "meow" word even as the layout
+ * shifts (search-input expanding on focus, etc.). We deliberately don't
+ * keep it anchored inside .topbar__badge, because .topbar creates its own
+ * stacking context (z-index:10 + position:relative) which would otherwise
+ * pin the card below any high-z fixed element (#debug-panel at 9999, toast
+ * stack, overlays). Fixed + JS-driven positioning is the only way to
+ * guarantee "always on top".
+ * ═══════════════════════════════════════════════════════════════════════ */
+.badge-email-card {
+  position: fixed;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border-radius: 12px;
+  background: rgba(20, 14, 36, 0.82);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.45),
+    0 0 18px rgba(139, 92, 246, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color: #e9e4ff;
+  font-size: 0.72rem; font-weight: 500; letter-spacing: 0.01em;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px) scale(0.97);
+  transform-origin: top right;
+  transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0.28s;
+  /* z-index 100000 beats everything in this app: #debug-panel (9999),
+   * .toast (likely ≥9000), FAB (100), sheets/overlays, etc. Fixed
+   * positioning gets us out of .topbar's stacking context (z:10) so we
+   * compete at the root, where 100000 wins. */
+  z-index: 100000;
+}
+.badge-email-card.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+  /* visibility transition delays must collapse to 0 once visible, otherwise
+   * the card keeps visibility:hidden during the fade-in. */
+  transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0s;
+}
+.badge-email-card__arrow {
+  position: absolute;
+  top: -5px; left: var(--arrow-x, 18px);   /* x set by JS so it always lands under the meow glyph, not the right edge */
+  width: 10px; height: 10px;
+  background: rgba(20, 14, 36, 0.82);
+  border-left: 1px solid rgba(167, 139, 250, 0.35);
+  border-top:  1px solid rgba(167, 139, 250, 0.35);
+  transform: rotate(45deg);
+}
+.badge-email-card__icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 6px;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(236, 72, 153, 0.18));
+  color: #c4b5fd;
+  flex-shrink: 0;
+}
+.badge-email-card__addr {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #f3efff;
+  background: linear-gradient(90deg, #c4b5fd 0%, #f0abfc 50%, #c4b5fd 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  /* Subtle personal touch: a slow shimmer on the address itself so it
+   * doesn't feel static — but slow enough to not compete with the
+   * border sweep above. */
+  animation: carousel-shimmer 6s ease-in-out infinite;
+}
+.badge-email-card__hint {
+  font-size: 0.58rem;
+  color: rgba(196, 181, 253, 0.55);
+  letter-spacing: 0.06em;
+  border-left: 1px solid rgba(167, 139, 250, 0.2);
+  padding-left: 8px;
+  margin-left: 2px;
+}
+/* Mobile — narrower padding, smaller hint (or hide it entirely on tiny screens). */
+@media (max-width: 640px) {
+  .badge-email-card { padding: 6px 10px; gap: 6px; }
+  .badge-email-card__hint { display: none; }
+}
+
 #carousel-text.is-hidden { opacity: 0; }
 
 }
@@ -1149,9 +1283,14 @@
     margin-right: 4px;
     padding: 4px 8px 4px 6px;
     gap: 4px;
+    /* Slightly tighter border sweep on narrow screens — same percentage of
+     * movement per second, but the smaller background-size keeps the bright
+     * stripe perceptually closer to the border so it doesn't feel like the
+     * animation is "skipping" across the now-shorter perimeter. */
   }
+  .topbar__badge::before { background-size: 220% 100%; }
   .topbar__badge-dot { width: 6px; height: 6px; }
-  .badge-by   { font-size: 0.6rem; }
+  .badge-by   { font-size: 0.56rem; }
   .badge-meow { font-size: 0.64rem; }
   #carousel-text { font-size: 0.64rem; }
 }

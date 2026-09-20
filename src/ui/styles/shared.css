@@ -71,6 +71,15 @@
   50%  { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
+/* Capsule border light sweep — a slow diagonal flow that makes the shell
+ * itself feel alive. Synced to the same 6s rhythm as the internal shimmers
+ * (3s shimmer × 2 cycles per sweep), so everything in the badge breathes in
+ * one tempo. background-position % is larger than 100% so the bright stripe
+ * never visibly enters from outside — it fades in from transparent. */
+@keyframes badge-border-sweep {
+  0%   { background-position:   0% 50%; }
+  100% { background-position: 300% 50%; }
+}
 @keyframes np-in {
   from { opacity: 0; transform: translateY(8px) scale(0.97); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
@@ -161,7 +170,7 @@
   cy, #cy, .cy { transition: none !important; }
   /* Disable the looping shimmers explicitly so they don't flicker at start. */
   .badge-shimmer, .carousel-shimmer, .badge-meow, .empty-state__icon,
-  .topbar__badge-dot, .tour-dt__dot, .node-ripple {
+  .topbar__badge-dot, .topbar__badge::before, .tour-dt__dot, .node-ripple {
     animation: none !important;
   }
   /* Respect that the user still wants visible feedback: keep outlines, but
