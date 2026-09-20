@@ -2,7 +2,7 @@
 id: cls-anticholinergic-m-y2-04-02
 label: 抗胆碱M受体药
 fill: cls-classification
-stroke: glow
+stroke: double
 location:
   book: 药学专业知识二
   chapter: 第四章 消化系统用药

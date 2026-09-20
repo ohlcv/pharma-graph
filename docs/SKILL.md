@@ -30,7 +30,7 @@ description: "将纸质思维导图照片（或扫描件）转录为符合药学
 |---|---|---|---|
 | `sec-` | `cls-structure` | 组织结构（书/篇/章/节入口） | `sec-sedative-y2-01-01` |
 | `cls-` | `cls-classification` | 药物分类 | `cls-benzodiazepine-y2-01-01` |
-| `med-` | `cls-drug` | **重点药**（有完整药理卡片，stroke: glow） | `med-diazepam-y2-01-01` |
+| `med-` | `cls-drug` | **重点药**（有完整药理卡片，stroke: double） | `med-diazepam-y2-01-01` |
 | `drug-` | `cls-drug` | **普通药**（仅提名，stroke 不填） | `drug-trizolam-y2-01-01` |
 | `disease-` | `cls-disease` | 疾病/症状 | `disease-insomnia-y2-01-01` |
 | `bio-` | `cls-biomolecule` | 生物实体（靶点/受体/酶） | `bio-gabaa-y2-01-01` |
@@ -40,7 +40,7 @@ description: "将纸质思维导图照片（或扫描件）转录为符合药学
 | `sum-` | `cls-summary` | 总结/表格 | `sum-barbiturate-y2-01` |
 | `mem-` | `cls-mnemonic` | 口诀 | `mem-barbiturate-y2-01-01` |
 
-**重点药 vs 普通药判定**：纸质版中该药物有独立框且框内有正文内容 → 重点药（`med-`，stroke: glow）；仅提名无独立画像 → 普通药（`drug-`，不填 stroke）。**所有药物都必须建独立节点**。
+**重点药 vs 普通药判定**：纸质版中该药物有独立框且框内有正文内容 → 重点药（`med-`，stroke: double）；仅提名无独立画像 → 普通药（`drug-`，不填 stroke）。**所有药物都必须建独立节点**。
 
 **章节后缀**：`y1`=药一、`y2`=药二、`y3`=药综、`y4`=法规，格式 `{书简写}-{章号}-{节号}`。
 
@@ -61,19 +61,21 @@ description: "将纸质思维导图照片（或扫描件）转录为符合药学
 - ❌ 用占位符（"待补充""暂无内容"）
 - ❌ 口诀写入 short（口诀只建独立节点，见 §六）
 
-### 1.4 stroke 规则（只写 glow，不写 auto）
+### 1.4 stroke 规则（重点节点写 double，普通节点不填）
 
-- **不填** = 默认 auto（无特效），**禁止显式写 `stroke: auto`**
-- **`glow`** = 呼吸光晕，只给纸质版"临床用药评价"分支下的节点（重点药/有临床评价的分类）
-- 分类与作用机制分支里的分类，即使列出了多个代表药，也不加 glow
+- **不填** = 默认 glow（呼吸光晕），**禁止显式写 `stroke: glow`（默认就是 glow，写出来冗余）**
+- **`double`** = 双线边框，只给纸质版"临床用药评价"分支下的节点（重点药/有临床评价的分类）
+- 分类与作用机制分支里的分类，即使列出了多个代表药，也不加 double
+
+> md 填的 `stroke`（如 `double`）与默认 `glow` 是**并存叠加**（`STROKE_MERGE_MODE=coexist`，默认），不是替换：重点节点 = 默认呼吸光晕 + 双线边框。
 
 | 节点类型 | stroke | 判定标准 |
 |---|---|---|
-| 重点药（临床用药评价里有独立评价框） | `glow` | 纸质版"临床用药评价"分支下有该药物的独立框 |
+| 重点药（临床用药评价里有独立评价框） | `double` | 纸质版"临床用药评价"分支下有该药物的独立框 |
 | 普通药（仅提名） | 不填 | 仅在分类框中提名 |
-| 重点分类（临床用药评价分支下有该分类） | `glow` | 临床用药评价分支下直接出现该分类名 |
+| 重点分类（临床用药评价分支下有该分类） | `double` | 临床用药评价分支下直接出现该分类名 |
 | 普通分类（仅在分类与作用机制分支出现） | 不填 | 仅在"分类与作用机制"分支出现 |
-| 跨节大总结/表格 | `glow` | 跨节汇总对比 |
+| 跨节大总结/表格 | `double` | 跨节汇总对比 |
 | 节内总结 | 不填 | 仅本节内总结 |
 
 ### 1.5 平铺结构（无 data 包装）
@@ -258,7 +260,7 @@ label: |
 ### Step 6 — 第一步交付（框架版 zip + 节点说明总结）
 
 - 打包节级 zip
-- 附节点说明总结（层级树、节点数、stroke 分布、glow 节点列表）
+- 附节点说明总结（层级树、节点数、stroke 分布、double 节点列表）
 - **明确告知用户：这是框架版，full 内容尚未填写，请审批节点结构**
 - 用户审批通过后进入第二步；用户提出修改则修改后重新交付
 
@@ -300,7 +302,7 @@ label: |
 | 节名 | 如「第一节 镇静催眠药」 |
 | 节点总数 | 用 `unzip -l` 反查的实际文件数 |
 | 层级结构 | 节入口 → 分类 → 子分类/药物/口诀 的层级树 |
-| glow 节点 | 列出所有 stroke: glow 的节点 |
+| double 节点 | 列出所有 stroke: double 的节点 |
 | full 填写情况 | 哪些节点填了 full、哪些留空 |
 | 口诀归属 | 每条口诀 part_of 指向哪个节点 |
 | 已知未完成项 | 哪些节点 full 未填、哪些关系待确认 |
@@ -326,7 +328,7 @@ label: |
 | 代表药物 | 写入分类节点的 `summary.full【代表药】` |
 | 临床用药评价 | **不单独建，不拆子节点**，其下内容合并写入对应重点药/分类的 full（见 §4.4） |
 | 作用机制 | 写入分类/药物节点的 `summary.full` |
-| 总结 | 节内总结可建节点（`cls-summary`），跨节大总结建节点并加 glow |
+| 总结 | 节内总结可建节点（`cls-summary`），跨节大总结建节点并加 double |
 
 ### 3.3 分类层级完整性（禁止药物直挂节入口）
 
@@ -388,7 +390,7 @@ summary:
 
 | 类型 | 前缀 | stroke | summary.full | 判定标准 |
 |---|---|---|---|---|
-| **重点药** | `med-` | `glow` | 有完整临床评价内容 | 纸质版有独立框且框内有正文 |
+| **重点药** | `med-` | `double` | 有完整临床评价内容 | 纸质版有独立框且框内有正文 |
 | **普通药** | `drug-` | 不填 | 留空 | 仅提名，无独立正文框 |
 
 - 纸质版一个框里列出多个药名（如"长效：苯巴比妥、巴比妥"），每个药各建独立节点，不合并
@@ -465,7 +467,7 @@ edges_out:
 id: med-diazepam-y2-01-01
 label: 地西泮
 fill: cls-drug
-stroke: glow
+stroke: double
 location:
   book: 药学专业知识二
   chapter: 第一章 精神与中枢神经系统用药
@@ -539,7 +541,7 @@ edges_out:
 
 | 节点类型 | tags 必须包含 | 可选包含 |
 |---|---|---|
-| **重点药**（glow） | 药品名 + 分类 tag + **药理作用 tag** | 适应症、禁忌、ADR（最多3个）、化学分类、代际 |
+| **重点药**（double） | 药品名 + 分类 tag + **药理作用 tag** | 适应症、禁忌、ADR（最多3个）、化学分类、代际 |
 | **普通药** | 药品名 + 分类 tag | —（可简化） |
 | **分类节点** | 自身 label | 子分类名、机制、重点代表药 |
 | **口诀节点** | `口诀` + 对应药名/分类名 | — |
@@ -723,8 +725,8 @@ summary:
 - [ ] 文件名 = label（中文）
 - [ ] id 是英文/拉丁文，唯一，前缀正确（med-/drug-/cls-/mem- 等）
 - [ ] fill 是已定义的药学顶层类
-- [ ] stroke 只写 glow，无显式 auto
-- [ ] glow 只给了临床用药评价分支里的节点
+- [ ] stroke 只写 double，无显式 glow/auto
+- [ ] double 只给了临床用药评价分支里的节点
 - [ ] **所有药物都建了独立节点**（重点药 med- + 普通药 drug-），无遗漏药名
 - [ ] **药物节点 instance_of 指向分类节点**，无药物直接挂节入口
 - [ ] **纸质版每一层分类框都建了对应节点**，包括"本节不重点介绍"的分类
@@ -784,13 +786,13 @@ summary:
 | 旧 essence | 新 fill | 新 stroke |
 |---|---|---|
 | module | cls-structure | 不填 |
-| umbrella-class / strict-class | cls-classification | 有临床评价 → glow |
-| medication | cls-drug | glow |
+| umbrella-class / strict-class | cls-classification | 有临床评价 → double |
+| medication | cls-drug | double |
 | drug | cls-drug | 不填 |
 | notion（作用特点/评价） | cls-feature | 不填 |
 | notion（不良反应/禁忌） | cls-adverse | 不填 |
 | concept | cls-concept | 不填 |
-| summary | cls-summary | 跨节 → glow |
+| summary | cls-summary | 跨节 → double |
 | mnemonic | cls-mnemonic | 不填 |
 
 迁移时同时移除 `data:` 包装、`essence` 字段、`depth` 字段，改为平铺结构。

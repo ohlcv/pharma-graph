@@ -2,7 +2,7 @@
 id: cls-anti-il5-y2-03-03
 label: 抗IL-5单克隆抗体
 fill: cls-classification
-stroke: glow
+stroke: double
 location:
   book: 药学专业知识二
   chapter: 第三章 呼吸系统用药
