@@ -259,8 +259,19 @@ export function getBorderEffect(stroke: string | undefined): 'glow' | 'flow' | u
 const SUBTREE_HUE_START_DEG = 200;
 /** Subtree 色相步进（15 桶循环，够覆盖大多数图谱） */
 const SUBTREE_HUE_STEP_DEG = 24;
-const SUBTREE_BORDER_SATURATION = 80;
-const SUBTREE_BORDER_LIGHTNESS = 50;
+
+/**
+ * Subtree 边框色在 OKLCH 里的感知亮度和饱和度。
+ *
+ * 用 OKLCH 而不是 HSL 的原因：HSL 把"亮度"当成 RGB 立方体的对角线，
+ * 同一 L=50% 下黄绿看起来很亮、蓝紫看起来很暗——15 个桶循环出来视觉
+ * 亮度参差不齐。OKLCH 的 L 是经过非线性校正的"感知亮度"，固定 L 后
+ * 所有色相的视觉亮度一致，光晕叠在一起也协调。
+ *
+ * L=0.62 对应"中等亮但不会刺眼"的边框权重；C=0.16 在保持鲜艳的同时
+ * 不会让高 C 区（如纯蓝、纯黄）的色相环失真。直接调这两个常量就行。
+ */
+const SUBTREE_BORDER_OKLCH = { L: 0.62, C: 0.16 } as const;
 
 /**
  * 把任意字符串稳定 hash 到 0..2^32-1（djb2）。
@@ -287,7 +298,7 @@ function stableHash(str: string): number {
 export function getSubtreeBorderColor(subtreeId: string): string {
   const bucket = stableHash(subtreeId) % 15;
   const hue = (SUBTREE_HUE_START_DEG + bucket * SUBTREE_HUE_STEP_DEG) % 360;
-  return hslToHex(hue, SUBTREE_BORDER_SATURATION, SUBTREE_BORDER_LIGHTNESS);
+  return oklchToHex(SUBTREE_BORDER_OKLCH.L, SUBTREE_BORDER_OKLCH.C, hue);
 }
 
 /**
@@ -314,23 +325,49 @@ export function getNeutralBorderColor(depth: number): string {
   return NEUTRAL_GRAY_BY_DEPTH[depth] ?? NEUTRAL_GRAY_FALLBACK;
 }
 
-/** HSL → #RRGGBB（仅用于边框色——饱和/明度固定，转换是纯数学） */
-function hslToHex(h: number, s: number, l: number): string {
-  const sat = s / 100;
-  const light = l / 100;
-  const c = (1 - Math.abs(2 * light - 1)) * sat;
-  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
-  const m = light - c / 2;
-  let r = 0, g = 0, b = 0;
-  if (h < 60) { r = c; g = x; }
-  else if (h < 120) { r = x; g = c; }
-  else if (h < 180) { g = c; b = x; }
-  else if (h < 240) { g = x; b = c; }
-  else if (h < 300) { r = x; b = c; }
-  else { r = c; b = x; }
+/**
+ * OKLCH → #RRGGBB（仅用于边框色——亮度和色度固定，转换是纯数学）。
+ *
+ * 链路：OKLCH → OKLab → linear sRGB → sRGB → hex。
+ *
+ * 之所以在 JS 里转而不直接返回 `oklch(...)` 字符串：
+ *   - cytoscape 的 canvas 样式表接受 OKLCH，但 glow-overlay.ts 的 withAlpha()
+ *     只识别 hex/rgb/rgba——它需要把颜色和 alpha 拼成 `rgba(r,g,b,a)` 给
+ *     canvas 渐变和描边用。子树的脉冲呼吸、悬停强度都靠这个 alpha 调制。
+ *   - 全 hex 输出让所有消费方（cytoscape 样式表 / glow-overlay / 调试
+ *     桥）拿到的字符串格式一致，withAlpha 不用改。
+ *
+ * 数学常量来自 CSS Color Level 4 规范的 OKLab 定义，标准实现，无外部依赖。
+ */
+function oklchToHex(L: number, C: number, hDeg: number): string {
+  // 1. OKLCH → OKLab（极坐标 → 直角坐标）
+  const hRad = (hDeg * Math.PI) / 180;
+  const a = C * Math.cos(hRad);
+  const b = C * Math.sin(hRad);
+
+  // 2. OKLab → linear sRGB（规范矩阵 M₂）
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
+
+  // l_, m_, s_ 是 cube-root 空间，需要 ^3 回到 linear-light sRGB
+  let r =  4.0767416621 * l_ ** 3 - 3.3077115913 * m_ ** 3 + 0.2309699292 * s_ ** 3;
+  let g = -1.2684380046 * l_ ** 3 + 2.6097574011 * m_ ** 3 - 0.3413193965 * s_ ** 3;
+  let bb = -0.0041960863 * l_ ** 3 - 0.7034186147 * m_ ** 3 + 1.7076147010 * s_ ** 3;
+
+  // 3. linear sRGB → sRGB（gamma 校正 + 钳位）
+  const toSrgb = (x: number) => {
+    const c = Math.max(0, Math.min(1, x));
+    return c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+  };
+  r = toSrgb(r);
+  g = toSrgb(g);
+  bb = toSrgb(bb);
+
+  // 4. → hex 字符串
   const toHex = (v: number) =>
-    Math.round((v + m) * 255).toString(16).padStart(2, '0');
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    Math.round(v * 255).toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(bb)}`;
 }
 
 /**
