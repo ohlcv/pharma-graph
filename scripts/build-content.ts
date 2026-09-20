@@ -25,6 +25,29 @@ export type GraphNode = {
   id: string;
   label: string;
   rel: string;
+  // ── 语义层（基于 OWL2）──────────────────────────────────────
+  fill?: string;
+  stroke?: string;
+  shape?: string;
+  // ── 摘要 ─────────────────────────────────────────────────
+  shortSummary?: string;
+  fullSummary?: string;
+  summary?: string;
+  // ── 分类归属（BFS/DFS 计算得出）───────────────────────────
+  depth?: number;
+  subtreeRoot?: string;
+  weight?: number;
+  // ── 位置 & 标签 ───────────────────────────────────────────
+  location?: {
+    book?: string;
+    part?: string;
+    chapter?: string;
+    section?: string;
+    item?: string;
+    subsection?: string;
+  };
+  tags?: string[];
+  // ── 边 ───────────────────────────────────────────────────
   edges_out?: EdgeTarget[];
 };
 export type GraphEdge = {
@@ -45,11 +68,28 @@ export type GraphData = {
 /**
  * Frontmatter parser for build-time use — delegates to the `yaml` package
  * so we get the same fidelity as the runtime parser in src/parser/frontmatter.ts.
+ *
+ * Returns all fields needed for graph-data.json (body is intentionally excluded
+ * — it's loaded lazily per-node in the detail panel).
  */
 export function parseFrontmatter(raw: string): {
   id?: string;
   label?: string;
   fill?: string;
+  stroke?: string;
+  shape?: string;
+  shortSummary?: string;
+  fullSummary?: string;
+  summary?: string;
+  location?: {
+    book?: string;
+    part?: string;
+    chapter?: string;
+    section?: string;
+    item?: string;
+    subsection?: string;
+  };
+  tags?: string[];
   edges_out?: EdgeTarget[];
   [key: string]: unknown;
 } | null {
@@ -67,12 +107,60 @@ export function parseFrontmatter(raw: string): {
         ? { ...parsed, ...(data as Record<string, unknown>) }
         : parsed;
 
-    return source as {
-      id?: string;
-      label?: string;
-      fill?: string;
-      edges_out?: EdgeTarget[];
-      [key: string]: unknown;
+    const fm = source;
+
+    // Resolve summary field: supports `summary: "..."` or `summary: { short: ..., full: ... }`
+    const rawSummary = fm['summary'] as Record<string, unknown> | string | undefined;
+    let shortSummary: string | undefined;
+    let fullSummary: string | undefined;
+
+    if (typeof rawSummary === 'object' && rawSummary !== null) {
+      shortSummary = typeof (rawSummary as Record<string, unknown>)['short'] === 'string'
+        ? String((rawSummary as Record<string, unknown>)['short']).trim()
+        : undefined;
+      fullSummary = typeof (rawSummary as Record<string, unknown>)['full'] === 'string'
+        ? String((rawSummary as Record<string, unknown>)['full']).trim()
+        : undefined;
+    } else if (typeof rawSummary === 'string') {
+      shortSummary = rawSummary.trim();
+    }
+
+    // fallback: top-level `full` takes over if summary.full wasn't provided
+    if (fullSummary === undefined) {
+      fullSummary = typeof fm['full'] === 'string' ? String(fm['full']).trim() : undefined;
+    }
+
+    const summary = shortSummary ?? fullSummary;
+
+    const locationRaw = fm['location'] as Record<string, unknown> | undefined;
+    const location = locationRaw && typeof locationRaw === 'object'
+      ? {
+          book:       typeof locationRaw['book']       === 'string' ? String(locationRaw['book']).trim()       : undefined,
+          part:       typeof locationRaw['part']       === 'string' ? String(locationRaw['part']).trim()       : undefined,
+          chapter:    typeof locationRaw['chapter']    === 'string' ? String(locationRaw['chapter']).trim()    : undefined,
+          section:    typeof locationRaw['section']    === 'string' ? String(locationRaw['section']).trim()    : undefined,
+          item:       typeof locationRaw['item']       === 'string' ? String(locationRaw['item']).trim()       : undefined,
+          subsection: typeof locationRaw['subsection'] === 'string' ? String(locationRaw['subsection']).trim() : undefined,
+        }
+      : undefined;
+
+    const tagsRaw = fm['tags'] as unknown[] | undefined;
+    const tags = Array.isArray(tagsRaw)
+      ? tagsRaw.filter((t): t is string => typeof t === 'string')
+      : undefined;
+
+    return {
+      id:         typeof fm['id']     === 'string' ? String(fm['id']).trim()                : undefined,
+      label:      typeof fm['label']  === 'string' ? String(fm['label']).trim()             : undefined,
+      fill:       typeof fm['fill']   === 'string' ? String(fm['fill']).trim()              : undefined,
+      stroke:     typeof fm['stroke'] === 'string' ? String(fm['stroke']).trim()            : undefined,
+      shape:      typeof fm['shape']  === 'string' ? String(fm['shape']).trim()             : undefined,
+      shortSummary,
+      fullSummary,
+      summary,
+      location,
+      tags:       tags && tags.length > 0 ? tags : undefined,
+      edges_out:  Array.isArray(fm['edges_out']) ? fm['edges_out'] as EdgeTarget[] : undefined,
     };
   } catch {
     return null;
@@ -81,7 +169,8 @@ export function parseFrontmatter(raw: string): {
 
 /**
  * Build pre-generated graph data JSON at build time.
- * This allows the browser to skip parsing 1000+ markdown files.
+ * Parses all .md files, computes BFS depth + DFS subtree classification,
+ * and writes the full graph-data.json so the browser can skip runtime parsing.
  */
 export async function buildGraphData(): Promise<{ nodes: number; edges: number }> {
   const root = process.cwd();
@@ -92,6 +181,7 @@ export async function buildGraphData(): Promise<{ nodes: number; edges: number }
     return { nodes: 0, edges: 0 };
   }
 
+  // ── 1. Walk all .md files ─────────────────────────────────────────────────
   const entries: Array<{ rel: string; abs: string }> = [];
 
   async function walk(dir: string): Promise<void> {
@@ -110,11 +200,7 @@ export async function buildGraphData(): Promise<{ nodes: number; edges: number }
 
   await walk(contentRoot);
 
-  // Parse all files and build graph data
-  const nodes: GraphNode[] = [];
-  const edges: GraphEdge[] = [];
-
-  // First pass: collect all node IDs
+  // ── 2. Parse all files ──────────────────────────────────────────────────
   const nodeDataMap = new Map<string, GraphNode>();
 
   for (const entry of entries) {
@@ -128,6 +214,14 @@ export async function buildGraphData(): Promise<{ nodes: number; edges: number }
         id: fm.id as string,
         label: (fm.label as string) ?? (fm.id as string),
         rel: entry.rel,
+        fill: fm.fill,
+        stroke: fm.stroke,
+        shape: fm.shape,
+        shortSummary: fm.shortSummary,
+        fullSummary: fm.fullSummary,
+        summary: fm.summary,
+        location: fm.location,
+        tags: fm.tags,
         edges_out: fm.edges_out,
       });
     } catch (err) {
@@ -135,14 +229,15 @@ export async function buildGraphData(): Promise<{ nodes: number; edges: number }
     }
   }
 
-  // Second pass: build nodes and edges
-  for (const node of nodeDataMap.values()) {
-    nodes.push(node);
+  // ── 3. Build raw nodes list + edges list ─────────────────────────────────
+  const allNodes: GraphNode[] = Array.from(nodeDataMap.values());
+  const rawEdges: GraphEdge[] = [];
 
+  for (const node of nodeDataMap.values()) {
     if (node.edges_out && Array.isArray(node.edges_out)) {
       for (const edge of node.edges_out) {
         if (!nodeDataMap.has(edge.target)) continue; // Skip dangling edges
-        edges.push({
+        rawEdges.push({
           id: `${node.id}||${edge.target}||${edge.type}`,
           source: node.id,
           target: edge.target,
@@ -155,28 +250,152 @@ export async function buildGraphData(): Promise<{ nodes: number; edges: number }
 
   // Deduplicate edges
   const seenEdges = new Set<string>();
-  const uniqueEdges = edges.filter((e) => {
+  const edges = rawEdges.filter((e) => {
     if (seenEdges.has(e.id)) return false;
     seenEdges.add(e.id);
     return true;
   });
 
+  // ── 4. BFS: compute depth from root (reverse BFS from leaves) ──────────
+  const nodeIds = new Set(nodeDataMap.keys());
+
+  const outDegree: Record<string, number> = {};
+  for (const id of nodeIds) outDegree[id] = 0;
+  for (const e of edges) outDegree[e.source] = (outDegree[e.source] ?? 0) + 1;
+
+  const reverseAdj: Record<string, string[]> = {};
+  for (const e of edges) {
+    if (!reverseAdj[e.target]) reverseAdj[e.target] = [];
+    reverseAdj[e.target].push(e.source);
+  }
+
+  const leaves: string[] = [];
+  for (const id of nodeIds) {
+    if (outDegree[id] === 0) leaves.push(id);
+  }
+
+  const depth: Record<string, number> = {};
+  const queue: string[] = [...leaves];
+  for (const leaf of leaves) depth[leaf] = 0;
+
+  let maxDepth = 0;
+  while (queue.length > 0) {
+    const curr = queue.shift()!;
+    const currDepth = depth[curr];
+    for (const parent of reverseAdj[curr] ?? []) {
+      if (parent in depth) continue;
+      const newDepth = currDepth + 1;
+      depth[parent] = newDepth;
+      if (newDepth > maxDepth) maxDepth = newDepth;
+      queue.push(parent);
+    }
+  }
+
+  // ── 5. DFS subtree classification ─────────────────────────────────────────
+  // Classifiers = nodes with ≥1 instance_of incoming edge
+  const instanceIn: Record<string, number> = {};
+  for (const id of nodeIds) instanceIn[id] = 0;
+  for (const e of edges) {
+    if (e.type === 'instance_of') {
+      instanceIn[e.target] = (instanceIn[e.target] ?? 0) + 1;
+    }
+  }
+
+  const forwardAdj: Record<string, string[]> = {};
+  for (const e of edges) {
+    if (!forwardAdj[e.target]) forwardAdj[e.target] = [];
+    forwardAdj[e.target].push(e.source);
+  }
+
+  const classifiers = new Set<string>();
+  for (const [id, count] of Object.entries(instanceIn)) {
+    if (count > 0) classifiers.add(id);
+  }
+
+  const parentOf: Record<string, string | undefined> = {};
+  for (const id of nodeIds) parentOf[id] = undefined;
+  for (const e of edges) parentOf[e.source] = e.target;
+
+  const subtreeRoot: Record<string, string> = {};
+  for (const id of nodeIds) {
+    if (classifiers.has(id)) {
+      subtreeRoot[id] = id;
+      continue;
+    }
+    const visited = new Set<string>();
+    let current: string | undefined = id;
+    while (current !== undefined && !visited.has(current)) {
+      visited.add(current);
+      const parent = parentOf[current];
+      if (parent === undefined) break;
+      if (classifiers.has(parent)) {
+        subtreeRoot[id] = parent;
+        break;
+      }
+      current = parent;
+    }
+  }
+
+  // DFS from each classifier to mark all descendants
+  for (const rootId of classifiers) {
+    const visited = new Set<string>();
+    const stack: string[] = [rootId];
+    while (stack.length > 0) {
+      const node = stack.pop()!;
+      if (visited.has(node)) continue;
+      visited.add(node);
+      subtreeRoot[node] = rootId;
+      for (const child of forwardAdj[node] ?? []) {
+        if (!visited.has(child)) stack.push(child);
+      }
+    }
+  }
+
+  // ── 6. Degree / weight ───────────────────────────────────────────────────
+  const degree: Record<string, number> = {};
+  for (const id of nodeIds) degree[id] = 0;
+  for (const e of edges) {
+    degree[e.source] = (degree[e.source] ?? 0) + 1;
+    degree[e.target] = (degree[e.target] ?? 0) + 1;
+  }
+
+  // ── 7. Assemble final nodes with computed fields ──────────────────────────
+  const seenNode = new Set<string>();
+  const finalNodes: GraphNode[] = [];
+
+  for (const node of allNodes) {
+    if (seenNode.has(node.id)) continue;
+    seenNode.add(node.id);
+
+    finalNodes.push({
+      ...node,
+      depth: depth[node.id] ?? 0,
+      subtreeRoot: subtreeRoot[node.id],
+      weight: degree[node.id] ?? 1,
+    });
+  }
+
+  // ── 8. Write output ──────────────────────────────────────────────────────
   const graphData: GraphData = {
     version: 2,
     generated: new Date().toISOString(),
-    stats: { nodes: nodes.length, edges: uniqueEdges.length },
-    nodes,
-    edges: uniqueEdges,
+    stats: { nodes: finalNodes.length, edges: edges.length },
+    nodes: finalNodes,
+    edges,
   };
 
   if (!existsSync(publicRoot)) await mkdir(publicRoot, { recursive: true });
 
-  await writeFile(join(publicRoot, GRAPH_DATA_FILENAME), JSON.stringify(graphData), 'utf-8');
+  await writeFile(
+    join(publicRoot, GRAPH_DATA_FILENAME),
+    JSON.stringify(graphData),
+    'utf-8',
+  );
 
   console.log(
-    `[buildGraphData] Generated ${GRAPH_DATA_FILENAME}: ${nodes.length} nodes, ${uniqueEdges.length} edges`,
+    `[buildGraphData] Generated ${GRAPH_DATA_FILENAME}: ${finalNodes.length} nodes, ${edges.length} edges, maxDepth=${maxDepth}`,
   );
-  return { nodes: nodes.length, edges: uniqueEdges.length };
+  return { nodes: finalNodes.length, edges: edges.length };
 }
 
 /**

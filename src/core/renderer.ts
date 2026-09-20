@@ -905,6 +905,17 @@ export class Renderer {
     return this.currentLayout;
   }
 
+  /**
+   * The currently-running layout instance, or null if no layout is in
+   * flight. Used by main.ts to force-stop a layout when the hard timeout
+   * fires — `cytoscape.Layouts.stop()` halts the simulation and emits
+   * `layoutstop`, which triggers our completion callback with whatever
+   * positions the nodes are currently at.
+   */
+  getCurrentLayoutInstance(): cytoscape.Layouts | null {
+    return this.currentLayoutInstance;
+  }
+
   private resolveOverlaps(): void {
     const seen = new Map<string, cytoscape.NodeSingular[]>();
     const nodes = this.cy.nodes().not(`.${CLASSES.LAYER_PARENT}`);

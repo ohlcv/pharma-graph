@@ -6,10 +6,15 @@
 // into the builder (used by the streaming loader in
 // src/core/optimized-content-loader.ts) and re-run build() to get
 // an up-to-date GraphData without re-parsing what's already cached.
+//
+// Also supports direct init via `initWithPrebuilt()` — the fast path when
+// graph-data.json is available (pre-built at build time). This skips all
+// frontmatter parsing and BFS/DFS computation.
 
 import { GraphData } from './graph.js';
 import { parseFrontmatterWithWarnings, type ParseWarning } from '../parser/frontmatter.js';
-import { buildGraph } from './build-graph.js';
+import { buildGraph, buildGraphFromPrebuilt } from './build-graph.js';
+import type { PrebuiltGraphData } from './build-graph.js';
 
 export class GraphManager {
   private mdFiles: Record<string, string>;
@@ -20,6 +25,17 @@ export class GraphManager {
 
   constructor(mdFiles: Record<string, string> = {}) {
     this.mdFiles = mdFiles;
+  }
+
+  /**
+   * Fast path: initialise directly from pre-built graph-data.json.
+   * Bypasses frontmatter parsing and BFS/DFS entirely.
+   * Call this instead of the streaming addFiles() path when the prebuilt
+   * file is available.
+   */
+  initWithPrebuilt(prebuilt: PrebuiltGraphData): void {
+    this.data = buildGraphFromPrebuilt(prebuilt);
+    this.warnings = [];
   }
 
   /**

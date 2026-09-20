@@ -7,6 +7,17 @@
 // new-schema field selection in one place. The old type/category/layer
 // fallback is intentionally NOT preserved here — content has been migrated,
 // and falling back to legacy fields only hides missing data.
+//
+// ── Fast path: prebuilt graph-data.json ─────────────────────────────────────
+//
+// When the browser fetches the pre-built graph-data.json (generated at build
+// time by scripts/build-content.ts), it can skip frontmatter parsing and the
+// entire BFS/DFS computation — everything is already computed. The only work
+// left is mapping GraphNode (build-time shape) to NodeData (runtime shape).
+//
+// Use buildGraphFromPrebuilt() when loading from graph-data.json.
+// Use buildGraph() when loading raw .md files (e.g. during development with
+// the content-loader streaming path).
 
 import { GraphData, NodeData, EdgeData } from './graph.js';
 import { ParsedFrontmatter } from '../parser/frontmatter.js';
@@ -206,7 +217,7 @@ export function buildGraph(
     let current: string | undefined = id;
     while (current !== undefined && !visited.has(current)) {
       visited.add(current);
-      const parent = parentOf[current];
+      const parent: string | undefined = parentOf[current];
       if (parent === undefined) break; // no parent (root or dangling)
       if (classifiers.has(parent)) {
         subtreeRoot[id] = parent;
@@ -274,4 +285,78 @@ export function buildGraph(
   }
 
   return { nodes, edges, danglingEdges, maxDepth };
+}
+
+// ── Fast path: prebuilt graph-data.json ─────────────────────────────────────
+
+export interface PrebuiltNode {
+  id: string;
+  label: string;
+  rel: string;
+  fill?: string;
+  stroke?: string;
+  shape?: string;
+  shortSummary?: string;
+  fullSummary?: string;
+  summary?: string;
+  depth?: number;
+  subtreeRoot?: string;
+  weight?: number;
+  location?: {
+    book?: string;
+    part?: string;
+    chapter?: string;
+    section?: string;
+    item?: string;
+    subsection?: string;
+  };
+  tags?: string[];
+  edges_out?: Array<{ target: string; type: string; reason?: string }>;
+}
+
+export interface PrebuiltGraphData {
+  nodes: PrebuiltNode[];
+  edges: Array<{ id: string; source: string; target: string; type: string; reason?: string }>;
+}
+
+/**
+ * Build a GraphData from the pre-built graph-data.json (generated at build time).
+ *
+ * The prebuilt JSON already contains:
+ *   - depth (BFS-computed)
+ *   - subtreeRoot (DFS-computed)
+ *   - weight (degree-computed)
+ *   - fill / stroke / shape / summary / location / tags
+ *
+ * This function only maps GraphNode → NodeData and computes maxDepth.
+ * No YAML parsing, no BFS, no DFS — O(n) scan only.
+ */
+export function buildGraphFromPrebuilt(prebuilt: PrebuiltGraphData): BuildResult {
+  const nodes: NodeData[] = prebuilt.nodes.map((n) => ({
+    id: n.id,
+    label: n.label,
+    fill: n.fill || undefined,
+    stroke: n.stroke as NodeData['stroke'],
+    shape: n.shape as NodeData['shape'],
+    shortSummary: n.shortSummary,
+    fullSummary: n.fullSummary,
+    summary: n.summary,
+    depth: n.depth ?? 0,
+    subtreeRoot: n.subtreeRoot,
+    weight: n.weight ?? 1,
+    location: n.location,
+    tags: n.tags,
+    edges_out: n.edges_out,
+    // rel from the prebuilt file is the sourcePath relative to public/content/
+    sourcePath: n.rel,
+  }));
+
+  const maxDepth = nodes.reduce((max, n) => Math.max(max, n.depth ?? 0), 0);
+
+  return {
+    nodes,
+    edges: prebuilt.edges,
+    danglingEdges: [],  // dangling edges were already filtered at build time
+    maxDepth,
+  };
 }

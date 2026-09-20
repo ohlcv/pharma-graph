@@ -40,9 +40,10 @@ import { brandCarousel } from './carousel.js';
 import { uiState } from './state.js';
 import { logInfo } from './logger.js';
 import {
-  loadContentStreaming,
-  type LoadProgress,
-} from '../core/optimized-content-loader.js';
+  loadGraph,
+  type LoadProgress as PrebuiltProgress,
+} from '../core/prebuilt-loader.js';
+import { detectDeviceCapability } from '../core/device-capability.js';
 import { installDispatcher, dispatchAction } from './action-dispatcher.js';
 import { updateStats, syncBottomSheetStats } from './graph-stats.js';
 import { fitGraph, randomize, syncLayoutDisplay, setCurrentLayout, restoreBsAdvancedPrefs } from './layout-manager.js';
@@ -70,7 +71,7 @@ let tourController: TourController;
 
 // ── Loading Indicator (corner pill) ───────────────────────────────────────────
 
-function updateLoadingIndicator(progress: LoadProgress): void {
+function updateLoadingIndicator(progress: PrebuiltProgress): void {
   const indicator = document.getElementById('loading-indicator');
   const label = document.getElementById('loading-label');
   const count = document.getElementById('loading-count');
@@ -83,48 +84,24 @@ function updateLoadingIndicator(progress: LoadProgress): void {
     if (label) label.textContent = '大爆炸';
     if (count) count.textContent = '';
     if (percent) percent.textContent = '100%';
-    // Fade-out & remove after a short celebration
     setTimeout(() => {
       indicator.classList.add('hidden');
-      setTimeout(() => {
-        indicator.style.display = 'none';
-      }, 600);
+      setTimeout(() => { indicator.style.display = 'none'; }, 600);
     }, 800);
     return;
   }
 
-  if (label) {
-    if (progress.phase === 'manifest') label.textContent = '获取内容';
-    else if (progress.phase === 'content') label.textContent = progress.message;
-    else if (progress.phase === 'graph') label.textContent = '构建图谱';
-    else if (progress.phase === 'render') label.textContent = '渲染画布';
-  }
-
-  if (count) {
-    if (progress.phase === 'content' && progress.total > 0) {
-      count.textContent = `${progress.loaded} / ${progress.total}`;
-    } else {
-      count.textContent = '';
-    }
-  }
-
-  if (percent) {
-    if (progress.phase === 'content' && progress.total > 0) {
-      const pct = Math.min(99, Math.round((progress.loaded / progress.total) * 100));
-      percent.textContent = `${pct}%`;
-    } else if (progress.phase === 'manifest') {
-      percent.textContent = '';
-    } else {
-      percent.textContent = '';
-    }
-  }
+  // Phase 'prebuilt' — show single-step progress
+  if (label) label.textContent = progress.message;
+  if (count) count.textContent = '';
+  if (percent) percent.textContent = '';
 }
 
 // ── Boot ───────────────────────────────────────────────────────────────────────
 
 async function boot(): Promise<void> {
-  // 1) 创建 GraphManager（先于 manifest 完成，初始为空）
-  const graphManager = new GraphManager({} as Record<string, string>);
+  // 1) Create GraphManager — will be populated by the prebuilt loader
+  const graphManager = new GraphManager({});
 
   // Brand carousel starts immediately — it has zero dependencies on graph
   // state and only touches the #carousel-text DOM node, which has been in
@@ -150,80 +127,75 @@ async function boot(): Promise<void> {
   initMusicPlayer();
   showOnboardingTip();
 
-  // 2) 流式加载内容：每收到一批 .md 就立即增量构建图谱塞进 cytoscape
-  //    让用户看到"节点一颗颗长出来"的渐进动画，而不是等全部加载完才显示。
-  let lastBatchCount = 0;
-  let totalExpected = 0;
-  const collectedFiles: Record<string, string> = {};
+  // 2) Load graph data. Two paths:
+  //    - Default (prebuilt):  one ~800 KB JSON fetch, instant.
+  //    - Fallback (md stream): when graph-data.json is missing/invalid,
+  //      stream all 1041 .md files. Slower, but never blocks a deploy.
+  const loadResult = await loadGraph(updateLoadingIndicator);
+  const collectedFiles: Record<string, string> = loadResult.files;
 
-  await loadContentStreaming(
-    updateLoadingIndicator,
-    (batchFiles, _loaded, total) => {
-      // 累积已加载文件
-      Object.assign(collectedFiles, batchFiles);
-      totalExpected = total;
-      lastBatchCount = Object.keys(collectedFiles).length;
+  if (loadResult.usedPrebuilt) {
+    // Fast path — all metadata is already in graph-data.json.
+    graphManager.initWithPrebuilt({
+      nodes: loadResult.graph.nodes.map((n) => ({
+        id: n.id,
+        label: n.label,
+        rel: n.sourcePath ?? '',
+        fill: n.fill,
+        stroke: n.stroke,
+        shape: n.shape,
+        shortSummary: n.shortSummary,
+        fullSummary: n.fullSummary,
+        summary: n.summary,
+        depth: n.depth,
+        subtreeRoot: n.subtreeRoot,
+        weight: n.weight,
+        location: n.location,
+        tags: n.tags,
+        edges_out: n.edges_out,
+      })),
+      edges: loadResult.graph.edges,
+    });
+  } else {
+    // Fallback path — frontmatter-parser + BFS/DFS run inside the manager.
+    graphManager.addFiles(collectedFiles);
+  }
 
-      // 增量构建图谱（GraphManager 现在支持增量 add）
-      graphManager.addFiles(batchFiles);
+  // 3) Initialise cytoscape from the graph manager's data
+  initGraphFromManager(graphManager, collectedFiles);
 
-      // 在第一批到达时就初始化 cytoscape（而不是等全部加载完）
-      if (!uiState.renderer) {
-        initGraphFromManager(graphManager, collectedFiles);
-      } else {
-        // 已经初始化过 → 增量添加新节点到 cytoscape
-        appendBatchToGraph(batchFiles, graphManager, collectedFiles);
-      }
-    },
-  );
+  // Stats + bottom-sheet counters
+  queueMicrotask(() => dumpDiag(graphManager));
 
-  // 加载完成 → 跑一次最终的布局（之前 streaming 期间用的临时圆周位置）。
-  // 胶囊的 phase='done' 触发由 finishStreamingLayout 内部负责：
-  //   - ≥ 80 节点：等 euler 的 layoutstop（物理收敛完成后）
-  //   - < 80 节点：100ms 后立刻触发（不跑 euler）
-  finishStreamingLayout({ loaded: lastBatchCount, total: totalExpected });
+  // 4) Post-load: run euler layout to settle the graph (or skip on slow devices)
+  const nodeCount = graphManager.getData().nodes.length;
+  finishStreamingLayout({ nodeCount });
 
-  // Stats + bottom-sheet counters are kept current by the `cy.on('add')`
-  // listener installed in initGraphFromManager — it fires for every batch
-  // streaming pumps in and for the initial cy.add() inside initGraphFromManager
-  // itself, so we don't need to refresh here. `cy.on('layoutstop')` covers
-  // the post-euler refresh too.
-
-  // 启动徽章 + 侧栏 + 各种 UI
   // Only the dot's colour is gated on loading completion — carousel words
   // and "by meow" are now running from the top of boot(). See comment there.
   const badgeDot = document.getElementById('badge-dot');
   if (badgeDot) badgeDot.classList.remove('topbar__badge-dot--loading');
 
-  // (sidebar active-state sync moved into initGraphFromManager — see above)
-
   // initResizeHandler() stays after the await — it calls fitGraph(uiState.renderer!)
   // which requires the Cytoscape instance to exist.
   initResizeHandler();
-
-  // 诊断 dump：所有被静默 skip 的边 + parser warnings + 数据计数，
-  // 用户在 console 里看 `__graphDiag` 就能看见全貌。
-  // 不阻塞 UI，纯调试。
-  queueMicrotask(() => dumpDiag(graphManager));
-  void lastBatchCount;
 }
 
 /**
  * Initialize cytoscape + event handlers from the current graph state.
- * Called once when the first batch arrives. We DO NOT run a full layout
- * here — subsequent batches will keep streaming in, and we'd rather let
- * the cosmic-expansion positioning handle growth naturally than re-fit
- * everything once. After the manifest finishes we just set the initial
- * zoom so the user can see the whole galaxy.
+ *
+ * The graph data is fully available at init time (prebuilt path). For the
+ * fallback (md streaming) path we keep the same signature: `collectedFiles`
+ * is passed in so cytoscape initialiser can wire per-node body resolution
+ * against the same source map (zero cost in the prebuilt path).
  */
 function initGraphFromManager(
   graphManager: GraphManager,
   collectedFiles: Record<string, string>,
 ): void {
-  const data = graphManager.build();
+  const data = graphManager.getData();
 
   logInfo('graph build:', {
-    mdFiles: Object.keys(collectedFiles).length,
     nodes: data.nodes.length,
     edges: data.edges.length,
   });
@@ -334,8 +306,8 @@ function initGraphFromManager(
   cy.zoom(0.08);
   cy.center();
 
-  // 第一批节点也走"从中心爆出来"动画，保证统一观感
-  // （appendBatchToGraph 已经处理了 init 后的批次，但 init 时的批次还没经过动画）
+  // Apply "from-center growth" animation to all nodes simultaneously — prebuilt
+  // path loads everything at once but we still want the visual entrance effect.
   cy.nodes().forEach((n, i) => {
     if (n.empty()) return;
     const angle = halton(i, 2) * Math.PI * 2;
@@ -375,35 +347,91 @@ function initGraphFromManager(
  * euler is skipped, the pill still fades out on a 100ms tick so we don't
  * strand it on screen.
  */
-function finishStreamingLayout(counts: { loaded: number; total: number }): void {
+/**
+ * After the manifest finishes, run the Euler force-directed layout once.
+ *
+ * Euler is allowed to run its full animation so users see nodes drift from
+ * their halo positions into the organic, topology-aware structure. This is
+ * the "gravity" phase of the cosmic metaphor.
+ *
+ * But Euler is expensive on slow devices — on a phone with a slow CPU the
+ * simulation can take 25-40 seconds, eat battery, and risk "tab unresponsive"
+ * warnings. We therefore:
+ *
+ *   1. Detect device capability up-front (cores + memory + network). If the
+ *      device looks slow (≥2 strong signals), skip Euler entirely — the halo
+ *      positions from the burst animation ARE the final positions.
+ *
+ *   2. As a hard ceiling regardless of device: if Euler hasn't converged
+ *      after `EULER_HARD_TIMEOUT_MS`, force-stop the layout and freeze the
+ *      in-flight positions. Better a frozen frame than a frozen tab.
+ *
+ * This function ALSO owns the loading pill's fade-out trigger — the pill
+ * disappears after Euler converges (or times out, or is skipped). For small
+ * graphs (< 80 nodes) Euler is skipped unconditionally because the halo
+ * positions are already pretty and Euler just makes them jitter.
+ */
+const EULER_HARD_TIMEOUT_MS = 60_000;
+
+function finishStreamingLayout(counts: { nodeCount: number }): void {
   if (!uiState.renderer) return;
   const cy = uiState.renderer.getCy();
-  const nodeCount = cy.nodes().length;
+  const nodeCount = counts.nodeCount;
 
-  // 太少的节点（比如缓存命中只有 100 个以下）就别折腾 euler 了——
-  // 小图上 euler 会乱抖，反而比初始环带位置更难看。直接保留 streaming
-  // 期间 halton 序列铺出来的环带作为最终位置；胶囊也按原时机正常淡出。
+  const completeLoading = (): void => {
+    updateLoadingIndicator({
+      phase: 'done',
+      loaded: nodeCount,
+      total: nodeCount,
+      message: '准备就绪',
+    });
+  };
+
+  // ── Skip 1: too few nodes — Euler jitter worse than halo positions ─────
   if (nodeCount < 80) {
-    setTimeout(() => updateLoadingIndicator({ phase: 'done', ...counts, message: '准备就绪' }), 100);
+    setTimeout(completeLoading, 100);
     return;
   }
 
+  // ── Skip 2: device too slow — Euler would block the tab for 25-40s ─────
+  const capability = detectDeviceCapability();
+  if (!capability.shouldRunEuler) {
+    logInfo('Euler skipped (slow device):', capability.reason);
+    setTimeout(completeLoading, 100);
+    return;
+  }
+
+  // ── Run Euler with a hard 10s ceiling ──────────────────────────────────
   cy.stop(undefined, true);
   cy.elements().removeClass('entering');
 
-  // The completion callback is bound by Renderer to the specific Euler
-  // layout instance created below — not to the global cy event bus. A stale
-  // layoutstop from any earlier / interrupted layout therefore cannot make
-  // the pill disappear while this Euler instance is still arranging nodes.
+  let settled = false;
+  const finalize = (): void => {
+    if (settled) return;
+    settled = true;
+    waitForGraphToSettle(cy, completeLoading);
+  };
+
+  // Hard timeout: if Euler hasn't emitted layoutstop within 10s, kill it.
+  // The positions at that moment are frozen as the final layout — better
+  // than letting the tab block on physics for 30+ seconds.
+  const hardTimeout = setTimeout(() => {
+    const inst = uiState.renderer?.getCurrentLayoutInstance?.();
+    if (inst) {
+      logInfo(`Euler timed out after ${EULER_HARD_TIMEOUT_MS}ms — freezing positions`);
+      inst.stop();
+    }
+    finalize();
+  }, EULER_HARD_TIMEOUT_MS);
+
   uiState.renderer.runLayout(
     DEFAULT_LAYOUT,
     { animate: true, randomize: false },
     {
       skipEntering: true,
       onLayoutStop: () => {
-        waitForGraphToSettle(cy, () => {
-          updateLoadingIndicator({ phase: 'done', ...counts, message: '准备就绪' });
-        });
+        clearTimeout(hardTimeout);
+        finalize();
       },
     },
   );
@@ -420,7 +448,7 @@ function finishStreamingLayout(counts: { loaded: number; total: number }): void 
  */
 function waitForGraphToSettle(cy: cytoscape.Core, onSettled: () => void): void {
   const quietForMs = 250;
-  const timeoutMs = 25_000;
+  const timeoutMs = 60_000;
   const epsilon = 0.01;
   const startedAt = performance.now();
   let quietSince = startedAt;
@@ -445,7 +473,7 @@ function waitForGraphToSettle(cy: cytoscape.Core, onSettled: () => void): void {
 
   const poll = (): void => {
     const now = performance.now();
-    const moving = cy.animated() || cy.nodes().animated() || sampleHasMoved();
+    const moving = sampleHasMoved();
 
     if (moving) quietSince = now;
 
@@ -454,10 +482,12 @@ function waitForGraphToSettle(cy: cytoscape.Core, onSettled: () => void): void {
       return;
     }
 
-    // Euler itself has a 20s simulation ceiling. Keep the UI recoverable if a
-    // third-party layout or browser bug leaves an animation flag stuck.
+    // Safety net: keep the UI recoverable if a third-party layout or browser
+    // bug leaves an animation flag stuck. 60s matches the hard Euler ceiling
+    // above — by that point the user has been staring at "大爆炸" long enough;
+    // just commit so the page becomes interactive.
     if (now - startedAt >= timeoutMs) {
-      console.warn('[loader] graph did not become still within 25s; completing loading indicator');
+      console.warn('[loader] graph did not become still within 60s; completing loading indicator');
       onSettled();
       return;
     }
