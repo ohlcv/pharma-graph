@@ -1,31 +1,28 @@
 // src/core/glow-overlay.ts
-// stroke="glow" 的呼吸光晕、stroke="flow" 的流动光效，都画在一张独立的
-// 覆盖层 canvas 上，贴着节点的真实轮廓（不是统一画个圆）。
+// stroke="glow" 的呼吸光晕、stroke="flow" 的旋转光弧，都画在一张独立的
+// 覆盖层 canvas 上。
 //
 // 为什么不直接在 cytoscape 样式上做动画
 // ────────────────────────────────────────────────────────────────────────────
 // 原来 glow 的实现是每帧 `glowNodes.style('outline-width', ...)`。哪怕只有 3
 // 个 glow 节点，改动任何元素的样式都会把 cytoscape 的整张画布标脏，于是
-// 1000+ 节点会以 60fps 被无限重绘。覆盖层方案：我们自己的 canvas 叠在
-// cytoscape 画布之上，自己的 rAF，完全不碰 cytoscape 的样式/重绘管线。
+// 1000+ 节点会以 60fps 被无限重绘 —— 等于主线程上挂了一个永久的满负载任务。
+// 这正是之前排查"点击卡 1 秒"时清理掉的那类开销，flow 的旋转效果不能重蹈覆辙。
+//
+// 覆盖层方案：我们自己的 canvas 叠在 cytoscape 画布之上，自己的 rAF，
+// 完全不碰 cytoscape 的样式/重绘管线。cytoscape 那 1000+ 个节点在动效运行
+// 期间一次都不会重画。
 //
 // 颜色统一读节点当前渲染出来的 border-color。这个值由 renderer.ts 的
 // stylesheet 级联算出来（子树色 / fill 兜底色 / glow 的固定紫），覆盖层
 // 只是"读"，不重新判断一遍取色逻辑——边框色只有一处数据源。
 //
-// 形状：node-shape-outline.ts 把 cytoscape 的 shape 名（ellipse/hexagon/
-// round-rectangle/tag/...）转成一圈多边形顶点，glow 和 flow 都沿着这圈
-// 顶点画，而不是统一画个圆——六边形节点的光晕是六边形的，标签形节点的
-// 光晕是带尖角的标签形。
-//
 // 视觉上：
-//   glow — 沿轮廓描边好几圈，越往外线越淡、越宽，叠出一层柔和的光晕，
-//          明暗随时间呼吸。
-//   flow — 不是一条线绕着转。是沿轮廓周长走位的几颗"水珠"，每颗后面拖一段
-//          渐隐的尾迹，像水流沿着节点边缘淌过去，而不是指针式的单线旋转。
+//   glow — 中间镂空的径向渐变圆环，明暗呼吸。内圈全透明，节点本体、边框、
+//          标签都从中间透出来，不会被糊住。
+//   flow — 沿节点外圈绕一圈的光弧（带渐隐尾巴的"彗星"），持续旋转。
 
 import type cytoscape from 'cytoscape';
-import { getNodeOutline, polygonPerimeter, pointAtPerimeterDistance, type Point } from './node-shape-outline.js';
 
 export interface GlowOverlayOptions {
   /** 传给 cytoscape 的那个 container（覆盖层会作为它的子元素插入）。 */
@@ -33,37 +30,34 @@ export interface GlowOverlayOptions {
   cy: cytoscape.Core;
   /** 呼吸光晕一个完整周期，毫秒。默认 2400（沉稳）。 */
   glowPeriodMs?: number;
-  /** 水珠绕节点一整圈的时间，毫秒。默认 2600——太快会显得毛躁，水流感需要慢一点。 */
+  /** 旋转光弧转一整圈的时间，毫秒。默认 2000——比呼吸稍快，看得出"流动"。 */
   flowPeriodMs?: number;
-  /** 动画帧率上限。默认 30——呼吸/流动都是连续慢变化，60fps 看不出区别，成本却翻倍。 */
+  /** 动画帧率上限。默认 30——呼吸/旋转都是连续慢变化，60fps 看不出区别，成本却翻倍。 */
   fps?: number;
-  /** 光晕相对节点轮廓向外扩散的像素上限（css 坐标）。默认 10。 */
-  glowSpreadPx?: number;
-  /** 流动效果的"轨道"相对节点轮廓向外的偏移（像素，css 坐标）。默认 3。 */
+  /** 光晕环相对节点半径向外扩散的比例。默认 0.55。 */
+  glowSpread?: number;
+  /** 流动光弧相对节点边框向外的偏移（像素，css 坐标）。默认 3。 */
   flowOffset?: number;
-  /** 水珠数量（同时沿轨道分布几颗）。默认 3。 */
-  flowDroplets?: number;
-  /** 每颗水珠身后拖几段渐隐尾迹。默认 4。 */
-  flowTrailSteps?: number;
-  /** 水珠基础半径（像素，css 坐标）。默认 3。 */
-  flowDropletRadius?: number;
-  /** 视口内同类节点数超过这个数就退化成静态（不再逐帧重画）。默认 60——
-   *  比纯圆形时代低一些，因为现在每个节点的绘制成本更高（多边形 + 多水珠）。 */
+  /** 流动光弧的线宽（像素，css 坐标）。默认 2.5。 */
+  flowLineWidth?: number;
+  /** 光弧"亮头"占一整圈的比例。默认 0.16。 */
+  flowHeadFraction?: number;
+  /** 亮头后面渐隐尾巴占一整圈的比例。默认 0.28。 */
+  flowTailFraction?: number;
+  /** 视口内同类节点数超过这个数就退化成静态（不再逐帧重画）。默认 80。 */
   maxAnimatedNodes?: number;
 }
 
-interface NodeOutlineInstance {
-  cx: number;
-  cy: number;
-  halfW: number;
-  halfH: number;
-  shape: string | undefined;
+interface RenderedNode {
+  x: number;
+  y: number;
+  /** 节点外接半径（含 border），rendered 坐标系。 */
+  r: number;
   color: string;
-  /** 局部坐标（未平移）的轮廓多边形，已按当前渲染尺寸生成。 */
-  outline: Point[];
-  segLens: number[];
-  perimeter: number;
 }
+
+type Halo = RenderedNode;
+type FlowRing = RenderedNode;
 
 /** `#rrggbb` / `rgb(...)` → `rgba(r,g,b,a)`。解析失败时回退到给定 alpha 的靛蓝。 */
 function withAlpha(color: string, alpha: number): string {
@@ -79,21 +73,27 @@ function withAlpha(color: string, alpha: number): string {
   return `rgba(129, 140, 248, ${alpha})`;
 }
 
+/** 部分旧浏览器（主要是较老的 Firefox/Safari）没有 createConicGradient。 */
+type MaybeConicCtx = CanvasRenderingContext2D & {
+  createConicGradient?: (startAngle: number, x: number, y: number) => CanvasGradient;
+};
+
 export class GlowOverlay {
   private readonly cy: cytoscape.Core;
   private readonly container: HTMLElement;
   private readonly canvas: HTMLCanvasElement;
-  private readonly ctx: CanvasRenderingContext2D | null;
+  private readonly ctx: MaybeConicCtx | null;
 
   private readonly glowPeriodMs: number;
   private readonly flowPeriodMs: number;
   private readonly frameInterval: number;
-  private readonly glowSpreadPx: number;
+  private readonly glowSpread: number;
   private readonly flowOffset: number;
-  private readonly flowDroplets: number;
-  private readonly flowTrailSteps: number;
-  private readonly flowDropletRadius: number;
+  private readonly flowLineWidth: number;
+  private readonly flowHeadFraction: number;
+  private readonly flowTailFraction: number;
   private readonly maxAnimatedNodes: number;
+  private readonly supportsConicGradient: boolean;
 
   private rafId: number | null = null;
   private lastDrawAt = 0;
@@ -113,11 +113,14 @@ export class GlowOverlay {
 
   private resizeObserver: ResizeObserver | null = null;
   private readonly onVisibility = (): void => {
+    // 页面切到后台时停掉 rAF（浏览器通常会自己节流，但显式停更省电，
+    // 也避免回到前台时 dt 出现一个巨大的跳变）。
     if (document.hidden) this.pause();
     else this.resume();
   };
   private readonly onGraphChange = (): void => {
     // 流式加载会分批 cy.add()，新来的 glow/flow 节点必须被纳入。
+    // 原实现只在构造时快照一次集合，所以流式进来的节点永远不会生效。
     this.nodesDirty = true;
   };
 
@@ -126,14 +129,14 @@ export class GlowOverlay {
       container,
       cy,
       glowPeriodMs = 2400,
-      flowPeriodMs = 2600,
+      flowPeriodMs = 2000,
       fps = 30,
-      glowSpreadPx = 10,
+      glowSpread = 0.55,
       flowOffset = 3,
-      flowDroplets = 3,
-      flowTrailSteps = 4,
-      flowDropletRadius = 3,
-      maxAnimatedNodes = 600,
+      flowLineWidth = 2.5,
+      flowHeadFraction = 0.16,
+      flowTailFraction = 0.28,
+      maxAnimatedNodes = 80,
     } = options;
 
     this.cy = cy;
@@ -141,13 +144,15 @@ export class GlowOverlay {
     this.glowPeriodMs = glowPeriodMs;
     this.flowPeriodMs = flowPeriodMs;
     this.frameInterval = 1000 / Math.max(1, fps);
-    this.glowSpreadPx = glowSpreadPx;
+    this.glowSpread = glowSpread;
     this.flowOffset = flowOffset;
-    this.flowDroplets = Math.max(1, flowDroplets);
-    this.flowTrailSteps = Math.max(1, flowTrailSteps);
-    this.flowDropletRadius = flowDropletRadius;
+    this.flowLineWidth = flowLineWidth;
+    this.flowHeadFraction = flowHeadFraction;
+    this.flowTailFraction = flowTailFraction;
     this.maxAnimatedNodes = maxAnimatedNodes;
 
+    // cytoscape 会把 container 设成 position:relative，但它是在 cytoscape()
+    // 返回后才生效的，这里兜一层，保证覆盖层定位正确。
     if (getComputedStyle(container).position === 'static') {
       container.style.position = 'relative';
     }
@@ -160,12 +165,16 @@ export class GlowOverlay {
       top: '0',
       width: '100%',
       height: '100%',
+      // 不接收任何指针事件 —— 点击、拖拽、框选全部照常落到 cytoscape 上。
       pointerEvents: 'none',
+      // 盖在 cytoscape 的几层 canvas 之上。因为 glow/flow 画的都是中空的环，
+      // 节点本体和标签仍然完整可见。
       zIndex: '3',
     } as Partial<CSSStyleDeclaration>);
     container.appendChild(this.canvas);
 
-    this.ctx = this.canvas.getContext('2d');
+    this.ctx = this.canvas.getContext('2d') as MaybeConicCtx | null;
+    this.supportsConicGradient = typeof this.ctx?.createConicGradient === 'function';
 
     this.syncSize();
     if (typeof ResizeObserver !== 'undefined') {
@@ -182,6 +191,8 @@ export class GlowOverlay {
   start(): void {
     if (this.rafId !== null || !this.ctx) return;
 
+    // 尊重系统的"减少动态效果"设置：画一帧静态的就停手（flow 表现为角度
+    // 固定在 0 的一段静态光弧，而不是完整旋转）。
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
       this.draw(0);
       return;
@@ -192,6 +203,7 @@ export class GlowOverlay {
     this.rafId = requestAnimationFrame(this.tick);
   }
 
+  /** 暂停但保留已绘制的画面。 */
   pause(): void {
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
@@ -203,11 +215,13 @@ export class GlowOverlay {
     if (this.rafId === null) this.start();
   }
 
+  /** 停止并清空覆盖层。 */
   stop(): void {
     this.pause();
     this.clearAll();
   }
 
+  /** 图数据变了（比如 render() 整体换图）时调用。 */
   refresh(): void {
     this.nodesDirty = true;
   }
@@ -217,6 +231,8 @@ export class GlowOverlay {
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
+    // cy 可能已经被 destroy 了，off() 在那之后调用是安全的 no-op，
+    // 但包一层以防万一。
     try {
       this.cy.off('add remove', this.onGraphChange);
     } catch {
@@ -232,6 +248,7 @@ export class GlowOverlay {
     const h = this.container.clientHeight;
     if (w === 0 || h === 0) return;
 
+    // 和 renderer 的 pixelRatio 上限保持一致（高分屏上 dpr=3 会让像素数翻一倍多）。
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     if (w === this.cssWidth && h === this.cssHeight && dpr === this.dpr) return;
 
@@ -240,44 +257,43 @@ export class GlowOverlay {
     this.dpr = dpr;
     this.canvas.width = Math.round(w * dpr);
     this.canvas.height = Math.round(h * dpr);
-    this.lastDirty = null;
+    this.lastDirty = null; // 尺寸变了，上一帧的脏矩形作废
   }
 
   private readonly tick = (now: number): void => {
     this.rafId = requestAnimationFrame(this.tick);
+
+    // 帧率节流：呼吸/旋转都是连续慢变化，30fps 完全够看。
     if (now - this.lastDrawAt < this.frameInterval) return;
     this.lastDrawAt = now;
+
     this.draw(now - this.startedAt);
   };
 
-  private ensureNodeCache(): void {
-    if (!this.nodesDirty && this.glowNodes && this.flowNodes) return;
-    this.glowNodes = this.cy.nodes('[stroke = "glow"]');
-    this.flowNodes = this.cy.nodes('[stroke = "flow"]');
-    this.nodesDirty = false;
-  }
-
-  /** elapsedMs：从 start() 起经过的毫秒数，用来分别推算呼吸相位和水流位移。 */
+  /** elapsedMs：从 start() 起经过的毫秒数，用来分别推算呼吸相位和旋转角度。 */
   private draw(elapsedMs: number): void {
     const ctx = this.ctx;
     if (!ctx) return;
 
-    this.ensureNodeCache();
-    const glowInstances = this.collectInstances(this.glowNodes, this.glowSpreadPx);
-    const flowInstances = this.collectInstances(this.flowNodes, this.flowOffset);
+    const halos = this.collectHalos();
+    const rings = this.collectFlowRings();
 
+    // 只清上一帧画过的区域。整张 clearRect 在 dpr=2 的 iPad 上每帧也要花掉
+    // 不少时间，而 glow/flow 通常只占画面的一小块。
     this.clearLastDirty();
 
-    if (glowInstances.length === 0 && flowInstances.length === 0) {
+    if (halos.length === 0 && rings.length === 0) {
       this.lastDirty = null;
       return;
     }
 
-    const glowActive = glowInstances.length > 0 && glowInstances.length <= this.maxAnimatedNodes;
-    const flowActive = flowInstances.length > 0 && flowInstances.length <= this.maxAnimatedNodes;
+    // 超过阈值说明视口里同类节点太多，继续逐帧画性价比太低 —— 画一帧静态的
+    // 然后（如果两种效果都不需要再动了）停下。
+    const glowActive = halos.length > 0 && halos.length <= this.maxAnimatedNodes;
+    const flowActive = rings.length > 0 && rings.length <= this.maxAnimatedNodes;
 
     const glowSine = Math.sin((elapsedMs / this.glowPeriodMs) * 2 * Math.PI);
-    const flowProgress = elapsedMs / this.flowPeriodMs; // 圈数，不取模——距离计算里自己 mod
+    const flowAngle = ((elapsedMs / this.flowPeriodMs) % 1) * 2 * Math.PI;
 
     const dpr = this.dpr;
     ctx.save();
@@ -294,13 +310,34 @@ export class GlowOverlay {
       if (y + reach > maxY) maxY = y + reach;
     };
 
-    for (const inst of glowInstances) {
-      const reach = this.drawGlow(ctx, inst, glowSine);
-      grow(inst.cx, inst.cy, reach);
+    if (halos.length > 0) {
+      const opacity = 0.34 + 0.12 * glowSine;          // 0.22 ↔ 0.46
+      const spreadScale = 1 + this.glowSpread * (1 + 0.18 * glowSine);
+      for (const h of halos) {
+        const outer = h.r * spreadScale;
+        // 内圈保持全透明，节点本体/边框/标签从中间透出来，不会被盖住。
+        const inner = h.r * 0.92;
+
+        const g = ctx.createRadialGradient(h.x, h.y, inner, h.x, h.y, outer);
+        g.addColorStop(0, withAlpha(h.color, 0));
+        g.addColorStop(0.18, withAlpha(h.color, opacity));
+        g.addColorStop(1, withAlpha(h.color, 0));
+
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(h.x, h.y, outer, 0, Math.PI * 2);
+        ctx.fill();
+
+        grow(h.x, h.y, outer);
+      }
     }
-    for (const inst of flowInstances) {
-      const reach = this.drawFlow(ctx, inst, flowProgress);
-      grow(inst.cx, inst.cy, reach);
+
+    if (rings.length > 0) {
+      for (const ring of rings) {
+        const outer = ring.r + this.flowOffset;
+        this.drawFlowRing(ctx, ring, outer, flowAngle);
+        grow(ring.x, ring.y, outer + this.flowLineWidth);
+      }
     }
 
     ctx.restore();
@@ -316,92 +353,40 @@ export class GlowOverlay {
     if (!glowActive && !flowActive) this.pause();
   }
 
-  /**
-   * 沿节点轮廓描边好几圈，越往外越淡越宽，叠出一层柔和的光晕（贴合节点
-   * 真实形状，不是统一画个圆）。呼吸由 sine 调制外扩幅度和整体不透明度。
-   * 返回本次实际画到的最大外扩半径，供调用方合并脏矩形范围。
-   */
-  private drawGlow(ctx: CanvasRenderingContext2D, inst: NodeOutlineInstance, sine: number): number {
-    const breath = 0.75 + 0.25 * (sine + 1) / 2; // 0.75 ↔ 1.0，呼吸时光晕整体缩放
-    const passes = [
-      { pad: this.glowSpreadPx * 1.0, width: 5, alpha: 0.09 },
-      { pad: this.glowSpreadPx * 0.62, width: 4, alpha: 0.16 },
-      { pad: this.glowSpreadPx * 0.30, width: 3, alpha: 0.24 },
-    ];
+  /** 画一段绕圆周旋转、带渐隐尾巴的光弧。 */
+  private drawFlowRing(ctx: MaybeConicCtx, ring: FlowRing, outer: number, angle: number): void {
+    ctx.lineWidth = this.flowLineWidth;
 
-    let maxReach = 0;
-    for (const pass of passes) {
-      const pad = pass.pad * breath;
-      const halfW = inst.halfW + pad;
-      const halfH = inst.halfH + pad;
-      const pts = getNodeOutline(inst.shape, halfW, halfH);
-      this.strokeClosedPath(ctx, inst.cx, inst.cy, pts);
-      ctx.strokeStyle = withAlpha(inst.color, pass.alpha * (0.7 + 0.3 * breath));
-      ctx.lineWidth = pass.width;
-      ctx.lineJoin = 'round';
+    if (this.supportsConicGradient && ctx.createConicGradient) {
+      // 圆锥渐变——0 到 1 沿圆周分布，startAngle 每帧往前挪就是"转动"。
+      // 亮头占 flowHeadFraction，之后渐隐到 0，剩下大半圈完全透明。
+      const grad = ctx.createConicGradient(angle, ring.x, ring.y);
+      const head = this.flowHeadFraction;
+      const tailEnd = Math.min(1, head + this.flowTailFraction);
+      grad.addColorStop(0, withAlpha(ring.color, 0.95));
+      grad.addColorStop(head, withAlpha(ring.color, 0.95));
+      grad.addColorStop(tailEnd, withAlpha(ring.color, 0));
+      grad.addColorStop(1, withAlpha(ring.color, 0));
+      ctx.strokeStyle = grad;
+      ctx.beginPath();
+      ctx.arc(ring.x, ring.y, outer, 0, Math.PI * 2);
       ctx.stroke();
-      maxReach = Math.max(maxReach, Math.max(halfW, halfH));
-    }
-    return maxReach + 4;
-  }
-
-  /**
-   * 沿节点轮廓的周长走位画几颗带尾迹的"水珠"，制造液体流动的观感，而不是
-   * 一条硬邦邦的线绕着转。返回本次实际画到的最大外扩半径。
-   */
-  private drawFlow(ctx: CanvasRenderingContext2D, inst: NodeOutlineInstance, progress: number): number {
-    const total = inst.perimeter;
-    if (total <= 0) return inst.halfW;
-
-    // 轨道本身画一道很淡的描边，像水沟一样，衬托水珠的存在感。
-    this.strokeClosedPath(ctx, inst.cx, inst.cy, inst.outline);
-    ctx.strokeStyle = withAlpha(inst.color, 0.10);
-    ctx.lineWidth = 1.5;
-    ctx.lineJoin = 'round';
-    ctx.stroke();
-
-    const trailSpacing = Math.max(4, total * 0.018);
-    const dropletSpacing = total / this.flowDroplets;
-    const baseDist = (progress % 1) * total;
-
-    let maxReach = inst.halfW + this.flowOffset;
-
-    for (let d = 0; d < this.flowDroplets; d++) {
-      const headDist = baseDist + d * dropletSpacing;
-      for (let t = 0; t < this.flowTrailSteps; t++) {
-        const dist = headDist - t * trailSpacing;
-        const p = pointAtPerimeterDistance(inst.outline, inst.segLens, total, dist);
-        const x = inst.cx + p.x;
-        const y = inst.cy + p.y;
-        const falloff = Math.pow(1 - t / this.flowTrailSteps, 1.6);
-        const alpha = 0.85 * falloff;
-        const radius = this.flowDropletRadius * (1.15 - 0.16 * t);
-
-        const g = ctx.createRadialGradient(x, y, 0, x, y, radius * 2.2);
-        g.addColorStop(0, withAlpha(inst.color, alpha));
-        g.addColorStop(0.5, withAlpha(inst.color, alpha * 0.45));
-        g.addColorStop(1, withAlpha(inst.color, 0));
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(x, y, radius * 2.2, 0, Math.PI * 2);
-        ctx.fill();
-
-        const reach = Math.max(inst.halfW, inst.halfH) + this.flowOffset + radius * 2.2;
-        if (reach > maxReach) maxReach = reach;
-      }
+      return;
     }
 
-    return maxReach;
-  }
-
-  private strokeClosedPath(ctx: CanvasRenderingContext2D, cx: number, cy: number, pts: Point[]): void {
-    if (pts.length === 0) return;
-    ctx.beginPath();
-    ctx.moveTo(cx + pts[0].x, cy + pts[0].y);
-    for (let i = 1; i < pts.length; i++) {
-      ctx.lineTo(cx + pts[i].x, cy + pts[i].y);
+    // 回退：不支持 createConicGradient 的浏览器（较老的 Firefox/Safari），
+    // 用几段离散圆弧、透明度递减来手动模拟"彗星尾巴"。
+    const segments = 16;
+    const litSegments = 5;
+    const segAngle = (Math.PI * 2) / segments;
+    for (let i = 0; i < litSegments; i++) {
+      const start = angle - i * segAngle;
+      const alpha = 0.85 * (1 - i / litSegments);
+      ctx.strokeStyle = withAlpha(ring.color, alpha);
+      ctx.beginPath();
+      ctx.arc(ring.x, ring.y, outer, start, start + segAngle * 1.05);
+      ctx.stroke();
     }
-    ctx.closePath();
   }
 
   private clearLastDirty(): void {
@@ -420,44 +405,56 @@ export class GlowOverlay {
     this.lastDirty = null;
   }
 
-  /** 取出视口内可见的节点，换算成 rendered 坐标 + 轮廓多边形；颜色读该节点当前的 border-color。 */
-  private collectInstances(
-    nodes: cytoscape.NodeCollection | null,
-    extraReachPx: number,
-  ): NodeOutlineInstance[] {
+  private ensureNodeCache(): void {
+    if (!this.nodesDirty && this.glowNodes && this.flowNodes) return;
+    this.glowNodes = this.cy.nodes('[stroke = "glow"]');
+    this.flowNodes = this.cy.nodes('[stroke = "flow"]');
+    this.nodesDirty = false;
+  }
+
+  /** 取出视口内可见的 glow 节点，换算成 rendered 坐标；颜色读该节点当前的 border-color。 */
+  private collectHalos(): Halo[] {
+    this.ensureNodeCache();
+    return this.collectRenderedNodes(this.glowNodes, this.glowSpread);
+  }
+
+  /** 取出视口内可见的 flow 节点，换算成 rendered 坐标；颜色读该节点当前的 border-color。 */
+  private collectFlowRings(): FlowRing[] {
+    this.ensureNodeCache();
+    // flow 的可见半径只需要覆盖 outline 偏移那一点点，不需要 glow 那么大的 spread。
+    return this.collectRenderedNodes(this.flowNodes, 0.15);
+  }
+
+  private collectRenderedNodes(nodes: cytoscape.NodeCollection | null, reachSpread: number): RenderedNode[] {
     if (!nodes || nodes.length === 0) return [];
 
-    const out: NodeOutlineInstance[] = [];
+    const out: RenderedNode[] = [];
     const w = this.cssWidth;
     const h = this.cssHeight;
 
     nodes.forEach((n: cytoscape.NodeSingular) => {
+      // dimmed 的节点不该发光/流动 —— 它正被"关掉"。
       if (n.hasClass('dimmed')) return;
+      // removed / 不可见的节点跳过。
       if (n.removed() || !n.visible()) return;
 
       const p = n.renderedPosition();
       if (!p) return;
-      const halfW = n.renderedOuterWidth() / 2;
-      const halfH = n.renderedOuterHeight() / 2;
-      const reach = Math.max(halfW, halfH) + extraReachPx + 16; // 16px 兜底给多边形尖角/水珠留余量
+      const r = n.renderedOuterWidth() / 2;
+      const reach = r * (1 + reachSpread) * 1.2;
 
+      // 视口裁剪：缩小到全图时大部分节点都在屏幕外，没必要为它们建渐变/画弧。
       if (p.x + reach < 0 || p.x - reach > w || p.y + reach < 0 || p.y - reach > h) return;
-      if (halfW < 2 || halfH < 2) return;
-
-      const shape = n.style('shape') as string | undefined;
-      const outline = getNodeOutline(shape, halfW, halfH);
-      const { segLens, total } = polygonPerimeter(outline);
+      // 太小的节点（缩得很远）效果已经看不见了，直接跳过。
+      if (r < 2) return;
 
       out.push({
-        cx: p.x,
-        cy: p.y,
-        halfW,
-        halfH,
-        shape,
+        x: p.x,
+        y: p.y,
+        r,
+        // 颜色直接读 cytoscape 渲染出来的 border-color——子树色 / fill 兜底 /
+        // glow 固定紫，取色逻辑只在 renderer.ts 的 stylesheet 里维护这一份。
         color: (n.style('border-color') as string) || '#818cf8',
-        outline,
-        segLens,
-        perimeter: total,
       });
     });
 
