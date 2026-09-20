@@ -321,13 +321,12 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         'text-margin-y': 6,
         'text-wrap': 'wrap',
         'text-max-width': '120px',
-        'text-background-color': 'rgba(15,17,23,0.82)',
-        'text-background-shape': 'roundrectangle',
-        'text-background-padding': '3px',
-        // 1000+ 节点最大的单项绘制开销是标签：每个节点一段文字 + 一个圆角
-        // 背景矩形。缩小到屏幕字号小于 9px 时 cytoscape 直接跳过整个标签的
-        // 绘制（连背景矩形一起），全图俯视时的重绘成本能掉一大截。
-        // 反正那个尺寸下也已经看不清字了。
+        // 星图式标注：细描边代替实心背景块。text-outline 只沿字形描边，
+        // 不额外画圆角矩形，标签更轻、更贴合"星图标注"的观感。
+        'text-outline-width': 2,
+        'text-outline-color': 'rgba(15,17,23,0.85)',
+        // 缩小到屏幕字号小于 9px 时 cytoscape 直接跳过整个标签绘制，
+        // 全图俯视时的重绘成本能掉一大截。
         'min-zoomed-font-size': 9,
         'border-width': 1,
         'border-color': '#475569',
@@ -414,7 +413,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
       style: {
         opacity: 0.1,
         'border-color': 'rgba(255,255,255,0.06)',
-        'text-background-color': 'rgba(15,17,23,0.5)',
+        'text-outline-color': 'rgba(15,17,23,0.5)',
         'line-color': 'transparent',
         'line-opacity': 0.1,
         'source-arrow-color': 'transparent',
@@ -452,9 +451,8 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         width: 2.5,
         'line-color': accent2,
         'target-arrow-color': accent2,
-        'text-background-color': 'rgba(15,17,23,0.85)',
-        'text-background-shape': 'roundrectangle',
-        'text-background-padding': '2px 4px',
+        'text-outline-width': 2,
+        'text-outline-color': 'rgba(15,17,23,0.85)',
         label: 'data(reason)',
         'font-size': 10,
         color: '#f1f5f9',
@@ -473,7 +471,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
       style: {
         'border-width': 1,
         'border-color': 'rgba(255,255,255,0.06)',
-        'text-background-color': 'rgba(0,0,0,0)',
+        'text-outline-width': 0,
       },
     },
     {
@@ -482,7 +480,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         opacity: 0.22,
         'border-color': 'rgba(255,255,255,0.06)',
         'border-width': 1,
-        'text-background-color': 'rgba(15,17,23,0.5)',
+        'text-outline-color': 'rgba(15,17,23,0.5)',
         'line-opacity': 0.08,
         color: 'rgba(226,232,240,0.25)',
       },
