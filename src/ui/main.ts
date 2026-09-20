@@ -27,7 +27,7 @@ import 'regenerator-runtime/runtime.js';
 
 import './styles/index.css';
 import type cytoscape from 'cytoscape';
-import { Renderer, formatNodeLabel } from '../core/renderer.js';
+import { Renderer } from '../core/renderer.js';
 import { GraphManager } from '../core/graph-manager.js';
 import { TourController } from './tour-controller.js';
 import { HighlightEngine } from './highlight-engine.js';
@@ -487,112 +487,33 @@ function appendBatchToGraph(
 
   const cy = uiState.renderer.getCy();
   const data = graphManager.build();
-
-  // Get only the new nodes/edges (those not yet in cy)
-  const existingNodeIds = new Set<string>();
-  for (const n of cy.nodes()) existingNodeIds.add(n.id());
-  const existingEdgeIds = new Set<string>();
-  for (const e of cy.edges()) existingEdgeIds.add(e.id());
-
   const ENTERING = uiState.renderer.CLASSES_ENTERING;
 
-  const newNodeEls = data.nodes
-    .filter((n) => !existingNodeIds.has(n.id))
-    .map((n) => ({
-      group: 'nodes' as const,
-      data: {
-        id: n.id,
-        label: formatNodeLabel(n.label) || n.id,
-        fill: n.fill,
-        stroke: n.stroke,
-        shape: n.shape,
-        depth: n.depth,
-        subtreeRoot: n.subtreeRoot,
-        shortSummary: n.shortSummary,
-        fullSummary: n.fullSummary,
-        summary: n.summary,
-        location: n.location,
-        tags: n.tags ?? [],
-        body: n.body,
-        weight: n.weight ?? 60,
-        edges_out: n.edges_out ?? [],
-      },
-    }));
+  // 快照 add 之前的节点/边集合，用于 halton 全局索引与 dangling 诊断。
+  const beforeNodeIds = new Set<string>();
+  for (const n of cy.nodes()) beforeNodeIds.add(n.id());
+  const beforeEdgeIds = new Set<string>();
+  for (const e of cy.edges()) beforeEdgeIds.add(e.id());
+  const existingCount = beforeNodeIds.size;
 
-  // 不再因为本批只有边没新节点而提前 return —— 边连接之前已存在的节点是合法且常见的。
-  // 不过完全没有节点也没有边的时候（空 batch）就早退，避免无意义的 work。
+  // 统一走 renderer 的元素归一化逻辑（stroke 兜底、subtree 色等），
+  // 不再在 main.ts 里手写一份会漂移的 node/edge 构造。
+  const { addedNodeIds, addedEdgeIds, skippedEdges } = uiState.renderer.addElements(data);
 
-  // 收集所有"已知"的节点 id（用于过滤边）——包括：
-  //   1. 已存在于 cy 的节点（之前的批次加进来的）
-  //   2. 当前 batch 的新节点
-  // 边可能引用这两种任意一种。之前的 bug 是只检查 (2)，导致引用之前
-  // 批次节点的边被错误地过滤掉，连接性丢失。
-  const allKnownIds = new Set<string>(existingNodeIds);
-  data.nodes.forEach((n) => allKnownIds.add(n.id));
-
-  const newEdgeEls = data.edges
-    .filter((e) => !existingEdgeIds.has(e.id) && allKnownIds.has(e.source) && allKnownIds.has(e.target))
-    .map((e, idx) => ({
-      group: 'edges' as const,
-      data: {
-        id: e.id ?? `edge-${idx}`,
-        source: e.source,
-        target: e.target,
-        edgeType: e.type,
-        reason: e.reason,
-      },
-    }));
-
-  // 大爆炸：从中心 (0,0) 向外扩散。新节点直接落在 halton 序列
-  // 指定的位置上（从原点 animate 飞过去），不挤压已有节点。
-  const existingNodes = cy.nodes();
-  const existingCount = existingNodes.length;
-
-  // 容错：即使上面 filter 漏掉了 dangling edge（比如某节点解析失败但有边引用），
-  // cytoscape 在 batch 里遇到 nonexistent source 会抛错并中断整个 add。
-  // 我们对节点和边分别 try/catch，单独失败不影响整体。
-  cy.batch(() => {
-    if (newNodeEls.length > 0) {
-      try {
-        cy.add(newNodeEls);
-      } catch (err) {
-        console.warn('[appendBatchToGraph] failed to add nodes:', err);
-      }
-      newNodeEls.forEach((el) => {
-        const node = cy.getElementById(el.data.id);
-        if (!node.empty()) node.addClass(ENTERING);
-      });
-    }
-  });
-
-  // 边单独 add，失败的边计入诊断（不阻断整批）。
-  // 多次刷新看到的同一个 dangling edge 计数累加，便于发现真正的根因
-  // ——比如某个 frontmatter 没解析成功，导致 source 节点缺失。
   const diag = ensureDiag();
-  for (const el of newEdgeEls) {
-    try {
-      cy.add(el);
-      const edge = cy.getElementById(el.data.id);
-      if (!edge.empty()) edge.addClass(ENTERING);
-    } catch (err) {
-      diag.skippedEdges.push({
-        id: el.data.id,
-        source: el.data.source,
-        target: el.data.target,
-        err: String(err),
-      });
-      if (diag.skippedEdges.length <= 5) {
-        console.warn('[appendBatchToGraph] skipped dangling edge', el.data.id, '→', err);
-      }
+  diag.skippedEdges.push(...skippedEdges);
+  if (diag.skippedEdges.length <= 5) {
+    for (const s of skippedEdges) {
+      console.warn('[appendBatchToGraph] skipped dangling edge', s.id, '→', s.err);
     }
   }
 
-  // 同时暴露"被 filter 过滤掉的边"——这些边两端都是 known 节点但因为
-  // existingEdgeIds 已经包含而跳过，这种情况是正常的（边已加过），
-  // 但 filter 因为两端不是 allKnownIds 而丢的边——那些是真正缺失的。
+  // 真正缺失的边：两端节点都还没加载，永远无法 add。
+  const allKnownIds = new Set(beforeNodeIds);
+  data.nodes.forEach((n) => allKnownIds.add(n.id));
   const trulyDangling = data.edges.filter(
     (e) =>
-      !existingEdgeIds.has(e.id) &&
+      !beforeEdgeIds.has(e.id) &&
       !allKnownIds.has(e.source) &&
       !allKnownIds.has(e.target), // 双端都不在 known 里——纯 dangling
   );
@@ -600,11 +521,21 @@ function appendBatchToGraph(
     diag.filteredDangling.push(...trulyDangling.map((e) => ({ id: e.id, source: e.source, target: e.target })));
   }
 
+  // 渐入 class（在 add 之后立即打上，避免出现一帧全亮再淡出的闪烁）。
+  addedNodeIds.forEach((id) => {
+    const node = cy.getElementById(id);
+    if (!node.empty()) node.addClass(ENTERING);
+  });
+  addedEdgeIds.forEach((id) => {
+    const edge = cy.getElementById(id);
+    if (!edge.empty()) edge.addClass(ENTERING);
+  });
+
   // 1. 新节点从原点 (0,0) 飞出到 halton 序列指定的目标位置。
   //    halton 索引是全局的（base 2/3），保证不管分批到达多少次，
   //    整体节点分布都均匀不重叠。
-  newNodeEls.forEach((el, i) => {
-    const node = cy.getElementById(el.data.id);
+  addedNodeIds.forEach((id, i) => {
+    const node = cy.getElementById(id);
     if (node.empty()) return;
 
     // 全局唯一索引（在总集中的位置）
@@ -625,13 +556,13 @@ function appendBatchToGraph(
   });
 
   // 2. 节点 + 边的渐入（在动画开始后立即开始，节点到位时刚好可见）
-  newNodeEls.forEach((el, i) => {
-    const node = cy.getElementById(el.data.id);
+  addedNodeIds.forEach((id, i) => {
+    const node = cy.getElementById(id);
     if (node.empty()) return;
     setTimeout(() => node.removeClass(ENTERING), 100 + i * 10);
   });
-  newEdgeEls.forEach((el, i) => {
-    const edge = cy.getElementById(el.data.id);
+  addedEdgeIds.forEach((id, i) => {
+    const edge = cy.getElementById(id);
     if (edge.empty()) return;
     setTimeout(() => edge.removeClass(ENTERING), 200 + i * 6);
   });

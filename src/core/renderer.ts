@@ -517,6 +517,15 @@ export interface RendererOptions {
 
 // ── Renderer ──────────────────────────────────────────────────────────────────
 
+export interface AddElementsResult {
+  /** ids of the nodes newly added to cytoscape. */
+  addedNodeIds: string[];
+  /** ids of the edges newly added to cytoscape (excluding those that failed). */
+  addedEdgeIds: string[];
+  /** edges cytoscape rejected (e.g. dangling endpoint) and that were not added. */
+  skippedEdges: Array<{ id: string; source: string; target: string; err: string }>;
+}
+
 export class Renderer {
   private cy: cytoscape.Core;
   private currentLayout = DEFAULT_LAYOUT;
@@ -650,6 +659,104 @@ export class Renderer {
     this.runLayout(layoutName ?? this.currentLayout);
     // 覆盖层自己会监听 add/remove，这里只需要让它立刻重新查询集合。
     this.glowOverlay?.refresh();
+  }
+
+  /**
+   * Incrementally merge a graph snapshot into cytoscape, reusing the exact
+   * same element normalization as the constructor (`buildElements`) so the
+   * streaming path can never drift from the initial path (stroke fallback,
+   * color fields, subtreeRoot, etc.).
+   *
+   * Also grows `subtreeColorMap` and re-applies the stylesheet when a new
+   * subtreeRoot shows up — otherwise streaming nodes would never pick up
+   * their `node[subtreeRoot=...]` border-color rule and would fall back to
+   * the default border.
+   */
+  addElements(data: GraphData): AddElementsResult {
+    const existingNodeIds = new Set<string>();
+    for (const n of this.cy.nodes()) existingNodeIds.add(n.id());
+    const existingEdgeIds = new Set<string>();
+    for (const e of this.cy.edges()) existingEdgeIds.add(e.id());
+
+    // Grow the subtree color map first so a (re)generated stylesheet below
+    // already covers every root present in this batch.
+    let subtreeRootsChanged = false;
+    for (const n of data.nodes) {
+      if (n.subtreeRoot && !(n.subtreeRoot in this.subtreeColorMap)) {
+        this.subtreeColorMap[n.subtreeRoot] = getSubtreeBorderColor(n.subtreeRoot);
+        subtreeRootsChanged = true;
+      }
+    }
+
+    const elements = this.buildElements(data);
+    const newNodes = elements.filter(
+      (el): el is cytoscape.NodeDefinition =>
+        el.group === 'nodes' && !existingNodeIds.has(el.data.id ?? ''),
+    );
+    const newEdges = elements.filter(
+      (el): el is cytoscape.EdgeDefinition =>
+        el.group === 'edges' && !existingEdgeIds.has(el.data.id ?? ''),
+    );
+
+    // Sync global per-node metadata for nodes that are already present.
+    // depth / subtreeRoot / weight are recomputed against the full graph on
+    // every `buildGraph`, so a node added in an earlier batch would otherwise
+    // keep the stale partial-graph values it was born with (e.g. depth=0 →
+    // the detail panel shows "中心" for everything).
+    this.cy.batch(() => {
+      for (const n of data.nodes) {
+        const existing = this.cy.getElementById(n.id);
+        if (existing.empty()) continue;
+        const cur = existing.data();
+        if (
+          cur.depth !== n.depth ||
+          cur.subtreeRoot !== n.subtreeRoot ||
+          cur.weight !== n.weight
+        ) {
+          existing.data({
+            depth: n.depth,
+            subtreeRoot: n.subtreeRoot,
+            weight: n.weight,
+          });
+        }
+      }
+    });
+
+    if (newNodes.length > 0) {
+      try {
+        this.cy.add(newNodes);
+      } catch (err) {
+        console.warn('[renderer.addElements] failed to add nodes:', err);
+      }
+    }
+
+    const skippedEdges: AddElementsResult['skippedEdges'] = [];
+    for (const el of newEdges) {
+      try {
+        this.cy.add(el);
+      } catch (err) {
+        skippedEdges.push({
+          id: el.data.id ?? '',
+          source: el.data.source,
+          target: el.data.target,
+          err: String(err),
+        });
+      }
+    }
+
+    // Only re-style when a new subtree root actually appeared — replacing the
+    // whole stylesheet is a full restyle and must not run on every batch.
+    if (subtreeRootsChanged) {
+      this.cy.style(STYLESHEET(this.maxDepth, this.subtreeColorMap));
+    }
+
+    return {
+      addedNodeIds: newNodes.map((el) => el.data.id ?? ''),
+      addedEdgeIds: newEdges
+        .filter((el) => !skippedEdges.some((s) => s.id === el.data.id))
+        .map((el) => el.data.id ?? ''),
+      skippedEdges,
+    };
   }
 
   destroy(): void {
@@ -798,7 +905,7 @@ export class Renderer {
 
   // ── Element builder ─────────────────────────────────────────────────────────
 
-  private buildElements(data: GraphData) {
+  private buildElements(data: GraphData): cytoscape.ElementDefinition[] {
     const nodeIds = new Set(data.nodes.map((n) => n.id));
     return [
       ...data.nodes.map((n) => {
@@ -819,6 +926,7 @@ export class Renderer {
         // border / outline / ghost 属性，无需额外的 class。
 
         return {
+          group: 'nodes' as const,
           data: {
             id: n.id,
             label: formatNodeLabel(n.label) || n.id,
@@ -848,6 +956,7 @@ export class Renderer {
       ...data.edges
         .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
         .map((e, idx) => ({
+          group: 'edges' as const,
           data: {
             id: e.id ?? `edge-${idx}`,
             source: e.source,
