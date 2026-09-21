@@ -240,7 +240,7 @@ export async function loadContentStreaming(
   // Cache disabled — 临时禁用，跳过 localStorage 缓存命中。
   // 调试后端改动时每次刷新都重新拉取，避免看到陈旧的 streaming 行为。
   // 恢复时把下一行 `return null;` 去掉即可。
-  const cached = null; // loadFromCache();
+  const cached: { files: Record<string, string>; timestamp: number } | null = null; // loadFromCache();
   if (cached) {
     report({
       phase: 'content',

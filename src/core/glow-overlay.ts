@@ -19,8 +19,10 @@
 //
 // 强调层（第二张 canvas，z-index 4）
 // ────────────────────────────────────────────────────────────────────────────
-// 选中的节点（class `selected-node`）画一团"强光"：从节点边缘向外扩散的亮晕 +
-// 一圈带 shadowBlur 的亮边，颜色读节点当前 border-color（即主题辅色）。
+// 选中的节点（class `selected-node`）画一团"强光"：贴着节点轮廓向外扩散的柔光
+// （两圈：大范围的外圈 + 贴边的亮内圈），颜色读节点当前 border-color（即主题辅色）。
+// 只画光、不画线，并且是实心的：样式表里选中边框已经是 4px 的主题色实线，再画一条线会显得像
+// "双线边框"；把节点内部擦空则会因为近似轮廓与真实形状不一致露出一圈异色的框。
 // 漫游时当前节点额外带 class `tour-pulsing`，强光按 1Hz 起伏——这取代了原来
 // tour.ts 里每帧 `node.style({border-width, border-color})` 的 rAF 脉冲：那种写法
 // 每帧都把 cytoscape 整张画布标脏，漫游期间等于一个 60fps 满帧重绘的常驻任务。
@@ -79,8 +81,6 @@ type FlowRing = RenderedNode;
 
 /** 强调层：漫游脉冲一个周期（毫秒），与旧的 1Hz 边框脉冲一致。 */
 const EMPH_PULSE_PERIOD_MS = 1000;
-/** 强光向外扩散的范围，相对节点半宽/半高的比例（基础光晕是 0.75）。 */
-const EMPH_SPREAD = 1.3;
 /** 同时画强光的节点数上限（正常只有 1~2 个，防止有人一次选中上百个）。 */
 const EMPH_MAX_NODES = 24;
 
@@ -127,7 +127,6 @@ export class GlowOverlay {
   private emphLastDrawAt = 0;
   private emphNodes: cytoscape.NodeCollection | null = null;
   private emphDirty = true;
-  private emphLastDirty: { x: number; y: number; w: number; h: number } | null = null;
   private readonly reducedMotion: boolean;
   private lastDrawAt = 0;
   private startedAt = 0;
@@ -344,7 +343,6 @@ export class GlowOverlay {
     this.emphCanvas.width = this.canvas.width;
     this.emphCanvas.height = this.canvas.height;
     this.lastDirty = null; // 尺寸变了，上一帧的脏矩形作废
-    this.emphLastDirty = null;
   }
 
   private readonly tick = (now: number): void => {
@@ -382,26 +380,21 @@ export class GlowOverlay {
     this.drawEmphasis(now - this.emphStartedAt);
   };
 
+  /**
+   * 整张强调层清空。
+   * 这里刻意不用"脏矩形"只擦上一帧画过的区域：阴影的高斯尾巴会延伸到估算的矩形之外，
+   * 尾巴每一帧都叠一层、永远擦不掉，最后在矩形边缘露出一圈细细的方框线——这层画布
+   * 只画寥寥几个节点，整张清空的开销可以忽略。
+   */
   private clearEmph(): void {
     this.emphCtx?.clearRect(0, 0, this.emphCanvas.width, this.emphCanvas.height);
-    this.emphLastDirty = null;
-  }
-
-  private clearEmphLast(): void {
-    const ctx = this.emphCtx;
-    if (!ctx) return;
-    const d = this.emphLastDirty;
-    if (!d) {
-      ctx.clearRect(0, 0, this.emphCanvas.width, this.emphCanvas.height);
-      return;
-    }
-    ctx.clearRect(d.x * this.dpr, d.y * this.dpr, d.w * this.dpr, d.h * this.dpr);
   }
 
   /**
-   * 给选中的节点画强光。
-   *  - 亮晕：径向渐变从节点边缘略靠内处出发向外扩散，边缘处最亮，形状贴合节点轮廓。
-   *  - 亮边：一圈沿轮廓的描边，带 shadowBlur，是"强光"的核心。
+   * 给选中的节点画强光——纯光，没有任何实线，节点内部实心染色（原因见下面循环里的说明）。
+   *  - 实心底：整个节点内部均匀的主题色。
+   *  - 外圈：大范围的柔光，形状贴合节点轮廓。
+   *  - 内圈：贴着节点边缘的一圈更亮的光。
    *  - 起伏：普通选中随基础呼吸周期轻微起伏；漫游当前节点（class tour-pulsing）
    *          按 1Hz 起伏、幅度更大；系统开了"减少动态效果"则保持恒定亮度。
    * 颜色读节点当前的 border-color（选中态由样式表给出主题辅色）。
@@ -415,11 +408,10 @@ export class GlowOverlay {
       this.emphDirty = false;
     }
 
-    this.clearEmphLast();
+    this.clearEmph();
 
     const nodes = this.emphNodes;
     if (!nodes || nodes.length === 0) {
-      this.emphLastDirty = null;
       this.pauseEmphasis();
       return;
     }
@@ -428,11 +420,6 @@ export class GlowOverlay {
     const h = this.cssHeight;
     const dpr = this.dpr;
     const TWO_PI = Math.PI * 2;
-
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
 
     ctx.save();
     ctx.scale(dpr, dpr);
@@ -453,57 +440,56 @@ export class GlowOverlay {
         ? 0.5
         : 0.5 + 0.5 * Math.sin((elapsedMs / (pulsing ? EMPH_PULSE_PERIOD_MS : this.glowPeriodMs)) * TWO_PI);
       const intensity = pulsing ? 0.55 + 0.45 * breath : 0.82 + 0.18 * breath;
-      const spread = EMPH_SPREAD * (pulsing ? 0.85 + 0.25 * breath : 1);
-      const outerR = maxHalf * (1 + spread);
-      const blur = (14 + 8 * intensity) * dpr;
-      const reach = outerR + blur / dpr;
+      const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
+      const wideBlur = clamp(maxHalf * 0.85, 14, 42) * (pulsing ? 0.85 + 0.3 * breath : 1);
+      const tightBlur = clamp(maxHalf * 0.3, 6, 14);
+      const bandW = wideBlur * 0.6;
+      // 只用于屏幕外剔除：阴影的可见范围约为光源带外沿 + 1.5 倍模糊半径，取 2 倍留足余量。
+      const reach = maxHalf + bandW + wideBlur * 2;
 
       if (p.x + reach < 0 || p.x - reach > w || p.y + reach < 0 || p.y - reach > h) return;
 
       const color = (n.style('border-color') as string) || readThemeColors().accent2;
+      const shape = n.style('shape') as string | undefined;
 
-      // ① 亮晕：从节点边缘略靠内处向外淡出。
-      const g = ctx.createRadialGradient(p.x, p.y, maxHalf * 0.85, p.x, p.y, outerR);
-      g.addColorStop(0, withAlpha(color, 0.6 * intensity));
-      g.addColorStop(0.18, withAlpha(color, 0.5 * intensity));
-      g.addColorStop(0.5, withAlpha(color, 0.2 * intensity));
-      g.addColorStop(1, withAlpha(color, 0));
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      this.traceOutline(ctx, p.x, p.y, getNodeOutline(n.style('shape') as string | undefined, halfW * (1 + spread), halfH * (1 + spread)));
-      ctx.fill();
-
-      // ② 亮边：沿轮廓一圈描边 + shadowBlur。shadowBlur 是设备像素，不受 scale 影响，所以乘 dpr。
+      // 只画"光"，不画任何一条线；并且是"实心"的，不是空心的。
+      // 1) 不画线：旧实现在节点外描了一圈亮边，紧贴样式表里 4px 的选中边框，读起来像
+      //    "双线边框"（和 stroke=double 的重点节点撞车）。
+      // 2) 不空心：这里的轮廓多边形只是真实节点形状的近似（圆角是用切角凑的）。如果把
+      //    节点内部"擦空"，近似形状和真实形状之间会露出一圈颜色不同的框；所以节点内部
+      //    整个染上主题色（实心），近似误差只出现在被模糊掉的边缘，看不出来。
+      // 做法：把"光源"画到画布左侧之外，用 shadowOffsetX 把它的阴影（只有柔光、没有实线）
+      // 投回节点位置——光的形状贴合节点、边缘天然柔和，屏幕上看不到光源本身。
+      // shadowBlur / shadowOffset 是设备像素，不受 ctx.scale 影响，所以乘 dpr。
+      const off = p.x + halfW + wideBlur * 2 + 60;
       ctx.save();
-      ctx.shadowColor = withAlpha(color, 0.95);
-      ctx.shadowBlur = blur;
-      ctx.strokeStyle = withAlpha(color, 0.55 + 0.4 * intensity);
-      ctx.lineWidth = pulsing ? 2 + 1.5 * breath : 2.5;
+      ctx.shadowOffsetX = off * dpr;
+      ctx.shadowOffsetY = 0;
+      ctx.fillStyle = '#000';
+      ctx.strokeStyle = '#000';
+      ctx.lineJoin = 'round';
+      // 实心底：整个节点内部均匀染上主题色，边缘只软化几像素。
+      ctx.shadowColor = withAlpha(color, 0.42 * intensity);
+      ctx.shadowBlur = clamp(maxHalf * 0.18, 4, 9) * dpr;
       ctx.beginPath();
-      this.traceOutline(ctx, p.x, p.y, getNodeOutline(n.style('shape') as string | undefined, halfW + 1.5, halfH + 1.5));
-      ctx.stroke();
+      this.traceOutline(ctx, p.x - off, p.y, getNodeOutline(shape, halfW, halfH));
+      ctx.fill();
+      const glowBand = (bandWidth: number, blurPx: number, alpha: number, passes: number): void => {
+        ctx.lineWidth = bandWidth;
+        ctx.shadowColor = withAlpha(color, alpha);
+        ctx.shadowBlur = blurPx * dpr;
+        ctx.beginPath();
+        this.traceOutline(ctx, p.x - off, p.y, getNodeOutline(shape, halfW + bandWidth / 2, halfH + bandWidth / 2));
+        for (let i = 0; i < passes; i++) ctx.stroke();
+      };
+      glowBand(bandW, wideBlur, 0.85 * intensity, 2); // 外圈：大范围、柔
+      glowBand(4, tightBlur, 0.95 * intensity, 2);    // 内圈：贴边、亮
       ctx.restore();
 
       drawn++;
-      if (p.x - reach < minX) minX = p.x - reach;
-      if (p.y - reach < minY) minY = p.y - reach;
-      if (p.x + reach > maxX) maxX = p.x + reach;
-      if (p.y + reach > maxY) maxY = p.y + reach;
     });
 
     ctx.restore();
-
-    if (drawn === 0) {
-      this.emphLastDirty = null;
-      return;
-    }
-    const pad = 2;
-    this.emphLastDirty = {
-      x: minX - pad,
-      y: minY - pad,
-      w: maxX - minX + pad * 2,
-      h: maxY - minY + pad * 2,
-    };
   }
 
   private draw(elapsedMs: number): void {
@@ -680,6 +666,9 @@ export class GlowOverlay {
     nodes.forEach((n: cytoscape.NodeSingular) => {
       // dimmed 的节点不该发光/流动 —— 它正被"关掉"。
       if (n.hasClass('dimmed')) return;
+      // 选中的节点由强调层负责发光。这里再画一层渐变光晕会叠在节点上面把它染色
+      // （类别填充色被盖住，看起来像"整个节点变黄"），也会和强调层的光叠成两圈。
+      if (n.hasClass('selected-node')) return;
       // removed / 不可见的节点跳过。
       if (n.removed() || !n.visible()) return;
 
