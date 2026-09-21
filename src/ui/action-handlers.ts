@@ -12,18 +12,18 @@ import { HighlightEngine } from './highlight-engine.js';
 import { DetailPanel } from './detail-panel.js';
 import { registerAction } from './action-dispatcher.js';
 import { DEFAULT_LAYOUT } from '../core/config.js';
+import { runLayout } from './layout/layout-engine.js';
 import {
-  runLayout,
+  renderLayoutParams,
+  renderBsLayoutParams,
   applyLayoutParams,
   resetLayoutParams,
-  fitGraph,
-  randomize,
-  animatePulse,
   toggleBsParams,
   toggleBsLayout,
   toggleBsAdvanced,
   applyBsParams,
-} from './layout-manager.js';
+} from './layout/layout-params.js';
+import { fitGraph, randomize, animatePulse } from './layout/toolbar-actions.js';
 import { highlightShape, clearShapeFilter } from './legend-manager.js';
 import {
   toggleBottomSheet,
@@ -36,8 +36,21 @@ import {
   closeLayoutMenu,
   toggleLayoutMenu,
   installLayoutMenuDismissHandlers,
-} from './layout-menu.js';
+} from './layout/layout-switcher.js';
 import { toggleBigscreen } from './bigscreen.js';
+
+/**
+ * Switch layout through the single entry point every UI path should use:
+ * runLayout() updates the current-layout state + switcher/labels and runs the
+ * layout; the two params panels then re-render for the new layout. Without
+ * the re-render, switching from Euler to COSE left Euler's sliders on screen
+ * (and "应用参数" would apply them to COSE).
+ */
+function switchLayout(name: string, renderer: Renderer): void {
+  runLayout(name, renderer);
+  renderLayoutParams(name);
+  renderBsLayoutParams(name);
+}
 
 export function registerAppActions(
   renderer: Renderer,
@@ -60,7 +73,10 @@ export function registerAppActions(
     clearShapeFilter();
     highlight.reset();
     detailPanel.close();
-    renderer.runLayout(DEFAULT_LAYOUT);
+    // Was `renderer.runLayout(DEFAULT_LAYOUT)`, which bypassed the layout
+    // state: after 重置 the switcher label and getCurrentLayout() still
+    // pointed at the previous layout.
+    switchLayout(DEFAULT_LAYOUT, renderer);
     updateStats(renderer.getCy());
     syncBottomSheetStats(renderer.getCy());
   });
@@ -115,12 +131,12 @@ export function registerAppActions(
 
   registerAction('run-layout', (_el, args) => {
     const name = args[0] ?? 'cose';
-    runLayout(name, renderer);
+    switchLayout(name, renderer);
   });
 
   registerAction('pick-layout', (el, args) => {
     const name = args[0] ?? el.dataset['name'] ?? 'cose';
-    runLayout(name, renderer);
+    switchLayout(name, renderer);
 
     // Sync button label + active item highlight
     const label = el.textContent?.trim() ?? '';

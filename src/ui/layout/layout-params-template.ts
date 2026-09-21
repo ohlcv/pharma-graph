@@ -97,7 +97,7 @@ export function renderParamRow(p: RenderParam, storedValue: string | undefined, 
   const step = p.step ?? 1;
   const valSpanId = valId ? ` id="${valId}"` : '';
   const valClass = isMobile ? 'bs-param-label__val' : 'param-label__val';
-  return `<div class="${rowClass}"${titleAttr}><div class="${labelClass}">${p.label}<span class="${valClass}"${valSpanId}>${fmt(val, step)}</span></div><input type="range" class="${sliderClass}" data-key="${p.key}" min="${p.min}" max="${p.max}" step="${step}" value="${val}" style="background:linear-gradient(to right,var(--accent)${pct}%,var(--border)${pct}%)"></div>`;
+  return `<div class="${rowClass}"${titleAttr}><div class="${labelClass}">${p.label}<span class="${valClass}"${valSpanId}>${fmt(val, step)}</span></div><input type="range" class="${sliderClass}" data-key="${p.key}" min="${min}" max="${max}" step="${step}" value="${val}" style="background:linear-gradient(to right,var(--accent)${pct}%,var(--border)${pct}%)"></div>`;
 }
 
 /**

@@ -7,8 +7,13 @@
  *
  * Falls back to the legacy streaming md-loader (optimized-content-loader) if
  * the prebuilt file is missing or invalid (e.g. after a partial build).
- * The fallback still uses the single-fetch graph path (graph-data.json) —
- * see main.ts for how it wires GraphManager with or without md content.
+ *
+ * ⚠️ 两条路径都是"一次性"的，调用方拿到的永远是完整数据：
+ *   - prebuilt：一次 fetch 返回整张图；
+ *   - md 兜底：loadContentStreaming 内部虽然按并发/批量拉取（只用于驱动进度条），
+ *     但 loadGraph 会 await 到全部收完，把完整的 files 一次性返回。
+ *   这里没有"边下边长"——loadContentStreaming 的 onBatch 回调在当前产品里
+ *   没有被接线（见下方 Fallback 段落），图谱始终是拿到全量后再统一构建。
  */
 
 import { buildGraphFromPrebuilt, type PrebuiltGraphData } from './build-graph.js';
@@ -60,6 +65,10 @@ const reportLegacy = (cb: ProgressCallback | undefined) =>
  *      1041 .md files via the manifest. Slower, but never blocks a deploy
  *      with a stale or missing graph-data.json.
  *
+ * 无论走哪条路径，返回值都是"完整"的：prebuilt 时 `files` 为空（正文按节点懒加载），
+ * md 兜底时 `files` 是全部 1041 份内容。调用方（main.ts）随后一次性建图，
+ * 不做任何增量追加。
+ *
  * Returns the graph + collected md files (empty in the prebuilt path).
  */
 export async function loadGraph(
@@ -85,6 +94,8 @@ export async function loadGraph(
   }
 
   // ── Fallback: stream all .md files ─────────────────────────────────────
+  // 只传进度回调，**不传** onBatch：这里刻意不做逐批渲染，全部收完后一次性
+  // 交给 GraphManager.addFiles()。所以"边下边长"在兜底路径上也不会发生。
   const collected = await loadContentStreaming(reportLegacy(report));
   // Caller will populate GraphManager via addFiles(); GraphManager.build()
   // computes BFS/DFS on the full set.

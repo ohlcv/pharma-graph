@@ -117,7 +117,7 @@ export class DetailPanel {
       const arrow = toggle.querySelector<HTMLElement>('.np-section__toggle-arrow');
       const content = section.querySelector<HTMLElement>('.np-section__content');
       if (arrow) arrow.classList.toggle('rotated', uiState.sectionState[key]);
-      if (content) content.style.display = uiState.sectionState[key] ? '' : 'none';
+      if (content) content.classList.toggle('u-hidden', !uiState.sectionState[key]);
     });
   }
 
@@ -236,7 +236,7 @@ export class DetailPanel {
         .closest('.np-section')
         ?.querySelector<HTMLElement>('.np-section__content');
       if (arrow) arrow.classList.toggle('rotated', uiState.sectionState[key]);
-      if (content) content.style.display = uiState.sectionState[key] ? '' : 'none';
+      if (content) content.classList.toggle('u-hidden', !uiState.sectionState[key]);
     });
   }
 }
@@ -252,8 +252,8 @@ function switchDesktopTab(tab: 'overview' | 'body'): void {
 
   overviewTab?.classList.toggle('active', tab === 'overview');
   bodyTab?.classList.toggle('active', tab === 'body');
-  if (overviewPage) overviewPage.style.display = tab === 'overview' ? '' : 'none';
-  if (bodyPage) bodyPage.style.display = tab === 'body' ? '' : 'none';
+  overviewPage?.classList.toggle('u-hidden', tab !== 'overview');
+  bodyPage?.classList.toggle('u-hidden', tab !== 'body');
 }
 
 // ── Color utilities ──────────────────────────────────────────────────────────
@@ -349,22 +349,14 @@ function buildSummaryHtml(d: cytoscape.NodeDataDefinition): string {
 </div>`;
 }
 
-function buildTagsHtml(d: cytoscape.NodeDataDefinition): string {
-  if (!d.tags || (d.tags as string[]).length === 0) return '';
-  return `<div class="np-section" data-section-key="tags">
-  <div class="np-section__toggle" data-section-key="tags">
-    <svg class="np-section__toggle-arrow rotated" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-    <span class="np-section__label">标签</span>
-  </div>
-  <div class="np-section__content">
-    <div class="np-tags">${(d.tags as string[]).map((t) => `<span class="np-tag">${escHtml(t)}</span>`).join('')}</div>
-  </div>
-</div>`;
-}
-
 function buildEdgesHtml(node: cytoscape.NodeSingular, cy: cytoscape.Core): string {
-  const outEdges = cy.edges(`[source = "${node.id()}"]`);
-  const inEdges = cy.edges(`[target = "${node.id()}"]`);
+  // Filter by data instead of building `[source = "<id>"]` selectors: node ids
+  // containing quotes / backslashes would produce a malformed selector. Going
+  // through connectedEdges() also makes this O(degree) instead of O(E).
+  const id = node.id();
+  const connected = node.connectedEdges();
+  const outEdges = connected.filter((e: cytoscape.EdgeSingular) => e.data('source') === id);
+  const inEdges = connected.filter((e: cytoscape.EdgeSingular) => e.data('target') === id);
   if (outEdges.length === 0 && inEdges.length === 0) return '';
 
   const outHtml = outEdges
@@ -374,7 +366,7 @@ function buildEdgesHtml(node: cytoscape.NodeSingular, cy: cytoscape.Core): strin
       const targetLabel = targetNode.empty() ? targetId : targetNode.data('label') || targetId;
       const edgeType = (edge.data('edgeType') as string) ?? DEFAULT_EDGE_TYPE;
       const reason = edge.data('reason') as string | undefined;
-      const edgeTypeLabel = isEdgeType(edgeType) ? EDGE_TYPE_LABEL[edgeType] : edgeType;
+      const edgeTypeLabel = escHtml(isEdgeType(edgeType) ? EDGE_TYPE_LABEL[edgeType] : edgeType);
       return `<div class="np-edge-item" data-target="${escAttr(targetId)}">
   <span class="np-edge-item__type">${edgeTypeLabel}</span>
   <div class="np-edge-item__body">
@@ -392,7 +384,7 @@ function buildEdgesHtml(node: cytoscape.NodeSingular, cy: cytoscape.Core): strin
       const srcLabel = srcNode.empty() ? srcId : srcNode.data('label') || srcId;
       const edgeType = (edge.data('edgeType') as string) ?? DEFAULT_EDGE_TYPE;
       const reason = edge.data('reason') as string | undefined;
-      const edgeTypeLabel = isEdgeType(edgeType) ? EDGE_TYPE_LABEL[edgeType] : edgeType;
+      const edgeTypeLabel = escHtml(isEdgeType(edgeType) ? EDGE_TYPE_LABEL[edgeType] : edgeType);
       return `<div class="np-edge-item np-edge-item--incoming" data-target="${escAttr(srcId)}">
   <span class="np-edge-item__type">${edgeTypeLabel}</span>
   <div class="np-edge-item__body">
@@ -445,15 +437,11 @@ function escHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+// Attribute values (always double-quoted in this file) need exactly the same
+// escapes as element text, so there is one implementation and one alias —
+// nothing to keep "in sync" by hand.
 function escAttr(s: string): string {
-  // Attribute values need the same escapes as element text: & would
-  // start a character entity, < could close the tag. Keep in sync with
-  // escHtml — if you add a character there, add it here too.
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return escHtml(s);
 }
 
 // Sentinel placed on its own line immediately before an H2 to mark it as

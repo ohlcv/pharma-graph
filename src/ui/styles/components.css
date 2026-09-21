@@ -10,6 +10,8 @@
  * - 媒体查询不设置 display，只改外观属性
  * - 严禁使用 !important 控制显示逻辑
  * - JS 绝不直接操作 style.display，改用 class 切换
+ * - 通用隐藏用 `.u-hidden`（定义在 layout.css 末尾，未分层，不用 !important）；
+ *   有语义状态类的组件（.open / .visible / .collapsed）优先用自己的状态类
  */
 
 /* ── Topbar ─────────────────────────────────────────────────────────────── */
@@ -178,10 +180,10 @@
   -webkit-will-change: background-position;
 }
 /* ═══════════════════════════════════════════════════════════════════════
- * Email card — revealed when the user hovers the "meow" word. Pure hover
- * only — no click handler — so it never competes with anything. Touch
- * devices never get the hover state (the JS opts in via pointer:fine), so
- * the card stays hidden on phones/tablets and never gets stranded visible.
+ * Email card — revealed by hovering the "meow" word (fine pointers) or by
+ * tapping it (coarse pointers: tap toggles, tapping anywhere else closes).
+ * See initBadgeEmailCard() in main.ts. The card is pointer-transparent while
+ * hidden and interactive while open, so the address can be selected.
  * ═══════════════════════════════════════════════════════════════════════ */
 .badge-email-card {
   position: absolute;
@@ -209,6 +211,10 @@
   z-index: 1000;
 }
 .badge-email-card.is-visible {
+  /* Interactive while open: lets the pointer rest on the card (main.ts keeps
+   * it open on card hover) and lets the address be selected / copied. While
+   * hidden it is visibility:hidden, which already blocks pointer events. */
+  pointer-events: auto;
   opacity: 1;
   visibility: visible;
   transform: translateY(0) scale(1);
@@ -1131,6 +1137,10 @@
 .bs-params-toggle:active { background: rgba(var(--accent-rgb), 0.08); color: var(--accent); }
 .bs-params-toggle__arrow { width: 14px; height: 14px; color: var(--muted); transition: transform 0.2s ease; flex-shrink: 0; }
 .bs-params-block.open .bs-params-toggle__arrow { transform: rotate(90deg); }
+/* 折叠态完全由 .open 驱动（JS 只切 class，不写 style.display）：
+ * 未展开时隐藏内容区和"应用/恢复默认"按钮行。 */
+.bs-params-block:not(.open) > .bs-params-body,
+.bs-params-block:not(.open) > .bs-params-actions { display: none; }
 .bs-params-body    { border-top: 1px solid var(--border); padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 10px; }
 .bs-layout-params  { display: flex; flex-direction: column; gap: 8px; }
 .bs-param-row      { display: flex; flex-direction: column; gap: 3px; }

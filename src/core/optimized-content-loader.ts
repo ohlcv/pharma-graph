@@ -221,6 +221,10 @@ function deviceProfile(): { concurrency: number; batchSize: number } {
  * The callback receives a `Record<key, rawMarkdown>` of newly arrived
  * files. Callers can render them progressively. Final `done` phase
  * fires once the entire manifest is exhausted.
+ *
+ * ⚠️ 注意：当前产品里 `loadGraph`(prebuilt-loader.ts) 调用本函数时**没有**传
+ * `onBatch`，所以批次只用于累计与进度上报，并不会触发逐批渲染。想要真正的
+ * "边下边长"，需要把 onBatch 接到 GraphManager.addFiles + 增量 add/animate 上。
  */
 export async function loadContentStreaming(
   onProgress?: ProgressCallback,

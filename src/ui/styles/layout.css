@@ -6,6 +6,24 @@
 
 /* ── Ambient background ─────────────────────────────────────────────────── */
 #app { z-index: 1; }
+
+/* Starfield canvas — 3 层视差星点，见 starfield.ts。
+ * 必须是定位元素：initStarfield 检测到 `position: static` 会直接停用并把
+ * 原因打到控制台（"[starfield] #starfield has no positioning CSS …"）。
+ * 不加这条时 canvas 会按默认 300×150 的 inline 尺寸留在文档流里，把 #app
+ * 的第一个子节点撑开、整页内容往下顶 150px——视觉上就是顶部一条黑带。
+ *
+ * z-index 必须是 0，不能是 -1：html 和 body 都有 `background: var(--bg)`，
+ * 负层级元素在绘制顺序里排在 body 背景**之前**，会被 #020617 整个盖掉
+ * （症状：canvas 明明按视口尺寸渲染了，屏幕上一个星点也看不到）。
+ * 0 让它落在 body 背景之上、又排在 header.topbar / #main 这些同层但更靠后
+ * 的兄弟之前，于是星点在图谱之下、UI 之上。 */
+#starfield {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
 /* Ambient background layer — only radial-glow halos, no dot-grid.
    Keep this layer empty if we want a perfectly clean backdrop:
    point is that the page isn't dead-flat; the gradient halos in
@@ -13,18 +31,37 @@
    texture — looked "IDE-ish" and competed with the canvas content.) */
 
 #app::after {
-  content: ''; position: fixed; inset: 0;
+  content: ''; position: fixed; inset: -20%;
   /* Two big halos: indigo top-left spills above the viewport so the
      glow "rises" off-screen; cyan bottom-right anchors the floor.
      blend-mode screen makes the halos read on top of the dark bg
      like an actual light source, not paint.
      (The third central vignette was removed — it just darkened the
-     middle of the canvas without adding rhythm.) */
+     middle of the canvas without adding rhythm.)
+
+     background-size 比 viewport 大 50%——给 @keyframes drift 留移动空间。
+     inset:-20% 让 halo 边缘不出现硬切，drift 时边缘不会突然露出纯黑。 */
   background:
-    radial-gradient(ellipse 120% 80% at 12% -5%, var(--halo-accent) 0%, transparent 65%),
-    radial-gradient(ellipse 100% 70% at 88% 95%, var(--halo-accent2) 0%, transparent 60%);
+    radial-gradient(ellipse 120% 80% at 18% 8%, var(--halo-accent) 0%, transparent 65%),
+    radial-gradient(ellipse 100% 70% at 82% 92%, var(--halo-accent2) 0%, transparent 60%);
+  background-size: 150% 150%;
+  background-position: 0 0;
   mix-blend-mode: screen;
   pointer-events: none; z-index: -1;
+  animation: nebula-drift 90s ease-in-out infinite alternate;
+  will-change: background-position;
+}
+
+/* 星云光晕缓慢漂移——两团 halo 各自反向移动，形成轻微的"对流"。
+   90s 一个完整周期，肉眼几乎察觉不到运动，但长时间停留会感觉背景
+   "在呼吸"。alternate + ease-in-out 让两端减速、中段加速，符合
+   视觉对"自然漂浮"的预期。
+   background-position 用百分比而不是 px——配合 background-size:150%
+   时，10% 的位移对应 ~15vh 的实际移动，刚好看不出但"有"。 */
+@keyframes nebula-drift {
+  0%   { background-position: 0%   0%; }
+  50%  { background-position: 8%   4%; }
+  100% { background-position: 4%  -3%; }
 }
 
 /* ── Main layout ──────────────────────────────────────────────────────────── */
@@ -282,3 +319,10 @@
 }
 
 }
+
+/* ── Display utility (unlayered) ─────────────────────────────────────────────
+ * JS 通过 classList.toggle('u-hidden', …) 显隐元素，而不是写 style.display。
+ * 故意放在 @layer 之外：未分层样式天然压过所有分层样式，所以即使目标元素在
+ * 某个 @layer 里写了 display:flex / inline-flex，也能被它盖住，且不需要 !important。
+ * 不叫 .is-hidden：#carousel-text.is-hidden 已被占用（做 opacity 淡出）。 */
+.u-hidden { display: none; }

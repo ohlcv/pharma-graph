@@ -11,7 +11,8 @@
 //
 // Heavier logic lives in dedicated modules:
 //   - action-handlers.ts  → registerAppActions
-//   - layout-menu.ts     → open/close dropdown
+//   - layout/layout-switcher.ts → open/close layout dropdown
+//   - starfield.ts       → initStarfield (parallax background stars)
 //   - search-ui.ts       → initSearchUI
 //   - music-player.ts    → initMusicPlayer
 //   - debug-bridge.ts    → installDebugBridge
@@ -46,7 +47,9 @@ import {
 import { detectDeviceCapability } from '../core/device-capability.js';
 import { installDispatcher, dispatchAction } from './action-dispatcher.js';
 import { updateStats, syncBottomSheetStats } from './graph-stats.js';
-import { fitGraph, randomize, syncLayoutDisplay, setCurrentLayout, restoreBsAdvancedPrefs, renderLayoutParams } from './layout-manager.js';
+import { syncLayoutDisplay, setCurrentLayout } from './layout/layout-engine.js';
+import { restoreBsAdvancedPrefs, renderLayoutParams } from './layout/layout-params.js';
+import { fitGraph, randomize } from './layout/toolbar-actions.js';
 import { initBigscreen, registerFitFn, registerTourController, registerCyAccessor, isBigscreen } from './bigscreen.js';
 import { initGraphEvents } from './graph-events.js';
 import { initSheetDrag, initPanelDrag, initPanelResize, syncTourBarPosition, initSectionHeights } from './drag-manager.js';
@@ -66,6 +69,7 @@ import { registerAppActions } from './action-handlers.js';
 import { initSearchUI } from './search-ui.js';
 import { initMusicPlayer } from './music-player.js';
 import { installDebugBridge } from './debug-bridge.js';
+import { initStarfield } from './starfield.js';
 
 let tourController: TourController;
 
@@ -85,8 +89,10 @@ function updateLoadingIndicator(progress: PrebuiltProgress): void {
     if (count) count.textContent = '';
     if (percent) percent.textContent = '100%';
     setTimeout(() => {
+      // `.hidden` starts the 0.5s opacity fade (shared.css); take the pill out
+      // of layout only after it has finished (600ms > 500ms).
       indicator.classList.add('hidden');
-      setTimeout(() => { indicator.style.display = 'none'; }, 600);
+      setTimeout(() => indicator.classList.add('u-hidden'), 600);
     }, 800);
     return;
   }
@@ -95,6 +101,23 @@ function updateLoadingIndicator(progress: PrebuiltProgress): void {
   if (label) label.textContent = progress.message;
   if (count) count.textContent = '';
   if (percent) percent.textContent = '';
+}
+
+/**
+ * Boot failed before the graph existed — without this the pill sits on
+ * "准备中…" with a pulsing yellow dot forever and the user has no idea why.
+ * If the graph is already up, a late failure is only logged.
+ */
+function showBootError(err: unknown): void {
+  console.error('[boot] failed:', err);
+  if (uiState.renderer) return;
+  const label = document.getElementById('loading-label');
+  const count = document.getElementById('loading-count');
+  const percent = document.getElementById('loading-percent');
+  if (label) label.textContent = '加载失败，请刷新重试';
+  if (count) count.textContent = '';
+  if (percent) percent.textContent = '';
+  showToast('图谱加载失败，请刷新页面重试', 'error');
 }
 
 // ── Boot ───────────────────────────────────────────────────────────────────────
@@ -119,7 +142,7 @@ async function boot(): Promise<void> {
   // All panel/sheet drag, resize, section-height, and music-player init functions
   // touch only DOM nodes that exist from the first byte of index.html. They can
   // safely run before loading completes — dragging the sheet while the graph is
-  // still streaming is a legitimate and useful interaction.
+  // still loading is a legitimate and useful interaction.
   initSheetDrag();
   initPanelDrag();
   initPanelResize();
@@ -130,7 +153,10 @@ async function boot(): Promise<void> {
   // 2) Load graph data. Two paths:
   //    - Default (prebuilt):  one ~800 KB JSON fetch, instant.
   //    - Fallback (md stream): when graph-data.json is missing/invalid,
-  //      stream all 1041 .md files. Slower, but never blocks a deploy.
+  //      fetch all 1041 .md files. Slower, but never blocks a deploy.
+  //    Both paths `await` to completion and hand back the FULL set — the md
+  //    path batches internally only to drive the progress bar, it is not
+  //    rendered progressively (no "边下边长"; see prebuilt-loader.ts).
   const loadResult = await loadGraph(updateLoadingIndicator);
   const collectedFiles: Record<string, string> = loadResult.files;
 
@@ -161,8 +187,9 @@ async function boot(): Promise<void> {
     graphManager.addFiles(collectedFiles);
   }
 
-  // 3) Initialise cytoscape from the graph manager's data
-  initGraphFromManager(graphManager, collectedFiles);
+  // 3) Initialise cytoscape from the graph manager's data — once, with every
+  //    node/edge already present (prebuilt or md fallback both finish above).
+  initGraphFromManager(graphManager);
 
   // Stats + bottom-sheet counters
   queueMicrotask(() => dumpDiag(graphManager));
@@ -184,15 +211,17 @@ async function boot(): Promise<void> {
 /**
  * Initialize cytoscape + event handlers from the current graph state.
  *
- * The graph data is fully available at init time (prebuilt path). For the
- * fallback (md streaming) path we keep the same signature: `collectedFiles`
- * is passed in so cytoscape initialiser can wire per-node body resolution
- * against the same source map (zero cost in the prebuilt path).
+ * All graph data is available up front (prebuilt JSON, or the md fallback
+ * after `addFiles`), so cytoscape is created once with the full element set.
+ *
+ * There is deliberately no incremental "append new batch" path here: the
+ * graph is built in a single pass and every node is then animated out from
+ * the centre together (see the "from-center growth" block below). The old
+ * `appendBatchToGraph` helper was never called and has been removed, so
+ * nothing is lost — do not reintroduce streaming-append without also wiring
+ * `loadContentStreaming`'s onBatch callback (see prebuilt-loader.ts).
  */
-function initGraphFromManager(
-  graphManager: GraphManager,
-  collectedFiles: Record<string, string>,
-): void {
+function initGraphFromManager(graphManager: GraphManager): void {
   const data = graphManager.getData();
 
   logInfo('graph build:', {
@@ -205,7 +234,7 @@ function initGraphFromManager(
 
   uiState.renderer = new Renderer({
     container,
-    data, // 第一批不需要预设位置：appendBatchToGraph 的动画会处理
+    data, // 不需要预设位置：下面对所有节点统一做"从中心爆出"动画
     layoutName: 'preset', // 不在构造时跑 layout
     layoutConfigs: LAYOUTS,
   });
@@ -262,29 +291,19 @@ function initGraphFromManager(
 
   initDebugOverlay(uiState.renderer);
 
-  // ── Wire up app-wide interactions the moment the graph is live, NOT
-  //     after streaming finishes. ─────────────────────────────────────────
-  // The streaming loader runs `initGraphFromManager` synchronously as soon
-  // as the first batch arrives (so nodes appear to "grow" into view); only
-  // later does `boot()` resume after `await loadContentStreaming(...)`.
-  // Until now, installDispatcher / registerAppActions / initKeyboardShortcuts
-  // / initBigscreen / installDebugBridge / initSearchUI were all called
-  // after that await — meaning the moment a user could tap a node (via
-  // graph-events.ts, which IS wired up here) they could open the detail
-  // panel, but every `data-action` button (close ×, sidebar toggle,
-  // bigscreen, toolbar layouts, …) and every keyboard shortcut was dead
-  // until streaming fully completed. Symptom: "I opened detail during
-  // streaming, can't close it, can't fullscreen, can't hide sidebar."
+  // ── Wire up app-wide interactions the moment the graph is live ─────────────
+  // These must not wait for boot() to resume after loading: as soon as the
+  // graph is on screen a user can tap a node (graph-events.ts is wired above),
+  // and every `data-action` button (close ×, sidebar toggle, bigscreen,
+  // toolbar layouts, …) and keyboard shortcut has to work at that point too.
   //
-  // Every dependency these need (uiState.renderer / highlight / detailPanel
-  // / search / tourController / registerFitFn / registerCyAccessor) is
-  // already initialised above. `installDispatcher` is idempotent, and
-  // `initBigscreen` has its own rAF retry if cy isn't ready yet.
-  // Sidebar toggle button's initial active state — read the sidebar DOM
-  // synchronously so the toggle reflects reality the moment the graph
-  // appears. Deferring this to after `await loadContentStreaming` meant
-  // users who set sidebar hidden by default would see a stale-active
-  // toggle button until streaming finished.
+  // Every dependency (uiState.renderer / highlight / detailPanel / search /
+  // tourController / registerFitFn / registerCyAccessor) is initialised above.
+  // `installDispatcher` is idempotent, and `initBigscreen` has its own rAF
+  // retry if cy isn't ready yet.
+  //
+  // Sidebar toggle button's initial active state is read from the DOM here so
+  // the button reflects reality the moment the graph appears.
   const sidebar = document.getElementById('sidebar');
   const sidebarBtn = document.getElementById('btn-sidebar-toggle');
   const nodePanel = document.getElementById('node-panel');
@@ -299,8 +318,10 @@ function initGraphFromManager(
   initBigscreen();
   installDebugBridge(uiState.renderer);
   initSearchUI(uiState.renderer.getCy(), uiState.highlight!, uiState.search!, uiState.detailPanel!);
+  // Background stars follow the camera (pan/zoom) — needs cy, nothing else.
+  initStarfield(uiState.renderer.getCy());
 
-  // Streaming 期间的初始 zoom——用 0.08 让用户能看到"全图概貌"，
+  // 初始 zoom——用 0.08 让用户能看到"全图概貌"，
   // 节点从中心爆出时整体框架已铺开。boot 完之后**不再动摄像头**——
   // euler 让节点收敛到哪里，镜头就停在哪里。
   cy.zoom(0.08);
@@ -336,29 +357,11 @@ function initGraphFromManager(
   renderLayoutParams(DEFAULT_LAYOUT);
 }
 
+/** Hard ceiling for the Euler simulation; see finishStreamingLayout. */
+const EULER_HARD_TIMEOUT_MS = 60_000;
+
 /**
- * After the manifest finishes, kick off the euler force-directed layout
- * once. Euler is allowed to run its full animation so users see nodes
- * drift from their "cosmic" positions into the organic, topology-aware
- * structure. This is the "gravity" phase of the cosmic metaphor: things
- * that "want to be" connected pull toward each other; lone nodes get
- * pushed apart.
- *
- * We deliberately do NOT touch the camera afterwards — euler lets nodes
- * settle where they settle, and the user sees exactly the final state
- * with no forced reframe. `cy.stop` cancels any in-flight position
- * animations from earlier "飞出去" bursts so euler owns the motion
- * without two systems fighting each other.
- *
- * This function ALSO owns the loading pill's fade-out trigger — the pill
- * disappears *after* euler's physical convergence finishes, so the
- * "大爆炸 / 100%" celebration is the last thing the user sees before the
- * graph enters its stable rest state. For small graphs (< 80 nodes) where
- * euler is skipped, the pill still fades out on a 100ms tick so we don't
- * strand it on screen.
- */
-/**
- * After the manifest finishes, run the Euler force-directed layout once.
+ * Once the graph is on screen, run the Euler force-directed layout once.
  *
  * Euler is allowed to run its full animation so users see nodes drift from
  * their halo positions into the organic, topology-aware structure. This is
@@ -380,8 +383,12 @@ function initGraphFromManager(
  * disappears after Euler converges (or times out, or is skipped). For small
  * graphs (< 80 nodes) Euler is skipped unconditionally because the halo
  * positions are already pretty and Euler just makes them jitter.
+ *
+ * We deliberately do NOT touch the camera afterwards — Euler lets nodes
+ * settle where they settle. `cy.stop(undefined, true)` cancels (and jumps to
+ * the end of) any in-flight position animations from the entrance burst so
+ * Euler owns the motion without two systems fighting each other.
  */
-const EULER_HARD_TIMEOUT_MS = 60_000;
 
 function finishStreamingLayout(counts: { nodeCount: number }): void {
   if (!uiState.renderer) return;
@@ -411,7 +418,7 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
     return;
   }
 
-  // ── Run Euler with a hard 10s ceiling ──────────────────────────────────
+  // ── Run Euler with a hard ceiling (EULER_HARD_TIMEOUT_MS) ──────────────
   cy.stop(undefined, true);
   cy.elements().removeClass('entering');
 
@@ -422,7 +429,7 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
     waitForGraphToSettle(cy, completeLoading);
   };
 
-  // Hard timeout: if Euler hasn't emitted layoutstop within 10s, kill it.
+  // Hard timeout: if Euler hasn't emitted layoutstop in time, kill it.
   // The positions at that moment are frozen as the final layout — better
   // than letting the tab block on physics for 30+ seconds.
   const hardTimeout = setTimeout(() => {
@@ -452,7 +459,7 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
  *
  * Cytoscape's `layoutstop` describes a layout lifecycle event, not a paint
  * guarantee. We therefore sample node positions on animation frames and
- * require 250ms with no movement (and no Cytoscape animation in progress).
+ * require 500ms (`quietForMs`) with no movement (and no Cytoscape animation in progress).
  * This makes the loading pill's disappearance follow the user's perception:
  * nodes settle first; only then may the pill celebrate and fade.
  */
@@ -511,109 +518,12 @@ function waitForGraphToSettle(cy: cytoscape.Core, onSettled: () => void): void {
 }
 
 /**
- * Append a batch of newly-arrived nodes to the already-rendered graph.
- * "Cosmic expansion" model — every new batch pushes existing nodes a bit
- * further from the origin (like the universe expanding as new matter is
- * added) and places new nodes on the outer ring. The result reads as
- * continuous outward growth instead of a "load → snap" transition.
- *
- * Edges that connect already-present nodes appear naturally because they
- * were created earlier in the streaming order; we don't re-layout.
- */
-function appendBatchToGraph(
-  batchFiles: Record<string, string>,
-  graphManager: GraphManager,
-  _collected: Record<string, string>,
-): void {
-  if (!uiState.renderer) return;
-
-  const cy = uiState.renderer.getCy();
-  const data = graphManager.build();
-  const ENTERING = uiState.renderer.CLASSES_ENTERING;
-
-  // 快照 add 之前的节点/边集合，用于 halton 全局索引与 dangling 诊断。
-  const beforeNodeIds = new Set<string>();
-  for (const n of cy.nodes()) beforeNodeIds.add(n.id());
-  const beforeEdgeIds = new Set<string>();
-  for (const e of cy.edges()) beforeEdgeIds.add(e.id());
-  const existingCount = beforeNodeIds.size;
-
-  // 统一走 renderer 的元素归一化逻辑（stroke 兜底、subtree 色等），
-  // 不再在 main.ts 里手写一份会漂移的 node/edge 构造。
-  const { addedNodeIds, addedEdgeIds, skippedEdges } = uiState.renderer.addElements(data);
-
-  const diag = ensureDiag();
-  diag.skippedEdges.push(...skippedEdges);
-  if (diag.skippedEdges.length <= 5) {
-    for (const s of skippedEdges) {
-      console.warn('[appendBatchToGraph] skipped dangling edge', s.id, '→', s.err);
-    }
-  }
-
-  // 真正缺失的边：两端节点都还没加载，永远无法 add。
-  const allKnownIds = new Set(beforeNodeIds);
-  data.nodes.forEach((n) => allKnownIds.add(n.id));
-  const trulyDangling = data.edges.filter(
-    (e) =>
-      !beforeEdgeIds.has(e.id) &&
-      !allKnownIds.has(e.source) &&
-      !allKnownIds.has(e.target), // 双端都不在 known 里——纯 dangling
-  );
-  if (trulyDangling.length > 0) {
-    diag.filteredDangling.push(...trulyDangling.map((e) => ({ id: e.id, source: e.source, target: e.target })));
-  }
-
-  // 渐入 class（在 add 之后立即打上，避免出现一帧全亮再淡出的闪烁）。
-  addedNodeIds.forEach((id) => {
-    const node = cy.getElementById(id);
-    if (!node.empty()) node.addClass(ENTERING);
-  });
-  addedEdgeIds.forEach((id) => {
-    const edge = cy.getElementById(id);
-    if (!edge.empty()) edge.addClass(ENTERING);
-  });
-
-  // 1. 新节点从原点 (0,0) 飞出到 halton 序列指定的目标位置。
-  //    halton 索引是全局的（base 2/3），保证不管分批到达多少次，
-  //    整体节点分布都均匀不重叠。
-  addedNodeIds.forEach((id, i) => {
-    const node = cy.getElementById(id);
-    if (node.empty()) return;
-
-    // 全局唯一索引（在总集中的位置）
-    const globalIdx = existingCount + i;
-    const angle = halton(globalIdx, 2) * Math.PI * 2;
-    const ringRadius = 50 + halton(globalIdx, 3) * 280;
-
-    // 先放原点，然后 animate 到目标（视觉上就是"从中心爆出来"）
-    node.position({ x: 0, y: 0 });
-    node.animate({
-      position: {
-        x: Math.cos(angle) * ringRadius,
-        y: Math.sin(angle) * ringRadius,
-      },
-      duration: 520,
-      easing: 'ease-out-cubic',
-    });
-  });
-
-  // 2. 节点 + 边的渐入（在动画开始后立即开始，节点到位时刚好可见）
-  addedNodeIds.forEach((id, i) => {
-    const node = cy.getElementById(id);
-    if (node.empty()) return;
-    setTimeout(() => node.removeClass(ENTERING), 100 + i * 10);
-  });
-  addedEdgeIds.forEach((id, i) => {
-    const edge = cy.getElementById(id);
-    if (edge.empty()) return;
-    setTimeout(() => edge.removeClass(ENTERING), 200 + i * 6);
-  });
-}
-
-/**
  * 诊断汇总：把所有被静默 skip 的边、被 filter 过滤掉的 dangling edge、
  * parser warnings 都收集到 window.__graphDiag 上。调试时一行命令就能看清
  * 整张图到底哪些边丢了、为什么丢。比"容错吞错 + 一片寂静"靠谱得多。
+ *
+ * 注意：skippedEdges / filteredDangling 原本由已移除的 streaming 追加路径填充，
+ * 现在恒为空；字段保留是为了不破坏 debug-bridge 等外部读取方的数据形状。
  */
 interface GraphDiag {
   skippedEdges: Array<{ id: string; source: string; target: string; err: string }>;
@@ -798,6 +708,8 @@ function initBadgeEmailCard(): void {
   // Mobile / touch devices have no hover: tap-toggle instead. Desktop keeps
   // the hover-revealed UX with 300ms / 120ms delays.
   const coarse = window.matchMedia('(pointer: coarse)').matches;
+  // The "悬停查看" hint is hover wording — drop it where hover doesn't exist.
+  if (coarse) card.querySelector('.badge-email-card__hint')?.remove();
   const OPEN_DELAY_MS = 300;
   const CLOSE_DELAY_MS = 120;
   let openTimer: number | undefined;
@@ -906,4 +818,4 @@ function initBadgeEmailCard(): void {
   });
 }
 
-void boot();
+boot().catch(showBootError);

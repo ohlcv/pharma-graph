@@ -140,10 +140,42 @@
   }
   </script>
 
+  <!-- ── SVG filter: 极淡噪点，破深色渐变色带 ────────────────────────────────
+       用 SVG <feTurbulence> 生成 200×200 的 pseudo-random 噪点 tile，
+       浏览器一次性渲染缓存，background-repeat 平铺整页。
+       CSS opacity 再调到 1–2%——刚好能"撕开"深色渐变出现的色带，
+       但肉眼几乎察觉不到（"看起来贵"的关键细节）。
+       baseFrequency=0.85 是 1px 级别细密颗粒，更高就会有"颗粒感"。
+       numOctaves=2 比 1 多一点变化（更接近胶片颗粒），
+       再多就开始看到纹理了。
+       feColorMatrix 把 colored noise 统一成白色，alpha 由 CSS 控制。 -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <filter id="noise" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/>
+      <feColorMatrix values="0 0 0 0 1
+                             0 0 0 0 1
+                             0 0 0 0 1
+                             0 0 0 0 1"/>
+    </filter>
+  </svg>
+
 </head>
 <body>
 
+<!-- 背景噪点层——必须放在 #app 之外。
+     放在 #app 里面会被 #app 的层叠上下文挡住，behind 内容但
+     在 cytoscape 上方（cytoscape 在 #app 内），反过来变成"前景噪点"。
+     放在 body 直接子节点 → 全局最底，mix-blend-mode: overlay 让它
+     只影响中间亮度，不染黑角落。 -->
+<div class="noise-overlay" aria-hidden="true"></div>
+
 <div id="app">
+
+  <!-- ── Background depth layers ─────────────────────────────────────────
+       视觉层次：噪点(最底，破色带) → 星点视差 → 两团星云光晕(#app::after)
+       canvas 放 #app 第一个子节点 → 默认 z-index 最低，被 cytoscape 盖住。
+       pointer-events:none 让它不挡节点点击。 -->
+  <canvas id="starfield" aria-hidden="true"></canvas>
 
   <!-- ── Loading indicator (corner, non-blocking) ──────────────────────────── -->
   <!-- 不阻塞图谱渲染：内容流式到达时节点会"生长"出来，呼吸灯+进度仅作辅助指示。
@@ -237,7 +269,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
         <span>随机</span>
       </button>
-      <button id="btn-reset" class="btn" data-action="reset-all" title="重置一切 — 布局回到 cose、清除形状筛选、取消高亮">
+      <button id="btn-reset" class="btn" data-action="reset-all" title="重置一切 — 布局回到默认（Euler）、清除形状筛选、取消高亮">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
         <span>重置</span>
       </button>
@@ -420,7 +452,7 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
                 <span>恢复默认</span>
               </button>
-              <button id="apply-params-btn" class="btn btn--apply" data-action="apply-layout-params" style="display:none">
+              <button id="apply-params-btn" class="btn btn--apply u-hidden" data-action="apply-layout-params">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                 <span>应用参数</span>
               </button>
@@ -487,7 +519,7 @@
     <div class="node-panel__resize" id="node-panel-resize" aria-hidden="true"></div>
     <div class="node-panel__body">
       <div id="lp-overview-page" class="np-page" role="tabpanel" aria-labelledby="lp-tab-overview"></div>
-      <div id="lp-body-page"    class="np-page" role="tabpanel" aria-labelledby="lp-tab-body"     style="display:none"></div>
+      <div id="lp-body-page"    class="np-page u-hidden" role="tabpanel" aria-labelledby="lp-tab-body"></div>
     </div>
   </div>
 
@@ -527,6 +559,16 @@
     <!-- ── Scroll body ────────────────────────────────────── -->
     <div class="bs-scroll">
 
+    <!-- ── Layout info (mobile: compact — label + badge, no description) ── -->
+    <div class="bs-section">
+      <div class="layout-info">
+        <div class="layout-info__header">
+          <span class="layout-info__label">布局</span>
+          <span class="layout-info__badge" id="bs-stat-layout">EULER</span>
+        </div>
+      </div>
+    </div>
+
     <!-- ── Essence chips ────────────────────────────────── -->
     <div class="bs-section">
       <div class="bs-section__label">节点本质（形状）</div>
@@ -551,7 +593,6 @@
         <div class="bs-stat"><span class="bs-stat__val bs-stat__val--edges" id="bs-stat-edges">—</span><span class="bs-stat__label">边</span></div>
         <div class="bs-stat"><span class="bs-stat__val bs-stat__val--selected" id="bs-stat-selected">0</span><span class="bs-stat__label">选中</span></div>
         <div class="bs-stat"><span class="bs-stat__val bs-stat__val--highlighted" id="bs-stat-highlighted">0</span><span class="bs-stat__label">高亮</span></div>
-        <div class="bs-stat"><span class="bs-stat__val" id="bs-stat-layout">COSE</span><span class="bs-stat__label">布局</span></div>
         <div class="bs-stat"><span class="bs-stat__val bs-stat__val--memory" id="bs-stat-memory">—</span><span class="bs-stat__label">内存</span></div>
       </div>
     </div>
@@ -620,7 +661,7 @@
         <span>图谱布局</span>
         <svg class="bs-params-toggle__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
-      <div class="bs-params-body" id="bs-layout-body" style="display:none">
+      <div class="bs-params-body" id="bs-layout-body">
         <div class="bs-layout-grid">
           <button class="bs-layout-btn layout-btn" id="bs-btn-cose" data-action="run-layout" data-arg="cose">COSE</button>
           <button class="bs-layout-btn layout-btn" id="bs-btn-concentric" data-action="run-layout" data-arg="concentric">同心圆</button>
@@ -640,10 +681,10 @@
         <span>布局参数</span>
         <svg class="bs-params-toggle__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
-      <div class="bs-params-body" id="bs-layout-params" style="display:none"></div>
+      <div class="bs-params-body" id="bs-layout-params"></div>
       <div class="bs-params-actions">
-        <button id="bs-reset-btn" class="bs-reset-btn" data-action="reset-layout-params" style="display:none" title="恢复默认">↻</button>
-        <button id="bs-apply-btn" class="bs-apply-btn" data-action="apply-bs-params" style="display:none">应用参数</button>
+        <button id="bs-reset-btn" class="bs-reset-btn" data-action="reset-layout-params" title="恢复默认">↻</button>
+        <button id="bs-apply-btn" class="bs-apply-btn" data-action="apply-bs-params">应用参数</button>
       </div>
     </div>
 
@@ -1051,5 +1092,12 @@
 </noscript>
 
 <script type="module" src="/src/ui/main.ts"></script>
+
+<!-- 大爆炸过渡幕布——加载完成后 2s 从中心炸开，淡出后消失。
+     z-index: 9999 确保在最顶层。
+     pointer-events: none 让它不挡任何交互（用户在大爆炸期间仍可操作）。
+     aria-hidden 符合无障碍。 -->
+<div id="bigbang-veil" aria-hidden="true"></div>
+
 </body>
 </html>
