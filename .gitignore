@@ -40,6 +40,10 @@ coverage/
 
 #临时文件
 *.tmp
+
+# 重构前的一次性备份（内容与 src/ 重复，不入库）
+/copy/
+
 # sitemap.xml / content-manifest.json 不提交 — 每次 vite build 都重新生成。
 # graph-data.json 必须提交 — 团队协作保持一致，prebuild 钩子在 vite build 前会重新生成。
 public/sitemap.xml
