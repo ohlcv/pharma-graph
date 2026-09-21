@@ -18,8 +18,7 @@ import {
   renderBsLayoutParams,
   applyLayoutParams,
   resetLayoutParams,
-  toggleBsParams,
-  toggleBsLayout,
+  toggleBsLayoutSetting,
   toggleBsAdvanced,
   applyBsParams,
 } from './layout/layout-params.js';
@@ -111,12 +110,8 @@ export function registerAppActions(
     toggleBottomSheet();
   });
 
-  registerAction('toggle-bs-params', () => {
-    toggleBsParams();
-  });
-
-  registerAction('toggle-bs-layout', () => {
-    toggleBsLayout();
+  registerAction('toggle-bs-layout-setting', () => {
+    toggleBsLayoutSetting();
   });
 
   registerAction('toggle-bs-advanced', () => {

@@ -1,7 +1,8 @@
 import { Renderer } from '../core/renderer.js';
 import { uiState } from './state.js';
 import { UiToggle } from './ui-toggle.js';
-import { getCurrentLayout, renderLayoutParams } from './layout-manager.js';
+import { getCurrentLayout } from './layout/layout-engine.js';
+import { renderLayoutParams } from './layout/layout-params.js';
 
 // ── Bottom sheet ───────────────────────────────────────────────────────────────
 
@@ -578,7 +579,7 @@ export function toggleSection(name: string): void {
   }
 
   if (head) head.classList.toggle('open', nowOpen);
-  if (nowOpen && name === 'params') renderLayoutParams(getCurrentLayout());
+  if (nowOpen && name === 'layout-setting') renderLayoutParams(getCurrentLayout());
 }
 
 /** Restore a section to its saved open/closed state (used by bigscreen roundtrip). */

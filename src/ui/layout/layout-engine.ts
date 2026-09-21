@@ -12,6 +12,7 @@ import { Renderer } from '../../core/renderer.js';
 import { LAYOUTS, DEFAULT_LAYOUT } from '../../core/config.js';
 import { cancel as cancelForceDrag } from '../../core/force-drag.js';
 import { forEachStatic } from '../dom-cache.js';
+import { loadStoredParams } from './layout-store.js';
 
 // ── Current layout state ────────────────────────────────────────────────────────
 
@@ -80,5 +81,8 @@ export function runLayout(name: string, renderer: Renderer): void {
   _currentLayout = name;
   syncLayoutDisplay(name);
   cancelForceDrag();
-  renderer.runLayout(name);
+  // 透传该布局在 localStorage 中保存的用户参数，否则 cytoscape 会退回默认值，
+  // 用户调好的滑杆数值在切换布局后就不再生效。
+  const overrides = loadStoredParams(name) ?? {};
+  renderer.runLayout(name, overrides);
 }

@@ -1,5 +1,6 @@
 /* src/ui/styles/sidebar/sidebar-params.css */
-/* Styles for the "布局参数" sidebar section (data-section="params").
+/* Styles for the "布局设置" sidebar sub-section (data-section="layout-setting",
+ * nested inside "高级设置"/data-section="advanced").
  * Extracted from components.css @layer sidebar to allow independent editing. */
 
 @layer sidebar-params {

@@ -15,10 +15,10 @@ import {
   loadStoredParams,
   saveStoredParams,
   clearStoredParams,
-  getMobileLayoutOpen,
-  setMobileLayoutOpen,
   getMobileAdvancedOpen,
   setMobileAdvancedOpen,
+  getMobileLayoutSettingOpen,
+  setMobileLayoutSettingOpen,
 } from './layout-store.js';
 import { getCurrentLayout } from './layout-engine.js';
 import { forEachStatic } from '../dom-cache.js';
@@ -73,7 +73,6 @@ function onDesktopParamsInput(e: Event): void {
 
 export function renderLayoutParams(name: string): void {
   const container = document.getElementById('layout-params-rows');
-  const applyBtn = document.getElementById('apply-params-btn');
   const params = LAYOUTS[name]?.params ?? [];
   if (!container) return;
 
@@ -83,12 +82,10 @@ export function renderLayoutParams(name: string): void {
 
   if (params.length === 0) {
     container.innerHTML = '<div class="no-params">此布局无可调参数</div>';
-    setHidden(applyBtn, true);
     return;
   }
   const stored = loadStoredParams(name);
   container.innerHTML = params.map((p) => renderParamRow(p as RenderParam, stored?.[p.key], 'desktop')).join('');
-  setHidden(applyBtn, false);
 }
 
 export function applyLayoutParams(renderer: Renderer): void {
@@ -192,47 +189,65 @@ export function applyBsParams(renderer: Renderer): void {
   renderer.runLayout(getCurrentLayout(), overrides);
 }
 
-export function toggleBsParams(): void {
-  const block = document.getElementById('bs-params-block');
+// ── Mobile bottom-sheet "布局设置" sub-accordion ──────────────────────────────
+
+/**
+ * Single source of truth for the sub-accordion's visual state:
+ * `collapsed` hides the body, `open` rotates the chevron, aria mirrors it.
+ * Toggle / restore / reset all go through here so the three can never drift.
+ */
+function applyBsLayoutSettingOpen(open: boolean): void {
+  const block = document.getElementById('bs-layout-setting');
+  const head = document.getElementById('bs-layout-setting-toggle');
   if (!block) return;
-  // Open/closed is CSS-driven by `.open` (body + action row are hidden via
-  // `.bs-params-block:not(.open)`). Rows are rendered lazily on first open.
-  const open = block.classList.toggle('open');
-  if (open) renderBsLayoutParams(getCurrentLayout());
+  block.classList.toggle('collapsed', !open);
+  block.classList.toggle('open', open);
+  head?.setAttribute('aria-expanded', open ? 'true' : 'false');
 }
 
-// ── Mobile bottom-sheet layout accordion ───────────────────────────────────────
+/** Same contract as applyBsLayoutSettingOpen, for the 高级设置 wrapper. */
+function applyBsAdvancedOpen(open: boolean): void {
+  const adv = document.getElementById('bs-advanced');
+  const head = document.getElementById('bs-advanced-toggle');
+  if (!adv) return;
+  adv.classList.toggle('collapsed', !open);
+  adv.classList.toggle('open', open);
+  head?.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
 
-export function toggleBsLayout(): void {
-  const block = document.getElementById('bs-layout-block');
+export function toggleBsLayoutSetting(): void {
+  const block = document.getElementById('bs-layout-setting');
   if (!block) return;
-  const open = block.classList.toggle('open');
-  setMobileLayoutOpen(open);
+  const willOpen = block.classList.contains('collapsed'); // 当前折叠 → 即将展开
+  applyBsLayoutSettingOpen(willOpen);
+  setMobileLayoutSettingOpen(willOpen);
+  if (willOpen) renderBsLayoutParams(getCurrentLayout());
 }
 
 export function toggleBsAdvanced(): void {
   const adv = document.getElementById('bs-advanced');
-  const head = document.getElementById('bs-advanced-toggle');
   if (!adv) return;
   const willOpen = adv.classList.contains('collapsed'); // currently collapsed → about to expand
-  adv.classList.toggle('collapsed', !willOpen);
-  head?.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+  applyBsAdvancedOpen(willOpen);
   setMobileAdvancedOpen(willOpen);
 }
 
 export function restoreBsAdvancedPrefs(): void {
-  if (getMobileAdvancedOpen()) {
-    const adv = document.getElementById('bs-advanced');
-    const head = document.getElementById('bs-advanced-toggle');
-    adv?.classList.remove('collapsed');
-    head?.setAttribute('aria-expanded', 'true');
-  }
-  if (getMobileLayoutOpen()) {
-    document.getElementById('bs-layout-block')?.classList.add('open');
-  }
+  if (getMobileAdvancedOpen()) applyBsAdvancedOpen(true);
+  restoreBsLayoutSettingPrefs();
 }
 
 export function resetBsAdvancedPrefs(): void {
-  setMobileLayoutOpen(false);
   setMobileAdvancedOpen(false);
+  resetBsLayoutSettingPrefs();
+  applyBsAdvancedOpen(false);
+}
+
+export function restoreBsLayoutSettingPrefs(): void {
+  if (getMobileLayoutSettingOpen()) applyBsLayoutSettingOpen(true);
+}
+
+export function resetBsLayoutSettingPrefs(): void {
+  setMobileLayoutSettingOpen(false);
+  applyBsLayoutSettingOpen(false);
 }

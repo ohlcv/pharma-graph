@@ -473,10 +473,21 @@
   transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1), padding 0.28s ease;
   padding-top: 0; padding-bottom: 0;
 }
-.sidebar-section[data-section-state="open"] .sidebar-section__body {
+.sidebar-section[data-section-state="open"] > .sidebar-section__body {
   max-height: none;
   padding: 0 14px 12px;
 }
+
+/* 嵌套 section（高级设置 → 布局设置）的对齐修正。
+ *
+ * 1) 上面的「展开态」规则必须用子选择器 `>`：原来用后代选择器时，外层「高级设置」
+ *    展开会给**所有后代** body 加上 `padding: 0 14px 12px`，包括已折叠的内层
+ *    #body-layout-setting。max-height:0 只压内容盒、不压 padding，于是折叠后
+ *    仍会露出 12px 的 padding-bottom —— 就是那条「半行」。
+ * 2) #body-advanced 本身去掉左右内边距：它里面装的是另一个 .sidebar-section，
+ *    若再加 14px，子级标题的竖条会比父级多缩进 14px，而「图例说明 → 节点本质」
+ *    那层只差 2px。去掉后两级竖条对齐，和「图例说明」的视觉层级一致。 */
+#body-advanced { padding-left: 0; padding-right: 0; }
 
 .node-type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
 .node-type-item {
@@ -1138,6 +1149,14 @@
 .bs-advanced__head { background: transparent; border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; font-family: inherit; }
 .bs-advanced__head:active .bs-advanced__title { color: var(--accent); }
 
+.bs-layout-setting { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.bs-layout-setting__head { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 14px; background: rgba(255,255,255,0.02); border: none; color: var(--text-2); font-size: 0.72rem; font-weight: 600; font-family: inherit; cursor: pointer; }
+.bs-layout-setting__title { display: flex; align-items: center; gap: 8px; }
+.bs-layout-setting__chev { width: 14px; height: 14px; color: var(--muted); transition: transform 0.2s ease; }
+.bs-layout-setting.open .bs-layout-setting__chev { transform: rotate(90deg); }
+.bs-layout-setting__body { border-top: 1px solid var(--border); padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 10px; }
+.bs-layout-setting.collapsed .bs-layout-setting__body { display: none; }
+
 .bs-params-block   { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
 .bs-params-toggle  { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 14px; background: rgba(255,255,255,0.02); border: none; color: var(--text-2); font-size: 0.72rem; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.14s, color 0.14s; -webkit-tap-highlight-color: transparent; }
 .bs-params-toggle:active { background: rgba(var(--accent-rgb), 0.08); color: var(--accent); }
@@ -1168,7 +1187,7 @@
 }
 .bs-apply-btn:active { background: rgba(var(--accent-rgb), 0.28); transform: scale(0.98); }
 .bs-apply-btn svg { width: 13px; height: 13px; }
-.bs-params-actions { display: flex; gap: 8px; align-items: center; margin: 0 14px 12px; }
+.bs-params-actions { display: flex; gap: 8px; align-items: center; margin: 0; }
 .bs-params-actions .bs-apply-btn { margin: 0; flex: 1 1 auto; width: auto; }
 .bs-reset-btn {
   display: flex; align-items: center; justify-content: center;

@@ -23,8 +23,6 @@ export {
   resetLayoutParams,
   renderBsLayoutParams,
   applyBsParams,
-  toggleBsParams,
-  toggleBsLayout,
   toggleBsAdvanced,
   restoreBsAdvancedPrefs,
   resetBsAdvancedPrefs,

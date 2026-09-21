@@ -14,11 +14,11 @@ export const LayoutStorageKeys = {
   /** Per-layout parameter values (JSON map of key → string value). */
   params: (name: string) => `${NS}:params:${name}`,
 
-  /** Whether the mobile "layout" block inside the bottom sheet is open. */
-  mobileLayoutOpen: 'pg.bs.layoutOpen',
-
   /** Whether the mobile "高级设置" accordion section is open. */
   mobileAdvancedOpen: 'pg.bs.advancedOpen',
+
+  /** Whether the mobile "布局设置" sub-accordion inside 高级设置 is open. */
+  mobileLayoutSettingOpen: 'pg.bs.layoutSettingOpen',
 } as const;
 
 // ── Read helpers ──────────────────────────────────────────────────────────────────
@@ -53,20 +53,6 @@ export function clearStoredParams(name: string): void {
   }
 }
 
-export function getMobileLayoutOpen(): boolean {
-  try {
-    return localStorage.getItem(LayoutStorageKeys.mobileLayoutOpen) === '1';
-  } catch {
-    return false;
-  }
-}
-
-export function setMobileLayoutOpen(open: boolean): void {
-  try {
-    localStorage.setItem(LayoutStorageKeys.mobileLayoutOpen, open ? '1' : '0');
-  } catch { /* ignore */ }
-}
-
 export function getMobileAdvancedOpen(): boolean {
   try {
     return localStorage.getItem(LayoutStorageKeys.mobileAdvancedOpen) === '1';
@@ -78,5 +64,19 @@ export function getMobileAdvancedOpen(): boolean {
 export function setMobileAdvancedOpen(open: boolean): void {
   try {
     localStorage.setItem(LayoutStorageKeys.mobileAdvancedOpen, open ? '1' : '0');
+  } catch { /* ignore */ }
+}
+
+export function getMobileLayoutSettingOpen(): boolean {
+  try {
+    return localStorage.getItem(LayoutStorageKeys.mobileLayoutSettingOpen) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function setMobileLayoutSettingOpen(open: boolean): void {
+  try {
+    localStorage.setItem(LayoutStorageKeys.mobileLayoutSettingOpen, open ? '1' : '0');
   } catch { /* ignore */ }
 }
