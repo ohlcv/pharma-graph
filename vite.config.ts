@@ -3,7 +3,7 @@ import legacy from '@vitejs/plugin-legacy';
 import {
   buildGraphData,
   buildManifest,
-} from './scripts/build-content.ts';
+} from './build/build-content.ts';
 
 function contentManifestPlugin(): Plugin {
   return {

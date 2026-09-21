@@ -1,12 +1,12 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scanContentDir } from '../src/parser/content-manager.js';
-import { buildNodes } from '../src/core/node-builder.js';
-import { buildEdges } from '../src/core/edge-builder.js';
-import type { GraphData } from '../src/core/graph.js';
+import { computeGraphData } from '../build/build-content.js';
 
 const ROOT = path.resolve(process.cwd());
+// 静态根目录指向构建产物 dist/（含 index.html + graph-data.json + 内容副本）。
+// 注意：public/ 是源资产目录，没有 index.html（那是构建产物，Vite 构建时生成到 dist/）。
+const STATIC_DIR = path.join(ROOT, 'dist');
 const PORT = Number(process.env.PORT) || 4173;
 
 const MIME: Record<string, string> = {
@@ -20,21 +20,15 @@ const MIME: Record<string, string> = {
   '.ico': 'image/x-icon',
 };
 
-async function buildGraphData(): Promise<GraphData> {
-  const files = await scanContentDir(path.join(ROOT, 'content'));
-  const nodes = await buildNodes(files);
-  const knownNodeIds = new Set(nodes.map((n) => n.id));
-  const edges = await buildEdges(files, knownNodeIds);
-  return { nodes, edges };
-}
-
 const server = http.createServer(async (req, res) => {
   const urlPath = req.url!.split('?')[0];
 
   // ── /api/graph ────────────────────────────────────────────────────────────
   if (urlPath === '/api/graph') {
     try {
-      const data = await buildGraphData();
+      // 动态构建：与预生成 graph-data.json 共享同一份 computeGraphData() 实现。
+      // 内容在 public/content/ 下（旧实现错指 content/，会扫到空目录返回空图）。
+      const data = await computeGraphData();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(data));
     } catch (err: unknown) {
@@ -47,7 +41,8 @@ const server = http.createServer(async (req, res) => {
 
   // ── Static files ──────────────────────────────────────────────────────────
   try {
-    let filePath = path.join(ROOT, decodeURIComponent(urlPath));
+    // 静态根目录指向 dist/，让 /、/graph-data.json、/content/*.md 命中构建产物。
+    let filePath = path.join(STATIC_DIR, decodeURIComponent(urlPath));
 
     if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
       filePath = path.join(filePath, 'index.html');
