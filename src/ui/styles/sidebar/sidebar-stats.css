@@ -1,0 +1,24 @@
+/* src/ui/styles/sidebar/sidebar-stats.css */
+/* Styles for the "图谱状态" sidebar section (data-section="stats").
+ * Extracted from components.css @layer sidebar to allow independent editing. */
+
+@layer sidebar-stats {
+
+.stat-list { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.stat-card  { background: rgba(255,255,255,0.025); border: 1px solid var(--border); border-radius: 9px; padding: 6px 8px; display: flex; flex-direction: column; gap: 3px; }
+.stat-card__label { font-size: 0.55rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.stat-card__value { font-size: 0.95rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; font-family: var(--font-mono); letter-spacing: -0.03em; line-height: 1; }
+.stat-card__value--nodes       { color: var(--stat-nodes); }
+.stat-card__value--edges       { color: var(--stat-edges); }
+.stat-card__value--selected    { color: var(--stat-selected); }
+.stat-card__value--highlighted { color: var(--stat-highlighted); }
+.stat-card__value--fps         { color: var(--stat-fps); }
+.stat-card__value--memory      { color: var(--stat-memory); }
+
+.layout-info { margin-top: 8px; padding: 10px 12px; background: rgba(255,255,255,0.025); border: 1px solid var(--border); border-radius: 9px; display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
+.layout-info__header { display: flex; align-items: center; gap: 6px; }
+.layout-info__label  { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); flex-shrink: 0; }
+.layout-info__badge  { font-size: 1.05rem; font-weight: 800; letter-spacing: 0.04em; color: var(--text); font-family: var(--font-mono); line-height: 1; }
+.layout-info__desc   { font-size: 0.68rem; color: var(--muted); line-height: 1.6; }
+
+}
