@@ -26,7 +26,7 @@ stroke（显式填写）─→ 覆盖 fill 的默认边框
 | `fill` | Direct Class Assertion（领域顶层类） | 个体归属的上层类 IRI |
 | `shape` | OWL2 实体类型枚举值（class/named_individual/...） | 显式填写时按 SHAPE_BY_OWL2 查表得 Cytoscape 形状 |
 | `stroke` | 自定义 AnnotationProperty `style` | OWL2 合法扩展，组合值 |
-| `edges_out.type` | OWL2 Axiom | 6 种公理 |
+| `edges_out.type` | OWL2 Axiom | 5 种公理 |
 
 > OWL2 允许自定义 AnnotationProperty，`style` 是本图谱定义的注释属性（组合值），属于 OWL2 标准扩展机制，非造词。
 > `shape` 填的是 OWL2 实体类型（如 `named_individual`），渲染时按 [RULES §三 SHAPE_BY_OWL2](./RULES.md) 映射到具体 Cytoscape 形状（ellipse / diamond / hexagon 等）。`fill: cls-drug` 隐含语义"named_individual 类的药物实例"，因此多数情况不填 shape、用 fill 的默认椭圆即可。
@@ -45,7 +45,7 @@ shape: auto | class | named_individual | object_property | data_property | annot
 # 可选，缺省 auto。auto 时由 fill 的默认配置决定几何形状。
 # 显式填写时填 OWL2 实体类型，对应固定几何形状（round-rectangle / ellipse / hexagon / rectangle / tag）。
 # 显式填写时覆盖 fill 的默认形状（最高优先级）。
-# 完整 OWL2 → 几何形状映射见 RULES §二 + SHAPE_BY_OWL2。
+# 完整 OWL2 → 几何形状映射见 RULES §三 + SHAPE_BY_OWL2。
 
 fill: string                # 可选，领域顶层 Class IRI（如 cls-drug / cls-disease）
 # 缺省时不写节点（节点归入通用类），具体 fill 值见 RULES §二。
@@ -94,7 +94,7 @@ edges_out:
 
 ### 3.2 shape — OWL2 实体类型（覆盖 fill 的默认形状）
 
-> **每个 OWL2 实体类型对应一个固定的 Cytoscape 几何形状**（一对一映射，见 [RULES.md §二](./RULES.md)）。
+> **每个 OWL2 实体类型对应一个固定的 Cytoscape 几何形状**（一对一映射，见 [RULES.md §三](./RULES.md)）。
 > **留空时使用 fill 的默认形状**——可访问 FILL_CONFIG 中的扩展形状（vee / tag / barrel 等）。
 
 | 值 | OWL2 原名 | 含义 | 几何形状 | 药学范畴 |
@@ -180,7 +180,7 @@ stroke 是自定义 AnnotationProperty `style` 的简写，值为组合枚举，
 
 > 无用户资料时 `full` 留空，不 AI 自动填充。
 
-### 3.8 edges_out — OWL2 公理（6 种）
+### 3.8 edges_out — OWL2 公理（5 种）
 
 | type | OWL2 对应 | 语义 | 方向规则 |
 |---|---|---|---|
@@ -389,14 +389,15 @@ edges_out:
 
 | 节点类型 | 前缀 | 示例 |
 |---|---|---|
-| 结构入口（class, cls-structure） | `sec` / `ch` / `bk` | `sec-sedative-y2-01-01` |
+| 结构入口（class, cls-structure） | `sec` / `ch` / `book` | `sec-sedative-y2-01-01` |
 | 分类（class, cls-classification） | `cls` | `cls-benzodiazepine-y2-01-01` |
 | 药物（named_individual, cls-drug） | `med`（重点）/ `drug`（普通） | `med-diazepam-y2-01-01` |
-| 疾病（named_individual, cls-disease） | `ill` | `ill-insomnia-y2-01-01` |
+| 疾病（named_individual, cls-disease） | `disease` | `disease-insomnia-y2-01-01` |
+| 生物实体（named_individual, cls-biomolecule） | `bio` | `bio-gabaa-y2-01-01` |
 | 作用特点/评价（annotation_property, cls-feature） | `feat` | `feat-barbiturate-feature-y2-01-01` |
 | 不良反应（annotation_property, cls-adverse） | `adr` | `adr-barbiturate-y2-01-01` |
-| 概念（annotation_property, cls-concept） | `cpt` | `cpt-liver-enzyme-y2-01-01` |
-| 总结（annotation_property, cls-summary） | `meta` | `meta-cyp1a2-summary-y2-01` |
+| 概念（annotation_property, cls-concept） | `concept` | `concept-bioavailability-y1-04` |
+| 总结（annotation_property, cls-summary） | `sum` | `sum-barbiturate-y2-01` |
 | 口诀（annotation_property, cls-mnemonic） | `mem` | `mem-barbiturate-y2-01-01` |
 
-> 前缀仅为约定，不参与图形编码；核心是 id 唯一且英文。
+> 前缀仅为约定，不参与图形编码；核心是 id 唯一且英文。权威表见 [SKILL.md §1.2](./SKILL.md)（frontmatter.md 不重复维护，避免双份漂移）。

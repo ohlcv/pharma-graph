@@ -380,6 +380,13 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
   const cy = uiState.renderer.getCy();
   const nodeCount = counts.nodeCount;
 
+  // 摘掉 entering（opacity: 0）必须在所有提前 return 之前：节点数 < 80 或
+  // 慢设备跳过 Euler 时，如果这里不摘，节点会一直透明只剩边（见 .entering 样式）。
+  // 同样把 entrance burst 的位置动画跳到末尾，避免动画在半途被砍导致节点悬在
+  // 奇怪的位置。
+  cy.stop(undefined, true);
+  cy.elements().removeClass('entering');
+
   const completeLoading = (): void => {
     updateLoadingIndicator({
       phase: 'done',
@@ -404,9 +411,6 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
   }
 
   // ── Run Euler with a hard ceiling (EULER_HARD_TIMEOUT_MS) ──────────────
-  cy.stop(undefined, true);
-  cy.elements().removeClass('entering');
-
   let settled = false;
   const finalize = (): void => {
     if (settled) return;

@@ -29,12 +29,7 @@ import { UiToggle } from './ui-toggle.js';
 import { showToast } from './ui-helpers.js';
 import { speechController } from './speech.js';
 import { UNIVERSE_ROOTS } from '../core/config.js';
-
-/**
- * 体系边界只沿"层级边"走。disjoint_with / equivalent_to 是对称关系，
- * source/target 的方向没有父子含义，沿着它们走会把另一个体系的节点泄漏进来。
- */
-const HIERARCHY_EDGE_TYPES: ReadonlySet<string> = new Set(['subclass_of', 'part_of', 'instance_of']);
+import { HIERARCHY_EDGE_TYPES } from '../core/edge-types.js';
 
 /** 漫游历史上限，避免无限漫游时 uiState.tour.pathHistory 无限增长。 */
 const PATH_HISTORY_MAX = 500;

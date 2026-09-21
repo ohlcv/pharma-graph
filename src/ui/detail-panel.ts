@@ -196,7 +196,10 @@ export class DetailPanel {
     const pH = this.panel.offsetHeight;
     const vpW = window.innerWidth;
     const vpH = window.innerHeight;
-    const PAD = 8;
+    // glass 皮肤侧栏离右边缘 10px，面板要比侧栏左缘再留 16px 间隙。
+    // CSS 默认 right: calc(var(--sidebar-width) + 26px) 的构成 = 10px(glass) + 16px(gap)。
+    const GLASS_MARGIN = 10;
+    const PANEL_GAP = 16;
     // 从 CSS 变量读真实侧栏宽度（components.css 的 --sidebar-width:
     // clamp(280px, 6vw + 248px, 320px)）。原来硬编码 260 在窄屏/glass 皮肤下
     // 会压到侧栏 30–70px。JS 读 CSS 变量而非复制数值，避免再次脱节。
@@ -207,17 +210,19 @@ export class DetailPanel {
     })();
     // Must sit below topbar(56) + toolbar(44) = 100px so panel header never
     // overlaps the top bars visually or event-wise.
-    const MIN_TOP = 108;
+    const MIN_TOP = 110;
 
     // Once the user has dragged or resized the panel, leave it where they
     // put it. We only reposition when no saved bounds exist — i.e. the
     // very first open of the session.
     if (hasSavedBounds()) return;
 
-    const sbW = (document.getElementById('sidebar')?.classList.contains('hidden') ?? true) ? 0 : SIDEBAR_W;
-    const left = vpW - pW - PAD - sbW;
+    const sidebarHidden = document.getElementById('sidebar')?.classList.contains('hidden') ?? true;
+    const sbW = sidebarHidden ? 0 : SIDEBAR_W;
+    const glassOffset = sidebarHidden ? 0 : GLASS_MARGIN;
+    const left = vpW - pW - PANEL_GAP - glassOffset - sbW;
     // 默认位置：右上角——水平已经贴 viewport 右边缘 (PAD=8px)，垂直贴 toolbar 下方
-    // (topbar 56 + toolbar 44 = 100 + 8px 间距 = 108)。不再做垂直居中，避免面板
+    // (topbar 56 + toolbar 44 = 100 + 10px 间距 = 110)。不再做垂直居中，避免面板
     // 在小屏幕上盖住中心图，也跟用户预期"右上"一致。
     const top = MIN_TOP;
 

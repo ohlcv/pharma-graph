@@ -6,9 +6,9 @@
 > - stroke 渲染参数（边框样式组合值）
 > - 药学概念 → fill/stroke 映射表
 >
-> **不包含**：转录工作流、字段制作规范、照片提取原则、YAML 格式、质量检查清单——这些在 [SKILL.md](../SKILL.md) 中。
+> **不包含**：转录工作流、字段制作规范、照片提取原则、YAML 格式、质量检查清单——这些在 [SKILL.md](./SKILL.md) 中。
 >
-> 旧 essence → 新规范迁移映射见 [SKILL.md §8.2](../SKILL.md)（RULES.md 不再单独维护该表，避免双份漂移）。
+> 旧 essence → 新规范迁移映射见 [SKILL.md §8.2](./SKILL.md)（RULES.md 不再单独维护该表，避免双份漂移）。
 > 通用字段规范见 [frontmatter.md](./frontmatter.md)（基于 OWL2，不绑定学科）。
 
 ---

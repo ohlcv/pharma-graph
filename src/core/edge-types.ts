@@ -26,6 +26,20 @@ export type EdgeType = (typeof EDGE_TYPES)[number];
 export const DEFAULT_EDGE_TYPE: EdgeType = 'instance_of';
 
 /**
+ * 层级边：source = 子，target = 父。深度 BFS / 叶子判定 / 子树归属 / 漫游
+ * 体系边界只沿这些边走。对称边（disjoint_with / equivalent_to）没有父子语义，
+ * 沿着它们走会把无关分支带进层级计算（ARD-004 附录 A 的体系隔离问题）。
+ *
+ * 单一事实来源：build-graph.ts / build-content.ts / tour.ts / tour-controller.ts
+ * 都应从这里 import，而不是各自维护一份 Set。
+ */
+export const HIERARCHY_EDGE_TYPES: ReadonlySet<string> = new Set([
+  'subclass_of',
+  'part_of',
+  'instance_of',
+]);
+
+/**
  * Type guard for incoming edge-type strings (e.g. from YAML).
  */
 export function isEdgeType(value: unknown): value is EdgeType {

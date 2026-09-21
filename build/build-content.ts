@@ -13,6 +13,7 @@ import { readdir, writeFile, stat, mkdir, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, relative, sep, posix } from 'node:path';
 import { parse as yamlParse } from 'yaml';
+import { HIERARCHY_EDGE_TYPES } from '../src/core/edge-types.js';
 
 export const CONTENT_DIR = 'public/content';
 export const PUBLIC_DIR = 'public';
@@ -21,18 +22,6 @@ export const SITEMAP_FILENAME = 'sitemap.xml';
 export const GRAPH_DATA_FILENAME = 'graph-data.json';
 
 export type EdgeTarget = { target: string; type: string; reason?: string };
-
-/**
- * 层级边：source = 子，target = 父。深度 BFS / 叶子判定 / 子树归属只沿这些
- * 边走，与 src/core/build-graph.ts 及 tour-controller 的 HIERARCHY_EDGE_TYPES
- * 口径保持一致。对称边（disjoint_with / equivalent_to）没有父子语义，会让
- * 根/叶子判定错误、深度被无关分支带偏（ADR-0006 附录 A 的体系隔离问题）。
- */
-const HIERARCHY_EDGE_TYPES: ReadonlySet<string> = new Set([
-  'subclass_of',
-  'part_of',
-  'instance_of',
-]);
 export type GraphNode = {
   id: string;
   label: string;

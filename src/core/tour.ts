@@ -1,6 +1,8 @@
 // src/core/tour.ts
 // Auto-exploration engine — Strategy pattern, 2 built-in strategies.
 
+import { HIERARCHY_EDGE_TYPES } from './edge-types.js';
+
 /** 漫游深度层级配置：5档设计，区分重点药和普通药 */
 export const TOUR_DEPTH_CONFIG = {
   // 档位 1-5 对应的 fill 类型包含关系
@@ -753,9 +755,7 @@ registerStrategy({
     // 之前直接按 FILL_ORDER + location 追加到末尾，导致用户看到"突然跳到
     // 一个无家可归的节点"。现在改用共享的 insertOrphansNearAncestors 工具，
     // 让游离节点尽量紧贴它的 location 祖先出现。
-    const beforeOrphanLen = result.length;
     insertOrphansNearAncestors(cy, result, visited);
-    const afterOrphanLen = result.length;
 
     return result;
   },
@@ -788,7 +788,6 @@ registerStrategy({
     // 现在把层级边当作前置关系：边方向是 子 → 父（source=子, target=父），
     // "父先于子" 就是"基础先于应用"。disjoint_with / equivalent_to 是对称关系，不构成先后，忽略。
     // 'prerequisite' 保留兼容：source 是 target 的前置。
-    const HIERARCHY_EDGE_TYPES = new Set(['subclass_of', 'part_of', 'instance_of']);
     const seenPairs = new Set<string>();
     edges.forEach((e) => {
       const type = e.data('edgeType') as string | undefined;
@@ -903,7 +902,9 @@ export class TourEngine {
   private strategyId: TourStrategy = 'has-dfs' as TourStrategy;
   /** 当前策略的钩子（start 时从策略 def 注入）。TourEngine 在各阶段检查，有则用。 */
   private _hooks: Partial<StrategyHooks> = {};
-  // Tracks how many times we've rebuilt the visit sequence in the *current*
+  /** 本轮 tour 已重启的轮数。MAX_RESTART_ATTEMPTS 现在是 Infinity，
+   *  实际由策略的 shouldRestart 钩子决定是否继续（默认 true 无限循环）。
+   *  start() 与正常结束时清零。 */
   private _restartAttempts = 0;
   // Bound handlers for cy graph-mutation events. Stored so that stop() can
   // remove them on engine teardown (fixes issue #15: totalExplored was a

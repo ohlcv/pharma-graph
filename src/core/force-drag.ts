@@ -1,4 +1,4 @@
-// src/ui/force-drag.ts
+// src/core/force-drag.ts
 // 拖动节点时保持一个力导向仿真运行（Obsidian / d3-force 拖拽的做法），
 // 替代 neighbor-tug.ts 的"起点 + 35% 位移"刚性牵引。
 //
