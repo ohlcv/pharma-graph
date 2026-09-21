@@ -652,7 +652,7 @@ export class GlowOverlay {
     if (!glowActive && !flowActive) this.pause();
   }
 
-  /** 把多边形顶点连成闭合子路径（配合外层 beginPath + fill('evenodd') 做镂空）。 */
+  /** 把多边形顶点连成闭合子路径（配合外层 fill 做实心光晕填充）。 */
   private traceOutline(ctx: CanvasRenderingContext2D, cx: number, cy: number, pts: Point[]): void {
     if (pts.length === 0) return;
     ctx.moveTo(cx + pts[0].x, cy + pts[0].y);

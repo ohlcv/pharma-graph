@@ -21,15 +21,17 @@ import { HighlightEngine } from './highlight-engine.js';
 import { DetailPanel } from './detail-panel.js';
 
 /** Minimal fake — only the methods the canvas-tap path touches. */
-function makeFakeTourController(): Pick<TourController, 'isRunning' | 'isPaused' | 'stop'> & {
+function makeFakeTourController(): Pick<TourController, 'isRunning' | 'isPaused' | 'stop' | 'refreshStartHintFromHighlight'> & {
   isRunning: ReturnType<typeof vi.fn>;
   isPaused: ReturnType<typeof vi.fn>;
   stop: ReturnType<typeof vi.fn>;
+  refreshStartHintFromHighlight: ReturnType<typeof vi.fn>;
 } {
   return {
     isRunning: vi.fn().mockReturnValue(false),
     isPaused: vi.fn().mockReturnValue(false),
     stop: vi.fn(),
+    refreshStartHintFromHighlight: vi.fn(),
   };
 }
 

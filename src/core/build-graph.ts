@@ -21,6 +21,7 @@
 
 import { GraphData, NodeData, EdgeData } from './graph.js';
 import { ParsedFrontmatter } from '../parser/frontmatter.js';
+import { EDGE_TYPES } from './edge-types.js';
 
 export interface BuildOptions {
   /** Set of node IDs considered "known" — edges pointing elsewhere are flagged. */
@@ -41,6 +42,16 @@ export interface BuildResult extends GraphData {
   /** Maximum depth seen in the BFS (0 when only the root exists). */
   maxDepth: number;
 }
+
+/**
+ * 层级边：source = 子，target = 父。深度 BFS 和子树归属只沿这些边走，
+ * 与 tour-controller 的 HIERARCHY_EDGE_TYPES 口径保持一致。对称边
+ * （disjoint_with / equivalent_to）没有父子语义，沿着它们走会把无关
+ * 分支带进深度/子树计算（详见 ARD-004 附录 A 的体系隔离问题）。
+ */
+const HIERARCHY_EDGE_TYPES: ReadonlySet<string> = new Set(
+  EDGE_TYPES.filter((t) => t === 'subclass_of' || t === 'part_of' || t === 'instance_of'),
+);
 
 /**
  * Build a GraphData object from a filepath → ParsedFrontmatter map.
@@ -97,6 +108,8 @@ export function buildGraph(
   //
   // Edges follow part_of / subclass_of / instance_of semantics: child → parent
   // (A part_of B is stored as an edge whose source is A and target is B).
+  // 只沿层级边走：对称边（disjoint_with / equivalent_to）会让根节点出现
+  // "伪出度"，导致根判定错误、深度被无关分支带偏。
   //
   //   1. Roots = nodes with out-degree 0, i.e. nodes that have no parent.
   //      (Isolated nodes also land here and get depth 0.)
@@ -109,7 +122,10 @@ export function buildGraph(
   // Build forward adjacency (source → targets) for degree computation
   const outDegree: Record<string, number> = {};
   for (const id of nodeIds) outDegree[id] = 0;
-  for (const e of edges) outDegree[e.source] = (outDegree[e.source] ?? 0) + 1;
+  for (const e of edges) {
+    if (!HIERARCHY_EDGE_TYPES.has(e.type)) continue;
+    outDegree[e.source] = (outDegree[e.source] ?? 0) + 1;
+  }
 
   // Reverse adjacency (target → sources): for walking FROM leaves TOWARD roots.
   // Initialize lazily so dangling-edge targets (not in nodeIds) are also covered.
@@ -119,7 +135,7 @@ export function buildGraph(
     return reverseAdj[target];
   };
   for (const e of edges) {
-    getReverseChildren(e.target).push(e.source);
+    if (HIERARCHY_EDGE_TYPES.has(e.type)) getReverseChildren(e.target).push(e.source);
   }
 
   // Roots = nodes with out-degree 0 (they point to no parent).
@@ -188,7 +204,9 @@ export function buildGraph(
     return forwardAdj[parent];
   };
   // For edge source → target (source is child of target), store source under target's key
-  for (const e of edges) getChildrenOf(e.target).push(e.source);
+  for (const e of edges) {
+    if (HIERARCHY_EDGE_TYPES.has(e.type)) getChildrenOf(e.target).push(e.source);
+  }
 
   // Step 1: Classifiers are nodes with ≥1 instance_of incoming edge
   const classifiers = new Set<string>();

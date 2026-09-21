@@ -76,7 +76,7 @@ summary:
 # === 边（OWL2 公理）===
 edges_out:
   - target: string          # 对方节点 id
-    type: subclass_of | instance_of | part_of | disjoint_with | equivalent_to | same_individual
+    type: subclass_of | instance_of | part_of | disjoint_with | equivalent_to
     reason: string          # 关系具体语义注释
 ---
 ```
@@ -189,8 +189,6 @@ stroke 是自定义 AnnotationProperty `style` 的简写，值为组合枚举，
 | `part_of` | TransitiveObjectProperty | 局部→整体（组成） | 局部→整体 |
 | `disjoint_with` | DisjointClasses | 互斥 | 对称 |
 | `equivalent_to` | EquivalentClasses | 类等价 | 对称 |
-| `same_individual` | SameIndividual | 个体同一/别名 | 对称 |
-
 > `part_of` 是声明为 Transitive 的 ObjectProperty，属于 OWL2 标准用法。
 > 口诀→主知识、总结→主章节等"辅助节点→主知识"也使用 `part_of`。
 

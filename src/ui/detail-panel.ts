@@ -197,7 +197,14 @@ export class DetailPanel {
     const vpW = window.innerWidth;
     const vpH = window.innerHeight;
     const PAD = 8;
-    const SIDEBAR_W = 260;
+    // 从 CSS 变量读真实侧栏宽度（components.css 的 --sidebar-width:
+    // clamp(280px, 6vw + 248px, 320px)）。原来硬编码 260 在窄屏/glass 皮肤下
+    // 会压到侧栏 30–70px。JS 读 CSS 变量而非复制数值，避免再次脱节。
+    const SIDEBAR_W = (() => {
+      const raw = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width').trim();
+      const px = raw ? parseFloat(raw) : 260;
+      return Number.isFinite(px) ? px : 260;
+    })();
     // Must sit below topbar(56) + toolbar(44) = 100px so panel header never
     // overlaps the top bars visually or event-wise.
     const MIN_TOP = 108;

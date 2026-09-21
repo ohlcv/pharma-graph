@@ -82,7 +82,7 @@ function makeDeps(cy: cytoscape.Core): GraphEventDeps {
 }
 
 describe('graph-events post-#19 drag-mode helper', () => {
-  it('adds and removes dragging-simplified on grab / free / dragfree', () => {
+  it('enters dragging-simplified on first drag (not grab), exits on free / dragfree', () => {
     const cy = makeFakeCytoscape();
     const deps = makeDeps(cy);
     initGraphEvents(deps);
@@ -90,12 +90,16 @@ describe('graph-events post-#19 drag-mode helper', () => {
     const cyx = cy as any;
     expect(cyx._trackedNode._isDragging()).toBe(false);
     cyx.emit('grab', 'node', { target: { id: 'b' } });
+    // grab 只开始 force-drag；等第一个 drag 事件来了才开 simplified（区分拖动与点击）。
+    expect(cyx._trackedNode._isDragging()).toBe(false);
+    cyx.emit('drag', { target: { id: 'b' } });
     expect(cyx._trackedNode._isDragging()).toBe(true);
     cyx.emit('free', 'node', { target: { id: 'b' } });
     expect(cyx._trackedNode._isDragging()).toBe(false);
 
     // Also exercised by dragfree (the fallback path when free is missed).
     cyx.emit('grab', 'node', { target: { id: 'b' } });
+    cyx.emit('drag', { target: { id: 'b' } });
     cyx.emit('dragfree', { target: { id: 'b' } });
     expect(cyx._trackedNode._isDragging()).toBe(false);
   });

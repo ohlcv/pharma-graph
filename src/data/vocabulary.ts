@@ -503,7 +503,7 @@ export const MESSAGES: DisciplineLayer[] = [
         ],
       },
       {
-        id: 'bioinfomatics', label: '生物信息学', parent: null,
+        id: 'bioinformatics', label: '生物信息学', parent: null,
         terms: [
           { name: '序列比对' }, { name: 'BLAST' }, { name: 'Smith-Waterman' },
           { name: 'Needleman-Wunsch' }, { name: '空位罚分' }, { name: '打分矩阵' },
@@ -527,7 +527,7 @@ export const MESSAGES: DisciplineLayer[] = [
         ],
       },
       {
-        id: 'psycolinguistics', label: '心理语言学', parent: null,
+        id: 'psycholinguistics', label: '心理语言学', parent: null,
         terms: [
           { name: '词汇通达' }, { name: '激活扩散模型' }, { name: '浊音启动' },
           { name: '非词效应' }, { name: '句法预测' }, { name: '花园路径效应' },
@@ -551,11 +551,11 @@ export const MESSAGES: DisciplineLayer[] = [
         id: 'climate', label: '气候科学', parent: null,
         terms: [
           { name: '辐射强迫' }, { name: '温室效应' }, { name: '气候敏感度' },
-          { name: '反馈机制' }, { name: '水汽反馈' }, { name: '冰- albedo反馈' },
+          { name: '反馈机制' }, { name: '水汽反馈' }, { name: '冰-albedo反馈' },
           { name: '云反馈' }, { name: 'ENSO' }, { name: '太平洋年代际振荡' },
           { name: 'AMOC' }, { name: '热盐环流' }, { name: '岁差' },
           { name: '倾角' }, { name: '偏心率' }, { name: '冰期-间冰期旋回' },
-          { name: '气候临界点' }, { name: ' tipping elements' }, { name: '碳预算' },
+          { name: '气候临界点' }, { name: 'tipping elements' }, { name: '碳预算' },
           { name: 'RCP情景' }, { name: 'SSP情景' }, { name: '气候预估不确定性' },
         ],
       },

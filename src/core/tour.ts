@@ -218,8 +218,9 @@ export interface StrategyHooks {
 
   /**
    * 允许策略自己控制"最多重启几次"。
-   * 默认 TourEngine 的硬上限是 3 次，这个钩子让策略知道当前已重启了几次，
-   * 从而决定是否继续——但最终停不停仍由引擎判断（引擎有 3 次绝对上限保底）。
+   * 引擎的 MAX_RESTART_ATTEMPTS 现在是 Infinity，这个钩子让策略决定是否
+   * 继续——默认 true（无限循环），返回 false 则该策略一次性跑完即可
+   * （如 topo-prereq 拓扑序，第二次遍历和第一次完全一样，循环没意义）。
    */
   onRestartAttempt?: (attemptCount: number, cy: cytoscape.Core) => void;
 
@@ -231,11 +232,9 @@ export interface StrategyHooks {
 
   /**
    * 在 seq 走完后、引擎决定是否重启前调用。
-   * 返回 true（默认）走引擎内置的 3 次硬上限循环；
+   * 返回 true（默认）继续循环（无限模式）；
    * 返回 false 表示该策略一次性跑完即可（如 topo-prereq 拓扑序，
    * 第二次遍历和第一次完全一样，循环没意义）。
-   *
-   * 引擎 3 次硬上限始终生效，策略不能调大。
    */
   shouldRestart?: (ctx: { attemptCount: number; maxAttempts: number; cy: cytoscape.Core }) => boolean;
 }
@@ -493,7 +492,7 @@ export const FILL_ORDER_INDEX: ReadonlyMap<string, number> = new Map(
 
 /**
  * 调用策略的 `shouldRestart` 钩子（如果有），决定当前是否要再走一轮。
- * 默认 true（沿用原行为：infinite mode 下一直循环到 3 次硬上限）。
+ * 默认 true（无限模式一直循环）。
  */
 function strategyAllowsRestart(
   strategy: TourStrategyDef,

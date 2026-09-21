@@ -17,8 +17,28 @@
 // safely by treating the nested map as the source of truth when present.
 
 import { parse as yamlParse, stringify as yamlStringify } from 'yaml';
-import { DEFAULT_EDGE_TYPE } from '../core/edge-types.js';
+import { DEFAULT_EDGE_TYPE, EDGE_TYPES } from '../core/edge-types.js';
 import type { StrokeType, ShapeType, NodeLocation } from '../core/graph.js';
+import { isValidFill, isValidEdgeType } from './schema.js';
+
+/** shape 白名单 —— 与 graph.ts 的 ShapeType 联合保持一致 */
+const VALID_SHAPE: ReadonlySet<string> = new Set([
+  'auto',
+  'class',
+  'named_individual',
+  'object_property',
+  'data_property',
+  'annotation_property',
+]);
+
+/** stroke 白名单 —— 与 graph.ts 的 StrokeType 联合保持一致 */
+const VALID_STROKE: ReadonlySet<string> = new Set([
+  'auto',
+  'glow',
+  'fallback',
+  'flow',
+  'double',
+]);
 
 // --- frontmatter 字段类型 ---
 
@@ -183,6 +203,33 @@ export function parseFrontmatterWithWarnings(
   const strokeRaw = getField(fm, 'stroke');
   const shape = getField(fm, 'shape');
 
+  // fill / stroke / shape / edges_out.type 白名单校验（issue：解析期就暴露，
+  // 避免非法值一路进 graph-data.json 到渲染层才炸，或静默用默认样式）。
+  if (fill && !isValidFill(fill)) {
+    warnings.push({
+      file: filePath,
+      field: 'fill',
+      message: `fill 值 "${fill}" 不在白名单（FILL_CONFIG 键），已保留原值，渲染层将回落默认样式`,
+      severity: 'warning',
+    });
+  }
+  if (strokeRaw && !VALID_STROKE.has(strokeRaw)) {
+    warnings.push({
+      file: filePath,
+      field: 'stroke',
+      message: `stroke 值 "${strokeRaw}" 非法（应为 auto|glow|fallback|flow|double），已保留原值`,
+      severity: 'warning',
+    });
+  }
+  if (shape && !VALID_SHAPE.has(shape)) {
+    warnings.push({
+      file: filePath,
+      field: 'shape',
+      message: `shape 值 "${shape}" 非法（应为 auto|class|named_individual|object_property|data_property|annotation_property），已保留原值`,
+      severity: 'warning',
+    });
+  }
+
   const rawSummary = fm['summary'] as Record<string, unknown> | string | undefined;
   let shortSummary: string | undefined;
   // summary 字段：支持两种布局
@@ -247,6 +294,14 @@ export function parseFrontmatterWithWarnings(
     const typeStr = rawType === undefined || rawType === null
       ? DEFAULT_EDGE_TYPE
       : String(rawType).trim() || DEFAULT_EDGE_TYPE;
+    if (!isValidEdgeType(typeStr)) {
+      warnings.push({
+        file: filePath,
+        field: `edges_out[${idx}].type`,
+        message: `type "${typeStr}" 不在白名单（${EDGE_TYPES}），边将用默认样式与中文标签`,
+        severity: 'warning',
+      });
+    }
     const reasonRaw = obj['reason'];
     edges.push({
       target: String(rawTarget).trim(),

@@ -21,6 +21,18 @@ export const SITEMAP_FILENAME = 'sitemap.xml';
 export const GRAPH_DATA_FILENAME = 'graph-data.json';
 
 export type EdgeTarget = { target: string; type: string; reason?: string };
+
+/**
+ * 层级边：source = 子，target = 父。深度 BFS / 叶子判定 / 子树归属只沿这些
+ * 边走，与 src/core/build-graph.ts 及 tour-controller 的 HIERARCHY_EDGE_TYPES
+ * 口径保持一致。对称边（disjoint_with / equivalent_to）没有父子语义，会让
+ * 根/叶子判定错误、深度被无关分支带偏（ARD-004 附录 A 的体系隔离问题）。
+ */
+const HIERARCHY_EDGE_TYPES: ReadonlySet<string> = new Set([
+  'subclass_of',
+  'part_of',
+  'instance_of',
+]);
 export type GraphNode = {
   id: string;
   label: string;
@@ -172,7 +184,12 @@ export function parseFrontmatter(raw: string): {
  * Parses all .md files, computes BFS depth + DFS subtree classification,
  * and writes the full graph-data.json so the browser can skip runtime parsing.
  */
-export async function buildGraphData(): Promise<{ nodes: number; edges: number }> {
+/**
+ * 纯计算：扫描 → 解析 → 建边 → BFS 深度 → 子树分类 → degree → 组装。
+ * 返回完整 GraphData 对象，不写入磁盘。
+ * 被 buildGraphData()（落盘）和 serve.ts（动态端点）共享。
+ */
+export async function computeGraphData(): Promise<GraphData> {
   const root = process.cwd();
   const contentRoot = join(root, CONTENT_DIR);
   const publicRoot = join(root, PUBLIC_DIR);
@@ -261,10 +278,14 @@ export async function buildGraphData(): Promise<{ nodes: number; edges: number }
 
   const outDegree: Record<string, number> = {};
   for (const id of nodeIds) outDegree[id] = 0;
-  for (const e of edges) outDegree[e.source] = (outDegree[e.source] ?? 0) + 1;
+  for (const e of edges) {
+    if (!HIERARCHY_EDGE_TYPES.has(e.type)) continue;
+    outDegree[e.source] = (outDegree[e.source] ?? 0) + 1;
+  }
 
   const reverseAdj: Record<string, string[]> = {};
   for (const e of edges) {
+    if (!HIERARCHY_EDGE_TYPES.has(e.type)) continue;
     if (!reverseAdj[e.target]) reverseAdj[e.target] = [];
     reverseAdj[e.target].push(e.source);
   }
@@ -303,6 +324,7 @@ export async function buildGraphData(): Promise<{ nodes: number; edges: number }
 
   const forwardAdj: Record<string, string[]> = {};
   for (const e of edges) {
+    if (!HIERARCHY_EDGE_TYPES.has(e.type)) continue;
     if (!forwardAdj[e.target]) forwardAdj[e.target] = [];
     forwardAdj[e.target].push(e.source);
   }
@@ -314,7 +336,9 @@ export async function buildGraphData(): Promise<{ nodes: number; edges: number }
 
   const parentOf: Record<string, string | undefined> = {};
   for (const id of nodeIds) parentOf[id] = undefined;
-  for (const e of edges) parentOf[e.source] = e.target;
+  for (const e of edges) {
+    if (HIERARCHY_EDGE_TYPES.has(e.type)) parentOf[e.source] = e.target;
+  }
 
   const subtreeRoot: Record<string, string> = {};
   for (const id of nodeIds) {
@@ -375,15 +399,23 @@ export async function buildGraphData(): Promise<{ nodes: number; edges: number }
     });
   }
 
-  // ── 8. Write output (skip when content is unchanged) ─────────────────────
-  const graphData: GraphData = {
+  // ── 8. 组装并返回（不写盘；写盘见 buildGraphData()）──────────────────────
+  return {
     version: 2,
     generated: new Date().toISOString(),
     stats: { nodes: finalNodes.length, edges: edges.length },
     nodes: finalNodes,
     edges,
   };
+}
 
+/**
+ * 落盘：computeGraphData() → 比较新旧 → 写入 public/graph-data.json。
+ * 仅在内容实际变更时才写入，避免无意义的 git dirty。
+ */
+export async function buildGraphData(): Promise<{ nodes: number; edges: number }> {
+  const graphData = await computeGraphData();
+  const publicRoot = join(process.cwd(), PUBLIC_DIR);
   if (!existsSync(publicRoot)) await mkdir(publicRoot, { recursive: true });
   const graphPath = join(publicRoot, GRAPH_DATA_FILENAME);
 
@@ -403,17 +435,17 @@ export async function buildGraphData(): Promise<{ nodes: number; edges: number }
 
   if (unchanged) {
     console.log(
-      `[buildGraphData] ${GRAPH_DATA_FILENAME} unchanged (${finalNodes.length} nodes, ${edges.length} edges) — skipped write.`,
+      `[buildGraphData] ${GRAPH_DATA_FILENAME} unchanged (${graphData.nodes.length} nodes, ${graphData.edges.length} edges) — skipped write.`,
     );
-    return { nodes: finalNodes.length, edges: edges.length };
+    return { nodes: graphData.nodes.length, edges: graphData.edges.length };
   }
 
   await writeFile(graphPath, JSON.stringify(graphData), 'utf-8');
 
   console.log(
-    `[buildGraphData] Generated ${GRAPH_DATA_FILENAME}: ${finalNodes.length} nodes, ${edges.length} edges, maxDepth=${maxDepth}`,
+    `[buildGraphData] Generated ${GRAPH_DATA_FILENAME}: ${graphData.nodes.length} nodes, ${graphData.edges.length} edges`,
   );
-  return { nodes: finalNodes.length, edges: edges.length };
+  return { nodes: graphData.nodes.length, edges: graphData.edges.length };
 }
 
 /**
