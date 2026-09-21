@@ -1044,7 +1044,13 @@
   max-height: calc(88dvh - env(safe-area-inset-bottom, 0px));
   overflow-y: auto; touch-action: none; flex-direction: column;
   padding: 0 16px max(16px, env(safe-area-inset-bottom));
-  transition: transform 0.32s cubic-bezier(0.34,1.4,0.64,1), opacity 0.32s;
+  /* Easing must NOT overshoot (y control points ≤ 1). The sheet is anchored
+   * with bottom: 0, so any progress > 1 pushes translateY below 0 — the panel
+   * rides ~5% of its height above the viewport bottom and briefly exposes a
+   * strip of page background (--bg, near-black) underneath it before settling
+   * back ("先往上跳一段再回落 + 底部黑条"). Use the same decelerating curve as
+   * #sheet-backdrop / #sheet-peek-tab so the whole gesture moves as one. */
+  transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.38s;
 }
 #bottom-sheet.open { transform: translateY(0); pointer-events: auto; }
 
