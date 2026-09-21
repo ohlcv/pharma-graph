@@ -26,7 +26,7 @@ export type EdgeTarget = { target: string; type: string; reason?: string };
  * 层级边：source = 子，target = 父。深度 BFS / 叶子判定 / 子树归属只沿这些
  * 边走，与 src/core/build-graph.ts 及 tour-controller 的 HIERARCHY_EDGE_TYPES
  * 口径保持一致。对称边（disjoint_with / equivalent_to）没有父子语义，会让
- * 根/叶子判定错误、深度被无关分支带偏（ARD-004 附录 A 的体系隔离问题）。
+ * 根/叶子判定错误、深度被无关分支带偏（ADR-0006 附录 A 的体系隔离问题）。
  */
 const HIERARCHY_EDGE_TYPES: ReadonlySet<string> = new Set([
   'subclass_of',

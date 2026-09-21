@@ -1,4 +1,11 @@
 
+# Cytoscape.js 通用速查（学习笔记）
+
+> 用途：本文件是 **Cytoscape.js v3 通用入门速查**（Graph/Node/Edge/Layout/Style/Events 等）。
+> 它**不绑定项目**——本项目的具体 Cytoscape 集成、布局参数、边类型样式在 [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md) 与 [`src/core/renderer.ts`](../src/core/renderer.ts)。
+> 维护策略：通用 API 速查类，**不随项目演进**，只在新 Cytoscape 主版本时整体刷新。
+
+---
 
 ## Cytoscape.js 核心概念与字段详解
 

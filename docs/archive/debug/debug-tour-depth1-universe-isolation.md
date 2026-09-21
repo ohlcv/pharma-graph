@@ -51,7 +51,7 @@ private getStrictDescendants(nodeId: string): Set<string> {
 
 ### 第二阶段：根因——cytoscape 边方向 vs outgoers/incomers 语义
 
-我们的图边方向：**source = child, target = parent**（参见 `docs/ARD/ADR-0001-层级关系统一使用isa方向.md`）。
+我们的图边方向：**source = child, target = parent**（参见 `docs/ADR/ADR-0001-层级关系统一使用isa方向.md`）。
 
 | cytoscape API | 语义 | 在我们的图里 = ? |
 |---|---|---|

@@ -1,12 +1,12 @@
-# ARD-004: applyRootScope 子树漫游算法重写 + 档位自动升级
+# ADR-0006: applyRootScope 子树漫游算法重写 + 档位自动升级
 
 | 字段 | 值 |
 |---|---|
 | **日期** | 2026-09-16 |
 | **状态** | 已实现 |
 | **决策者** | AI Assistant + 用户 |
-| **影响范围** | `src/core/tour.ts`（applyRootScope/start/recomputeTotal）、`src/ui/tour-controller.ts`（onRootOutOfLevel 事件处理）、`docs/ARD/ARD-004.md` |
-| **前置条件** | ADR-0001（isa 方向已统一），ARD-003（档位过滤已实现） |
+| **影响范围** | `src/core/tour.ts`（applyRootScope/start/recomputeTotal）、`src/ui/tour-controller.ts`（onRootOutOfLevel 事件处理）、`docs/ADR/ADR-0006.md` |
+| **前置条件** | ADR-0001（isa 方向已统一），ADR-0005（档位过滤已实现） |
 
 ---
 
@@ -230,7 +230,7 @@ UI 处理：显示 toast "所选节点不在【结构】档位内，已自动切
 |---|---|
 | `src/core/tour.ts` | 完全重写 `applyRootScope()`（~100 行）；新增 `RootOutOfLevelInfo` 接口、`onRootOutOfLevel` 事件字段；在 `start()` 中加入自动升级逻辑 |
 | `src/ui/tour-controller.ts` | 新增 `onRootOutOfLevel` 事件处理器（toast + 滑块同步） |
-| `docs/ARD/ARD-004.md` | 本文档 |
+| `docs/ADR/ADR-0006.md` | 本文档 |
 
 ---
 
@@ -274,7 +274,7 @@ npm run validate      # frontmatter 校验
 | 编号 | 标题 | 关系 |
 |---|---|---|
 | ADR-0001 | 层级关系统一使用 isa（子→父）方向 | 依赖：incomers BFS 的方向语义基于 isa |
-| ARD-003 | 漫游深度层级过滤系统 | 依赖：isNodeInLevel 过滤逻辑；本 ARD 扩展了其边界处理 |
+| ADR-0005 | 漫游深度层级过滤系统 | 依赖：isNodeInLevel 过滤逻辑；本 ADR 扩展了其边界处理 |
 
 ---
 

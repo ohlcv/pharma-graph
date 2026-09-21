@@ -47,7 +47,7 @@ export interface BuildResult extends GraphData {
  * 层级边：source = 子，target = 父。深度 BFS 和子树归属只沿这些边走，
  * 与 tour-controller 的 HIERARCHY_EDGE_TYPES 口径保持一致。对称边
  * （disjoint_with / equivalent_to）没有父子语义，沿着它们走会把无关
- * 分支带进深度/子树计算（详见 ARD-004 附录 A 的体系隔离问题）。
+ * 分支带进深度/子树计算（详见 ADR-0006 附录 A 的体系隔离问题）。
  */
 const HIERARCHY_EDGE_TYPES: ReadonlySet<string> = new Set(
   EDGE_TYPES.filter((t) => t === 'subclass_of' || t === 'part_of' || t === 'instance_of'),

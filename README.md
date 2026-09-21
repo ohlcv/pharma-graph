@@ -132,7 +132,7 @@ pharma-graph/
 │       └── styles/         # index.css（@layer 声明 + 全部 import，glass 最后）/
 │                           #   base / layout / components / glass / tour / sidebar/
 ├── docs/                   # 开发文档（frontmatter / SKILL / RULES / ADR / DEBUG 等）
-├── ARD/                    # 架构决策与需求说明
+├── ADR/                    # 架构决策（docs/ADR/ 的同级目录别名；正式目录是 docs/ADR/）
 ├── archive/                # 历史版本快照
 ├── scripts/                # 构建与校验脚本（build-graph-data / validate / audit 等）
 ├── index.html              # 单页入口 + SEO（JSON-LD / noscript / 爬虫可见数据）
@@ -214,9 +214,9 @@ edges_out:                          # 对外关联（出边）
 | [docs/CODE-WIKI.md](docs/CODE-WIKI.md) | 代码结构速查 |
 | [docs/Cytoscape.md](docs/Cytoscape.md) | Cytoscape.js 用法与踩坑记录 |
 | [docs/布局参数清单.md](docs/布局参数清单.md) | 7 种布局的可调参数与默认值 |
-| [docs/ARD/](docs/ARD/) | 架构决策记录（ADR-0001 ~ 0004） |
-| [docs/DEBUG/](docs/DEBUG/) | 问题排查记录（侧栏、大屏、漫游、初始缩放等） |
-| [ARD/修改要求.md](ARD/修改要求.md) | 布局设置重构的改动说明 |
+| [docs/ADR/](docs/ADR/) | 架构决策记录（ADR-0001 ~ 0006） |
+| [docs/DEBUG/](docs/DEBUG/) | 问题排查记录（仅活跃问题；已修复归档到 `docs/archive/debug/`） |
+| [docs/archive/施工单-布局设置重构-2026.md](docs/archive/施工单-布局设置重构-2026.md) | 布局设置重构的施工单（已实施，归档） |
 
 ---
 

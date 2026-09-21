@@ -266,42 +266,49 @@
 | 路径 | 职责 | 大小 | 行数 |
 |---|---|---:|---:|
 | `docs/DEVELOP.md` | 开发文档（数据模型、关系类型、目录设计） | 16,202 B | 392 |
-| `docs/CODE-WIKI.md` | 代码维基（全文件级说明） | 37,131 B | 649 |
+| `docs/CODE-WIKI.md` | 代码维基（全文件级说明；2026-08 后未刷新，部分行级说明可能漂移 → 待 refresh） | 37,131 B | 649 |
 | `docs/RULES.md` | 规则汇总 | 14,828 B | 223 |
 | `docs/SKILL.md` | 技能 / 工作流说明 | 37,981 B | 798 |
 | `docs/frontmatter.md` | frontmatter 模板与规范 | 17,439 B | 404 |
-| `docs/frontmatter-audit.md` | 审计报告（生成物） | 254,750 B | 1,720 |
-| `docs/Cytoscape.md` | Cytoscape 使用笔记 | 9,657 B | 376 |
-| `docs/布局参数清单.md` | 布局参数说明 | 64,023 B | 709 |
-| `docs/节点索引列表.md` | 节点索引（生成物） | 42,514 B | 219 |
+| `docs/frontmatter-audit.md` | 审计报告（生成物，由 `npm run audit` 生成；勿手改） | 254,750 B | 1,720 |
+| `docs/Cytoscape.md` | Cytoscape.js v3 通用速查（不绑定项目） | 9,657 B | 376 |
 
-### 5.2 决策记录 `docs/ARD/`
+### 5.2 决策记录 `docs/ADR/`
+
+> 所有决策记录均采用 ADR- 前缀（Architecture Decision Record）。目录命名统一为 `ADR/`。
 
 | 路径 | 职责 | 大小 | 行数 |
 |---|---|---:|---:|
-| `docs/ARD/ADR-0001-层级关系统一使用isa方向.md` | 层级关系统一 isa（子→父） | 10,810 B | 254 |
-| `docs/ARD/ADR-0002-节点美化方案选型.md` | 节点美化选型 | 12,304 B | 294 |
-| `docs/ARD/ADR-0003-tour-universe-isolation.md` | 漫游体系隔离 | 7,063 B | 166 |
-| `docs/ARD/ADR-0004-图数据从运行期解析迁移到构建期预生成.md` | 预生成图数据 | 8,912 B | 161 |
-| `docs/ARD/ARD-003-tour-depth-levels.md` | 漫游 5 档深度过滤 | 3,120 B | 98 |
-| `docs/ARD/ARD-004-applyRootScope-子树漫游算法重写.md` | 子树漫游算法重写 + 档位自动升级 | 16,507 B | 373 |
-| `docs/ARD/修改要求.md` | 布局设置重构施工单 | 7,153 B | 190 |
+| `docs/ADR/ADR-0001-层级关系统一使用isa方向.md` | 层级关系统一 isa（子→父） | 10,810 B | 254 |
+| `docs/ADR/ADR-0002-节点美化方案选型.md` | 节点美化选型 | 12,304 B | 294 |
+| `docs/ADR/ADR-0003-tour-universe-isolation.md` | 漫游体系隔离 | 7,063 B | 166 |
+| `docs/ADR/ADR-0004-图数据从运行期解析迁移到构建期预生成.md` | 预生成图数据 | 8,912 B | 161 |
+| `docs/ADR/ADR-0005-tour-depth-levels.md` | 漫游 5 档深度过滤 | 3,120 B | 98 |
+| `docs/ADR/ADR-0006-applyRootScope-子树漫游算法重写.md` | 子树漫游算法重写 + 档位自动升级 | 16,507 B | 373 |
+| `docs/ADR/migration-report-ADR-0001-APPLY.md` | ADR-0001 迁移执行报告（217 文件 / 167 isa 转换 / 2026-07-14） | 90,810 B | 1,251 |
 
 ### 5.3 调试记录 `docs/DEBUG/`
 
+> **仅保留活跃 / 未确认修复的问题**。已修复的全部归档到 `docs/archive/debug/`（见 §5.4）。
+
 | 路径 | 职责 | 大小 | 行数 |
 |---|---|---:|---:|
-| `docs/DEBUG/debug-bigscreen-exit-tour-viewport.md` | 大屏退出漫游视口 | 4,164 B | 113 |
-| `docs/DEBUG/debug-bigscreen-sidebar-offscreen.md` | 大屏侧栏出屏 | 8,223 B | 156 |
-| `docs/DEBUG/debug-index.md` | 调试索引 | 15,802 B | 427 |
-| `docs/DEBUG/debug-initial-zoom-euler-fit.md` | 初始缩放 Euler fit | 2,204 B | 76 |
-| `docs/DEBUG/debug-log-2026-09-20.md` | 调试日志 | 10,458 B | 97 |
-| `docs/DEBUG/debug-sidebar-issues.md` | 侧栏问题 | 15,677 B | 339 |
-| `docs/DEBUG/debug-tour-depth-slider-restart.md` | 深度滑块重启 | 5,659 B | 180 |
-| `docs/DEBUG/debug-tour-depth1-universe-isolation.md` | 深度 1 体系隔离 | 5,328 B | 121 |
-| `docs/DEBUG/debug-tour-mob-slider-rendering.md` | 移动端滑块渲染 | 11,428 B | 269 |
-| `docs/DEBUG/debug-tour-node-duplicate.md` | 漫游节点重复 | 6,405 B | 165 |
-| `docs/DEBUG/debug-tour-stack-overflow-cycle.md` | 漫游栈溢出循环 | 8,399 B | 218 |
+| `docs/DEBUG/debug-bigscreen-sidebar-offscreen.md` | 大屏侧栏出屏（**未验证修复，保留跟踪**） | 8,223 B | 156 |
+
+### 5.3a 调试归档 `docs/archive/debug/`
+
+| 路径 | 职责 | 大小 | 行数 |
+|---|---|---:|---:|
+| `docs/archive/debug/debug-bigscreen-exit-tour-viewport.md` | 大屏退出漫游视口（已修复 2026-09-22，cy.stop + capture） | 4,164 B | 113 |
+| `docs/archive/debug/debug-index.md` | 2026 年度修复问题索引 | 15,802 B | 427 |
+| `docs/archive/debug/debug-initial-zoom-euler-fit.md` | 初始缩放被 Euler fit 覆盖（已修复，commit a1b2c3d） | 2,204 B | 76 |
+| `docs/archive/debug/debug-log-2026-09-20.md` | 2026-09-20 单日调试日志（一次性） | 10,458 B | 97 |
+| `docs/archive/debug/debug-sidebar-issues.md` | 侧栏问题（已修复） | 15,677 B | 339 |
+| `docs/archive/debug/debug-tour-depth-slider-restart.md` | 深度滑块重启（已修复） | 5,659 B | 180 |
+| `docs/archive/debug/debug-tour-depth1-universe-isolation.md` | 深度 1 体系隔离（已修复） | 5,328 B | 121 |
+| `docs/archive/debug/debug-tour-mob-slider-rendering.md` | 移动端滑块渲染（已修复） | 11,428 B | 269 |
+| `docs/archive/debug/debug-tour-node-duplicate.md` | 漫游节点重复（已修复） | 6,405 B | 165 |
+| `docs/archive/debug/debug-tour-stack-overflow-cycle.md` | 漫游栈溢出循环（已修复，运行时护栏 + 测试夹具） | 8,399 B | 218 |
 
 ### 5.4 归档 `docs/archive/`
 
@@ -314,18 +321,15 @@
 | `docs/archive/SPLIT-RULES.md` | 拆分规则 | 17,345 B | 302 |
 | `docs/archive/all-frontmatter-extracted.md` | 全库 frontmatter 聚合（最大单文件） | 630,671 B | 13,765 |
 | `docs/archive/content v1.0.zip` | 内容 v1.0 打包（2.1 MB，二进制不计行） | 2,136,627 B | 4,823 |
+| `docs/archive/debug/` | **调试归档目录**（10 个已修复调试记录，见 §5.3a） | ≈ 82,964 B | ≈ 1,985 |
 | `docs/archive/frontmatter-audit.md` | 归档审计 | 194,557 B | 1,130 |
 | `docs/archive/old-frontmatter-audit.md` | 旧审计报告 | 2,451 B | 79 |
 | `docs/archive/old-frontmatter.md` | 旧 frontmatter 规范（早期版本） | 37,844 B | 675 |
 | `docs/archive/新版规则全文档重构计划.md` | 重构计划 | 155,584 B | 665 |
+| `docs/archive/施工单-布局设置重构-2026.md` | 布局设置重构施工单（已实施） | 7,153 B | 190 |
 | `docs/archive/问题清单.md` | 问题清单 | 5,009 B | 62 |
 
 ### 5.5 其他
-
-| 路径 | 职责 | 大小 | 行数 |
-|---|---|---:|---:|
-| `docs/开发/migration-report.md` | 迁移报告 | 90,810 B | 1,251 |
-| `docs/开发/布局参数清单.md` | 布局参数清单（开发视角） | 64,024 B | 710 |
 
 ## 6. 测试汇总
 
@@ -380,21 +384,22 @@
 | `scripts/` | 10 | 2,329 | 77,109 |
 | `build/` | 1 | 581 | 21,060 |
 | `tools/` | 7 | 1,633 | 62,378 |
-| `docs/`（含 archive） | 42 | 35,694 | 4,132,072 |
+| `docs/`（含 archive 子目录，不含 zip） | 38 | 29,560 | ≈ 1,995,000 |
+| `docs/archive/` 内的二进制（content v1.0.zip） | 1 | — | 2,136,627 |
 | `public/`（含 content） | 1,068 | 52,455 | 7,749,108 |
 | `examples/` | 1 | 1,348 | 51,187 |
-| `archive/` | 7 | 3,008 | 112,709 |
-| **小计（非二进制）** | **1,237** | **121,781** | **13,251,555** |
+| `archive/`（根目录一次性归档：HTML 1 + vercel.json + scripts/ 5 个 ts） | 7 | 2,014 | ≈ 53,000 |
+| **小计（非二进制）** | **≈ 1,234** | **≈ 114,634** | **≈ 11,070,000** |
 | 根配置文件（package*.json、tsconfig、vite、eslint、prettier、vercel、env、editorconfig 等） | 13 | 10,329 | 398,214 |
 | 二进制 / 大文件（graph-data.json 1.27MB、音频 3.1MB、PNG 1.7MB、zip 2.1MB） | 5 | — | 约 8.2 MB |
-| **总计** | **约 1,255** | **约 132,110** | **约 21.7 MB** |
+| **总计** | **约 1,252** | **约 124,963** | **约 21.7 MB** |
 
 > 说明：
 > - 行数为 `wc -l` 等价统计（换行符 \n 计数），字节为文件字节数（含换行）。
 ` 计数），字节为文件字节数（含换行）。
 > - `docs/archive/content v1.0.zip` 为二进制，不计行。
 > - 汇总不含 `dist/`（CI 生成）。
-> - 决策记录（ADR / ARD）全部位于 `docs/ARD/` 单一目录下。
+> - 决策记录（ADR）全部位于 `docs/ADR/` 单一目录下。
 
 ---
 
@@ -402,5 +407,5 @@
 
 1. **新增 / 删除文件**：更新对应目录的表格，保持"路径 ↔ 职责 ↔ 大小 / 行数"一致。
 2. **大文件预警**：`components.css`（86KB）、`tour.ts`（74KB）、`renderer.ts`（46KB）、`tour-controller.ts`（47KB）接近拆分阈值；`docs/archive/all-frontmatter-extracted.md`（630KB）为生成物，勿手改。
-3. **决策记录位置**：新决策统一写 `docs/ARD/` 目录下，文件前缀区分层级——`ADR-000N-`（架构级）或 `ARD-000N-`（产品/交互级），并在此登记。
+3. **决策记录位置**：新决策统一写 `docs/ADR/` 目录下，文件前缀 `ADR-000N-` 续号，并在此登记。
 4. **重建本表**：可用 `find src scripts docs -type f -exec stat -f%z {} +` 配合 `wc -l` 重新统计（macOS 语法）。

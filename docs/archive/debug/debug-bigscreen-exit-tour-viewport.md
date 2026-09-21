@@ -102,10 +102,12 @@ setTimeout(() => setTimeout(doRestore, 0), 0);
 
 ## 待解决
 
-- [ ] 在 `cy.animate()` 动画**稳定时**（`complete` 回调后）才允许 capture
-- [ ] 或在退出大屏时暂停/停止漫游动画，capture 稳定视口
-- [ ] 或完全绕过 `cy.animate()` 的视口控制，改用手动 `cy.pan()` / `cy.zoom()`
-- [ ] 验证 `cy.resize()` 到底在哪个时间点触发，是否需要额外监听
+- [x] 在退出大屏时暂停/停止漫游动画，capture 稳定视口（方案 2：调用 `cy.stop()` 后再 capture；见 `src/ui/bigscreen.ts:188` 与 `src/ui/bigscreen.ts:242`）
+- [ ] ~~在 `cy.animate()` 动画**稳定时**（`complete` 回调后）才允许 capture~~ — 被方案 2 取代，无需实现
+- [ ] ~~或完全绕过 `cy.animate()` 的视口控制，改用手动 `cy.pan()` / `cy.zoom()`~~ — 未采用
+- [ ] ~~验证 `cy.resize()` 到底在哪个时间点触发，是否需要额外监听~~ — `cy.stop()` 解决了时序问题
+
+> 状态：**已修复 2026-09-22**（commit 在本会话外）。`captureViewport()` 在 `cy.stop()` 之后被调用，确保捕获的是稳定帧而非动画中间态。
 
 ## 相关代码
 
