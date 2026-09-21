@@ -5,7 +5,28 @@
 @layer layout {
 
 /* ── Ambient background ─────────────────────────────────────────────────── */
-#app { z-index: 1; }
+/* #app 必须是一个 stacking context：下面 #app::after 光晕用 z-index:-1 表示
+ * "在 #app 内容之后、但在 html/body 背景之前"。若 #app 不建立 stacking
+ * context，这个 -1 会落到根 stacking context，被 html/body 的 #020617 背景
+ * 整层盖住（和星点层当年踩的同一个坑）。
+ * isolation:isolate 只建立 stacking context、不改布局，也不会像
+ * position:relative 那样改变绝对定位子元素的包含块。 */
+#app { isolation: isolate; }
+
+/* 噪点层（body 直接子级，见 index.html）：用一张 200×200 的 SVG data-URI
+ * feTurbulence 平铺成极细胶片颗粒，破深色渐变的色带。z-index:0 让它画在
+ * body 背景之上、#app 之下；mix-blend-mode:overlay 只抬中间亮度、不把四角
+ * 染黑。原始设计是 2.2% 的几乎不可见颗粒，这里取 4% 便于肉眼确认，嫌脏就
+ * 调回 0.022。 */
+.noise-overlay {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='200' height='200' fill='%23fff' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  mix-blend-mode: overlay;
+  opacity: 0.04;
+}
 
 /* Starfield canvas — 3 层视差星点，见 starfield.ts。
  * 必须是定位元素：initStarfield 检测到 `position: static` 会直接停用并把
@@ -13,11 +34,9 @@
  * 不加这条时 canvas 会按默认 300×150 的 inline 尺寸留在文档流里，把 #app
  * 的第一个子节点撑开、整页内容往下顶 150px——视觉上就是顶部一条黑带。
  *
- * z-index 必须是 0，不能是 -1：html 和 body 都有 `background: var(--bg)`，
- * 负层级元素在绘制顺序里排在 body 背景**之前**，会被 #020617 整个盖掉
- * （症状：canvas 明明按视口尺寸渲染了，屏幕上一个星点也看不到）。
- * 0 让它落在 body 背景之上、又排在 header.topbar / #main 这些同层但更靠后
- * 的兄弟之前，于是星点在图谱之下、UI 之上。 */
+ * z-index 用 0：星点要排在 #app::after 光晕（-1）之上、又在图谱/UI 之下。
+ * 现在 #app 已经是 stacking context，负值不会再掉到 body 背景后面，但保持
+ * 0 让"噪点 → 光晕 → 星点 → 图谱/UI"的层级关系最直观。 */
 #starfield {
   position: fixed; inset: 0;
   pointer-events: none;
@@ -47,6 +66,8 @@
   background-size: 150% 150%;
   background-position: 0 0;
   mix-blend-mode: screen;
+  /* z-index:-1 相对 #app 的 stacking context（#app 已 isolation:isolate），
+     所以画在 #app 内容之后、body 背景之前，不再被 #020617 盖掉。 */
   pointer-events: none; z-index: -1;
   animation: nebula-drift 90s ease-in-out infinite alternate;
   will-change: background-position;

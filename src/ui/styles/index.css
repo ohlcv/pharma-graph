@@ -1,4 +1,4 @@
-@layer base, shared, layout, topbar, toolbar, sidebar, sidebar-stats, sidebar-params, node-panel, bottom-sheet, tour, bigscreen;
+@layer base, shared, layout, topbar, toolbar, sidebar, sidebar-stats, sidebar-params, node-panel, bottom-sheet, tour, bigscreen, glass;
 
 @import "./base.css";
 @import "./shared.css";
@@ -7,3 +7,7 @@
 @import "./tour.css";
 @import "./sidebar/sidebar-stats.css";
 @import "./sidebar/sidebar-params.css";
+/* Liquid Glass 皮肤。必须是最后一条 import：层级之间"后声明的层赢"，
+ * 所以 glass 能盖过上面所有层，而 layout.css 里未分层的 .u-hidden 仍然赢过它。
+ * 删掉这一行就回到原样。 */
+@import "./glass.css";

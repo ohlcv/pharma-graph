@@ -140,24 +140,9 @@
   }
   </script>
 
-  <!-- ── SVG filter: 极淡噪点，破深色渐变色带 ────────────────────────────────
-       用 SVG <feTurbulence> 生成 200×200 的 pseudo-random 噪点 tile，
-       浏览器一次性渲染缓存，background-repeat 平铺整页。
-       CSS opacity 再调到 1–2%——刚好能"撕开"深色渐变出现的色带，
-       但肉眼几乎察觉不到（"看起来贵"的关键细节）。
-       baseFrequency=0.85 是 1px 级别细密颗粒，更高就会有"颗粒感"。
-       numOctaves=2 比 1 多一点变化（更接近胶片颗粒），
-       再多就开始看到纹理了。
-       feColorMatrix 把 colored noise 统一成白色，alpha 由 CSS 控制。 -->
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-    <filter id="noise" x="0" y="0" width="100%" height="100%">
-      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/>
-      <feColorMatrix values="0 0 0 0 1
-                             0 0 0 0 1
-                             0 0 0 0 1
-                             0 0 0 0 1"/>
-    </filter>
-  </svg>
+  <!-- 噪点纹理已内嵌进 src/ui/styles/layout.css 的 .noise-overlay
+       background-image（200×200 SVG data-URI，feTurbulence 平铺），
+       这里不再需要单独的隐藏 <svg> 滤镜。 -->
 
 </head>
 <body>

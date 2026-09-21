@@ -83,6 +83,12 @@ type FlowRing = RenderedNode;
 const EMPH_PULSE_PERIOD_MS = 1000;
 /** 同时画强光的节点数上限（正常只有 1~2 个，防止有人一次选中上百个）。 */
 const EMPH_MAX_NODES = 24;
+/**
+ * 视口内 glow/flow 节点数不超过这个值时，基础光晕层在 cytoscape 每画完一帧后
+ * 立刻同步重画（见 onRender）。超过就仍走 30fps 的 rAF 节流，避免几百个径向渐变
+ * 每帧都画。漫游时镜头是放大聚焦的，视口内节点很少，正好落在这个范围里。
+ */
+const SYNC_DRAW_MAX_NODES = 120;
 
 /** `#rrggbb` / `rgb(...)` → `rgba(r,g,b,a)`。解析失败时回退到当前主题的主色。 */
 function withAlpha(color: string, alpha: number): string {
@@ -130,6 +136,13 @@ export class GlowOverlay {
   private readonly reducedMotion: boolean;
   private lastDrawAt = 0;
   private startedAt = 0;
+  /** start() 已调用且未 stop()。onRender 只在覆盖层"已启用"时才重画基础层。 */
+  private started = false;
+  /** 上一次 draw() 画到的视口内 glow+flow 节点数，决定 onRender 能否同步重画。 */
+  private lastVisibleCount = 0;
+  /** 上一次 draw()/检查时的镜头（pan + zoom），用来判断停帧状态下镜头是否动过。 */
+  private lastVp = { x: NaN, y: NaN, z: NaN };
+  private staleTimer: number | null = null;
 
   /** 缓存的 glow/flow 节点集合；图变动时置脏，下一帧重新查询。 */
   private glowNodes: cytoscape.NodeCollection | null = null;
@@ -161,6 +174,56 @@ export class GlowOverlay {
     this.emphDirty = true;
     this.ensureEmphLoop();
   };
+  /**
+   * cytoscape 每画完一帧就同步重画覆盖层。
+   *
+   * 覆盖层有自己的 rAF（30fps 节流），和 cytoscape 的渲染循环互不同步：镜头在
+   * pan/zoom 动画中时，节点已经被 cytoscape 画到新位置，覆盖层还停在上一帧甚至上上一帧，
+   * 光晕就和节点错开。漫游每一步都有 600ms 的 pan+zoom 动画，所以最明显。
+   * cy 的 'render' 事件在它画完一帧后同步触发，此时 renderedPosition() 与刚画出的
+   * 画面一致；在这里立即重画，两张画布就落在同一帧里。
+   */
+  private readonly onRender = (): void => {
+    if (document.hidden) return;
+    const now = performance.now();
+
+    // 强调层（选中强光 / 漫游脉冲）：只有 1~2 个节点，直接同步画。
+    if (this.emphRaf !== null) {
+      this.emphLastDrawAt = now;
+      this.drawEmphasis(now - this.emphStartedAt);
+    }
+
+    // 基础层（所有 glow / flow 节点的呼吸光晕）。
+    if (!this.started) return;
+    if (this.lastVisibleCount <= SYNC_DRAW_MAX_NODES) {
+      this.lastDrawAt = now; // 让紧随其后的 rAF tick 跳过这一帧，不重复画
+      this.draw(this.reducedMotion ? 0 : now - this.startedAt);
+      return;
+    }
+    // 节点太多、已经停帧成静态图：镜头一动，静态图就和节点错位了。
+    // 先清掉（不留错位的鬼影），镜头停稳后再补画一次。
+    if (this.rafId === null && this.viewportMoved()) {
+      this.clearAll();
+      this.scheduleStaticRefresh();
+    }
+  };
+
+  private viewportMoved(): boolean {
+    const p = this.cy.pan();
+    const z = this.cy.zoom();
+    const moved = p.x !== this.lastVp.x || p.y !== this.lastVp.y || z !== this.lastVp.z;
+    this.lastVp = { x: p.x, y: p.y, z };
+    return moved;
+  }
+
+  private scheduleStaticRefresh(): void {
+    if (this.staleTimer !== null) window.clearTimeout(this.staleTimer);
+    this.staleTimer = window.setTimeout(() => {
+      this.staleTimer = null;
+      this.resume(); // 重新画一帧；视口内节点变少了会恢复动画，仍太多则再次停帧
+    }, 150);
+  }
+
   private readonly onGraphChange = (): void => {
     // 流式加载会分批 cy.add()，新来的 glow/flow 节点必须被纳入。
     // 原实现只在构造时快照一次集合，所以流式进来的节点永远不会生效。
@@ -239,6 +302,7 @@ export class GlowOverlay {
     document.addEventListener('visibilitychange', this.onVisibility);
     this.cy.on('add remove', this.onGraphChange);
     this.cy.on('class select unselect add remove', this.onEmphChange);
+    this.cy.on('render', this.onRender);
     // 构造时可能已经有选中的节点（例如重建覆盖层）。
     this.ensureEmphLoop();
   }
@@ -247,6 +311,7 @@ export class GlowOverlay {
 
   start(): void {
     if (this.rafId !== null || !this.ctx) return;
+    this.started = true;
 
     // 尊重系统的"减少动态效果"设置：画一帧静态的就停手（flow 表现为角度
     // 固定在 0 的一段静态光弧，而不是完整旋转）。
@@ -274,6 +339,7 @@ export class GlowOverlay {
 
   /** 停止并清空覆盖层。 */
   stop(): void {
+    this.started = false;
     this.pause();
     this.clearAll();
     this.pauseEmphasis();
@@ -303,6 +369,11 @@ export class GlowOverlay {
   }
 
   destroy(): void {
+    this.started = false;
+    if (this.staleTimer !== null) {
+      window.clearTimeout(this.staleTimer);
+      this.staleTimer = null;
+    }
     this.pause();
     if (this.redrawTimer !== null) {
       window.clearTimeout(this.redrawTimer);
@@ -317,6 +388,7 @@ export class GlowOverlay {
     try {
       this.cy.off('add remove', this.onGraphChange);
       this.cy.off('class select unselect add remove', this.onEmphChange);
+      this.cy.off('render', this.onRender);
     } catch {
       /* cy 已销毁 */
     }
@@ -498,6 +570,8 @@ export class GlowOverlay {
 
     const halos = this.collectHalos();
     const rings = this.collectFlowRings();
+    this.lastVisibleCount = halos.length + rings.length;
+    this.viewportMoved(); // 记录这一帧对应的镜头，供停帧状态下判断"镜头动过没有"
 
     // 只清上一帧画过的区域。整张 clearRect 在 dpr=2 的 iPad 上每帧也要花掉
     // 不少时间，而 glow/flow 通常只占画面的一小块。
