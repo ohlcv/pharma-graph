@@ -375,7 +375,7 @@ export async function buildGraphData(): Promise<{ nodes: number; edges: number }
     });
   }
 
-  // ── 8. Write output ──────────────────────────────────────────────────────
+  // ── 8. Write output (skip when content is unchanged) ─────────────────────
   const graphData: GraphData = {
     version: 2,
     generated: new Date().toISOString(),
@@ -385,12 +385,30 @@ export async function buildGraphData(): Promise<{ nodes: number; edges: number }
   };
 
   if (!existsSync(publicRoot)) await mkdir(publicRoot, { recursive: true });
+  const graphPath = join(publicRoot, GRAPH_DATA_FILENAME);
 
-  await writeFile(
-    join(publicRoot, GRAPH_DATA_FILENAME),
-    JSON.stringify(graphData),
-    'utf-8',
-  );
+  // Regeneration must be a no-op when only `generated` differs. Rewriting the
+  // file just to bump the timestamp dirties git and triggers pointless commits
+  // and builds. Compare the payload with the timestamp stripped and skip the
+  // write when nothing else changed.
+  let unchanged = false;
+  try {
+    const existing = JSON.parse(await readFile(graphPath, 'utf-8')) as GraphData;
+    unchanged =
+      JSON.stringify({ ...existing, generated: undefined }) ===
+      JSON.stringify({ ...graphData, generated: undefined });
+  } catch {
+    // Missing or unreadable file → treat as changed and write a fresh copy.
+  }
+
+  if (unchanged) {
+    console.log(
+      `[buildGraphData] ${GRAPH_DATA_FILENAME} unchanged (${finalNodes.length} nodes, ${edges.length} edges) — skipped write.`,
+    );
+    return { nodes: finalNodes.length, edges: edges.length };
+  }
+
+  await writeFile(graphPath, JSON.stringify(graphData), 'utf-8');
 
   console.log(
     `[buildGraphData] Generated ${GRAPH_DATA_FILENAME}: ${finalNodes.length} nodes, ${edges.length} edges, maxDepth=${maxDepth}`,
@@ -473,14 +491,24 @@ export async function buildManifest(): Promise<{ files: number }> {
   if (!existsSync(publicRoot)) await mkdir(publicRoot, { recursive: true });
 
   // 1) content-manifest.json
-  await writeFile(
+  const manifestJson = JSON.stringify({ files: entries.map((e) => e.rel) }, null, 2);
+  const manifestChanged = await writeFileIfChanged(
     join(publicRoot, MANIFEST_FILENAME),
-    JSON.stringify({ files: entries.map((e) => e.rel) }, null, 2),
+    manifestJson,
     'utf8',
   );
 
   // 2) sitemap.xml — 收录根页 + 所有 .md 内容页
-  const now = isoDate(new Date());
+  // 首页 lastmod 取内容文件的最新 mtime，而不是“当前构建时间”——
+  // 这样跨天重复生成时 sitemap 字节不变，不会产生无意义的提交。
+  const newestMtime =
+    entries.length > 0
+      ? entries.reduce(
+          (newest, e) => (e.mtime.getTime() > newest.getTime() ? e.mtime : newest),
+          entries[0].mtime,
+        )
+      : new Date();
+  const now = isoDate(newestMtime);
   const lines: string[] = [];
   lines.push('<?xml version="1.0" encoding="UTF-8"?>');
   lines.push(
@@ -514,10 +542,40 @@ export async function buildManifest(): Promise<{ files: number }> {
 
   lines.push('</urlset>');
   lines.push('');
-  await writeFile(join(publicRoot, SITEMAP_FILENAME), lines.join('\n'), 'utf8');
-
-  console.log(
-    `[buildManifest] Generated ${MANIFEST_FILENAME} (${entries.length} files) + ${SITEMAP_FILENAME}`,
+  const sitemapChanged = await writeFileIfChanged(
+    join(publicRoot, SITEMAP_FILENAME),
+    lines.join('\n'),
+    'utf8',
   );
+
+  if (manifestChanged || sitemapChanged) {
+    console.log(
+      `[buildManifest] Generated ${MANIFEST_FILENAME} (${entries.length} files) + ${SITEMAP_FILENAME}`,
+    );
+  } else {
+    console.log(
+      `[buildManifest] ${MANIFEST_FILENAME} + ${SITEMAP_FILENAME} unchanged (${entries.length} files) — skipped write.`,
+    );
+  }
   return { files: entries.length };
+}
+
+/**
+ * Write `path` only when its content actually changes. Repeated regenerations
+ * (dev HMR, prebuild, manual scripts) then never dirty git for byte-identical
+ * output. Returns true when the file was written.
+ */
+async function writeFileIfChanged(
+  abs: string,
+  content: string,
+  encoding: 'utf8',
+): Promise<boolean> {
+  try {
+    const existing = await readFile(abs, encoding);
+    if (existing === content) return false;
+  } catch {
+    // Missing or unreadable file → write a fresh copy below.
+  }
+  await writeFile(abs, content, encoding);
+  return true;
 }
