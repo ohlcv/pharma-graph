@@ -16,12 +16,8 @@ import {
   FILL_CONFIG,
   FILL_BORDER_HINTS,
   FILL_BORDER_DEFAULT,
-  STROKE_CONFIG,
   STROKE_MERGE_MODE,
   SHAPE_BY_OWL2,
-  getBorderColor,
-  getBorderStyle,
-  getBorderEffect,
 } from './config.js';
 import { GlowOverlay } from './glow-overlay.js';
 import { readThemeColors, themeKey } from './theme-colors.js';
@@ -112,15 +108,6 @@ export const CLASSES = {
   // TOUR_PULSING: 漫游当前节点。呼吸强光由 glow-overlay.ts 的强调层绘制，
   //   不再用 rAF 每帧改 cytoscape 样式（那会让整张画布 60fps 重绘）。
   TOUR_PULSING: 'tour-pulsing',
-  // ── Neighbor-tug interaction (lightweight "pull" feedback on drag) ──────────
-  // NEIGHBOR_TUGGED: added to 1-hop neighbours of a node while it is being
-  //   dragged. Drives the CSS transition that nudges neighbours a few px
-  //   toward the dragged node (release snaps them back via transition).
-  // NEIGHBOR_TUG_ORIGIN_X/Y: stored absolute coordinates each tugged neighbour
-  //   was sitting at when the drag started. The tug module writes these as
-  //   data attributes so the CSS layer can compute offsets without invoking
-  //   JS on every frame (perf: 1100-node graph must NOT animate via JS rAF).
-  NEIGHBOR_TUGGED: 'neighbor-tugged',
 } as const;
 
 // Ripple fallback colors — used only when a node/edge carries no color of its
@@ -514,29 +501,6 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         'line-color': accent2,
         'target-arrow-color': accent2,
         opacity: 0.85,
-      },
-    },
-    // ── Neighbor tug (drag-pull feedback) ────────────────────────────────────
-    // While a node is being dragged, its 1-hop neighbours get the
-    // `.neighbor-tugged` class added by src/ui/neighbor-tug.ts. During the
-    // drag we move them with direct `position()` writes (no animation, no
-    // rAF — cytoscape Canvas redraws them in the same frame as the dragged
-    // node, so neighbours appear to follow the cursor). On release we
-    // animate them back to their original positions via `node.animate()`
-    // to create the elastic snap-back effect.
-    //
-    // This selector only owns the visual styling — dim tugged neighbours
-    // slightly so they read as "secondary" vs. the node the user is holding.
-    // The position animation is handled in JS because cytoscape stylesheet
-    // `transition-property` doesn't include `position` in all versions.
-    {
-      selector: `.${'neighbor-tugged'}`,
-      style: {
-        opacity: 0.85,
-        'border-width': 2,
-        'transition-property': 'opacity, border-width, border-color',
-        'transition-duration': '180ms',
-        'transition-timing-function': 'ease-out',
       },
     },
   ];

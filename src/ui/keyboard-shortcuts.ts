@@ -32,8 +32,13 @@ let deleteArmedAt = 0;
 export function initShortcuts(cy: Core, callbacks: ShortcutCallbacks): void {
   const cancelDeleteArm = () => { deleteArmedAt = 0; };
   document.addEventListener('keydown', (e) => {
-    if ((e.target as HTMLElement).tagName === 'INPUT') return;
-    if ((e.target as HTMLElement).tagName === 'SELECT') return;
+    const t = e.target as HTMLElement | null;
+    if (
+      t &&
+      (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)
+    ) {
+      return;
+    }
 
     // Arm/confirm Backspace + Delete so a stray keystroke can't wipe the graph.
     if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -57,6 +62,12 @@ export function initShortcuts(cy: Core, callbacks: ShortcutCallbacks): void {
     if (deleteArmedAt !== 0 && (e.key.length === 1 || e.key === 'Enter' || e.key === 'Tab')) {
       cancelDeleteArm();
     }
+
+    // 带修饰键的组合（Ctrl+F / Cmd+R / Ctrl+P / Cmd+T …）是浏览器的，
+    // 不能当成单键快捷键（否则 Ctrl+F 会触发"适应"、Ctrl+P 会触发"漫游暂停"）。
+    // 唯一的例外是下面自己处理的 Ctrl/Cmd+A。
+    const isSelectAll = (e.key === 'a' || e.key === 'A') && (e.ctrlKey || e.metaKey);
+    if ((e.ctrlKey || e.metaKey || e.altKey) && !isSelectAll) return;
 
     switch (e.key) {
       case 'Escape':

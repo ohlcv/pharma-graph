@@ -39,6 +39,16 @@ export class GraphManager {
   }
 
   /**
+   * Adopt a GraphData that was already mapped from graph-data.json
+   * (loadGraph() has run buildGraphFromPrebuilt once). Avoids re-mapping every
+   * node a second time the way initWithPrebuilt(...) would.
+   */
+  initWithGraph(graph: GraphData): void {
+    this.data = graph;
+    this.warnings = [];
+  }
+
+  /**
    * Add a batch of file → content pairs and invalidate the cache so
    * the next `build()` re-runs the graph builder on the union.
    *

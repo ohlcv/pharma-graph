@@ -338,8 +338,15 @@ export function stringifyFrontmatter(
   if (fm.fill)            top['fill']   = fm.fill;
   if (fm.stroke)         top['stroke'] = fm.stroke;
   if (fm.shape)          top['shape']  = fm.shape;
-  if (fm.shortSummary || fm.fullSummary) {
-    top['summary'] = fm.shortSummary ?? fm.fullSummary;
+  // 有 full 时必须写成 { short, full }；原来只写 short ?? full 一个字符串，
+  // 两者都有时 full 会在回写时丢掉。
+  if (fm.fullSummary) {
+    const summary: Record<string, string> = {};
+    if (fm.shortSummary) summary['short'] = fm.shortSummary;
+    summary['full'] = fm.fullSummary;
+    top['summary'] = summary;
+  } else if (fm.shortSummary) {
+    top['summary'] = fm.shortSummary;
   }
   if (fm.edges_out?.length) top['edges_out'] = fm.edges_out;
   if (fm.tags?.length)      top['tags']      = fm.tags;

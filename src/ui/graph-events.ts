@@ -64,10 +64,12 @@ function setCytoscapeDragMode(cy: cytoscape.Core, on: boolean): void {
 
 export function initGraphEvents(deps: GraphEventDeps): void {
   const { cy } = deps;
-  const dbgBtn = document.getElementById('debug-toggle');
 
   cy.on('tap', 'node', (evt) => {
     const node = evt.target;
+    // 按需查找：#debug-toggle 是 initDebugOverlay() 才注入的，而它在 initGraphEvents() 之后执行，
+    // 在这里提前缓存拿到的永远是 null。
+    const dbgBtn = document.getElementById('debug-toggle');
     if (dbgBtn) {
       dbgBtn.style.transition = 'none';
       dbgBtn.style.background = '#4338ca';
@@ -155,7 +157,8 @@ export function initGraphEvents(deps: GraphEventDeps): void {
 
   cy.on('mouseout', 'node', (evt) => {
     const node = evt.target;
-    if (node.hasClass('dimmed') || node.hasClass('highlighted')) return;
+    // 无条件摘掉 hovered。原来遇到 dimmed / highlighted 就 return，而 resetClasses()
+    // 又不清 hovered，悬停过的高亮邻居在取消选中后会一直带着悬停描边。
     node.removeClass('hovered');
     // 只清除当前节点的关联边上的 tour 预览，而非全图所有边
     node.connectedEdges().removeClass('tour-path-preview');
@@ -231,10 +234,9 @@ export function initGraphEvents(deps: GraphEventDeps): void {
   // debounced so we won't thrash when a batch adds hundreds of nodes at once.
   cy.on('add', () => { updateStats(cy); syncBottomSheetStats(cy); });
 
+  // 缩放上下限由 cytoscape 自己的 minZoom / maxZoom 保证（见 Renderer 选项）；
+  // 这里原来的 5.0 钳制和 maxZoom=4.0 对不上，且永远不会生效。
   cy.on('zoom', () => {
-    const zoom = cy.zoom();
-    if (zoom < 0.02) cy.zoom(0.02);
-    if (zoom > 5.0) cy.zoom(5.0);
     deps.showZoomIndicator(cy);
   });
 }

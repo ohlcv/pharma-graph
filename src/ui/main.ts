@@ -162,26 +162,7 @@ async function boot(): Promise<void> {
 
   if (loadResult.usedPrebuilt) {
     // Fast path — all metadata is already in graph-data.json.
-    graphManager.initWithPrebuilt({
-      nodes: loadResult.graph.nodes.map((n) => ({
-        id: n.id,
-        label: n.label,
-        rel: n.sourcePath ?? '',
-        fill: n.fill,
-        stroke: n.stroke,
-        shape: n.shape,
-        shortSummary: n.shortSummary,
-        fullSummary: n.fullSummary,
-        summary: n.summary,
-        depth: n.depth,
-        subtreeRoot: n.subtreeRoot,
-        weight: n.weight,
-        location: n.location,
-        tags: n.tags,
-        edges_out: n.edges_out,
-      })),
-      edges: loadResult.graph.edges,
-    });
+    graphManager.initWithGraph(loadResult.graph);
   } else {
     // Fallback path — frontmatter-parser + BFS/DFS run inside the manager.
     graphManager.addFiles(collectedFiles);
@@ -566,6 +547,9 @@ function dumpDiag(graphManager?: GraphManager): void {
       diag.edgesInData = data.edges.length;
     }
   }
+  // window.__graphDiag 照常填充（debug-bridge 等外部读取方要用），但只在开发环境往控制台输出，
+  // 否则生产环境会泄漏内部管线状态（和 logger.ts 的初衷相反）。
+  if (!import.meta.env.DEV) return;
   // 用 console.table 把 parserWarnings 单独列出来（默认 console.info
   // 折叠了，table 会展开）。其它字段用 group 输出。
   if (diag.parserWarnings.length > 0) {

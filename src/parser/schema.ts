@@ -7,21 +7,15 @@
 // the edge-type vocabulary (that lives in core/edge-types.ts).
 
 import { EDGE_TYPES } from '../core/edge-types.js';
+import { FILL_CONFIG } from '../core/config.js';
 
 /**
- * Canonical fill values (decide node visual class — colour + shape in CSS).
- * Replaces the deprecated `essence` field (removed in commit 4e64d6b).
+ * Canonical fill values — derived from FILL_CONFIG (the visual single source of
+ * truth) so the validator can never drift from what the renderer knows.
+ * (The hand-written list used to miss cls-disease / cls-biomolecule / cls-feature
+ * and contain a cls-table that FILL_CONFIG doesn't define.)
  */
-export const VALID_FILL: readonly string[] = [
-  'cls-structure',      // 结构入口 — 书本/章节根节点
-  'cls-classification', // 分类节点 — umbrella / strict class
-  'cls-concept',        // 概念/术语
-  'cls-drug',           // 药物节点
-  'cls-adverse',        // ADR / 禁忌 / 相互作用
-  'cls-mnemonic',       // 记忆口诀
-  'cls-summary',        // 总结归纳
-  'cls-table',          // 表格对比
-] as const;
+export const VALID_FILL: readonly string[] = Object.keys(FILL_CONFIG);
 
 /**
  * Canonical edge-type vocabulary. Re-exported from edge-types.ts

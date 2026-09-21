@@ -59,7 +59,11 @@ export interface GlowOverlayOptions {
   flowDroplets?: number;
   /** 光点内芯半径（像素，css 坐标）。默认 3；外圈光晕约 1.8 倍。 */
   flowDropletRadius?: number;
-  /** 视口内同类节点数超过这个数就退化成静态（不再逐帧重画）。默认 80。 */
+  /**
+   * 视口内同类节点数超过这个数就退化成静态（不再逐帧重画）。默认 150。
+   * 现在所有 fill 的 defaultStroke 都是 glow，视口里动辄几百个 glow 节点；
+   * 每帧为每个节点建径向渐变，iPad 上很容易成为最重的一块，所以别设太高。
+   */
   maxAnimatedNodes?: number;
 }
 
@@ -241,7 +245,7 @@ export class GlowOverlay {
       flowOffset = 3,
       flowDroplets = 1,
       flowDropletRadius = 3,
-      maxAnimatedNodes = 800,
+      maxAnimatedNodes = 150,
     } = options;
 
     this.cy = cy;
@@ -736,8 +740,15 @@ export class GlowOverlay {
     const out: RenderedNode[] = [];
     const w = this.cssWidth;
     const h = this.cssHeight;
+    // 先用模型坐标做一次粗裁剪，避免为视口外的 ~1000 个节点逐个算 renderedPosition /
+    // hasClass / visible。PAD 覆盖最大节点尺寸 + 光晕外扩（都在模型坐标里，不随 zoom 变）。
+    const ext = this.cy.extent();
+    const PAD = 120;
 
     nodes.forEach((n: cytoscape.NodeSingular) => {
+      const mx = n.position('x');
+      const my = n.position('y');
+      if (mx < ext.x1 - PAD || mx > ext.x2 + PAD || my < ext.y1 - PAD || my > ext.y2 + PAD) return;
       // dimmed 的节点不该发光/流动 —— 它正被"关掉"。
       if (n.hasClass('dimmed')) return;
       // 选中的节点由强调层负责发光。这里再画一层渐变光晕会叠在节点上面把它染色

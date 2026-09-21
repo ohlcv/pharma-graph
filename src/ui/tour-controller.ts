@@ -21,7 +21,7 @@
 //   complete (engine callback) → idle, then auto-hide after 2s
 
 import cytoscape from 'cytoscape';
-import { TourEngine, TourStrategy, TourStepInfo, getLocationKey, TOUR_DEPTH_CONFIG, isKeyDrug, TourCompleteInfo } from '../core/tour.js';
+import { TourEngine, TourStrategy, TourStepInfo, TOUR_DEPTH_CONFIG } from '../core/tour.js';
 import { Renderer } from '../core/renderer.js';
 import { DetailPanel } from './detail-panel.js';
 import { uiState, registerTourBarToggle } from './state.js';
@@ -30,7 +30,14 @@ import { showToast } from './ui-helpers.js';
 import { speechController } from './speech.js';
 import { UNIVERSE_ROOTS } from '../core/config.js';
 
-const SEARCH_INPUT_DEBOUNCE_MS = 220;
+/**
+ * 体系边界只沿"层级边"走。disjoint_with / equivalent_to 是对称关系，
+ * source/target 的方向没有父子含义，沿着它们走会把另一个体系的节点泄漏进来。
+ */
+const HIERARCHY_EDGE_TYPES: ReadonlySet<string> = new Set(['subclass_of', 'part_of', 'instance_of']);
+
+/** 漫游历史上限，避免无限漫游时 uiState.tour.pathHistory 无限增长。 */
+const PATH_HISTORY_MAX = 500;
 
 /** Slider drag UI — kept tabular so CSS-only fill can mirror the value live. */
 interface SliderBind {
@@ -221,8 +228,10 @@ export class TourController {
       if (seen.has(curId)) continue;
       seen.add(curId);
       if (UNIVERSE_ROOTS.has(curId)) return curId;
-      const parents = this.cy.getElementById(curId).outgoers('node');
-      parents.forEach((p: cytoscape.NodeSingular) => { queue.push(p.id()); });
+      this.cy.getElementById(curId).outgoers('edge').forEach((edge: cytoscape.EdgeSingular) => {
+        if (!HIERARCHY_EDGE_TYPES.has(edge.data('edgeType') as string)) return;
+        queue.push(edge.target().id());
+      });
     }
     return null;
   }
@@ -248,9 +257,10 @@ export class TourController {
       const cur = queue.shift()!;
       const node = this.cy.getElementById(cur);
       if (node.empty()) continue;
-      // incomers('node'): 沿 incoming edges 找到的所有 node 邻居
-      // 在 source=child, target=parent 的图里 = children（descendants）
-      node.incomers('node').forEach((child: cytoscape.NodeSingular) => {
+      // 只沿层级边（source=child, target=parent）反向走：incoming edge 的 source 就是 child。
+      node.incomers('edge').forEach((edge: cytoscape.EdgeSingular) => {
+        if (!HIERARCHY_EDGE_TYPES.has(edge.data('edgeType') as string)) return;
+        const child = edge.source();
         if (!set.has(child.id())) {
           set.add(child.id());
           queue.push(child.id());
@@ -323,12 +333,6 @@ export class TourController {
 
   private currentInterval(): number {
     return this.findSlider('interval')?.range.valueAsNumber ?? 3000;
-  }
-
-  private currentMaxDepth(): number {
-    const v = this.findSlider('maxdepth')?.range.valueAsNumber ?? 5;
-    // 档位 5 = 全部（无限漫游）
-    return v >= 5 ? -1 : v;
   }
 
   private findSlider(which: 'interval' | 'maxdepth'): SliderBind | undefined {
@@ -809,8 +813,6 @@ export class TourController {
 
   private onStep(info: TourStepInfo): void {
     if (!this.cy) return;
-    const loc = this.cy.getElementById(info.nodeId).data('location') as Record<string, string> | null;
-    const key = loc ? getLocationKey(this.cy.getElementById(info.nodeId) as cytoscape.NodeSingular) : '(no location)';
     this.running = true;
     this.paused = false;
     // Push to history
@@ -818,6 +820,7 @@ export class TourController {
     const prev = info.path.slice(0, -1);
     if (prev.length > 0) ph.push(prev[prev.length - 1], info.nodeId);
     else                 ph.push(info.nodeId);
+    if (ph.length > PATH_HISTORY_MAX) ph.splice(0, ph.length - PATH_HISTORY_MAX);
 
     // 节点 badge = 已访问节点 / 档位总节点（X/Y 格式）
     const nodeBadge = `${info.currentStep}/${info.totalToExplore}`;
@@ -928,7 +931,7 @@ export class TourController {
   }
 
   private onComplete(
-    info: { reason: 'depth-reached' | 'no-more-restarts' | 'no-root'; maxAttempts: number } | 'depth-reached' | 'no-more-restarts' | 'no-root',
+    info: { reason: 'depth-reached' | 'no-more-restarts' | 'no-root'; maxAttempts: number; attempts?: number } | 'depth-reached' | 'no-more-restarts' | 'no-root',
   ): void {
     this.running = false;
     this.paused = false;
@@ -940,7 +943,10 @@ export class TourController {
     // 引擎现在 maxAttempts = Infinity（A 方案：去掉硬上限），UI 显示时降级为 "∞"。
     // 不要硬编码 3，让数据从引擎传过来。
     const rawMax = isString ? 3 : info.maxAttempts;
-    const maxAttemptsLabel: number | string = !Number.isFinite(rawMax) ? '∞' : rawMax;
+    // 显示实际重启的轮数。maxAttempts 是 Infinity，拿它当"已试 N 轮"会显示成 "已试 ∞ 轮"。
+    // 只有引擎没给 attempts（旧调用方 / 测试传字符串）时才退回到上限。
+    const tried = isString ? rawMax : (info.attempts ?? rawMax);
+    const maxAttemptsLabel: number | string = !Number.isFinite(tried) ? '∞' : tried;
     const maxAttempts: number = rawMax;
     const exhausted = reason === 'no-more-restarts';
     const badge = exhausted ? '⏹' : '\u2713';
@@ -1031,6 +1037,3 @@ export class TourController {
     return node.empty() ? nodeId : (node.data('label') || nodeId);
   }
 }
-
-// Re-exported SEARCH_INPUT_DEBOUNCE_MS kept here for proximity to related tour state.
-export { SEARCH_INPUT_DEBOUNCE_MS };

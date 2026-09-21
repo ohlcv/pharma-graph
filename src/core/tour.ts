@@ -98,6 +98,8 @@ export type TourCompleteReason = 'depth-reached' | 'no-more-restarts' | 'no-root
 export interface TourCompleteInfo {
   reason: TourCompleteReason;
   maxAttempts: number;
+  /** 引擎停下之前实际重启的轮数。maxAttempts 现在是 Infinity，UI 不能拿它当"已试 N 轮"。 */
+  attempts?: number;
 }
 
 /** Payload for onRootOutOfLevel — fired when the engine auto-upgrades the
@@ -1464,6 +1466,15 @@ export class TourEngine {
     }
 
     this.seq = this.seq.filter((id) => this._universeNodeIds.has(id));
+    // 过滤只保留策略顺序，不保证 rootId 排第一（多父节点可能被别的父节点提前带出来）。
+    // start() 直接把 seq[0] 当起点，所以这里显式把用户选中的节点提到最前。
+    const rootIdx = this.seq.indexOf(rootId);
+    if (rootIdx > 0) {
+      this.seq.splice(rootIdx, 1);
+      this.seq.unshift(rootId);
+    } else if (rootIdx < 0) {
+      this.seq.unshift(rootId);
+    }
     this.recomputeTotal();
     return;
   }
@@ -1538,6 +1549,7 @@ export class TourEngine {
         strategyDeclinedRestart = true;
       }
 
+      const attempts = this._restartAttempts;
       this._restartAttempts = 0;
       this.stopped = true;
       // Distinguish between normal completion ('depth-reached': configured depth
@@ -1548,7 +1560,7 @@ export class TourEngine {
       // doesn't have to hardcode "3".
       const reason: TourCompleteReason =
         this.maxDepth < 0 && !strategyDeclinedRestart ? 'no-more-restarts' : 'depth-reached';
-      this.onComplete?.({ reason, maxAttempts: MAX_RESTART_ATTEMPTS });
+      this.onComplete?.({ reason, maxAttempts: MAX_RESTART_ATTEMPTS, attempts });
       return;
     }
   }

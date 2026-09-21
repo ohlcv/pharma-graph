@@ -77,12 +77,38 @@ export const LAYOUT_LABELS: Record<string, string> = {
 
 // ── Layout runner ────────────────────────────────────────────────────────────────
 
+/**
+ * localStorage 里的参数全是字符串（滑块 "80000"、复选框 "1"/"0"）。
+ * 直接 Object.assign 进 cytoscape 配置会得到 tile: "0"（truthy）、
+ * nodeRepulsion: "80000" 这类错误类型，所以按 LAYOUTS 里声明的 type 还原。
+ */
+export function coerceStoredParams(
+  name: string,
+  stored: Record<string, string> | null,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (!stored) return out;
+  for (const p of LAYOUTS[name]?.params ?? []) {
+    const raw = stored[p.key];
+    if (raw === undefined) continue;
+    if (p.type === 'bool') {
+      out[p.key] = raw === '1' || raw === 'true';
+    } else if (p.type === 'select') {
+      out[p.key] = raw;
+    } else {
+      const n = parseFloat(raw);
+      if (!Number.isNaN(n)) out[p.key] = n;
+    }
+  }
+  return out;
+}
+
 export function runLayout(name: string, renderer: Renderer): void {
   _currentLayout = name;
   syncLayoutDisplay(name);
   cancelForceDrag();
   // 透传该布局在 localStorage 中保存的用户参数，否则 cytoscape 会退回默认值，
   // 用户调好的滑杆数值在切换布局后就不再生效。
-  const overrides = loadStoredParams(name) ?? {};
+  const overrides = coerceStoredParams(name, loadStoredParams(name));
   renderer.runLayout(name, overrides);
 }

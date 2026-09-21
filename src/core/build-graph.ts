@@ -93,20 +93,18 @@ export function buildGraph(
     degree[e.target] = (degree[e.target] ?? 0) + 1;
   }
 
-  // ── BFS: compute depth from root (center = 0) ─────────────────────────────────
+  // ── BFS: compute depth from the roots (root = 0, deeper = larger) ─────────────
   //
-  // Edges follow part_of / subclass_of semantics: child → parent (A part_of B means
-  // A is a child of B, stored as edges_out from A pointing to B).
+  // Edges follow part_of / subclass_of / instance_of semantics: child → parent
+  // (A part_of B is stored as an edge whose source is A and target is B).
   //
-  // Therefore we run REVERSE BFS:
-  //   1. Find leaves (out-degree = 0, nodes that nothing points to)
-  //   2. Walk backwards along edge direction (parent → child) toward roots
-  //   3. Leaves get depth=0, their parents depth=1, grandparents depth=2 …
-  //      → The root "执业药师考试体系" ends up with the highest depth.
+  //   1. Roots = nodes with out-degree 0, i.e. nodes that have no parent.
+  //      (Isolated nodes also land here and get depth 0.)
+  //   2. Walk from the roots toward the children (target → source).
+  //   3. Roots get depth 0, their children 1, grandchildren 2 …
+  //      → the root "执业药师考试体系" is the center (0); depth grows outward.
   //
-  // The spectrum color (gold center vs hue wheel) is just visual convention:
-  // we label it 0=gold-center and 1-6=depth rings so users can orient by
-  // any consistent convention. Reversing the label is a one-line cosmetic change.
+  // This matches config.ts (LEVEL_LABEL[0] = '中心', NEUTRAL_GRAY_BY_DEPTH[0]).
 
   // Build forward adjacency (source → targets) for degree computation
   const outDegree: Record<string, number> = {};
@@ -124,19 +122,18 @@ export function buildGraph(
     getReverseChildren(e.target).push(e.source);
   }
 
-  // Leaves = nodes with out-degree = 0 (nothing points from them to a parent)
-  const leaves: string[] = [];
+  // Roots = nodes with out-degree 0 (they point to no parent).
+  const roots: string[] = [];
   for (const id of nodeIds) {
-    if (outDegree[id] === 0) leaves.push(id);
+    if (outDegree[id] === 0) roots.push(id);
   }
 
-  // Reverse BFS from leaves, walking "up" the tree toward the root
-  // (which has the most ancestors, i.e. the deepest reverse BFS depth).
+  // BFS from the roots, walking "down" toward the children.
   const depth: Record<string, number> = {};
   const queue: string[] = [];
-  for (const leaf of leaves) {
-    depth[leaf] = 0;
-    queue.push(leaf);
+  for (const root of roots) {
+    depth[root] = 0;
+    queue.push(root);
   }
 
   let maxDepth = 0;
@@ -167,12 +164,13 @@ export function buildGraph(
   //
   // Algorithm:
   //   1. Identify all classifiers (node has ≥1 instance_of incoming edge).
-  //   2. For each node, walk UP the parent chain to find its nearest
-  //      classifier ancestor (the subtree root).
-  //   3. Run a DFS from each classifier to mark ALL descendants, so even
-  //      intermediate nodes (not directly below a leaf) are labeled.
-  //   4. Nodes with no classifier ancestor keep subtreeRoot = undefined
-  //      and fall back to depth-based border color.
+  //   2. Multi-source BFS from ALL classifiers at once, walking down to the
+  //      children. The first classifier to reach a node is its NEAREST
+  //      classifier ancestor, so nested classifiers keep their own subtree.
+  //      Ties (equal distance) are broken by classifier id, so the result does
+  //      not depend on file order.
+  //   3. Nodes with no classifier ancestor keep subtreeRoot = undefined
+  //      and fall back to the fill-based border color.
 
   const instanceIn: Record<string, number> = {};
   for (const id of nodeIds) instanceIn[id] = 0;
@@ -198,48 +196,21 @@ export function buildGraph(
     if (count > 0) classifiers.add(id);
   }
 
-  // Step 2: For each node, walk UP the parent chain to find nearest classifier.
-  // Edge direction: source → target means source is child of target.
-  // Pre-build parent-of map for O(1) parent lookup; visited set guards
-  // against cycles (disjoint_with, equivalent_to, etc.) and dangling edges.
-  const parentOf: Record<string, string | undefined> = {};
-  for (const id of nodeIds) parentOf[id] = undefined;
-  for (const e of edges) parentOf[e.source] = e.target; // last-write wins if multi-parent
-
+  // Step 2: multi-source BFS from every classifier. BFS visits in distance order,
+  // so the first writer of subtreeRoot[node] is the nearest classifier ancestor.
   const subtreeRoot: Record<string, string> = {};
-  for (const id of nodeIds) {
-    if (classifiers.has(id)) {
-      subtreeRoot[id] = id; // classifier owns itself
-      continue;
-    }
-    // Walk up: each node points to its parent via parentOf[]
-    const visited = new Set<string>();
-    let current: string | undefined = id;
-    while (current !== undefined && !visited.has(current)) {
-      visited.add(current);
-      const parent: string | undefined = parentOf[current];
-      if (parent === undefined) break; // no parent (root or dangling)
-      if (classifiers.has(parent)) {
-        subtreeRoot[id] = parent;
-        break;
-      }
-      current = parent;
-    }
+  const subtreeQueue: string[] = [];
+  for (const c of [...classifiers].sort()) {
+    subtreeRoot[c] = c; // a classifier owns itself
+    subtreeQueue.push(c);
   }
-
-  // Step 3: DFS from each classifier to mark all descendants
-  // (handles nodes that are internal to a subtree but not directly under a leaf)
-  for (const root of classifiers) {
-    const visited = new Set<string>();
-    const stack: string[] = [root];
-    while (stack.length > 0) {
-      const node = stack.pop()!;
-      if (visited.has(node)) continue;
-      visited.add(node);
-      subtreeRoot[node] = root;
-      for (const child of getChildrenOf(node)) {
-        if (!visited.has(child)) stack.push(child);
-      }
+  for (let qi = 0; qi < subtreeQueue.length; qi++) {
+    const cur = subtreeQueue[qi];
+    const owner = subtreeRoot[cur];
+    for (const child of getChildrenOf(cur)) {
+      if (child in subtreeRoot) continue;
+      subtreeRoot[child] = owner;
+      subtreeQueue.push(child);
     }
   }
 
@@ -311,6 +282,8 @@ export interface PrebuiltNode {
     subsection?: string;
   };
   tags?: string[];
+  /** 正文。graph-data.json 里没带的话，详情面板的「正文」页就是空的（见 detail-panel.buildBodyHtml）。 */
+  body?: string;
   edges_out?: Array<{ target: string; type: string; reason?: string }>;
 }
 
@@ -346,6 +319,7 @@ export function buildGraphFromPrebuilt(prebuilt: PrebuiltGraphData): BuildResult
     weight: n.weight ?? 1,
     location: n.location,
     tags: n.tags,
+    body: n.body,
     edges_out: n.edges_out,
     // rel from the prebuilt file is the sourcePath relative to public/content/
     sourcePath: n.rel,

@@ -12,7 +12,10 @@ marked.setOptions({
   breaks: false, // md line breaks stay paragraph-breaks; don't double <br>
 });
 
-const SAFE_ATTR = ['target', 'rel', 'src', 'href', 'alt', 'title', 'class'];
+// type / checked / disabled 只为 GFM 任务列表（<input type=checkbox disabled>）放行。
+// ALLOWED_ATTR 会整个替换 DOMPurify 的默认白名单，少了 type 的 input 会变成普通文本框，
+// 所以 renderMarkdown() 末尾还会把非 checkbox 的 input 剔掉。
+const SAFE_ATTR = ['target', 'rel', 'src', 'href', 'alt', 'title', 'class', 'type', 'checked', 'disabled'];
 const SAFE_TAGS = [
   'a',
   'p',
@@ -71,14 +74,14 @@ function rewriteImageSrc(src: string, sourceUrl: string): string {
   if (src.startsWith('/')) return src;
   // Build a directory URL for the source file: strip trailing filename
   // segment, normalise `..`, prefix `/content/`.
-  const parts = sourceUrl.split('/').filter(Boolean);
-  parts.pop(); // drop filename
-  const dirParts = parts.map((p) => (p === '..' ? '' : p));
-  if (src.startsWith('./')) src = src.slice(2);
-  const joined = [...dirParts, ...src.split('/')]
-    .filter((p, i, arr) => p !== '' || i === arr.length - 1)
-    .join('/');
-  return '/content/' + joined;
+  const stack = sourceUrl.split('/').filter(Boolean);
+  stack.pop(); // drop filename
+  for (const seg of src.split('/')) {
+    if (seg === '' || seg === '.') continue;
+    if (seg === '..') stack.pop(); // 上溯一级（原来是直接丢掉 '..'，../a.png 会落在本目录）
+    else stack.push(seg);
+  }
+  return '/content/' + stack.join('/');
 }
 
 function rewriteImageAttrs(html: string, sourceUrl: string): string {
@@ -107,11 +110,15 @@ export function renderMarkdown(text: string, sourceUrl = ''): string {
   if (!text || !text.trim()) return '';
   const rawHtml = marked.parse(text, { async: false }) as string;
   const withImages = sourceUrl ? rewriteImageAttrs(rawHtml, sourceUrl) : rawHtml;
-  return DOMPurify.sanitize(withImages, {
+  const clean = DOMPurify.sanitize(withImages, {
     ALLOWED_TAGS: SAFE_TAGS,
     ALLOWED_ATTR: SAFE_ATTR,
     // Block javascript: URLs even if DOMPurify would otherwise let them slip
     // through an `a[href]`. Same goes for `formaction` on inputs.
     ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z+.:]|$))/i,
   });
+  // 只放行任务列表用的 checkbox，其余 input（文本框等）一律剔除；checkbox 强制只读。
+  return clean
+    .replace(/<input\b(?![^>]*\btype="checkbox")[^>]*>/gi, '')
+    .replace(/<input\b(?![^>]*\bdisabled)/gi, '<input disabled');
 }
