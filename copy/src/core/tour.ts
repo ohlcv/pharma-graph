@@ -5,9 +5,6 @@
 export const TOUR_DEPTH_CONFIG = {
   // 档位 1-5 对应的 fill 类型包含关系
   // 每档包含所有更低档的内容
-  // 注意：'cls-drug-key' 不是 FILL_CONFIG 里的真实 fill，而是"重点药"的伪类型，
-  // 实际判定见 isKeyDrug()（fill === 'cls-drug' 且 stroke === 'double'）。
-  // 过滤逻辑以 isNodeInLevel() 为准，这里的 includes 仅作说明/展示用途。
   levels: [
     {
       level: 1,
@@ -49,24 +46,18 @@ export const TOUR_DEPTH_CONFIG = {
   },
 };
 
-/**
- * 判断节点是否为"重点药"（stroke: double 的 cls-drug 节点）。
- *
- * 注意：glow 现在是所有节点的默认 stroke（FILL_CONFIG[fill].defaultStroke），
- * 普通药的 data.stroke 也是 'glow'；只有 md 里显式写了 `stroke: double` 的才是重点药。
- * 之前用 `stroke === 'glow'` 判断，结果正好反了：普通药被当成重点药，重点药反而被跳过。
- */
+/** 判断节点是否为"重点药"（有 glow 边框的 cls-drug 节点） */
 export function isKeyDrug(node: cytoscape.NodeSingular): boolean {
   const fill = node.data('fill') as string;
   const stroke = node.data('stroke') as string | undefined;
-  return fill === 'cls-drug' && stroke === 'double';
+  return fill === 'cls-drug' && stroke === 'glow';
 }
 
 /** 判断节点是否属于给定档位的内容范围 */
 export function isNodeInLevel(node: cytoscape.NodeSingular, level: number): boolean {
   const fill = node.data('fill') as string;
   const stroke = node.data('stroke') as string | undefined;
-  const isKey = fill === 'cls-drug' && stroke === 'double';
+  const isKey = fill === 'cls-drug' && stroke === 'glow';
 
   // 档位 5 = 全部
   if (level >= 5) return true;
@@ -767,7 +758,7 @@ registerStrategy({
   label: '层级依赖（广度优先）',
   description: '按知识依赖关系走（基础先于应用），适合查漏补缺单知识点。',
   // 拓扑序跑一次就完整覆盖全部节点，再循环一遍得到相同序列，毫无意义。
-  // 因此显式拒绝重启——引擎收到 false 后会立即以 'depth-reached'（正常走完）收束。
+  // 因此显式拒绝重启——引擎收到 false 后会立即以 'no-more-restarts' 收束。
   hooks: {
     shouldRestart: () => false,
   },
@@ -782,35 +773,13 @@ registerStrategy({
       prereqOut.set(n.id(), []);
       prereqIn.set(n.id(), []);
     });
-    // 边类型词表现在只有 5 种 OWL 风格边（见 edge-types.ts），不存在 'prerequisite'。
-    // 原来只认 'prerequisite'，导致依赖图恒为空，拓扑序退化成纯 location 兜底排序。
-    // 现在把层级边当作前置关系：边方向是 子 → 父（source=子, target=父），
-    // "父先于子" 就是"基础先于应用"。disjoint_with / equivalent_to 是对称关系，不构成先后，忽略。
-    // 'prerequisite' 保留兼容：source 是 target 的前置。
-    const HIERARCHY_EDGE_TYPES = new Set(['subclass_of', 'part_of', 'instance_of']);
-    const seenPairs = new Set<string>();
     edges.forEach((e) => {
-      const type = e.data('edgeType') as string | undefined;
-      let pre: string; // 前置（先访问）
-      let dep: string; // 依赖它的（后访问）
-      if (type && HIERARCHY_EDGE_TYPES.has(type)) {
-        pre = e.target().id();
-        dep = e.source().id();
-      } else if (type === 'prerequisite') {
-        pre = e.source().id();
-        dep = e.target().id();
-      } else {
-        return;
+      if (e.data('edgeType') === 'prerequisite') {
+        const src = e.source().id();
+        const tgt = e.target().id();
+        prereqOut.get(src)!.push(tgt); // src is prerequisite of tgt
+        prereqIn.get(tgt)!.push(src);
       }
-      // 自环 / 端点是 layer-parent（不在 nodes 里）/ 重复边：跳过。
-      // 自环会让节点入度永远 > 0，重复边虽然 in/out 计数一致，但没必要。
-      if (pre === dep) return;
-      if (!prereqOut.has(pre) || !prereqIn.has(dep)) return;
-      const pairKey = pre + '\x00' + dep;
-      if (seenPairs.has(pairKey)) return;
-      seenPairs.add(pairKey);
-      prereqOut.get(pre)!.push(dep);
-      prereqIn.get(dep)!.push(pre);
     });
 
     // Topological sort using Kahn's algorithm
@@ -990,9 +959,7 @@ export class TourEngine {
 
     const strategy = getStrategy(options.strategy);
     this.strategyId = options.strategy;
-    // 钩子挂在 def.hooks 下，而不是 def 本身。原来直接把整个 def 强转成
-    // Partial<StrategyHooks>，导致 shouldVisit / onCycleEnd / onRestartAttempt 全部读不到。
-    this._hooks = strategy.hooks ?? {};
+    this._hooks = strategy as Partial<StrategyHooks>;
 
     // Visit history resets on every start (fresh tour).
     this._visited = [];
@@ -1471,8 +1438,6 @@ export class TourEngine {
   private visitNext(): void {
     if (this.stopped) return;
     let restarted = false;
-    // 策略主动拒绝重启（如 topo-prereq 一遍即完整覆盖）＝ 正常走完，不是"轮次耗尽"。
-    let strategyDeclinedRestart = false;
     let loopSafety = 0;
     while (true) {
       loopSafety++;
@@ -1535,19 +1500,15 @@ export class TourEngine {
           this._hooks.onCycleEnd?.(this.cy);
           continue;
         }
-        strategyDeclinedRestart = true;
       }
 
       this._restartAttempts = 0;
       this.stopped = true;
-      // Distinguish between normal completion ('depth-reached': configured depth
-      // reached, or the strategy said one pass is enough) and restart-loop
-      // exhaustion ('no-more-restarts': a restart was attempted but produced
-      // nothing to visit), so the controller can tell the user why the tour
-      // stopped on its own (issue #16). Include maxAttempts so the controller
-      // doesn't have to hardcode "3".
-      const reason: TourCompleteReason =
-        this.maxDepth < 0 && !strategyDeclinedRestart ? 'no-more-restarts' : 'depth-reached';
+      // Distinguish between the configured-depth (normal) and the
+      // restart-loop exhaustion paths so the controller can tell the user
+      // why the tour stopped on its own (issue #16). Include maxAttempts so
+      // the controller doesn't have to hardcode "3".
+      const reason: TourCompleteReason = this.maxDepth < 0 ? 'no-more-restarts' : 'depth-reached';
       this.onComplete?.({ reason, maxAttempts: MAX_RESTART_ATTEMPTS });
       return;
     }
@@ -1569,19 +1530,13 @@ export class TourEngine {
     const pathLabels = path.map((id) => this.cy.getElementById(id).data('label') || id);
 
     this.stopTourPulse();
-    // 放进一个 batch：cytoscape 每次 add/removeClass 都会立即对全图重算样式，
-    // 并按「中间状态 → 新状态」启动 transition。这里原来分三次改类（先清 → 全部 dimmed
-    // → 再给目标去掉 dimmed），每步要对全图算三遍样式，还会让中间态产生多余的过渡。
-    // batch 之后样式只按「上一步 → 最终状态」算一次，既省算力也不会有中间态。
-    this.cy.batch(() => {
-      this.cy.elements().removeClass('selected-node highlighted highlighted-edge');
-      this.cy.elements().addClass('dimmed');
-      node.removeClass('dimmed highlighted').addClass('selected-node');
-      node.connectedEdges().removeClass('dimmed').addClass('highlighted-edge');
-      // 与 highlightNode 保持一致：用 neighborhood 而非 connectedEdges().targets()
-      // neighborhood 覆盖所有相邻节点（无论边的方向）
-      node.neighborhood('node').not('.layer-parent').removeClass('dimmed').addClass('highlighted');
-    });
+    this.cy.elements().removeClass('selected-node highlighted highlighted-edge');
+    this.cy.elements().addClass('dimmed');
+    node.removeClass('dimmed highlighted').addClass('selected-node');
+    node.connectedEdges().removeClass('dimmed').addClass('highlighted-edge');
+    // 与 highlightNode 保持一致：用 neighborhood 而非 connectedEdges().targets()
+    // neighborhood 覆盖所有相邻节点（无论边的方向）
+    node.neighborhood('node').not('.layer-parent').removeClass('dimmed').addClass('highlighted');
 
     this.startTourPulse(node);
 

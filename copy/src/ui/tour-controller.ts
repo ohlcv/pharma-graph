@@ -961,6 +961,7 @@ export class TourController {
     if (exhausted) {
       const label = `已停止 · 已试 ${maxAttemptsLabel} 轮`;
       this.setText('tour-dt-node-name',   label);
+      this.setText('tour-dt-node-name2', label);
     }
 
     // Issue #29: announce terminal tour state to screen readers. This

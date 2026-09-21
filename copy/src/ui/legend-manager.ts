@@ -1,0 +1,259 @@
+// src/ui/legend-manager.ts
+// Owns the two remaining legend axes (essence/edge) and the active filter
+// state they expose. Pure UI/UI-state — no layout, no cytoscape binding.
+//
+// （A1 方案：第三轴 depth legend 已删除。无 subtreeRoot 节点用中性灰 fallback，
+//  不再向用户展示"depth 颜色"这条线索——depth 仍可在 detail-panel 看到，但
+//  只作为拓扑文字，不带颜色语义。）
+
+import type { Core } from 'cytoscape';
+import { HighlightEngine } from './highlight-engine.js';
+import { staticEls } from './dom-cache.js';
+import { uiState } from './state.js';
+import {
+  SHAPE_LABEL,
+  EDGE_TYPE_STYLE,
+  EDGE_TYPE_LABEL,
+  FILL_CONFIG,
+} from '../core/config.js';
+import { DEFAULT_EDGE_TYPE, isEdgeType } from '../core/edge-types.js';
+import { buildLegend } from './legend-factory.js';
+import { updateStats, syncBottomSheetStats } from './graph-stats.js';
+
+// ── Active filter state ────────────────────────────────────────────────────────
+
+let activeShapeFilter: string | null = null;
+let activeEdgeFilter: string | null = null;
+
+export function getActiveShapeFilter(): string | null {
+  return activeShapeFilter;
+}
+
+export function clearShapeFilter(): void {
+  clearAllFilters();
+  activeShapeFilter = null;
+}
+
+export function clearAllFilters(): void {
+  activeShapeFilter = null;
+  activeEdgeFilter = null;
+  staticEls(
+    '.legend-row', '.legend-edge-row',
+    '.shape-filter-item', '.bs-chip',
+  ).forEach((el) => el.classList.remove('active'));
+}
+
+// ── Axis populators ────────────────────────────────────────────────────────────
+
+// Shapes are read from the canonical FILL_CONFIG in config.ts so the
+// legend stays in sync with the actual node renderer. Defensive fallback
+// keeps the legend rendering even if a fill is added without a config.
+const FILL_LABEL_MAP: Record<string, string> = Object.fromEntries(
+  Object.entries(FILL_CONFIG).map(([k, v]) => [k, v.label]),
+);
+const FILL_SHAPE_MAP: Record<string, string> = Object.fromEntries(
+  Object.entries(FILL_CONFIG).map(([k, v]) => [k, v.shape]),
+);
+const FILL_COLOR_MAP: Record<string, string> = Object.fromEntries(
+  Object.entries(FILL_CONFIG).map(([k, v]) => [k, v.background]),
+);
+
+function makeFillSwatch(fillKey: string): string {
+  const shape = FILL_SHAPE_MAP[fillKey] ?? 'ellipse';
+  const fill = FILL_COLOR_MAP[fillKey] ?? '#94a3b8';
+  return `<span class="legend-node--shape shape-${shape}" style="background:${fill}"></span>`;
+}
+
+// ── Essence legend ─────────────────────────────────────────────────────────────
+
+export function populateEssenceLegend(cy: Core): void {
+  buildLegend(cy, {
+    labels: FILL_LABEL_MAP,
+    countScope: 'nodes',
+    countSelector: '[fill = "${key}"]',
+    desktopContainerId: 'legend-essence-grid',
+    mobileContainerId: 'bs-essence-chips',
+    desktopCountPrefix: 'legend-essence-count-',
+    mobileCountPrefix: 'bs-essence-count-',
+    rowClass: 'legend-row',
+    dataKey: 'data-type',
+    desktopRow: (k, label) => `<div class="legend-row" data-type="${k}">${makeFillSwatch(k)}<span class="legend-row__label">${label}</span><span class="legend-row__count" id="legend-essence-count-${k}"></span></div>`,
+    mobileChip: (k, label) => `<div class="bs-chip" data-type="${k}">${makeFillSwatch(k)}<span>${label}</span><span class="bs-chip__count" id="bs-essence-count-${k}"></span></div>`,
+    onClick: (key, highlight) => highlightFillFilter(key, highlight),
+    onCycle: (_key, delta, highlight) => { cycleHighlightedNodes(delta, highlight); },
+  });
+}
+
+function dashAttr(lineStyle: string): string {
+  if (lineStyle === 'dashed') return 'stroke-dasharray="5 3"';
+  if (lineStyle === 'dotted') return 'stroke-dasharray="1 3"';
+  return '';
+}
+
+function arrowSvg(style: { color: string; arrow: string }, xMax: number): string {
+  if (style.arrow === 'triangle') {
+    return `<polygon points="${xMax},5 ${xMax - 4},2 ${xMax - 4},8" fill="${style.color}"/>`;
+  }
+  if (style.arrow === 'tee') {
+    return `<line x1="${xMax - 2}" y1="2" x2="${xMax}" y2="5" stroke="${style.color}" stroke-width="2"/><line x1="${xMax - 2}" y1="8" x2="${xMax}" y2="5" stroke="${style.color}" stroke-width="2"/>`;
+  }
+  return '';
+}
+
+function defaultEdgeStyle(): { color: string; lineStyle: string; arrow: string } {
+  return { color: '#95a5a6', lineStyle: 'solid', arrow: 'none' };
+}
+
+function EDGE_TYPE_STYLE_FALLBACK(k: string) {
+  return EDGE_TYPE_STYLE[k] ?? defaultEdgeStyle();
+}
+
+export function populateEdgeLegend(cy: Core): void {
+  buildLegend(cy, {
+    labels: EDGE_TYPE_LABEL,
+    countScope: 'edges',
+    countSelector: '[edgeType = "${key}"]',
+    desktopContainerId: 'legend-edge-grid',
+    mobileContainerId: 'bs-edge-chips',
+    desktopCountPrefix: 'legend-edge-count-',
+    mobileCountPrefix: 'bs-edge-count-',
+    rowClass: 'legend-edge-row',
+    dataKey: 'data-edge',
+    desktopRow: (k, label) => {
+      const style = EDGE_TYPE_STYLE_FALLBACK(k);
+      return `<div class="legend-edge-row" data-edge="${k}"><svg width="28" height="10" viewBox="0 0 28 10"><line x1="2" y1="5" x2="26" y2="5" stroke="${style.color}" stroke-width="2" ${dashAttr(style.lineStyle)}/>${arrowSvg(style, 26)}</svg><span class="legend-edge-row__label">${label}</span><span class="legend-edge-row__count" id="legend-edge-count-${k}"></span></div>`;
+    },
+    mobileChip: (k, label) => {
+      const style = EDGE_TYPE_STYLE_FALLBACK(k);
+      return `<div class="bs-chip" data-edge="${k}"><svg width="24" height="10" viewBox="0 0 24 10" style="flex-shrink:0"><line x1="2" y1="5" x2="22" y2="5" stroke="${style.color}" stroke-width="2" ${dashAttr(style.lineStyle)}/>${arrowSvg(style, 22)}</svg><span>${label}</span><span class="bs-chip__count" id="bs-edge-count-${k}"></span></div>`;
+    },
+    onClick: (key, highlight) => highlightEdgeTypeFilter(key, highlight),
+    onCycle: (_key, delta, highlight) => { cycleHighlightedNodes(delta, highlight); },
+  });
+}
+
+// ── Cycle helpers (keyboard ↑/↓ within an active legend filter) ────────────────
+
+/**
+ * Cycle through the nodes currently highlighted by `legendRowKey`. Used by
+ * ArrowUp/Down handlers in attachDelegated so pressing ↑/↓ while focused on
+ * a legend row walks the *nodes* the filter exposes, not the legend rows
+ * themselves. Returns true if focus changed.
+ *
+ * - If a node is already selected among the highlighted set, ArrowDown moves
+ *   to the next one (wrapping); ArrowUp moves to the previous one (wrapping).
+ * - If nothing is selected, ArrowDown picks the first, ArrowUp the last.
+ * - If the set is empty (filter not active), the keypress is a no-op (but
+ *   still swallows the default scroll behaviour upstream).
+ */
+export function cycleHighlightedNodes(
+  delta: -1 | 1,
+  highlight: HighlightEngine,
+): boolean {
+  const cy = highlight.getCy();
+  const LAYER_PARENT = 'layer-parent';
+  const HIGHLIGHTED = 'highlighted';
+  const SETTLED_NODE = 'selected-node';
+
+  const set = cy.nodes(`.${HIGHLIGHTED}`).not(`.${LAYER_PARENT}`);
+  if (set.length === 0) return false;
+
+  const ids = set.map((n) => n.id());
+  const currentIdx = ids.findIndex((id) => cy.getElementById(id).hasClass(SETTLED_NODE));
+  let nextIdx: number;
+  if (currentIdx < 0) {
+    nextIdx = delta > 0 ? 0 : ids.length - 1;
+  } else {
+    nextIdx = (currentIdx + delta + ids.length) % ids.length;
+  }
+  if (nextIdx === currentIdx) return false;
+
+  const target = cy.getElementById(ids[nextIdx]);
+
+  // Apply only the per-node visual change. We deliberately do NOT call
+  // focusOnNode() here because that would tear down the legend filter's
+  // `.highlighted` set and replace it with the target's neighbourhood.
+  cy.elements().unselect();
+  cy.nodes(`.${SETTLED_NODE}`).removeClass(SETTLED_NODE);
+  target.addClass(SETTLED_NODE);
+  target.select();
+  cy.stop().animate({
+    center: { eles: target },
+    zoom: 1.5,
+    duration: 400,
+    easing: 'ease-out-cubic',
+  });
+
+  // Keep the detail panel in sync with the cycled node. cy.select() doesn't
+  // fire 'tap node', so the graph-events handler that normally calls
+  // detailPanel.show() never runs here.
+  uiState.detailPanel?.show(target.id());
+  return true;
+}
+
+// ── Filter highlight handlers ──────────────────────────────────────────────────
+
+/**
+ * Highlight nodes by fill type (领域顶层类, e.g. cls-drug) from the legend click.
+ * Uses highlightFill() to match n.data('fill') directly — in sync with the new
+ * OWL2 spec where the node's `fill` field (not legacy `essence`) is the primary
+ * visual-classification key.
+ */
+export function highlightFillFilter(fill: string, highlight: HighlightEngine): void {
+  if (activeShapeFilter === fill) {
+    // Toggle off: clear filter and reset all nodes
+    clearAllFilters();
+    highlight.reset();
+    updateStats(highlight.getCy());
+    syncBottomSheetStats(highlight.getCy());
+    return;
+  }
+
+  // Set new filter
+  clearAllFilters();
+  activeShapeFilter = fill;
+  highlight.highlightFill(fill);
+
+  // Activate the matching legend row/chip
+  staticEls('.legend-row[data-type]').forEach((el) => {
+    if (el.dataset.type === fill) el.classList.add('active');
+  });
+  staticEls('.bs-chip[data-type]').forEach((el) => {
+    if (el.dataset.type === fill) el.classList.add('active');
+  });
+
+  updateStats(highlight.getCy());
+  syncBottomSheetStats(highlight.getCy());
+}
+
+/** @deprecated kept for action-handlers compatibility */
+const highlightEssenceFilter = highlightFillFilter;
+/** @deprecated kept for action-handlers compatibility */
+const highlightShape = highlightFillFilter;
+export { highlightEssenceFilter, highlightShape };
+
+export function highlightEdgeTypeFilter(edge: string, highlight: HighlightEngine): void {
+  if (activeEdgeFilter === edge) {
+    clearAllFilters();
+    highlight.reset();
+    updateStats(highlight.getCy());
+    syncBottomSheetStats(highlight.getCy());
+    return;
+  }
+  clearAllFilters();
+  activeEdgeFilter = edge;
+  highlight.highlightEdgeType(edge);
+  activateAxis('.legend-edge-row[data-edge]', 'data-edge', edge);
+  activateAxis('.bs-chip[data-edge]', 'data-edge', edge);
+  updateStats(highlight.getCy());
+  syncBottomSheetStats(highlight.getCy());
+}
+
+function activateAxis(selector: string, attr: string, key: string): void {
+  // Always query directly — avoids stale staticEls cache. buildLegend invalidates
+  // the cache when it rebuilds, but the re-query here is cheap and always correct.
+  const resolved = Array.from(document.querySelectorAll<HTMLElement>(selector));
+  resolved.forEach((el) => {
+    if (el.getAttribute(attr) === key) el.classList.add('active');
+  });
+}

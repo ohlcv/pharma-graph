@@ -210,16 +210,9 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
       'border-width': 2,
       'border-style': 'solid' as cytoscape.Css.LineStyle,
       'border-opacity': 1,
-      // 注意：这里不能再写 border-color 的 transition。
-      // glow 现在是所有节点的默认 stroke，这条规则会命中全图节点，而且它写的
-      // transition-property 会覆盖基础样式里的 'opacity'。后果有两个：
-      //   1) 漫游/点选时节点从 .dimmed（border-color 是近乎纯白的
-      //      rgba(255,255,255,0.06)）切到 .selected-node，边框色会在 200ms 内
-      //      从白色渐变到主题辅色；glow-overlay 的选中强光每帧读 border-color，
-      //      于是整个节点闪一下白（"选中节点瞬间变白"）。
-      //   2) 全图变暗时几百个节点同时跑 border-color 插值，违背了基础样式里
-      //      "只过渡 opacity"的性能约定。
-      // 不写 transition-* 就会继承基础样式的 opacity 过渡，边框色瞬时切换。
+      'transition-property': 'border-color',
+      'transition-duration': 200,
+      'transition-timing-function': 'ease-in-out',
     },
   };
 
@@ -418,11 +411,6 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
     {
       selector: '.dimmed',
       style: {
-        // 变暗瞬时完成，不做 180ms 淡出：淡出到一半的节点是灰蒙蒙的半透明，
-        // 漫游每步都会撞见上一步的节点还"亮着"，看起来很突兀。
-        // （cytoscape 用新状态的 transition 配置，所以只影响「进入 dimmed」；
-        //  恢复时走基础样式的 180ms 淡入，不受影响。）
-        'transition-duration': 0,
         opacity: 0.1,
         'border-color': 'rgba(255,255,255,0.06)',
         'text-outline-color': 'rgba(15,17,23,0.5)',
@@ -454,16 +442,6 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
       selector: '.highlighted',
       style: {
         opacity: 0.95,
-      },
-    },
-    // 选中节点瞬时到位，不做 opacity 淡入：它的强光由 glow-overlay 立即画出，
-    // 如果节点本体还在从 0.1 淡入，会出现"光先亮、节点后出现"的错位。
-    // （cytoscape 用「新状态」的 transition 配置，所以这条只影响进入选中态；
-    //  离开选中态走 dimmed/基础样式的 180ms 淡出，不受影响。）
-    {
-      selector: '.selected-node',
-      style: {
-        'transition-duration': 0,
       },
     },
     {

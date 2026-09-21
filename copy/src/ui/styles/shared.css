@@ -1,0 +1,221 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   shared.css — Global Animations · Utility Classes
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@layer shared {
+
+/* ── Non-blocking loading indicator (corner) ─────────────────────────────────
+   Positioned bottom-center, low-key pill with breathing dot.
+   The graph *renders in real time* as content streams in — this
+   indicator is just a passive status badge that fades when done. */
+.loading-indicator {
+  position: fixed;
+  bottom: 18px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 7px 14px 7px 11px;
+  background: rgba(12, 18, 34, 0.78);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+  pointer-events: none;
+}
+.loading-indicator.hidden {
+  opacity: 0;
+  transform: translateX(-50%) translateY(12px);
+}
+.loading-indicator .loading-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--yellow);
+  box-shadow: 0 0 10px var(--yellow), 0 0 18px rgba(251, 191, 36, 0.35);
+  animation: dot-pulse 1.4s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.loading-indicator.complete .loading-dot {
+  background: var(--green);
+  box-shadow: 0 0 10px var(--green), 0 0 18px rgba(52, 211, 153, 0.35);
+  animation: dot-pulse 3s ease-in-out infinite;
+}
+/* No extra transition-delay on .complete: main.ts already holds the pill for
+ * 800ms before adding `.hidden`, then removes it from layout after 600ms.
+ * A CSS delay on top of that (it used to be 0.6s) pushed the fade past the
+ * moment the element was taken out of layout, so the pill just vanished. */
+.loading-label { letter-spacing: 0.04em; }
+.loading-count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 6ch; text-align: left;
+}
+.loading-percent {
+  color: var(--text);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 4ch; text-align: right;
+}
+
+/* ── Glass dashboard edge — 1px gradient hairline (bright top-left → dark
+ *    bottom-right) that reads like a lit glass bezel and follows
+ *    border-radius natively.
+ *
+ *    Implemented as the panel's OWN layered background rather than an
+ *    ::before overlay: #sidebar / #bottom-sheet are overflow:auto scroll
+ *    containers, and an absolutely positioned child (::before included)
+ *    scrolls away with their content — the ring detaches from the visible
+ *    edges as soon as the panel scrolls. The element's own background is
+ *    anchored to its border/padding boxes and never scrolls.
+ *
+ *    Panels pass their tint through --glass-bg; the tint fills the
+ *    padding box and the gradient only shows through the 1px transparent
+ *    border band. ─────────────────────────────────────────────────────── */
+.glass-edge {
+  border: 1px solid transparent;
+  /* Two image layers (background-color is NOT a layer, so it cannot take
+     the second clip value): solid panel tint clipped to padding-box,
+     gradient ring clipped to border-box — the ring only shows through the
+     1px transparent border band. */
+  background-image:
+    linear-gradient(var(--glass-bg, rgba(12, 18, 34, 0.9)),
+                    var(--glass-bg, rgba(12, 18, 34, 0.9))),
+    linear-gradient(135deg,
+      rgba(255,255,255,0.24) 0%,
+      rgba(255,255,255,0.06) 45%,
+      rgba(0,0,0,0.34) 100%);
+  background-clip: padding-box, border-box;
+  background-origin: padding-box, border-box;
+}
+
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.85); }
+}
+@keyframes badge-shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50%       { background-position: 100% 50%; }
+}
+@keyframes carousel-shimmer {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+/* Capsule border light sweep — a slow diagonal flow that makes the shell
+ * itself feel alive. Synced to the same 6s rhythm as the internal shimmers
+ * (3s shimmer × 2 cycles per sweep), so everything in the badge breathes in
+ * one tempo. background-position % is larger than 100% so the bright stripe
+ * never visibly enters from outside — it fades in from transparent. */
+@keyframes badge-border-sweep {
+  0%   { background-position:   0% 50%; }
+  100% { background-position: 300% 50%; }
+}
+@keyframes np-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(16px) scale(0.95); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+@keyframes nodeRipple {
+  0%   { opacity: 0.7; transform: translate(-50%, -50%) scale(0); }
+  100% { opacity: 0;   transform: translate(-50%, -50%) scale(3); }
+}
+
+/* Topbar logo: slow benzene-ring rotation. Stays between 0 and 360
+   only — a full turn — so the loop seam is invisible. 16s is slow
+   enough that it reads as "alive" rather than "loading spinner". */
+@keyframes logo-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.topbar__logo-mark svg {
+  transform-origin: 50% 50%;
+  animation: logo-spin 16s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .topbar__logo-mark svg { animation: none; }
+}
+
+/* ── Keyboard key badge ─────────────────────────────────────────────────── */
+.key {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.58rem; font-weight: 700;
+  color: var(--text-2); background: var(--border);
+  border: 1px solid var(--border-hi); border-bottom-width: 2px;
+  padding: 1px 5px; border-radius: 4px;
+  line-height: 1.5; letter-spacing: 0.02em;
+  white-space: nowrap; flex-shrink: 0;
+}
+/* Key badge inside toolbar buttons — lighter weight to stay in the background */
+.btn .key {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.12);
+  border-bottom-color: rgba(255,255,255,0.18);
+  color: var(--muted);
+  font-size: 0.55rem;
+}
+
+/* ── Focus ring for keyboard-promoted divs (legend rows, chips) ──────────── */
+/* Use :focus-visible so mouse clicks don't show a ring, only Tab navigation. */
+.legend-row:focus-visible,
+.legend-edge-row:focus-visible,
+.bs-chip:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent), 0 0 0 5px rgba(var(--accent-rgb), 0.22);
+}
+
+/* ── Reduced-motion accommodation ──────────────────────────────────────────
+   Users with `prefers-reduced-motion: reduce` (vestibular sensitivity,
+   screen-reader or battery saver) should not be subjected to looping
+   decorative animations or long transitions.
+
+   Strategy:
+   - Kill *infinite* decorations (shimmer, dot-pulse).
+   - Compress *finite* enter animations to < 1 frame (instant).
+   - Keep opacity/colour transitions short so hover/focus feedback still works.
+
+   This is intentionally broad: scoped via known animation names so we don't
+   break legitimate user-driven transitions on inputs. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* Cytoscape canvas transitions — set via JS in renderer.ts, but we can ask
+     for instant motion at the stylesheet level too. */
+  cy, #cy, .cy { transition: none !important; }
+  /* Disable the looping decorations explicitly so they don't flicker at start.
+     (badge-shimmer / carousel-shimmer are @keyframes names, not classes —
+     the universal rule above already neutralises them.) */
+  .badge-meow, .empty-state__icon,
+  .topbar__badge-dot, .topbar__badge::before, .tour-dt__dot, .node-ripple {
+    animation: none !important;
+  }
+  /* Respect that the user still wants visible feedback: keep outlines, but
+     remove the halo/glow which is itself a (subtle) motion driver. */
+  .legend-row:focus-visible,
+  .legend-edge-row:focus-visible,
+  .bs-chip:focus-visible {
+    outline: 2px solid var(--accent);
+    box-shadow: none;
+  }
+}
+
+}

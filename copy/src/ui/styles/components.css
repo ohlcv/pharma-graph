@@ -1,0 +1,1390 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   components.css — Topbar · Toolbar · Sidebar · Node Panel · Bottom Sheet
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/*
+ * 显示控制规范 (Display Control Contract)
+ * ============================================
+ * - 显示/隐藏统一由 JS 通过 class 驱动（.visible, .hidden, .open）
+ * - CSS 只负责外观样式（颜色、尺寸、布局方向）
+ * - 媒体查询不设置 display，只改外观属性
+ * - 严禁使用 !important 控制显示逻辑
+ * - JS 绝不直接操作 style.display，改用 class 切换
+ * - 通用隐藏用 `.u-hidden`（定义在 layout.css 末尾，未分层，不用 !important）；
+ *   有语义状态类的组件（.open / .visible / .collapsed）优先用自己的状态类
+ */
+
+/* ── Topbar ─────────────────────────────────────────────────────────────── */
+@layer topbar {
+
+.topbar {
+  background: rgba(12, 18, 34, 0.85);
+  backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--border); height: 56px;
+  display: flex; align-items: center; gap: 0; padding: 0;
+  /* Topbar is the highest persistent chrome — anything it contains (the
+   * email card now, future dropdowns/menus) must paint above the toolbar
+   * (z-index 25) and the layout-switcher menu (z-index 30). 50 puts us
+   * clear of those but still below the mobile bottom sheet (50) and the
+   * node-detail overlay (100), which is the right precedence: floating
+   * UI panels > permanent chrome > canvas. */
+  position: relative; z-index: 50;
+}
+.topbar__logo {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 20px; height: 100%; flex-shrink: 0;
+}
+.topbar__logo-mark {
+  width: 32px; height: 32px; border-radius: 9px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 18px var(--accent-glow), 0 4px 12px rgba(0,0,0,0.4); flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+.topbar__logo-mark svg { width: 22px; height: 22px; color: rgba(255,255,255,0.95); }
+/* Subtle inner sheen so the mark reads as a glossy capsule rather
+   than a flat square. Kept off the ring shapes — only the wrapper. */
+.topbar__logo-mark::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.18) 0%, transparent 50%);
+  pointer-events: none;
+  border-radius: inherit;
+}
+.topbar__brand {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  /* No max-width here — let the brand-name's clamp() handle sizing.
+   * overflow:hidden is the last-resort safety net if clamp ever overflows. */
+  overflow: hidden;
+}
+.topbar__brand-name {
+  /* clamp(min, preferred, max): font scales with viewport width automatically.
+   * At 360px Android  → 0.68rem  (≈10.9px — compact, badge stays visible)
+   * At 768px mobile  → 0.76rem  (≈12.2px)
+   * At 1200px desktop → 0.92rem (≈14.7px — full-size)
+   * The clamp is the single fix for the "brand pushes badge off bar" bug:
+   * font never grows beyond what the bar can hold, so badge is never squeezed. */
+  font-size: clamp(0.68rem, 2.5vw, 0.92rem);
+  font-weight: 800;
+  font-family: var(--font-display);
+  /* gradient text */
+  background: linear-gradient(135deg, #f1f5f9 0%, var(--accent-light) 100%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.015em; line-height: 1.2;
+  /* white-space: nowrap is redundant here — clamp() on font-size
+   * already prevents overflow by shrinking, not wrapping. */
+}
+.topbar__brand-sub  {
+  font-size: 0.62rem; color: var(--muted);
+  letter-spacing: 0.18em; line-height: 1;
+  font-weight: 500; text-transform: uppercase;
+  font-family: var(--font-display);
+}
+
+.topbar__search-center { flex: 1; display: flex; align-items: center; justify-content: center; }
+.topbar__search-wrap   { position: relative; display: flex; align-items: center; flex: 1; min-width: 160px; }
+.topbar__search-icon   { position: absolute; left: 8px; width: 13px; height: 13px; color: var(--muted); pointer-events: none; flex-shrink: 0; }
+.topbar__search-input  {
+  height: 28px; padding: 0 10px 0 26px; width: 160px;
+  background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text); font-size: 0.72rem; font-family: inherit; outline: none;
+  transition: border-color 0.15s, background 0.15s, width 0.2s;
+}
+.topbar__search-input::placeholder { color: var(--muted); }
+.topbar__search-input:focus { background: rgba(255,255,255,0.1); border-color: var(--accent); width: 220px; }
+
+.topbar__badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin-left: auto; margin-right: 16px; flex-shrink: 1; min-width: 0;
+  padding: 6px 14px 6px 10px; border-radius: 20px; border: 1px solid transparent;
+  /* Faint glass — keep the alpha low (≤4%) so backdrop-filter blur actually
+   * shows through to the topbar gradient beneath. The previous 15%/10% was
+   * too opaque and made the blur effect invisible. */
+  background: rgba(255,255,255,0.03);
+  /* Top inner highlight + soft outer glow: makes the shell feel "lit from
+   * above" instead of flat. Inner highlight is a 1px white inset shadow;
+   * outer glow is the same purple family the border sweep uses, so the
+   * capsule and its moving border share one color story. */
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    inset 0 -1px 0 rgba(0,0,0,0.25),
+    0 0 16px rgba(var(--accent-rgb), 0.18);
+  position: relative; font-size: 0.72rem; font-weight: 600;
+  letter-spacing: 0.04em; color: transparent; text-shadow: none; backdrop-filter: blur(8px);
+  /* Subtle elevation on hover — keeps the capsule inviting without
+   * breaking the quiet permanent-decor feel. */
+  transition: box-shadow 0.35s ease, background 0.35s ease;
+}
+.topbar__badge:hover {
+  background: rgba(255,255,255,0.05);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.12),
+    inset 0 -1px 0 rgba(0,0,0,0.25),
+    0 0 22px rgba(var(--accent-rgb), 0.32);
+}
+/* Diagonal light sweep on the border — the "streamer" you asked for.
+ * Gradient is ~4× wider than the element so the bright violet→pink stripe
+ * slides across the perimeter and fades before re-entering; background-size
+ * is set in % to keep this resolution-independent. Same palette as the
+ * .badge-meow text shimmer so the shell and the word breathe in one tone. */
+.topbar__badge::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+  background: linear-gradient(110deg,
+    rgba(var(--accent-rgb), 0.15)  0%,
+    rgba(var(--accent-rgb), 0.55) 22%,
+    rgba(var(--accent2-rgb), 0.85) 38%,
+    rgba(var(--accent-rgb), 0.55) 54%,
+    rgba(var(--accent-rgb), 0.15) 76%,
+    rgba(var(--accent-rgb), 0.15) 100%);
+  background-size: 300% 100%;
+  -webkit-mask: linear-gradient(#fff,#fff) content-box, linear-gradient(#fff,#fff) content-box;
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff,#fff) content-box, linear-gradient(#fff,#fff) content-box;
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: badge-border-sweep 6s linear infinite;
+  will-change: background-position;
+}
+.topbar__badge-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+  box-shadow: 0 0 10px var(--green), 0 0 20px rgba(34,197,94,0.3);
+  animation: dot-pulse 3s ease-in-out infinite; flex-shrink: 0; filter: brightness(1.2);
+}
+.topbar__badge-dot--loading { background: var(--yellow); box-shadow: 0 0 10px var(--yellow), 0 0 20px rgba(234,179,8,0.3); }
+/* "by" sits between the carousel word and "meow" — kept low-contrast so the
+ * word and the italic gradient get all the attention. Same purple family
+ * but lower alpha and lighter weight, with extra letter-spacing so it reads
+ * as a tiny breathing pause rather than competing text. */
+.badge-by   { color: rgba(var(--accent-rgb), 0.55); font-weight: 300; font-size: 0.64rem; letter-spacing: 0.14em; text-transform: uppercase; text-shadow: none; }
+.badge-meow {
+  font-style: italic; font-weight: 800; color: var(--accent); font-size: 0.76rem;
+  background: linear-gradient(90deg, rgba(var(--accent-rgb), 1) 0%, rgba(var(--accent2-rgb), 1) 20%, rgba(var(--accent-rgb), 1) 40%, rgba(var(--accent-rgb), 0.7) 60%, rgba(var(--accent2-rgb), 1) 80%, rgba(var(--accent-rgb), 1) 100%);
+  background-size: 400% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: badge-shimmer 3s ease-in-out -1.5s infinite;
+  filter: drop-shadow(0 0 10px rgba(var(--accent-rgb), 0.7)) drop-shadow(0 0 22px rgba(var(--accent2-rgb), 0.4));
+  /* hint GPU to composite the animated background-position in a separate
+   * layer — prevents the shimmer from flickering on Android Chrome where
+   * the browser doesn't infer this automatically. */
+  will-change: background-position;
+  -webkit-will-change: background-position;
+}
+.topbar__badge-carousel { display: inline-block; min-width: 3ch; text-align: left; }
+#carousel-text {
+  display: inline-block; background-size: 400% 100%;
+  animation: carousel-shimmer 3s ease-in-out infinite; transition: opacity 0.45s ease;
+  filter: drop-shadow(0 0 8px rgba(var(--accent-rgb), 0.5)) drop-shadow(0 0 18px rgba(var(--accent2-rgb), 0.25));
+  /* same GPU hint for carousel text shimmer on Android. */
+  will-change: background-position;
+  -webkit-will-change: background-position;
+}
+/* ═══════════════════════════════════════════════════════════════════════
+ * Email card — revealed by hovering the "meow" word (fine pointers) or by
+ * tapping it (coarse pointers: tap toggles, tapping anywhere else closes).
+ * See initBadgeEmailCard() in main.ts. The card is pointer-transparent while
+ * hidden and interactive while open, so the address can be selected.
+ * ═══════════════════════════════════════════════════════════════════════ */
+.badge-email-card {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;                       /* anchor to the right edge of the capsule so it doesn't clip off-screen on narrow viewports */
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border-radius: 12px;
+  background: rgba(20, 14, 36, 0.82);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  border: 1px solid rgba(var(--accent-rgb), 0.35);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.45),
+    0 0 18px rgba(var(--accent-rgb), 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color: #e9e4ff;
+  font-size: 0.72rem; font-weight: 500; letter-spacing: 0.01em;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px) scale(0.97);
+  transform-origin: top right;
+  transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0.28s;
+  z-index: 1000;
+}
+.badge-email-card.is-visible {
+  /* Interactive while open: lets the pointer rest on the card (main.ts keeps
+   * it open on card hover) and lets the address be selected / copied. While
+   * hidden it is visibility:hidden, which already blocks pointer events. */
+  pointer-events: auto;
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+  /* visibility transition delays must collapse to 0 once visible, otherwise
+   * the card keeps visibility:hidden during the fade-in. */
+  transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0s;
+}
+.badge-email-card__arrow {
+  position: absolute;
+  top: -5px; right: 18px;       /* arrow roughly under the "meow" word, give or take per font */
+  width: 10px; height: 10px;
+  background: rgba(20, 14, 36, 0.82);
+  border-left: 1px solid rgba(var(--accent-rgb), 0.35);
+  border-top:  1px solid rgba(var(--accent-rgb), 0.35);
+  transform: rotate(45deg);
+}
+.badge-email-card__icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 6px;
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.25), rgba(var(--accent2-rgb), 0.18));
+  color: var(--accent-light);
+  flex-shrink: 0;
+}
+.badge-email-card__addr {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #f3efff;
+  background: linear-gradient(90deg, var(--accent-light) 0%, var(--accent2) 50%, var(--accent-light) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  /* Subtle personal touch: a slow shimmer on the address itself so it
+   * doesn't feel static — but slow enough to not compete with the
+   * border sweep above. */
+  animation: carousel-shimmer 6s ease-in-out infinite;
+}
+.badge-email-card__hint {
+  font-size: 0.58rem;
+  color: rgba(var(--accent-light-rgb), 0.55);
+  letter-spacing: 0.06em;
+  border-left: 1px solid rgba(var(--accent-rgb), 0.2);
+  padding-left: 8px;
+  margin-left: 2px;
+}
+/* Mobile — narrower padding, smaller hint (or hide it entirely on tiny screens). */
+@media (max-width: 640px) {
+  .badge-email-card { padding: 6px 10px; gap: 6px; }
+  .badge-email-card__hint { display: none; }
+}
+
+#carousel-text.is-hidden { opacity: 0; }
+
+}
+
+/* ── Toolbar ────────────────────────────────────────────────────────────── */
+@layer toolbar {
+
+.toolbar {
+  display: flex; align-items: center; gap: 4px;
+  padding: 0 16px; height: 44px; border-bottom: 1px solid var(--border);
+  background: rgba(12, 18, 34, 0.6); overflow-x: auto;
+  position: relative; z-index: 25;
+}
+.toolbar__sep    { width: 1px; height: 20px; background: var(--border); margin: 0 6px; flex-shrink: 0; }
+.toolbar__label  { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); padding: 0 4px; white-space: nowrap; flex-shrink: 0; }
+.toolbar__spacer { flex: 1; min-width: 8px; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 11px; border-radius: 8px;
+  border: 1px solid transparent; background: transparent;
+  color: var(--text-2); font-size: 0.73rem; font-weight: 500;
+  font-family: inherit; cursor: pointer; white-space: nowrap;
+  transition: background 0.18s var(--ease-out), border-color 0.18s, color 0.18s, box-shadow 0.18s, transform 0.1s;
+  position: relative; overflow: hidden; line-height: 1.4; flex-shrink: 0;
+}
+.btn::after { content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle at 50% 50%, var(--accent-soft) 0%, transparent 70%);
+  opacity: 0; transform: scale(0.6); transform-origin: 50% 50%;
+  transition: opacity 0.25s var(--ease-out), transform 0.4s var(--ease-spring);
+}
+.btn:hover::after  { opacity: 1; transform: scale(1.4); }
+.btn:active::after { opacity: 1; transform: scale(0.95); transition-duration: 0.05s; }
+.btn > * { position: relative; z-index: 1; }
+.btn:hover  {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(var(--accent-rgb), 0.5);
+  color: var(--text);
+  box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.25), 0 4px 14px -4px rgba(var(--accent-rgb), 0.35);
+}
+.btn:active { transform: scale(0.96); box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.4), 0 4px 12px rgba(var(--accent-rgb), 0.45); }
+.btn svg    { width: 14px; height: 14px; flex-shrink: 0; }
+.btn--primary { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 14px var(--accent-glow); color: #fff; font-weight: 600; }
+.btn--primary:hover { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.5); color: #fff; }
+.btn--ghost       { background: rgba(255,255,255,0.04); border-color: var(--border); }
+.btn--ghost:hover { background: rgba(255,255,255,0.08); border-color: var(--border-hi); color: var(--text); }
+.btn--danger      { color: var(--red); }
+.btn--danger:hover { background: rgba(248,113,113,0.1); border-color: rgba(248,113,113,0.3); }
+.btn--active      { background: rgba(var(--accent-rgb), 0.15); border-color: rgba(var(--accent-rgb), 0.4); color: var(--accent); }
+
+.btn.layout-btn.active { background: rgba(var(--accent-rgb), 0.12); border-color: var(--accent); color: var(--accent); box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.22); }
+.layout-btn:hover:not(.active) { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12); color: var(--text); }
+.layout-btn:hover:not(.active)::after { opacity: 0; }
+
+#btn-tour.active  { background: rgba(var(--accent-rgb), 0.18); border-color: var(--accent); color: var(--accent); box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.25); }
+#btn-tour.active svg { stroke: var(--accent); }
+#btn-music.active { background: rgba(var(--accent-rgb), 0.18); border-color: var(--accent); color: var(--accent); box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.25); }
+#btn-music.active svg { stroke: var(--accent); }
+
+/* ── Layout segmented switcher (toolbar) ─────────────────────────────────────── */
+/* A single "布局 · COSE ⌄" trigger in the toolbar opens a popover with all 7
+ * options. The popover is rendered outside the toolbar (body level, position:fixed)
+ * to avoid overflow clipping issues. */
+.layout-switcher { position: relative; flex-shrink: 0; }
+.layout-switcher__btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 9px 5px 11px; border-radius: 8px;
+  border: 1px solid var(--accent); color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.12);
+  box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.22);
+  font-size: 0.73rem; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+  font-family: inherit; line-height: 1.4;
+  transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+.layout-switcher__btn:hover { background: rgba(var(--accent-rgb), 0.18); box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.32); }
+.layout-switcher__btn:active { transform: scale(0.97); }
+.layout-switcher__label { color: var(--muted); font-weight: 500; letter-spacing: 0.04em; }
+.layout-switcher__sep   { color: var(--muted); opacity: 0.6; font-weight: 400; }
+.layout-switcher__current { font-family: var(--font-mono); letter-spacing: -0.01em; }
+.layout-switcher__chev {
+  width: 12px; height: 12px;
+  transition: transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
+  color: var(--accent); opacity: 0.85;
+}
+.layout-switcher.visible .layout-switcher__chev { transform: rotate(180deg); }
+
+.layout-switcher__menu {
+  position: fixed;
+  z-index: 30;
+  padding: 4px;
+  display: flex; flex-direction: column; gap: 1px;
+  background: rgba(12, 18, 34, 0.92);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--border-hi);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04) inset, 0 0 24px rgba(var(--accent-rgb), 0.08);
+  opacity: 0; pointer-events: none;
+  transform: translateY(-4px) scale(0.97);
+  transform-origin: top left;
+  transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.layout-switcher__menu.visible {
+  opacity: 1; pointer-events: auto; transform: translateY(0) scale(1);
+}
+.layout-switcher__item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border-radius: 7px;
+  border: 1px solid transparent; background: transparent;
+  color: var(--text-2); font-size: 0.72rem; font-weight: 500;
+  font-family: inherit; cursor: pointer; text-align: left;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.layout-switcher__item:hover  { background: rgba(255,255,255,0.06); color: var(--text); border-color: var(--border); }
+.layout-switcher__item.active {
+  background: rgba(var(--accent-rgb), 0.18); color: var(--accent); border-color: rgba(var(--accent-rgb), 0.4);
+  box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.2);
+}
+.layout-switcher__item.active::before {
+  content: ''; display: inline-block; width: 4px; height: 4px;
+  border-radius: 50%; background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+  margin-right: 2px; flex-shrink: 0;
+}
+
+}
+
+/* ── Sidebar ────────────────────────────────────────────────────────────── */
+@layer sidebar {
+
+:root {
+  /* Sidebar width scales with viewport so 2-column legend rows have
+   * enough room for long Chinese labels like "局部→整体 (123)".
+   * Floor 280px (single-column minimum usability), ceiling 320px
+   * (canvas should keep most of the screen on desktop). The 6vw term
+   * gives extra room on wide screens without hurting narrow ones. */
+  --sidebar-width: clamp(280px, 6vw + 248px, 320px);
+}
+
+/* Sidebar is positioned absolute so it never participates in #main's
+   flex layout. This is the linchpin of the no-flash design:
+
+     - #cy is the ONLY flex item in #main → it always fills #main's
+       full width, regardless of sidebar's visible state.
+     - #main's flex dimensions never change when sidebar toggles →
+       cytoscape's canvas never resizes → canvas surface never clears →
+       no black flash.
+
+   Hiding is purely visual: `transform: translateX(100%)` slides the
+   sidebar off the right edge of #main, `opacity: 0` makes it invisible,
+   `pointer-events: none` makes it click-through.
+
+   Trade-off: nodes that cytoscape positions in the rightmost 320px
+   are visually covered by the sidebar when it's visible — but the user
+   doesn't see that region anyway, so it's invisible overhead. */
+#sidebar {
+  position: absolute; top: 0; right: 0; bottom: 0;
+  width: var(--sidebar-width);
+  --glass-bg: rgba(12, 18, 34, 0.7);
+  backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
+  overflow-y: auto;
+  display: flex; flex-direction: column;
+  transform: translateX(0); opacity: 1;
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity   0.28s ease;
+  will-change: transform, opacity;
+  padding-bottom: 16px;
+  z-index: 6;
+}
+#sidebar.hidden {
+  transform: translateX(100%); opacity: 0; pointer-events: none;
+}
+
+.sidebar-section { padding: 0; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.sidebar-section__head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; cursor: pointer; user-select: none;
+  border-radius: 8px; margin: 0 6px;
+  border: 1px solid transparent;
+  transition: background 0.14s, border-color 0.14s, color 0.14s;
+}
+.sidebar-section__head:hover {
+  background: rgba(255,255,255,0.04);
+  border-color: var(--border);
+  color: var(--text);
+}
+.sidebar-section__head:active {
+  background: rgba(var(--accent-rgb), 0.12);
+  border-color: rgba(var(--accent-rgb), 0.4);
+}
+/* 侧栏标题 + 重音条：顶层 section（.sidebar-section__title）与图例子标题
+ * （.legend-section__title）共用同一套规格，避免两处规则各自漂移
+ * —— 统一前是 0.62rem / 12px条 11px / 间距8px vs 0.6rem / 0.1em / 条10px / 间距7px。
+ * 层级差异只由缩进体现（如「布局设置」+2px），不再由字号或条高体现。 */
+.sidebar-section__title,
+.legend-section__title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--muted);
+}
+.sidebar-section__title::before,
+.legend-section__title::before {
+  content: ''; display: block; width: 3px; height: 10px; border-radius: 2px;
+  background: var(--accent); flex-shrink: 0;
+}
+.sidebar-section__chevron { width: 14px; height: 14px; color: var(--muted); transition: transform 0.2s cubic-bezier(0.4,0,0.2,1), color 0.15s; flex-shrink: 0; }
+.sidebar-section__chevron.open { transform: rotate(90deg); transition: transform var(--dur-normal) var(--ease-out); }
+.sidebar-section__body {
+  max-height: 0; overflow: hidden;
+  transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1), padding 0.28s ease;
+  padding-top: 0; padding-bottom: 0;
+}
+.sidebar-section[data-section-state="open"] > .sidebar-section__body {
+  max-height: none;
+  padding: 0 14px 12px;
+}
+
+/* 嵌套 section（高级设置 → 布局设置）的对齐修正。
+ *
+ * 1) 上面的「展开态」规则必须用子选择器 `>`：原来用后代选择器时，外层「高级设置」
+ *    展开会给**所有后代** body 加上 `padding: 0 14px 12px`，包括已折叠的内层
+ *    #body-layout-setting。max-height:0 只压内容盒、不压 padding，于是折叠后
+ *    仍会露出 12px 的 padding-bottom —— 就是那条「半行」。
+ * 2) #body-advanced 本身去掉左右内边距：它里面装的是另一个 .sidebar-section，
+ *    若再加 14px，子级标题的竖条会比父级多缩进 14px，而「图例说明 → 节点本质」
+ *    那层只差 2px。去掉后子级回到与顶层同一基准，再由下面那条规则精确对齐。 */
+#body-advanced { padding-left: 0; padding-right: 0; }
+
+/* 3) 嵌套的「布局设置」按图例子项（「节点本质」）对齐竖条 x：+2px
+ *    —— 顶层标题是 margin 6 + padding 14 = 20px，
+ *    图例子项是 body 内边距 14 + 头部 padding 8 = 22px，差 2px。
+ *    字号与条高已由上面的统一规格覆盖，这里只管缩进。 */
+[data-section="layout-setting"] > .sidebar-section__head { padding-left: 16px; }
+
+.node-type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.node-type-item {
+  display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 9px;
+  cursor: pointer; border: 1px solid transparent;
+  transition: background 0.14s, border-color 0.14s, transform 0.12s;
+  user-select: none; position: relative; overflow: hidden;
+}
+.node-type-item::before { content: ''; position: absolute; inset: 0; background: var(--accent); opacity: 0; transition: opacity 0.14s; border-radius: inherit; }
+.node-type-item:hover { background: rgba(255,255,255,0.04); border-color: var(--border-hi); transform: translateY(-1px); }
+.node-type-item:hover::before { opacity: 0.04; }
+.node-type-item.active { border-color: rgba(var(--accent-rgb), 0.5); background: rgba(var(--accent-rgb), 0.18); box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.25); }
+.node-type-item__dot   { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; position: relative; z-index: 1; box-shadow: 0 0 6px currentColor; }
+.node-type-item__label { font-size: 0.72rem; color: var(--text-2); font-weight: 500; position: relative; z-index: 1; line-height: 1; }
+.node-type-item__count { font-size: 0.62rem; color: var(--muted); font-weight: 400; margin-left: auto; flex-shrink: 0; }
+
+/* ── Legend blocks (图例说明) ───────────────────────────────────────────────── */
+/* `legend-block` is now a foldable sub-section. The header/grid-rows animation
+ * is identical to `.sidebar-section`, so the four axes (节点本质 / 学科领域 /
+ * 知识层级 / 关联关系) each become their own collapsible card without any
+ * extra JS. The chevron icon is shared via `.sidebar-section__chevron`. */
+.legend-block { display: flex; flex-direction: column; gap: 0; flex-shrink: 0; }
+.legend-block + .legend-block { margin-top: 8px; }
+.legend-block__label { display: none; }   /* legacy label class kept off the DOM */
+
+.legend-section__head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 8px; cursor: pointer; user-select: none;
+  border-radius: 7px; border: 1px solid transparent;
+  transition: background 0.14s, border-color 0.14s, color 0.14s;
+}
+.legend-section__head:hover {
+  background: rgba(255,255,255,0.04);
+  border-color: var(--border);
+  color: var(--text);
+}
+.legend-section__head:active {
+  background: rgba(var(--accent-rgb), 0.12);
+  border-color: rgba(var(--accent-rgb), 0.4);
+}
+/* .legend-section__title / ::before 的规格已并入上方与
+ * .sidebar-section__title 共用的那条统一规则，此处不再重复定义。 */
+.legend-section__body {
+  max-height: 0; overflow: hidden;
+  transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1), padding 0.28s ease;
+  padding: 0 4px;
+}
+.legend-section[data-section-state="open"] .legend-section__body {
+  max-height: 400px; overflow-y: auto; overflow-x: auto;
+  /* Allow both axes to scroll independently: vertical scroll when content
+   * exceeds max-height, horizontal scroll for long labels. */
+  padding: 0 4px 6px;
+}
+
+.legend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; min-width: 0; width: 100%; max-width: 100%; overflow-x: auto; }
+.legend-grid--1 { grid-template-columns: 1fr; }
+.legend-grid--2 { grid-template-columns: 1fr 1fr; }
+.legend-grid--3 { grid-template-columns: 1fr 1fr 1fr; }
+.legend-grid--4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.legend-grid--5 { grid-template-columns: 1fr 1fr 1fr 1fr 1fr; }
+
+.legend-row {
+  display: flex; align-items: center; gap: 7px;
+  padding: 5px 8px; border-radius: 7px;
+  cursor: pointer; border: 1px solid transparent;
+  transition: background 0.12s, border-color 0.12s;
+  user-select: none;
+  /* Prevent long labels from expanding the row past its grid column,
+   * which pushes the count off-screen before overflow-x: auto fires.
+   * The label inside handles its own text ellipsis. */
+  min-width: 0;
+}
+.legend-row:hover { background: rgba(255,255,255,0.04); border-color: var(--border-hi); }
+
+.legend-node { flex-shrink: 0; width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.legend-node--shape {
+  width: 12px; height: 12px;
+  display: inline-block; flex-shrink: 0;
+  background: #94a3b8;
+}
+.legend-node--shape.shape-ellipse         { border-radius: 50%; }
+.legend-node--shape.shape-rectangle       { border-radius: 2px; }
+.legend-node--shape.shape-round-rectangle { border-radius: 4px; }
+.legend-node--shape.shape-diamond         { transform: rotate(45deg); width: 10px; height: 10px; margin: 1px; }
+.legend-node--shape.shape-triangle        { clip-path: polygon(50% 0%, 100% 85%, 0% 85%); }
+.legend-node--shape.shape-pentagon        {
+  clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+}
+.legend-node--shape.shape-octagon         {
+  clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+}
+.legend-node--shape.shape-star            {
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+}
+.legend-node--shape.shape-tag             {
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 0 100%);
+  width: 14px;
+}
+.legend-node--shape.shape-round-tag       {
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 0 100%);
+  border-radius: 3px 5px 5px 3px;
+  width: 14px;
+}
+/* 备用形状 */
+.legend-node--shape.shape-round-triangle     { clip-path: polygon(50% 0%, 100% 85%, 0% 85%); border-radius: 3px; }
+.legend-node--shape.shape-bottom-round-rectangle { clip-path: polygon(0 0, 100% 0, 100% 70%, calc(100% - 15%) 100%, 15% 100%, 0 70%); }
+.legend-node--shape.shape-cut-rectangle      { clip-path: polygon(0 0, 85% 0, 100% 15%, 100% 100%, 0 100%); }
+.legend-node--shape.shape-barrel             { clip-path: polygon(15% 0%, 85% 0%, 100% 50%, 85% 100%, 15% 100%, 0% 50%); }
+.legend-node--shape.shape-rhomboid           { clip-path: polygon(25% 0%, 100% 0%, 75% 100%, 0% 100%); }
+.legend-node--shape.shape-right-rhomboid     { clip-path: polygon(0% 0%, 75% 0%, 100% 100%, 25% 100%); }
+.legend-node--shape.shape-round-diamond      { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); border-radius: 4px; }
+.legend-node--shape.shape-round-pentagon     { clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%); border-radius: 3px; }
+.legend-node--shape.shape-hexagon            { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); }
+.legend-node--shape.shape-round-hexagon      { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); border-radius: 4px; }
+.legend-node--shape.shape-concave-hexagon    { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 85% 100%, 15% 100%, 0% 50%); }
+.legend-node--shape.shape-heptagon            { clip-path: polygon(50% 0%, 85% 15%, 100% 50%, 85% 85%, 50% 100%, 15% 85%, 0% 50%); }
+.legend-node--shape.shape-round-heptagon     { clip-path: polygon(50% 0%, 85% 15%, 100% 50%, 85% 85%, 50% 100%, 15% 85%, 0% 50%); border-radius: 3px; }
+.legend-node--shape.shape-round-octagon      { clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%); border-radius: 3px; }
+.legend-node--shape.shape-vee                { clip-path: polygon(50% 60%, 100% 0%, 100% 100%, 50% 100%, 0% 100%, 0% 0%); }
+.legend-shape-svg { display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.legend-shape-svg svg { width: 16px; height: 16px; }
+.legend-node--cat   { width: 8px; height: 8px; border-radius: 50%; display: inline-block; border: 1px solid rgba(255,255,255,0.15); }
+.legend-swatch      { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.legend-row__label {
+  font-size: 0.7rem; color: var(--text-2); font-weight: 500;
+  /* flex item inside a multi-column grid cell: min-width:0 lets the label
+   * shrink below its content width, then ellipsis clips the overflow.
+   * flex: 1 1 auto → basis=auto (not 0%) so short labels expand to fill
+   * available space, not stay at 0-width and let the count get pushed off.
+   * Without min-width:0 a long Chinese label pushes its cell past the
+   * column track, the whole grid blows out, and on iOS WebView the
+   * legend block appears shifted right (clipped by overflow:hidden on
+   * the sheet). Visible as the legend block looking "偏右" on iPhone
+   * while Android renders fine. */
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.legend-row__count { font-size: 0.6rem; color: var(--muted); font-weight: 400; flex-shrink: 0; margin-left: auto; }
+.legend-row.active {
+  background: rgba(var(--accent-rgb), 0.18);
+  border-color: rgba(var(--accent-rgb), 0.5);
+  box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.25);
+}
+.legend-row.active .legend-row__label {
+  color: var(--accent);
+}
+
+.legend-edge-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 8px; border-radius: 7px;
+  font-size: 0.68rem; color: var(--text-2); font-weight: 500;
+  cursor: pointer; border: 1px solid transparent;
+  transition: background 0.12s, border-color 0.12s;
+  /* Same as .legend-row: prevent the row itself from expanding past its
+   * grid column on long Chinese labels like "局部→整体". */
+  min-width: 0;
+}
+.legend-edge-row.active {
+  background: rgba(var(--accent-rgb), 0.18);
+  border-color: rgba(var(--accent-rgb), 0.5);
+  box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.25);
+}
+.legend-edge-row.active .legend-edge-row__label {
+  color: var(--accent);
+}
+.legend-edge-row:hover { background: rgba(255,255,255,0.04); border-color: var(--border-hi); }
+
+.legend-edge-row svg { flex-shrink: 0; }
+.legend-edge-row__label {
+  flex: 1 1 auto; min-width: 0;
+  /* Same fix as .legend-row__label — see comment there. Edge label sits
+   * inside a 2-column legend grid; min-width:0 lets it ellipsise instead
+   * of blowing the column width. The sidebar width itself is now
+   * responsive (--sidebar-width), so on wider viewports the row has
+   * enough room for full text. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.legend-edge-row__count { font-size: 0.6rem; color: var(--muted); font-weight: 400; flex-shrink: 0; margin-left: auto; }
+
+/* category dot in sidebar (dynamic) */
+.legend-cat-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+/* ── Stat cards + layout info (migrated → sidebar/sidebar-stats.css) ─────── */
+/* .stat-list | .stat-card* | .layout-info* */
+/* ── Layout params (migrated → sidebar/sidebar-params.css) ──────────────── */
+/* .layout-params | #layout-params-rows | .param-row | .param-slider | .btn--apply … */
+
+.shape-filter-list { display: flex; flex-direction: column; gap: 3px; }
+.shape-filter-item { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; transition: background 0.12s, border-color 0.12s; user-select: none; }
+.shape-filter-item:hover { background: rgba(255,255,255,0.035); border-color: var(--border-hi); }
+.shape-filter-item.active { background: rgba(var(--accent-rgb), 0.18); border-color: rgba(var(--accent-rgb), 0.5); box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.25); }
+.shape-filter-item__shape { flex-shrink: 0; }
+.shape-filter-item__label { font-size: 0.72rem; color: var(--text-2); font-weight: 500; }
+
+.tag-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.tag { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px; border: 1px solid var(--border); background: rgba(255,255,255,0.04); font-size: 0.65rem; font-weight: 500; color: var(--text-2); cursor: pointer; transition: background 0.14s, color 0.14s; }
+.tag:active { background: rgba(var(--accent-rgb), 0.15); color: var(--accent); }
+
+/* ── Layout info (migrated → sidebar/sidebar-stats.css) ──────────────────── */
+/* .layout-info | .layout-info__header | .layout-info__label | .layout-info__badge | .layout-info__desc */
+
+/* ── Layout params (migrated → sidebar/sidebar-params.css) ──────────────── */
+/* .layout-params | #layout-params-rows | .param-row | .param-label | .param-label__val | .param-slider | .param-select | .no-params | .btn--apply | .param-actions | .btn--ghost | .btn--sm */
+
+.shortcuts-list { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.shortcut-item  { display: flex; align-items: center; gap: 6px; font-size: 0.68rem; color: var(--muted); padding: 4px 0; }
+.shortcut-item__label { font-weight: 500; }
+
+}
+
+/* ── Node detail panel ──────────────────────────────────────────────────── */
+@layer node-panel {
+
+#node-panel {
+  position: fixed; top: 72px; right: calc(var(--sidebar-width) + 16px); left: auto; z-index: 30;
+  width: 360px; max-width: min(360px, calc(100vw - 24px));
+  max-height: calc(100vh - 96px);
+  --glass-bg: rgba(10, 14, 28, 0.90); border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.55), 0 0 40px rgba(var(--accent-rgb), 0.06);
+  display: flex; flex-direction: column; overflow: hidden;
+  visibility: hidden; opacity: 0; pointer-events: none;
+  transition: opacity 0.22s ease, visibility 0.22s; touch-action: none;
+}
+
+/* ── Mobile: auto-sized panel, same drag/resize as desktop ─────────── */
+@media (max-width: 768px) {
+  #node-panel {
+    top: 56px; right: auto; left: 8px;
+    width: auto;
+    max-width: calc(100vw - 16px);
+    height: auto;
+    max-height: 40vh;
+  }
+}
+/* When sidebar is hidden, panel can sit at the right edge. */
+#node-panel.sidebar-hidden-adjust { right: 16px; }
+#node-panel.visible { visibility: visible; opacity: 1; pointer-events: auto; display: flex; animation: np-in 0.3s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+#node-panel.dragging { cursor: grabbing; user-select: none; }
+#node-panel.dragging .node-panel__header { cursor: grabbing; }
+#node-panel.resizing { cursor: se-resize; user-select: none; }
+
+.node-panel__resize {
+  position: absolute; right: 0; bottom: 0; width: 14px; height: 14px;
+  cursor: se-resize; touch-action: none;
+  /* Two thin diagonal lines drawn with a single gradient — matches the
+     bottom-right grip convention used by native window chrome. */
+  background-image:
+    linear-gradient(135deg, transparent 0 6px, var(--border-hi) 6px 7px, transparent 7px 8px,
+                                transparent 0 9px, var(--border-hi) 9px 10px, transparent 10px 100%);
+}
+.node-panel__resize:hover { background-image:
+    linear-gradient(135deg, transparent 0 6px, var(--accent) 6px 7px, transparent 7px 8px,
+                                transparent 0 9px, var(--accent) 9px 10px, transparent 10px 100%);
+}
+
+.node-panel__header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid rgba(30,45,69,0.7); flex-shrink: 0; touch-action: none; cursor: grab; }
+.node-panel__title  { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+.node-panel__close  { width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--border); background: rgba(255,255,255,0.03); color: var(--muted); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.14s, color 0.14s, border-color 0.14s; flex-shrink: 0; }
+.node-panel__close:hover { background: rgba(248,113,113,0.15); border-color: var(--red); color: var(--red); }
+.node-panel__close svg { width: 12px; height: 12px; }
+.node-panel__pin    { width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--border); background: rgba(255,255,255,0.03); color: var(--muted); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.14s, color 0.14s, border-color 0.14s; flex-shrink: 0; }
+.node-panel__pin:hover  { background: rgba(var(--accent-rgb), 0.15); border-color: rgba(var(--accent-rgb), 0.5); }
+.node-panel__pin.active { background: rgba(var(--accent-rgb), 0.2);  border-color: rgba(var(--accent-rgb), 0.7); }
+.node-panel__pin svg { width: 12px; height: 12px; }
+.node-panel__tabs { display: flex; gap: 4px; }
+.node-panel__tab  { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border); background: rgba(255,255,255,0.03); color: var(--muted); font-size: 0.6rem; font-weight: 700; cursor: pointer; transition: background 0.14s, color 0.14s, border-color 0.14s; display: flex; align-items: center; justify-content: center; }
+.node-panel__tab.active        { background: rgba(var(--accent-rgb), 0.18); border-color: rgba(var(--accent-rgb), 0.5); color: var(--accent); }
+.node-panel__tab:hover:not(.active) { background: rgba(255,255,255,0.06); border-color: var(--border-hi); color: var(--text-2); }
+
+.node-panel__body { padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.node-panel__body::-webkit-scrollbar { width: 3px; }
+.node-panel__body::-webkit-scrollbar-track { background: transparent; }
+.node-panel__body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+.np-page { display: flex; flex-direction: column; gap: 12px; }
+.np-page .np-section { display: flex; flex-direction: column; gap: 6px; }
+.np-page .np-section__label { font-size: 0.62rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.np-page .np-summary  { font-size: 0.78rem; color: var(--text); line-height: 1.65; }
+.np-page .np-tags     { display: flex; flex-wrap: wrap; gap: 4px; }
+.np-page .np-tag      { font-size: 0.6rem; padding: 2px 7px; border-radius: 4px; background: rgba(var(--accent-rgb), 0.1); border: 1px solid rgba(var(--accent-rgb), 0.2); color: var(--accent); }
+.np-page .np-edges-group { display: flex; flex-direction: column; gap: 4px; }
+.np-page .np-edges-group__label { font-size: 0.62rem; color: var(--muted); }
+.np-page .np-count    { font-size: 0.58rem; padding: 1px 5px; border-radius: 3px; background: rgba(var(--accent-rgb), 0.12); color: var(--accent); }
+.np-page .np-edge-item { display: flex; gap: 6px; padding: 5px 7px; border-radius: 5px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); cursor: pointer; transition: background 0.12s; }
+.np-page .np-edge-item:hover { background: rgba(var(--accent-rgb), 0.1); border-color: rgba(var(--accent-rgb), 0.2); }
+.np-page .np-edge-item__type   { font-size: 0.58rem; color: var(--accent); white-space: nowrap; padding-top: 1px; min-width: 32px; }
+.np-page .np-edge-item__target { font-size: 0.72rem; color: var(--text); }
+.np-page .np-edge-item__reason { font-size: 0.62rem; color: var(--muted); }
+.np-page .np-neighbor { display: inline-block; font-size: 0.65rem; padding: 2px 7px; border-radius: 4px; background: rgba(255,255,255,0.04); color: var(--text-2); margin: 2px 4px 2px 0; cursor: pointer; transition: background 0.12s; }
+.np-page .np-neighbor:hover { background: rgba(var(--accent-rgb), 0.1); color: var(--accent); }
+.np-page .np-question { padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.np-page .np-question:last-child { border-bottom: none; }
+.np-page .np-question__label  { font-size: 0.62rem; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+.np-page .np-question__answer { font-size: 0.75rem; color: var(--text); line-height: 1.7; }
+
+.np-hero { display: flex; flex-direction: column; gap: 4px; }
+.np-hero__badges { display: flex; gap: 5px; flex-wrap: wrap; }
+.np-badge { font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; padding: 2px 8px; border-radius: 5px; border: 1px solid; flex-shrink: 0; }
+.np-badge--type    { border-color: rgba(var(--accent-rgb), 0.4);  background: rgba(var(--accent-rgb), 0.12); }
+.np-hero__name     { font-size: 1rem; font-weight: 700; color: var(--text); letter-spacing: -0.01em; line-height: 1.35; word-break: break-word; }
+.np-hero__location { font-size: 0.66rem; color: var(--muted); line-height: 1.5; word-break: break-word; }
+.np-hero__tags     { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.np-tag--inline    { font-size: 0.6rem; font-weight: 500; color: var(--text-2); background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 2px 9px; transition: background 0.12s, color 0.12s, border-color 0.12s; cursor: pointer; }
+.np-tag--inline:hover { background: rgba(var(--accent-rgb), 0.18); border-color: rgba(var(--accent-rgb), 0.4); color: var(--accent); }
+
+.np-summary-section { display: flex; flex-direction: column; gap: 6px; }
+.np-summary { font-size: 0.75rem; color: var(--text-2); line-height: 1.65; padding: 10px 12px; background: rgba(var(--accent-rgb), 0.06); border-left: 2px solid rgba(var(--accent-rgb), 0.35); border-radius: 0 6px 6px 0; }
+
+.np-section { display: flex; flex-direction: column; gap: 6px; }
+.np-section__label  { font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.np-section__toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; padding: 2px 0; }
+.np-section__toggle-arrow { width: 12px; height: 12px; color: var(--muted); transition: transform 0.2s ease; flex-shrink: 0; }
+.np-section__toggle-arrow.rotated { transform: rotate(90deg); }
+
+/* Summary toggle button */
+.np-summary__toggle {
+  margin-left: auto;
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.12);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.np-summary__toggle:hover {
+  background: rgba(var(--accent-rgb), 0.2);
+  border-color: rgba(var(--accent-rgb), 0.5);
+}
+
+.np-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.np-tag  { font-size: 0.64rem; font-weight: 500; color: var(--text-2); background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 2px 9px; transition: background 0.12s, color 0.12s, border-color 0.12s; cursor: pointer; }
+.np-tag:hover { background: rgba(var(--accent-rgb), 0.18); border-color: rgba(var(--accent-rgb), 0.4); color: var(--accent); }
+
+.np-edges { display: flex; flex-direction: column; gap: 4px; }
+.np-edge-item { display: flex; align-items: flex-start; gap: 8px; padding: 6px 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; cursor: pointer; transition: background 0.12s, border-color 0.12s; }
+.np-edge-item:hover { background: rgba(var(--accent-rgb), 0.1); border-color: rgba(var(--accent-rgb), 0.3); }
+/* Incoming edge-item: distinguished by an amber stripe on the left — same shape
+   as outgoing items so the two groups read at a glance. */
+.np-edge-item--incoming {
+  background: rgba(251,191,36,0.04);
+  border-left: 2px solid rgba(251,191,36,0.55);
+  border-color: rgba(251,191,36,0.18);
+}
+.np-edge-item--incoming:hover {
+  background: rgba(251,191,36,0.08);
+  border-color: rgba(251,191,36,0.4);
+}
+.np-edge-item--incoming .np-edge-item__type {
+  color: var(--amber);
+  border-color: rgba(251,191,36,0.35);
+  background: rgba(251,191,36,0.1);
+}
+.np-edge-item__type   { font-size: 0.56rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); border: 1px solid rgba(var(--accent-rgb), 0.3); background: rgba(var(--accent-rgb), 0.1); border-radius: 4px; padding: 1px 5px; flex-shrink: 0; margin-top: 1px; }
+.np-edge-item__body   { flex: 1; min-width: 0; }
+.np-edge-item__target { font-size: 0.72rem; font-weight: 600; color: var(--text); line-height: 1.4; }
+.np-edge-item__reason { font-size: 0.65rem; color: var(--muted); line-height: 1.5; margin-top: 2px; }
+
+.np-neighbors { display: flex; flex-wrap: wrap; gap: 5px; }
+.np-neighbor  { font-size: 0.65rem; font-weight: 500; color: var(--text-2); background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 3px 9px; cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s; }
+.np-neighbor:hover { background: rgba(var(--accent-rgb), 0.15); border-color: rgba(var(--accent-rgb), 0.35); color: var(--accent); }
+.np-neighbor--incoming:hover { background: rgba(var(--accent-rgb), 0.15); border-color: rgba(var(--accent-rgb), 0.35); color: var(--purple); }
+
+.np-edges-group + .np-edges-group { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.06); }
+.np-edges-group__label { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-2); margin-bottom: 4px; }
+/* Visual cue for incoming group — label picks up the amber accent shared by
+   the .np-edge-item--incoming cards, so the two sub-groups read as a unit. */
+.np-edges-group--incoming .np-edges-group__label { color: var(--yellow); }
+.np-count { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; font-size: 0.6rem; font-weight: 700; color: var(--accent); background: rgba(var(--accent-rgb), 0.15); border-radius: 8px; padding: 0 4px; margin-left: 4px; vertical-align: middle; }
+
+.np-body-content { display: flex; flex-direction: column; gap: 12px; }
+.np-question { display: flex; flex-direction: column; gap: 3px; }
+.np-question__label  { font-size: 0.65rem; font-weight: 700; color: var(--accent); line-height: 1.4; }
+.np-question__answer { font-size: 0.72rem; color: var(--text-2); line-height: 1.65; }
+
+.node-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: rgba(2,6,23,0.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); animation: overlay-in 0.2s ease; }
+.node-overlay-card { position: relative; border-radius: 18px; padding: 22px; width: 310px; max-height: 72vh; overflow-y: auto; background: rgba(15,23,42,0.95); border: 1px solid var(--border-hi); box-shadow: 0 24px 64px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04) inset, 0 0 40px rgba(var(--accent-rgb), 0.08); animation: card-in 0.22s cubic-bezier(0.34,1.56,0.64,1); }
+.node-overlay-close { position: absolute; top: 12px; right: 12px; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; background: var(--border); color: var(--text-2); border: none; line-height: 1; transition: background 0.14s, color 0.14s; }
+.node-overlay-close:hover { background: var(--accent); color: #fff; }
+
+/* ── Markdown content (.np-markdown) ────────────────────────────────────────
+ * Rendered markdown injected via renderMarkdown() — see src/ui/markdown.ts.
+ * Sized for the 360px panel body, so line-height and font-size are tighter
+ * than the main UI text. Tables, lists, code, blockquote, images, links —
+ * all get their own line so it's easy to tune one element without touching
+ * the rest.
+ *
+ * Inheritance: the wrapper sits inside `.np-summary` or
+ * `.np-question__answer`, so its base font-size and color come from those.
+ * We only override for elements that need to deviate (e.g. table cell
+ * padding, code background).
+ */
+.np-markdown { color: var(--text-2); }
+.np-markdown > *:first-child { margin-top: 0; }
+.np-markdown > *:last-child  { margin-bottom: 0; }
+.np-markdown p { margin: 0 0 0.55em; }
+.np-markdown h1,
+.np-markdown h2,
+.np-markdown h3,
+.np-markdown h4 {
+  margin: 0.85em 0 0.4em; font-weight: 600; color: var(--text);
+  line-height: 1.35;
+}
+.np-markdown h1 { font-size: 1rem;    border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 4px; }
+.np-markdown h2 { font-size: 0.92rem; border-left: 3px solid var(--accent); padding-left: 8px; }
+.np-markdown h3 { font-size: 0.82rem; color: var(--text-2); }
+.np-markdown h4 { font-size: 0.76rem; color: var(--muted);   }
+.np-markdown strong { color: var(--text); font-weight: 700; }
+.np-markdown em { color: var(--text); font-style: italic; }
+.np-markdown ul,
+.np-markdown ol { margin: 0.4em 0 0.6em; padding-left: 1.4em; }
+.np-markdown li { margin: 0.18em 0; }
+.np-markdown li > p { margin: 0.2em 0; }
+.np-markdown code {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 1px 5px; border-radius: 3px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.85em; color: #f5d491;
+}
+.np-markdown pre {
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.06);
+  padding: 9px 11px; border-radius: 6px;
+  overflow-x: auto; margin: 0.55em 0;
+  font-size: 0.72rem; line-height: 1.55;
+}
+.np-markdown pre code {
+  background: transparent; border: none; padding: 0;
+  color: var(--text); font-size: inherit;
+}
+.np-markdown blockquote {
+  border-left: 3px solid rgba(var(--accent-rgb), 0.45);
+  margin: 0.55em 0; padding: 4px 10px;
+  color: var(--muted); background: rgba(var(--accent-rgb), 0.05);
+  border-radius: 0 5px 5px 0;
+}
+.np-markdown blockquote > *:first-child { margin-top: 0; }
+.np-markdown blockquote > *:last-child  { margin-bottom: 0; }
+.np-markdown hr {
+  border: none; border-top: 1px solid rgba(255,255,255,0.08);
+  margin: 0.85em 0;
+}
+.np-markdown table {
+  border-collapse: collapse; width: 100%; margin: 0.55em 0;
+  font-size: 0.72rem; display: block; overflow-x: auto; max-width: 100%;
+}
+.np-markdown th,
+.np-markdown td {
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 5px 8px; text-align: left; vertical-align: top;
+}
+.np-markdown th {
+  background: rgba(var(--accent-rgb), 0.14);
+  color: var(--text); font-weight: 600;
+}
+.np-markdown tr:nth-child(even) td { background: rgba(255,255,255,0.025); }
+.np-markdown img {
+  max-width: 100%; height: auto; display: block;
+  border-radius: 5px; margin: 0.45em 0;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.np-markdown a {
+  color: var(--accent); text-decoration: none;
+  border-bottom: 1px dashed rgba(var(--accent-rgb), 0.5);
+  transition: border-bottom-style 0.12s, color 0.12s;
+}
+.np-markdown a:hover { color: var(--accent-light); border-bottom-style: solid; }
+/* GFM task list checkbox: the markdown engine emits an <input disabled>
+ * followed by text. Keep the box inline with the text. */
+.np-markdown input[type='checkbox'] {
+  appearance: none; -webkit-appearance: none;
+  width: 12px; height: 12px; border-radius: 3px;
+  border: 1px solid var(--accent);
+  background: rgba(var(--accent-rgb), 0.08);
+  margin-right: 6px; vertical-align: -1px; cursor: default;
+  position: relative; top: 1px;
+}
+.np-markdown input[type='checkbox']:checked {
+  background: var(--accent);
+}
+.np-markdown input[type='checkbox']:checked::after {
+  content: ''; position: absolute; left: 3px; top: 0px;
+  width: 4px; height: 7px;
+  border: solid #fff; border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+}
+
+/* ── Bottom sheet (mobile) ──────────────────────────────────────────────── */
+@layer bottom-sheet {
+
+.bottom-sheet {
+  display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+  --glass-bg: rgba(12, 18, 34, 0.88);
+  backdrop-filter: blur(32px) saturate(180%); -webkit-backdrop-filter: blur(32px) saturate(180%);
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.35);
+  flex-direction: column; gap: 0;
+  padding: 0 0 max(16px, env(safe-area-inset-bottom));
+  max-height: 90dvh; overflow: hidden; overscroll-behavior: contain;
+  touch-action: none; will-change: transform;
+  transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1);
+  transform: translateY(var(--sheet-offset, 100dvh));
+}
+.bottom-sheet.open { transform: translateY(0); }
+
+.bs-drag-handle { display: flex; align-items: center; justify-content: center; padding: 12px 0 2px; cursor: grab; flex-shrink: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
+.bs-drag-handle:active { cursor: grabbing; }
+.bs-drag-handle__bar { width: 36px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.18); transition: background 0.15s; }
+.bs-drag-handle:active .bs-drag-handle__bar { background: rgba(255,255,255,0.4); }
+
+.bs-scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 0 16px; -webkit-overflow-scrolling: touch; }
+
+#sheet-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 49; pointer-events: none; opacity: 0; transition: opacity 0.38s cubic-bezier(0.32, 0.72, 0, 1); }
+#sheet-backdrop.visible { opacity: 1; pointer-events: auto; }
+
+#sheet-peek-tab { display: none; position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); width: 44px; height: 44px; border-radius: 50%; z-index: 48; background: rgba(12,18,34,0.75); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); cursor: pointer; align-items: center; justify-content: center; box-shadow: 0 2px 12px rgba(0,0,0,0.4); pointer-events: none; opacity: 0; transition: opacity 0.38s cubic-bezier(0.32,0.72,0,1), transform 0.38s cubic-bezier(0.32,0.72,0,1); }
+#sheet-peek-tab.visible { opacity: 1; pointer-events: auto; }
+#sheet-peek-tab:active  { transform: translateX(-50%) scale(0.92); }
+
+#sheet-expand-bar { display: flex; width: calc(100% - 24px); margin: 0 12px; align-items: center; justify-content: center; padding: 8px 16px; cursor: pointer; border: none; background: transparent; color: var(--text-2); user-select: none; -webkit-tap-highlight-color: transparent; transition: background 0.15s, color 0.15s, transform 0.12s ease; }
+#sheet-expand-bar:active { background: rgba(var(--accent-rgb), 0.12); color: var(--accent); transform: scale(0.98); }
+#sheet-expand-bar svg { width: 14px; height: 14px; color: var(--muted); transition: color 0.15s, transform 0.32s cubic-bezier(0.34,1.4,0.64,1); }
+#sheet-expand-bar:active svg { color: var(--accent); }
+#sheet-expand-bar.sheet-open svg { transform: rotate(180deg); }
+
+#sheet-close-bar { display: none; position: fixed; top: 0; left: 0; right: 0; height: 32px; align-items: center; justify-content: center; background: rgba(12,18,34,0.95); backdrop-filter: blur(24px) saturate(200%); -webkit-backdrop-filter: blur(24px) saturate(200%); border-radius: 0 0 22px 22px; box-shadow: 0 10px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.05) inset; cursor: pointer; color: var(--text-2); user-select: none; -webkit-tap-highlight-color: transparent; z-index: 50; transition: background 0.15s, color 0.15s; }
+#sheet-close-bar:active { background: rgba(var(--accent-rgb), 0.12); color: var(--accent); }
+#sheet-close-bar svg { width: 16px; height: 16px; color: var(--muted); transition: color 0.15s; }
+#sheet-close-bar:active svg { color: var(--accent); }
+
+#bottom-sheet {
+  position: fixed; bottom: 0; top: auto; left: 0; right: 0;
+  transform: translateY(100%); pointer-events: none;
+  /* No backdrop-filter here — Android Chrome (Chromium 103+) supports it, but
+   * `backdrop-filter: blur` shows and blurs the content behind the element,
+   * making the graph canvas bleed through. The intended visual is "solid
+   * blurred-ish dark panel", not "see-through blurred glass". A solid
+   * rgba(12,18,34,0.97) gives us opaque-on-both-platforms consistent look.
+   * iOS Safari would blur with backdrop-filter but gets a slightly different
+   * (opaque) treatment — acceptable; the Android result is much better than
+   * the previous transparent rgba(12,18,34,0.30). */
+  --glass-bg: rgba(12, 18, 34, 0.97);
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+  z-index: 50;
+  max-height: calc(88dvh - env(safe-area-inset-bottom, 0px));
+  overflow-y: auto; touch-action: none; flex-direction: column;
+  padding: 0 16px max(16px, env(safe-area-inset-bottom));
+  /* Easing must NOT overshoot (y control points ≤ 1). The sheet is anchored
+   * with bottom: 0, so any progress > 1 pushes translateY below 0 — the panel
+   * rides ~5% of its height above the viewport bottom and briefly exposes a
+   * strip of page background (--bg, near-black) underneath it before settling
+   * back ("先往上跳一段再回落 + 底部黑条"). Use the same decelerating curve as
+   * #sheet-backdrop / #sheet-peek-tab so the whole gesture moves as one. */
+  transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.38s;
+}
+#bottom-sheet.open { transform: translateY(0); pointer-events: auto; }
+
+.bs-quick-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.bs-quick-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px 8px; border-radius: 10px; border: 1px solid transparent; background: transparent; color: var(--text-2); font-size: 0.65rem; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.14s, border-color 0.14s, color 0.14s, box-shadow 0.14s; -webkit-tap-highlight-color: transparent; user-select: none; }
+.bs-quick-btn:hover { background: rgba(255,255,255,0.07); border-color: var(--border-hi); color: var(--text); }
+.bs-quick-btn:active { background: rgba(255,255,255,0.09); border-color: var(--border-hi); color: var(--text); }
+.bs-quick-btn svg    { width: 15px; height: 15px; color: var(--text-2); transition: color 0.14s; }
+.bs-quick-btn:hover svg { color: var(--text); }
+.bs-quick-btn.active { background: rgba(var(--accent-rgb), 0.18); border-color: rgba(var(--accent-rgb), 0.4); color: var(--accent); box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.25); }
+.bs-quick-btn.active svg { color: var(--accent); }
+
+.bs-stats-row { display: flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.bs-stat { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1; padding: 6px 4px; background: rgba(255,255,255,0.02); border: none; border-right: 1px solid var(--border); }
+.bs-stat:last-child { border-right: none; }
+.bs-stat__val       { font-size: 0.95rem; font-weight: 700; font-family: var(--font-mono); color: var(--text); letter-spacing: -0.02em; line-height: 1; }
+.bs-stat__val--nodes       { color: var(--stat-nodes); }
+.bs-stat__val--edges       { color: var(--stat-edges); }
+.bs-stat__val--selected    { color: var(--stat-selected); }
+.bs-stat__val--highlighted { color: var(--stat-highlighted); }
+.bs-stat__val--fps         { color: var(--stat-fps); }
+.bs-stat__val--memory     { color: var(--stat-memory); }
+.bs-stat__label { font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+
+.bs-section + .bs-section { margin-top: 6px; }
+.bs-section { display: flex; flex-direction: column; gap: 8px; }
+/* 抽屉标题统一到与侧栏同一套规格：0.6rem / 700 / 0.1em / uppercase / --muted
+ * （见 @layer sidebar 里 .sidebar-section__title 与 .legend-section__title 共用的那条规则）。 */
+.bs-section__label { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.bs-section:has(.bs-layout-grid) { padding-bottom: 4px; }
+
+.bs-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.bs-chip  { display: flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border); background: rgba(255,255,255,0.03); font-size: 0.72rem; font-weight: 500; color: var(--text-2); cursor: pointer; transition: background 0.14s, border-color 0.14s, color 0.14s; -webkit-tap-highlight-color: transparent; user-select: none; }
+.bs-chip:active:not(.active) { background: rgba(var(--accent-rgb), 0.15); border-color: var(--accent); color: var(--accent); }
+.bs-chip.active { background: rgba(var(--accent-rgb), 0.18); border-color: rgba(var(--accent-rgb), 0.4); color: var(--accent); box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.25); }
+.bs-chip__dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.bs-chip__swatch { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.bs-chip__shape { display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.bs-chip__shape.shape-ellipse         { width: 12px; height: 12px; border-radius: 50%; }
+.bs-chip__shape.shape-rectangle       { width: 12px; height: 12px; border-radius: 2px; }
+.bs-chip__shape.shape-round-rectangle { width: 12px; height: 12px; border-radius: 4px; }
+.bs-chip__shape.shape-diamond         { width: 10px; height: 10px; transform: rotate(45deg); }
+.bs-chip__shape.shape-triangle        { width: 12px; height: 12px; clip-path: polygon(50% 0%, 100% 85%, 0% 85%); }
+.bs-chip__shape.shape-pentagon        { width: 12px; height: 12px; clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%); }
+.bs-chip__shape.shape-octagon         { width: 12px; height: 12px; clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%); }
+.bs-chip__shape.shape-star            { width: 12px; height: 12px; clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
+.bs-chip__shape.shape-tag             { width: 14px; height: 12px; clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 0 100%); }
+.bs-chip__shape.shape-round-tag       { width: 14px; height: 12px; clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 0 100%); border-radius: 3px 5px 5px 3px; }
+/* 备用形状 */
+.bs-chip__shape.shape-round-triangle      { width: 12px; height: 12px; clip-path: polygon(50% 0%, 100% 85%, 0% 85%); border-radius: 3px; }
+.bs-chip__shape.shape-bottom-round-rectangle { width: 12px; height: 12px; clip-path: polygon(0 0, 100% 0, 100% 70%, calc(100% - 15%) 100%, 15% 100%, 0 70%); }
+.bs-chip__shape.shape-cut-rectangle       { width: 12px; height: 12px; clip-path: polygon(0 0, 85% 0, 100% 15%, 100% 100%, 0 100%); }
+.bs-chip__shape.shape-barrel              { width: 12px; height: 12px; clip-path: polygon(15% 0%, 85% 0%, 100% 50%, 85% 100%, 15% 100%, 0% 50%); }
+.bs-chip__shape.shape-rhomboid            { width: 12px; height: 12px; clip-path: polygon(25% 0%, 100% 0%, 75% 100%, 0% 100%); }
+.bs-chip__shape.shape-right-rhomboid     { width: 12px; height: 12px; clip-path: polygon(0% 0%, 75% 0%, 100% 100%, 25% 100%); }
+.bs-chip__shape.shape-round-diamond       { width: 10px; height: 10px; transform: rotate(45deg); border-radius: 3px; }
+.bs-chip__shape.shape-round-pentagon      { width: 12px; height: 12px; clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%); border-radius: 3px; }
+.bs-chip__shape.shape-hexagon             { width: 12px; height: 12px; clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); }
+.bs-chip__shape.shape-round-hexagon       { width: 12px; height: 12px; clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); border-radius: 4px; }
+.bs-chip__shape.shape-concave-hexagon     { width: 12px; height: 12px; clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 85% 100%, 15% 100%, 0% 50%); }
+.bs-chip__shape.shape-heptagon            { width: 12px; height: 12px; clip-path: polygon(50% 0%, 85% 15%, 100% 50%, 85% 85%, 50% 100%, 15% 85%, 0% 50%); }
+.bs-chip__shape.shape-round-heptagon     { width: 12px; height: 12px; clip-path: polygon(50% 0%, 85% 15%, 100% 50%, 85% 85%, 50% 100%, 15% 85%, 0% 50%); border-radius: 3px; }
+.bs-chip__shape.shape-round-octagon      { width: 12px; height: 12px; clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%); border-radius: 3px; }
+.bs-chip__shape.shape-vee                { width: 12px; height: 12px; clip-path: polygon(50% 60%, 100% 0%, 100% 100%, 50% 100%, 0% 100%, 0% 0%); }
+.bs-chip__dot--cat { border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); }
+.bs-chip__edge-line {
+  display: inline-block; width: 18px; height: 0;
+  vertical-align: middle; flex-shrink: 0; border-radius: 2px;
+}
+.bs-chip--edge {
+  display: inline-flex; align-items: center; gap: 6px;
+}
+
+.bs-layout-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.bs-layout-btn  { padding: 7px 4px; border-radius: 10px; border: 1px solid var(--border); background: rgba(255,255,255,0.03); color: var(--text-2); font-size: 0.68rem; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.14s, border-color 0.14s, color 0.14s; -webkit-tap-highlight-color: transparent; text-align: center; }
+.bs-layout-btn.active           { background: rgba(var(--accent-rgb), 0.18); border-color: rgba(var(--accent-rgb), 0.4); color: var(--accent); box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.25); }
+.bs-layout-btn:active:not(.active) { background: rgba(var(--accent-rgb), 0.1); border-color: rgba(var(--accent-rgb), 0.4); color: var(--accent); }
+
+/* ── "高级设置"容器：把图谱布局 + 布局参数这两块放到一起，共享折叠记忆 ────── */
+.bs-advanced { display: flex; flex-direction: column; gap: 8px; }
+.bs-advanced__head { display: flex; align-items: center; justify-content: space-between; padding: 6px 4px 0; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.bs-advanced__title { display: flex; align-items: center; gap: 8px; }
+.bs-advanced__chev { width: 12px; height: 12px; color: var(--muted); transition: transform 0.2s ease; flex-shrink: 0; }
+.bs-advanced.open .bs-advanced__chev { transform: rotate(90deg); }
+.bs-advanced__hint { font-size: 0.6rem; font-weight: 500; color: var(--muted); letter-spacing: 0.04em; }
+.bs-advanced__body { display: flex; flex-direction: column; gap: 8px; }
+.bs-advanced.collapsed .bs-advanced__body { display: none; }
+.bs-advanced__head { background: transparent; border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; font-family: inherit; }
+.bs-advanced__head:active .bs-advanced__title { color: var(--accent); }
+
+.bs-layout-setting { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.bs-layout-setting__head { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 14px; background: rgba(255,255,255,0.02); border: none; color: var(--muted); font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; font-family: inherit; cursor: pointer; }
+.bs-layout-setting__title { display: flex; align-items: center; gap: 8px; }
+.bs-layout-setting__chev { width: 14px; height: 14px; color: var(--muted); transition: transform 0.2s ease; }
+.bs-layout-setting.open .bs-layout-setting__chev { transform: rotate(90deg); }
+.bs-layout-setting__body { border-top: 1px solid var(--border); padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 10px; }
+.bs-layout-setting.collapsed .bs-layout-setting__body { display: none; }
+
+.bs-params-block   { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.bs-params-toggle  { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 14px; background: rgba(255,255,255,0.02); border: none; color: var(--text-2); font-size: 0.72rem; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.14s, color 0.14s; -webkit-tap-highlight-color: transparent; }
+.bs-params-toggle:active { background: rgba(var(--accent-rgb), 0.08); color: var(--accent); }
+.bs-params-toggle__arrow { width: 14px; height: 14px; color: var(--muted); transition: transform 0.2s ease; flex-shrink: 0; }
+.bs-params-block.open .bs-params-toggle__arrow { transform: rotate(90deg); }
+/* 折叠态完全由 .open 驱动（JS 只切 class，不写 style.display）：
+ * 未展开时隐藏内容区和"应用/恢复默认"按钮行。 */
+.bs-params-block:not(.open) > .bs-params-body,
+.bs-params-block:not(.open) > .bs-params-actions { display: none; }
+.bs-params-body    { border-top: 1px solid var(--border); padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 10px; }
+.bs-layout-params  { display: flex; flex-direction: column; gap: 8px; }
+.bs-param-row      { display: flex; flex-direction: column; gap: 3px; }
+.bs-param-label    { display: flex; justify-content: space-between; align-items: center; font-size: 0.68rem; color: var(--muted); font-weight: 500; }
+.bs-param-label__val { font-family: var(--font-mono); font-size: 0.64rem; color: var(--text-2); background: rgba(255,255,255,0.05); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border); min-width: 40px; text-align: right; font-weight: 600; }
+.bs-param-slider   { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 2px; background: var(--border); outline: none; cursor: pointer; }
+.bs-param-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%; background: var(--accent); cursor: pointer; box-shadow: 0 0 6px rgba(var(--accent-rgb), 0.4); transition: transform 0.1s; }
+.bs-param-slider:active::-webkit-slider-thumb { transform: scale(1.2); }
+.bs-apply-btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  margin: 0 14px 12px; width: calc(100% - 28px);
+  padding: 8px 16px; border-radius: 8px;
+  border: 1px solid rgba(var(--accent-rgb), 0.45);
+  background: rgba(var(--accent-rgb), 0.14);
+  color: rgba(var(--accent-light-rgb), 0.9);
+  font-size: 0.72rem; font-weight: 600; font-family: inherit;
+  cursor: pointer; transition: background 0.14s, border-color 0.14s, transform 0.14s;
+  -webkit-tap-highlight-color: transparent;
+}
+.bs-apply-btn:active { background: rgba(var(--accent-rgb), 0.28); transform: scale(0.98); }
+.bs-apply-btn svg { width: 13px; height: 13px; }
+.bs-params-actions { display: flex; gap: 8px; align-items: center; margin: 0; }
+.bs-params-actions .bs-apply-btn { margin: 0; flex: 1 1 auto; width: auto; }
+.bs-reset-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; flex-shrink: 0;
+  border-radius: 8px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted);
+  font-size: 1.1rem; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.14s, border-color 0.14s, background 0.14s;
+}
+.bs-reset-btn:hover { color: var(--text); border-color: var(--border-hi); background: rgba(255,255,255,0.04); }
+.bs-reset-btn:active { transform: scale(0.94); }
+
+#fab { display: none; width: 52px; height: 52px; border-radius: 16px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; cursor: pointer; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(var(--accent-rgb), 0.4), 0 8px 24px rgba(0,0,0,0.4); transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.15s; -webkit-tap-highlight-color: transparent; }
+#fab:hover  { transform: scale(1.08); box-shadow: 0 6px 20px rgba(var(--accent-rgb), 0.5), 0 10px 30px rgba(0,0,0,0.5); }
+#fab:active { transform: scale(0.95); }
+#fab svg { width: 22px; height: 22px; color: #fff; }
+#fab.active { border-radius: 50%; }
+#fab.active svg line { transition: transform 0.2s, opacity 0.2s; }
+#fab.active svg line:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+#fab.active svg line:nth-child(2) { opacity: 0; }
+#fab.active svg line:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+.bs-mobile-search { display: flex; align-items: center; background: rgba(255,255,255,0.06); border: 1px solid var(--border); border-radius: 8px; margin: 10px 16px 12px; position: relative; }
+.bs-mobile-search__icon  { position: absolute; left: 10px; width: 15px; height: 15px; color: var(--muted); pointer-events: none; flex-shrink: 0; }
+.bs-mobile-search__input { width: 100%; height: 36px; padding: 0 12px 0 34px; background: transparent; border: none; border-radius: inherit; color: var(--text); font-size: 1rem; font-family: inherit; outline: none; }
+.bs-mobile-search__input::placeholder { color: var(--muted); }
+
+/* ── Mobile responsive ──────────────────────────────────────────────────── */
+/* iOS Safari on narrow screens uses a 980px Compatibility View viewport
+ * (content is scaled down), which hides the real space crunch. Android
+ * Chrome reports the true ~360px innerWidth. All mobile rules below are
+ * tuned for the real Android constraint — iOS Safari scales everything
+ * down automatically, so it benefits too. */
+@media (max-width: 768px) {
+  #sidebar { display: none; }
+  #main    { flex-direction: row; }
+  #cy      { flex: 1 1 auto; }
+  .topbar  { z-index: 60; }
+  #app.sheet-open { z-index: 60; }
+  .toolbar { display: none; }
+  #sheet-expand-bar { display: none; }
+  #sheet-close-bar  { display: none; }
+  .bottom-sheet     { display: flex; }
+  #bottom-sheet     { display: flex; }
+  #sheet-backdrop   { display: block; pointer-events: none; }
+  #sheet-backdrop.visible { pointer-events: auto; }
+  #sheet-peek-tab   { display: flex; }
+  .bs-params-block  { display: flex; }
+  .bottom-sheet     { border-radius: 22px 22px 0 0; }
+  .bs-mobile-search { display: flex; }
+
+  /* ── topbar on real narrow viewports ── */
+  .topbar {
+    /* height auto lets the content drive the bar — badge + dot are
+     * single-line; the bar doesn't need 56px if we don't force it. */
+    height: auto;
+    min-height: 48px;
+    padding: 0 12px;
+  }
+  .topbar__logo {
+    /* logo mark stays 28px; the text beside it gets tight constraints */
+    padding: 0 10px 0 0;
+    gap: 6px;
+  }
+  .topbar__logo-mark { width: 28px; height: 28px; border-radius: 7px; }
+  .topbar__logo-mark svg { width: 18px; height: 18px; }
+
+  /* Brand: max-width is the hard constraint that lets .topbar__badge's
+   * margin-left:auto work. 8 Chinese chars at 0.72rem ≈ 92px; 105px clips
+   * the last char. 135px fits all 8 with room to spare. */
+  .topbar__brand {
+    flex-shrink: 0;
+    max-width: 135px;
+    overflow: hidden;
+  }
+  /* clamp(min, preferred, max) makes font-size scale fluidly:
+   *   360px → 0.72rem (≈11.5px)  compact, badge stays visible
+   *   768px → 0.92rem (≈14.7px)  desktop size
+   * text-size-adjust:100% prevents mobile browsers from overriding
+   * the font-size with their own text-size algorithms. */
+  .topbar__brand-name {
+    font-size: clamp(0.72rem, calc(0.28 * 100vw - 29.4px), 0.92rem);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    white-space: nowrap;
+    letter-spacing: 0;
+  }
+  .topbar__brand-sub { display: none; }
+
+  /* search-center is hidden on mobile; a separate bs-mobile-search
+   * replaces it inside the bottom-sheet. No overflow risk here. */
+  .topbar__search-center { display: none; }
+
+  /* badge: flex-shrink:0 keeps the capsule at full size. margin-left:auto
+   * is what actually pushes it to the far right of the topbar — this only
+   * works because .topbar__brand has max-width (not flex-shrink:1). */
+  .topbar__badge {
+    flex-shrink: 0;
+    margin-left: auto;
+    margin-right: 4px;
+    padding: 4px 8px 4px 6px;
+    gap: 4px;
+    /* Slightly tighter border sweep on narrow screens — same percentage of
+     * movement per second, but the smaller background-size keeps the bright
+     * stripe perceptually closer to the border so it doesn't feel like the
+     * animation is "skipping" across the now-shorter perimeter. */
+  }
+  .topbar__badge::before { background-size: 220% 100%; }
+  .topbar__badge-dot { width: 6px; height: 6px; }
+  .badge-by   { font-size: 0.56rem; }
+  .badge-meow { font-size: 0.64rem; }
+  #carousel-text { font-size: 0.64rem; }
+}
+
+/* Close @layer bottom-sheet (opened by `@layer bottom-sheet {` earlier in this file).
+   NOTE: the mobile .topbar__badge / .badge-* overrides just above live in this
+   layer and only win over the `topbar` layer because bottom-sheet is declared
+   later in index.css. Keep that order, or move them back into `topbar`. */
+}
+
+/* ── Bigscreen / Cinema Mode ─────────────────────────────────────────────── */
+/* The single root class lives on <html> (not #app) to avoid any chance of
+   polluting cytoscape overlay or extension DOM nodes. */
+@layer bigscreen {
+
+html.bigscreen,
+html.bigscreen body { background: var(--bg); }
+
+/* Node #main normally has height: calc(100vh - 56px - 44px) — it hard-codes the
+   topbar (56px) + toolbar (44px) heights as fixed offsets.
+   In bigscreen those bars are hidden so that 100px deduction leaves a
+   black bar at the bottom.  Override it here so the canvas truly fills
+   the full viewport.
+   Node-panel is kept — it is part of the graph exploration. */
+html.bigscreen #main {
+  height: 100vh;
+}
+
+html.bigscreen #sidebar {
+  flex: 0 0 0; width: 0; overflow: hidden; border-left: none;
+}
+
+/* Deeper ambient halo for the "pure graph theatre" feel. */
+html.bigscreen #app::after {
+  background:
+    radial-gradient(ellipse 120% 80% at 12% -5%, var(--halo-accent-strong) 0%, transparent 65%),
+    radial-gradient(ellipse 100% 70% at 88% 95%, var(--halo-accent2-strong) 0%, transparent 60%);
+  opacity: 1;
+}
+
+/* Hide all desktop chrome. Node-panel is kept — it is part of the graph
+   exploration, not a browser chrome element.
+
+   IMPORTANT: #sidebar is intentionally NOT in this list. The flex-basis
+   collapse above (flex:0 0 0 + width:0) is what makes the sidebar invisible
+   during bigscreen. Adding `display:none` here would tear down the sidebar's
+   rendering context mid-transition, and on exit the sidebar's own
+   `transform`/`opacity` transitions can fail to re-apply cleanly.
+   Keeping the sidebar in normal flow under overflow:hidden is the
+   least-invasive way to hide it without touching its DOM state. */
+html.bigscreen .topbar,
+html.bigscreen .toolbar,
+html.bigscreen #tour-dt,
+html.bigscreen #zoom-indicator { display: none !important; }
+
+/* Prominent z-index so node-panel (if opened) floats above canvas. */
+html.bigscreen .node-panel { z-index: 40; right: 16px; }
+
+/* Hint toast — fades in 0.2s, holds 1.5s, fades out. */
+.bigscreen-hint {
+  position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%);
+  padding: 8px 18px; border-radius: 999px;
+  background: rgba(15,17,23,0.88); backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.75); font-size: 0.74rem;
+  pointer-events: none; opacity: 0; z-index: 200;
+  animation: bigscreen-hint-in 1.5s ease-out 0.2s 1 forwards;
+  white-space: nowrap;
+}
+@keyframes bigscreen-hint-in {
+  0%   { opacity: 0; transform: translate(-50%, 8px); }
+  15%  { opacity: 1; transform: translate(-50%, 0); }
+  75%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -4px); }
+}
+
+/* Icon state: make the expand icon visible when not in bigscreen. */
+
+}

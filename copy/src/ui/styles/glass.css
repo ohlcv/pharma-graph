@@ -1,0 +1,493 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   glass.css — Liquid Glass skin
+   顶栏 · 工具栏 · 桌面侧栏 · 节点详情面板 · 移动端底部面板
+
+   接入方式：在 styles/index.css 里，把它放在所有其它 @import 的最后一条：
+       @import './glass.css' layer(glass);
+   本文件里的 `@layer glass { … }` 也可以直接写，效果一样。它必须是最后一层：
+   层级之间"后声明的层赢"，与选择器权重无关，所以不用改任何现有规则、
+   也不需要 !important。删掉这个 import，界面就回到原样。
+
+   ── 设计语言（只有一个"记忆点"）──────────────────────────────────────────
+   边缘高光。每块玻璃都有一条从左上角亮起、向右下渐隐、右下角再轻轻回亮的
+   1px 轮廓（.glass-edge 的第 4 层背景），再配一条紧贴其内的顶部内高光。
+   其余一律克制：不加彩色渐变、不加多余动效。
+
+   ── 材质分三档 ────────────────────────────────────────────────────────────
+     大面板  .glass-edge（侧栏 / 详情面板 / 底部面板）：模糊 30px，带高光与焦散
+     条状    .topbar / .toolbar：模糊 22px，只带顶部高光
+     浮层    菜单 / toast / 缩放提示 / 加载胶囊 / 底部把手：同大面板，尺寸小
+   面板内部的卡片一律只用半透明填充，不再叠 backdrop-filter——
+   它只会采样到面板自己已经模糊过的内容，白白多一份 GPU 开销。
+
+   ── 状态类的处理约定 ──────────────────────────────────────────────────────
+   容器（.visible / .open / .hidden 控制 transform、opacity）我只改外观，绝不碰
+   transform / opacity / visibility / transition。控件（按钮、标签页、chip）的
+   base / hover / active 被同一层里的规则改写时，我把这几个状态一起重写了。
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@layer glass {
+
+/* ── Tokens ────────────────────────────────────────────────────────────────
+   强调色沿用主题的 --accent-rgb（主题切换时自动跟随），后面的数字只是兜底。 */
+:root {
+  --lg-blur: 22px;
+  --lg-blur-lg: 30px;
+  --lg-sat: 175%;
+  --lg-bright: 1.05;
+
+  --lg-tint: rgba(17, 23, 44, 0.40);        /* 条状：顶栏 / 工具栏 */
+  --lg-tint-panel: rgba(13, 18, 36, 0.52);  /* 大面板：侧栏 / 底部面板 */
+  --lg-tint-dense: rgba(11, 16, 32, 0.66);  /* 文字密集的面板：详情 */
+
+  --lg-line: rgba(255, 255, 255, 0.14);
+  --lg-line-soft: rgba(255, 255, 255, 0.07);
+  --lg-fill: rgba(255, 255, 255, 0.055);    /* 面板内的卡片 */
+  --lg-fill-hi: rgba(255, 255, 255, 0.10);
+  --lg-accent: var(--accent-rgb, 129, 140, 248);
+
+  --lg-shadow: 0 28px 64px -18px rgba(0, 0, 0, 0.68), 0 6px 18px rgba(0, 0, 0, 0.34);
+  --lg-shadow-sm: 0 12px 32px -10px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --lg-spring: cubic-bezier(0.32, 1.35, 0.5, 1);
+
+  /* 内高光：顶部一条亮线 + 底部一条暗线，让玻璃有"厚度"。 */
+  --lg-bevel:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+    inset 0 -14px 22px -14px rgba(0, 0, 0, 0.32);
+
+  --lg-filter-lg: blur(var(--lg-blur-lg)) saturate(var(--lg-sat)) brightness(var(--lg-bright));
+  --lg-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+}
+
+/* 性能档：iPad / 低端机上想省 GPU，就在 <html> 上加 data-glass="lite"。
+   模糊半径减半以上，去掉饱和度和亮度增益，观感依然是磨砂玻璃。 */
+html[data-glass="lite"] {
+  --lg-blur: 10px;
+  --lg-blur-lg: 12px;
+  --lg-sat: 130%;
+  --lg-bright: 1;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   1. 大面板：.glass-edge  →  #sidebar / #node-panel / #bottom-sheet
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.glass-edge {
+  --glass-bg: var(--lg-tint-panel);
+  border: 1px solid transparent;
+  /* 四层背景，从上到下：
+       ① 左上角镜面高光   ② 右下角强调色焦散
+       ③ 主体色调         ④ 1px 轮廓（只透过 border 那一圈显示）
+     背景是元素自己的背景而不是 ::before：#sidebar / #bottom-sheet 是滚动容器，
+     绝对定位的伪元素会跟着内容滚走，轮廓就和面板边缘脱开了。 */
+  background-image:
+    radial-gradient(130% 80% at 0% 0%, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.04) 40%, transparent 64%),
+    radial-gradient(90% 60% at 100% 100%, rgba(var(--lg-accent), 0.13) 0%, transparent 62%),
+    linear-gradient(var(--glass-bg), var(--glass-bg)),
+    linear-gradient(140deg,
+      rgba(255,255,255,0.58) 0%,
+      rgba(255,255,255,0.18) 20%,
+      rgba(255,255,255,0.05) 52%,
+      rgba(255,255,255,0.10) 80%,
+      rgba(255,255,255,0.26) 100%);
+  background-clip: padding-box, padding-box, padding-box, border-box;
+  background-origin: padding-box, padding-box, padding-box, border-box;
+  -webkit-backdrop-filter: var(--lg-filter-lg);
+  backdrop-filter: var(--lg-filter-lg);
+  box-shadow: var(--lg-bevel), var(--lg-shadow);
+}
+
+/* 详情面板文字最多，色调压深一点，正文对比度优先。 */
+#node-panel.glass-edge { --glass-bg: var(--lg-tint-dense); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   2. 顶栏
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.topbar {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.02) 100%),
+    radial-gradient(60% 140% at 12% 0%, rgba(var(--lg-accent), 0.14) 0%, transparent 70%),
+    var(--lg-tint-dense);
+  -webkit-backdrop-filter: var(--lg-filter);
+  backdrop-filter: var(--lg-filter);
+  border-bottom: 1px solid var(--lg-line-soft);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    0 12px 32px -14px rgba(0,0,0,0.6);
+}
+
+/* 搜索框：下陷的玻璃槽，聚焦时亮起一圈强调色光环。 */
+.topbar__search-icon { left: 12px; }
+.topbar__search-input {
+  height: 32px;
+  padding: 0 14px 0 34px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow:
+    inset 0 1px 3px rgba(0,0,0,0.45),
+    inset 0 0 0 1px rgba(255,255,255,0.09),
+    0 1px 0 rgba(255,255,255,0.06);
+  transition: background 0.18s, box-shadow 0.22s, width 0.24s var(--lg-spring);
+}
+.topbar__search-input:focus {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: transparent;
+  box-shadow:
+    inset 0 1px 3px rgba(0,0,0,0.35),
+    inset 0 0 0 1px rgba(var(--lg-accent), 0.75),
+    0 0 0 4px rgba(var(--lg-accent), 0.20);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   3. 工具栏
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.toolbar {
+  gap: 8px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.015) 100%),
+    var(--lg-tint);
+  -webkit-backdrop-filter: var(--lg-filter);
+  backdrop-filter: var(--lg-filter);
+  border-bottom: 1px solid var(--lg-line-soft);
+  /* 工具栏自己是 overflow-x:auto，外阴影会被裁掉，所以只用内阴影。 */
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+.toolbar__sep {
+  width: 1px; height: 22px; margin: 0 4px;
+  background: linear-gradient(180deg, transparent, rgba(255,255,255,0.22), transparent);
+}
+
+/* 成组按钮：一颗玻璃胶囊。里面的 .btn 保持原来的透明底和悬停/激活态。 */
+.toolbar__group {
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 3px; flex-shrink: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.24),
+    inset 0 0 0 1px rgba(255,255,255,0.07),
+    inset 0 -8px 12px -8px rgba(0,0,0,0.3);
+}
+/* 布局选择器本身已经是一颗强调色胶囊，不再套一层。 */
+.toolbar__group:has(> .layout-switcher) {
+  padding: 0; background: none; box-shadow: none;
+}
+
+.toolbar .btn { border-radius: 999px; }
+
+/* 单独摆放的按钮（漫游 / 音乐 / 大屏 / 侧栏开关）：用 ::before 铺一层玻璃，
+   不碰 background / box-shadow，所以 .active、:hover 的强调色照常叠在下面。 */
+.toolbar > .btn::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255,255,255,0.11), rgba(255,255,255,0.03));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.24),
+    inset 0 0 0 1px rgba(255,255,255,0.07);
+  pointer-events: none;
+}
+
+/* 悬停高光：顶部一抹镜面反光（不改 background，避免和强调色打架）。 */
+.toolbar .btn:hover { border-color: rgba(255,255,255,0.18); }
+
+/* 布局选择器的弹出菜单。 */
+.layout-switcher__menu {
+  padding: 6px; gap: 2px;
+  border-radius: 18px;
+  border: 1px solid var(--lg-line);
+  background:
+    radial-gradient(120% 70% at 0% 0%, rgba(255,255,255,0.13) 0%, transparent 60%),
+    var(--lg-tint-dense);
+  -webkit-backdrop-filter: var(--lg-filter-lg);
+  backdrop-filter: var(--lg-filter-lg);
+  box-shadow: var(--lg-bevel), var(--lg-shadow);
+}
+.layout-switcher__item { border-radius: 12px; padding: 7px 12px; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   4. 桌面侧栏：悬浮玻璃卡片
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* 离开屏幕边缘 10px，四角圆润；宽度不变，所以依赖 --sidebar-width 的地方不受影响。 */
+#sidebar {
+  top: 10px; right: 10px; bottom: 10px;
+  border-radius: 28px;
+  padding: 10px 10px 12px;
+  gap: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.22) transparent;
+}
+/* 隐藏时要多滑出 10px 的边距，否则会在屏幕边缘露出一条玻璃边。 */
+#sidebar.hidden { transform: translateX(calc(100% + 24px)); }
+/* 大屏模式把宽度压成 0，但 1px 的轮廓会留下一条细线。 */
+html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
+
+#sidebar::-webkit-scrollbar { width: 6px; }
+#sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.20); border-radius: 3px; }
+#sidebar::-webkit-scrollbar-track { background: transparent; }
+
+/* 每个分区是一张内嵌的半透明卡片，取代原来的整行分隔线。 */
+.sidebar-section {
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.065), rgba(255,255,255,0.022));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.11);
+}
+.sidebar-section__head { margin: 0; border-radius: 19px; padding: 11px 14px; }
+.sidebar-section[data-section-state="open"] .sidebar-section__body { padding: 0 12px 12px; }
+
+#sidebar .btn { border-radius: 999px; }
+
+/* 统计小块 / 布局说明：更深一点的下陷小块。 */
+.stat-card,
+.layout-info {
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.025));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
+}
+
+.legend-row, .legend-edge-row { border-radius: 10px; }
+.node-type-item { border-radius: 12px; }
+
+/* 滑块：白色胶囊滑块 + 细轨道，接近 iOS 的样子。轨道的填充色由 JS 内联写入。 */
+.param-slider,
+.bs-param-slider { height: 5px; border-radius: 3px; }
+.param-slider::-webkit-slider-thumb,
+.bs-param-slider::-webkit-slider-thumb {
+  width: 24px; height: 15px; border-radius: 8px;
+  background: linear-gradient(180deg, #ffffff, #e6eaf4);
+  border: 0;
+  box-shadow:
+    0 2px 6px rgba(0,0,0,0.5),
+    0 0 0 0.5px rgba(0,0,0,0.25),
+    inset 0 -1px 0 rgba(0,0,0,0.10);
+}
+.param-slider::-webkit-slider-thumb:hover { transform: scale(1.08); box-shadow: 0 3px 9px rgba(0,0,0,0.55), 0 0 0 0.5px rgba(0,0,0,0.25), inset 0 -1px 0 rgba(0,0,0,0.10); }
+.param-slider::-moz-range-thumb,
+.bs-param-slider::-moz-range-thumb {
+  width: 24px; height: 15px; border-radius: 8px; border: 0;
+  background: linear-gradient(180deg, #ffffff, #e6eaf4);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(0,0,0,0.25);
+}
+.param-label__val,
+.bs-param-label__val { border-radius: 999px; padding: 1px 8px; }
+.param-select { border-radius: 12px; padding: 6px 12px; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   5. 节点详情面板
+   ══════════════════════════════════════════════════════════════════════════ */
+
+#node-panel { border-radius: 26px; }
+
+/* 侧栏现在离屏幕边缘 10px，详情面板的默认位置跟着多让 10px（桌面、非大屏、
+   侧栏可见时）。JS 一旦写入 left/top（拖动过或 reposition），这条就不再起作用。 */
+@media (min-width: 769px) {
+  html:not(.bigscreen) #node-panel:not(.sidebar-hidden-adjust) {
+    right: calc(var(--sidebar-width) + 26px);
+  }
+}
+
+/* 出现动画：轻轻弹一下。只改 transform，不加 filter，避免和 backdrop-filter 叠加变卡。 */
+@keyframes lg-pop {
+  0%   { opacity: 0; transform: translateY(10px) scale(0.955); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+#node-panel.visible { animation: lg-pop 0.42s var(--lg-spring) both; }
+
+.node-panel__header {
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--lg-line-soft);
+  background: linear-gradient(180deg, rgba(255,255,255,0.075), transparent);
+}
+
+/* 概 / 文：分段控件。凹槽里浮着一块亮的玻璃滑块。 */
+.node-panel__tabs {
+  gap: 2px; padding: 2px; border-radius: 999px;
+  background: rgba(0, 0, 0, 0.30);
+  box-shadow:
+    inset 0 1px 3px rgba(0,0,0,0.5),
+    inset 0 0 0 1px rgba(255,255,255,0.06);
+}
+.node-panel__tab {
+  width: 30px; height: 24px; border-radius: 999px;
+  border-color: transparent; background: transparent;
+  transition: background 0.2s, color 0.2s, box-shadow 0.25s;
+}
+.node-panel__tab:hover:not(.active) { background: rgba(255,255,255,0.09); border-color: transparent; }
+.node-panel__tab.active {
+  color: #fff; border-color: transparent;
+  background: linear-gradient(180deg, rgba(255,255,255,0.30), rgba(255,255,255,0.14));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.55),
+    0 2px 8px rgba(0,0,0,0.4);
+}
+
+/* 固定 / 关闭：圆形玻璃按钮。只加高光和圆角，背景与悬停色沿用原来的。 */
+.node-panel__pin,
+.node-panel__close {
+  width: 26px; height: 26px; border-radius: 50%;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.20);
+}
+
+.node-panel__body { padding: 14px 16px 18px; }
+.node-panel__body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.22); }
+
+/* 面板里的卡片：半透明填充 + 内高光，不叠 backdrop-filter。 */
+.np-edge-item,
+.np-page .np-edge-item {
+  border-radius: 14px; padding: 8px 12px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+}
+.np-summary,
+.np-page .np-summary {
+  padding: 11px 14px;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-left: 1px solid rgba(255,255,255,0.07);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(var(--lg-accent), 0.13), rgba(255,255,255,0.03) 70%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
+}
+.np-badge { border-radius: 999px; padding: 2px 10px; }
+.np-summary__toggle { border-radius: 999px; padding: 2px 10px; }
+.np-markdown pre { border-radius: 12px; }
+.np-markdown blockquote { border-radius: 0 12px 12px 0; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   6. 移动端底部面板
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.bottom-sheet,
+#bottom-sheet {
+  /* 底部面板此前故意做成近乎不透明（0.97），原因是 Android 上模糊会让下面的
+     画布"透"上来。现在换成强模糊 + 中等色调：透出来的只是大块柔和色，不影响可读性。 */
+  --glass-bg: var(--lg-tint-panel);
+  border-radius: 30px 30px 0 0;
+}
+
+.bs-drag-handle__bar { width: 40px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.32); }
+
+.bs-mobile-search {
+  border-radius: 999px; border: 1px solid transparent;
+  background: rgba(255,255,255,0.07);
+  box-shadow:
+    inset 0 1px 3px rgba(0,0,0,0.45),
+    inset 0 0 0 1px rgba(255,255,255,0.09),
+    0 1px 0 rgba(255,255,255,0.06);
+}
+.bs-mobile-search__input { padding-left: 38px; }
+.bs-mobile-search__icon { left: 14px; }
+
+/* 快捷操作：每颗按钮一块玻璃瓦片。用 ::before 铺底，z-index:-1 配合 isolation
+   放在文字后面，不影响 .active 的强调色底。 */
+.bs-quick-btn {
+  position: relative; isolation: isolate;
+  border-radius: 18px;
+}
+.bs-quick-btn::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.22),
+    inset 0 0 0 1px rgba(255,255,255,0.06);
+  pointer-events: none;
+}
+
+.bs-chip {
+  border-color: rgba(255,255,255,0.09);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
+}
+.bs-chip.active {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.28), 0 0 14px rgba(var(--lg-accent), 0.32);
+}
+
+.bs-stats-row {
+  border-radius: 18px; border-color: rgba(255,255,255,0.07);
+  background: linear-gradient(180deg, rgba(255,255,255,0.065), rgba(255,255,255,0.02));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.11);
+}
+.bs-stat { border-right-color: rgba(255,255,255,0.07); background: transparent; }
+
+.bs-params-block {
+  border-radius: 20px; border-color: rgba(255,255,255,0.07);
+  background: linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.018));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
+}
+.bs-params-toggle { background: transparent; }
+.bs-params-body { border-top-color: rgba(255,255,255,0.07); }
+
+.bs-layout-btn { border-radius: 14px; border-color: rgba(255,255,255,0.09); box-shadow: inset 0 1px 0 rgba(255,255,255,0.09); }
+.bs-layout-btn.active { box-shadow: inset 0 1px 0 rgba(255,255,255,0.26), 0 0 14px rgba(var(--lg-accent), 0.3); }
+.bs-apply-btn { border-radius: 999px; }
+
+/* 展开面板的小圆钮。transform 里带 translateX(-50%)，所以这里不碰 transform。 */
+#sheet-peek-tab {
+  border: 1px solid var(--lg-line);
+  background:
+    radial-gradient(120% 90% at 20% 0%, rgba(255,255,255,0.20) 0%, transparent 62%),
+    var(--lg-tint-dense);
+  -webkit-backdrop-filter: var(--lg-filter);
+  backdrop-filter: var(--lg-filter);
+  box-shadow: var(--lg-bevel), var(--lg-shadow-sm);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   7. 小浮层：toast / 缩放提示 / 加载胶囊——和上面同一种材质，避免"孤儿"。
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.toast,
+.zoom-indicator,
+.loading-indicator {
+  border: 1px solid var(--lg-line);
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(255,255,255,0.13) 0%, transparent 60%),
+    var(--lg-tint-dense);
+  -webkit-backdrop-filter: var(--lg-filter);
+  backdrop-filter: var(--lg-filter);
+  box-shadow: var(--lg-bevel), var(--lg-shadow-sm);
+}
+.toast { border-radius: 18px; }
+.toast--info    { border-color: rgba(var(--lg-accent), 0.45); }
+.toast--success { border-color: rgba(52, 211, 153, 0.45); }
+.toast--error   { border-color: rgba(248, 113, 113, 0.45); }
+.zoom-indicator { border-radius: 999px; padding: 5px 12px; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   8. 降级
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* 浏览器不支持 backdrop-filter：改成近乎不透明，保证可读。 */
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .glass-edge, #node-panel.glass-edge { --glass-bg: rgba(12, 17, 34, 0.95); }
+  .topbar, .toolbar, .layout-switcher__menu, .toast, .zoom-indicator,
+  .loading-indicator, #sheet-peek-tab { background-color: rgba(12, 17, 34, 0.95); }
+}
+
+/* 系统"降低透明度"：同上，并去掉重的模糊。 */
+@media (prefers-reduced-transparency: reduce) {
+  .glass-edge, #node-panel.glass-edge { --glass-bg: rgba(12, 17, 34, 0.96); }
+  .topbar, .toolbar, .layout-switcher__menu, .toast, .zoom-indicator,
+  .loading-indicator, #sheet-peek-tab { background-color: rgba(12, 17, 34, 0.96); }
+  .glass-edge, .topbar, .toolbar, .layout-switcher__menu, .toast,
+  .zoom-indicator, .loading-indicator, #sheet-peek-tab {
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+}
+
+/* 系统"增强对比度"：轮廓和分隔线更亮。 */
+@media (prefers-contrast: more) {
+  :root { --lg-line: rgba(255,255,255,0.34); --lg-line-soft: rgba(255,255,255,0.22); }
+  .sidebar-section, .stat-card, .layout-info, .bs-stats-row, .bs-params-block {
+    border-color: rgba(255,255,255,0.22);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #node-panel.visible { animation: none; }
+}
+
+}

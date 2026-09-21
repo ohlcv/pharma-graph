@@ -239,12 +239,16 @@ describe('TourEngine totalExplored live sync (issue #15 fix)', () => {
 });
 
 describe('TourEngine shouldRestart hook (issue #7)', () => {
-  // 测试策略钩子：shouldRestart 返回 false 时引擎立即以 'no-more-restarts'
-  // 收束，不再进入下一轮（_restartAttempts 保持 0）。
+  // 测试策略钩子：shouldRestart 返回 false 时引擎立即收束，不再进入下一轮
+  // （_restartAttempts 最终归 0）。
+  //
+  // 收束原因按 tour.ts 的定义：'no-more-restarts' 只留给「尝试重启但没产出」的
+  // 轮次耗尽，策略主动拒绝重启（如 topo-prereq 一遍即完整覆盖）算「正常走完」，
+  // 报 'depth-reached'。
   //
   // 测试不依赖真定时器：visitNext 是同步的，循环也只是同步 loopSafety。
   // 装一个 3 节点的 cy，用 registerStrategy 临时注册一个会调用 shouldRestart 的策略。
-  it('shouldRestart returning false: first cycle completes then engine stops without incrementing _restartAttempts', () => {
+  it('shouldRestart returning false: first cycle completes then engine stops as depth-reached', () => {
     registerStrategy({
       id: 'test-no-restart',
       label: 'Test: no restart',
@@ -279,8 +283,8 @@ describe('TourEngine shouldRestart hook (issue #7)', () => {
     (engine as unknown as { visitNext: () => void }).visitNext(); // visit c → seq exhausted
     (engine as unknown as { visitNext: () => void }).visitNext(); // triggers restart logic
 
-    expect(captured?.reason).toBe('no-more-restarts');
-    expect(engine['_restartAttempts']).toBe(0); // shouldRestart=false 直接跳过计数
+    expect(captured?.reason).toBe('depth-reached');
+    expect(engine['_restartAttempts']).toBe(0); // 拒绝重启后计数会被清回 0
 
     engine.stop();
     // 清理：撤销测试策略，防止泄漏到后续测试。
