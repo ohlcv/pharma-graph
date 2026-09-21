@@ -310,6 +310,11 @@ function initGraphFromManager(graphManager: GraphManager): void {
 
   // Apply "from-center growth" animation to all nodes simultaneously — prebuilt
   // path loads everything at once but we still want the visual entrance effect.
+  //
+  // 641 个节点各自排 setTimeout 摘 'entering' class 是一次性副作用：用 finishStreamingLayout
+  // 里的 `cy.elements().removeClass('entering')` 同步一次清完 + `cy.stop(undefined, true)`
+  // 把 position 动画跳到末尾，这里就不再排 setTimeout；既避免冗余的 641 个回调触发
+  // glow-overlay.onEmphChange，也避免 race（如果 setTimeout 先跑就让节点淡入再被全局删）。
   cy.nodes().forEach((n, i) => {
     if (n.empty()) return;
     const angle = halton(i, 2) * Math.PI * 2;
@@ -324,7 +329,6 @@ function initGraphFromManager(graphManager: GraphManager): void {
       duration: 520,
       easing: 'ease-out-cubic',
     });
-    setTimeout(() => n.removeClass('entering'), 100 + i * 10);
   });
 
   // ── Populate sidebar the moment the graph is ready — not after layout settles.

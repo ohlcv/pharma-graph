@@ -146,6 +146,8 @@ export class GlowOverlay {
   private lastVisibleCount = 0;
   /** 上一次 draw()/检查时的镜头（pan + zoom），用来判断停帧状态下镜头是否动过。 */
   private lastVp = { x: NaN, y: NaN, z: NaN };
+  /** viewport 抖动时最后一次 scheduleStaticRefresh 的时间戳，避免 pan 抖动时反复 clear。 */
+  private lastStaticRefreshAt = 0;
   private staleTimer: number | null = null;
 
   /** 缓存的 glow/flow 节点集合；图变动时置脏，下一帧重新查询。 */
@@ -205,10 +207,15 @@ export class GlowOverlay {
       return;
     }
     // 节点太多、已经停帧成静态图：镜头一动，静态图就和节点错位了。
-    // 先清掉（不留错位的鬼影），镜头停稳后再补画一次。
+    // 先清掉（不留错位的鬼影），一帧后再补画（缩短空白窗到 1 帧：150 → 16ms）。
+    // 同时给 viewport 抖动加 200ms 节流，避免 pan 中反复 clear + resume 让光晕"边画边抖"。
     if (this.rafId === null && this.viewportMoved()) {
-      this.clearAll();
-      this.scheduleStaticRefresh();
+      // 给 viewport 抖动加 200ms 节流，避免 pan 中反复 clear + resume 让光晕"边画边抖"。
+      if (now - this.lastStaticRefreshAt >= 200) {
+        this.lastStaticRefreshAt = now;
+        this.clearAll();
+        this.scheduleStaticRefresh(16);
+      }
     }
   };
 
@@ -220,12 +227,12 @@ export class GlowOverlay {
     return moved;
   }
 
-  private scheduleStaticRefresh(): void {
+  private scheduleStaticRefresh(delayMs = 16): void {
     if (this.staleTimer !== null) window.clearTimeout(this.staleTimer);
     this.staleTimer = window.setTimeout(() => {
       this.staleTimer = null;
-      this.resume(); // 重新画一帧；视口内节点变少了会恢复动画，仍太多则再次停帧
-    }, 150);
+      this.resume();
+    }, delayMs);
   }
 
   private readonly onGraphChange = (): void => {

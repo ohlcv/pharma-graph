@@ -1577,7 +1577,11 @@ export class TourEngine {
     silent = false,
   ): void {
     const node = this.cy.getElementById(nodeId);
-    const pathLabels = path.map((id) => this.cy.getElementById(id).data('label') || id);
+    // path 在所有 4 个调用点都只传 [id]（见 start/pre/jumpTo/visitNext），
+    // pathLabels 因此只需取该节点的 label——line 1603 的 stepInfo.label 已经
+    // 拿过同样的值，避免重复一次 getElementById + data()。
+    const nodeLabel = node.data('label') as string | undefined;
+    const pathLabels = [nodeLabel || nodeId];
 
     this.stopTourPulse();
     // 放进一个 batch：cytoscape 每次 add/removeClass 都会立即对全图重算样式，
@@ -1600,7 +1604,7 @@ export class TourEngine {
 
     const stepInfo: TourStepInfo = {
       nodeId,
-      label: node.data('label') || nodeId,
+      label: nodeLabel || nodeId,
       depth,
       path,
       pathLabels,
