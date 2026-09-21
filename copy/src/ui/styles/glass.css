@@ -467,23 +467,125 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
 .zoom-indicator { border-radius: 999px; padding: 5px 12px; }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   8. 降级
+   8. 漫游条（发展趋势）—— 玻璃材质
+   桌面版 .tour-dt 与手机版 .tour-mob 原本各自写死深色背景（#1a1f35），
+   现在统一成玻璃三件套：tint + 边缘高光 + backdrop blur。
+   只改材质，不碰 layout / transform / display（JS 与 tour.css 控制）。
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* 漫游条容器：同 toast 同档材质 + 强调色描边（原来视觉上就是紫描边）。
+   外部保持原来的布局与 transform（tour.css 的 translateX(-50%) / 动画）。 */
+.tour-dt,
+.tour-mob {
+  background:
+    radial-gradient(130% 90% at 0% 0%, rgba(255,255,255,0.12) 0%, transparent 56%),
+    var(--lg-tint-dense);
+  -webkit-backdrop-filter: var(--lg-filter);
+  backdrop-filter: var(--lg-filter);
+  border-color: rgba(var(--lg-accent), 0.28);
+  box-shadow: var(--lg-bevel), var(--lg-shadow-sm);
+}
+
+/* 手机版在 ≤768px 下由 tour.css 里的一整块 @media 规则重写背景。
+   这里用同媒体查询再盖一次，把写死的 #1a1f35 换成玻璃。 */
+@media (max-width: 768px) {
+  .tour-mob {
+    background:
+      radial-gradient(130% 90% at 0% 0%, rgba(255,255,255,0.12) 0%, transparent 56%),
+      var(--lg-tint-dense);
+    -webkit-backdrop-filter: var(--lg-filter);
+    backdrop-filter: var(--lg-filter);
+    border: 1px solid rgba(var(--lg-accent), 0.28);
+    box-shadow: var(--lg-bevel), var(--lg-shadow-sm);
+  }
+  /* 手机版收起态（.collapsed）只剩下把手，材质的右下角高光会随圆角变化，
+     高度变小后背景中的径向渐变位置不变，看起来还算自然——保持现状。 */
+}
+
+/* 漫游条内部控件跟随玻璃：
+   - 桌面版滑块的 background 本身就是可见轨道（60×4 横条），压淡一档；
+     手机版的可视轨道是单独的 .tour-mob__track 细线，range 铺满整个
+     32×80 触摸热区，必须保持透明——否则会露出一块白色矩形。
+   - 拇指用半透明强调色玻璃点（内高光 + 光晕），比白色胶囊更通透、也更轻；
+   - 按钮沿用工具栏的做法——用 ::before 铺一层玻璃底，不碰
+     background / box-shadow，所以 .active、:hover 的强调色照常生效。
+     tour.css 已给按钮内容抬了 z-index:1，玻璃层自然压在下面。 */
+.tour-dt__range { background: rgba(255,255,255,0.08); }
+/* 显式压回透明：glass 层优先级高于 tour.css，不写这条就会把整块触摸热区染白。 */
+.tour-mob__range { background: transparent; }
+.tour-dt__range::-webkit-slider-thumb,
+.tour-mob__range::-webkit-slider-thumb,
+.tour-dt__range::-moz-range-thumb,
+.tour-mob__range::-moz-range-thumb {
+  background: rgba(var(--accent-rgb), 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.35),
+    0 1px 4px rgba(0,0,0,0.35),
+    0 0 8px rgba(var(--accent-rgb), 0.55);
+}
+
+.tour-dt__btn::before,
+.tour-mob__badge::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255,255,255,0.11), rgba(255,255,255,0.03));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.22),
+    inset 0 0 0 1px rgba(255,255,255,0.06);
+  pointer-events: none;
+}
+
+/* 其它还没进玻璃材质的浮层：邮箱卡片 / 节点叠加卡片 / 大屏提示——都换
+   成同档 tint + 边缘高光（各自原有圆角与布局不动）。 */
+.badge-email-card,
+.bigscreen-hint {
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(255,255,255,0.11) 0%, transparent 58%),
+    var(--lg-tint-dense);
+  border-color: var(--lg-line);
+  box-shadow: var(--lg-bevel), var(--lg-shadow-sm);
+  -webkit-backdrop-filter: var(--lg-filter-lg);
+  backdrop-filter: var(--lg-filter-lg);
+}
+/* 节点叠加卡片：父级 .node-overlay 已经 blur(10px)，卡片自己不再叠
+   backdrop-filter（白费一层 GPU；符合"面板内部卡片不再模糊"的约定）。
+   文字密集，用密色调（同 #node-panel 的 --lg-tint-dense），可读性优先。 */
+.node-overlay-card {
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(255,255,255,0.10) 0%, transparent 58%),
+    var(--lg-tint-dense);
+  border-color: var(--lg-line);
+  box-shadow: var(--lg-bevel), var(--lg-shadow-sm);
+}
+/* 邮箱卡片的强调色描边保留（hover 状态也用它）。 */
+.badge-email-card {
+  border-color: rgba(var(--lg-accent), 0.35);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   9. 降级
    ══════════════════════════════════════════════════════════════════════════ */
 
 /* 浏览器不支持 backdrop-filter：改成近乎不透明，保证可读。 */
 @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
   .glass-edge, #node-panel.glass-edge { --glass-bg: rgba(12, 17, 34, 0.95); }
   .topbar, .toolbar, .layout-switcher__menu, .toast, .zoom-indicator,
-  .loading-indicator, #sheet-peek-tab { background-color: rgba(12, 17, 34, 0.95); }
+  .loading-indicator, #sheet-peek-tab,
+  .tour-dt, .tour-mob, .badge-email-card, .node-overlay-card, .bigscreen-hint {
+    background-color: rgba(12, 17, 34, 0.95);
+  }
 }
 
 /* 系统"降低透明度"：同上，并去掉重的模糊。 */
 @media (prefers-reduced-transparency: reduce) {
   .glass-edge, #node-panel.glass-edge { --glass-bg: rgba(12, 17, 34, 0.96); }
   .topbar, .toolbar, .layout-switcher__menu, .toast, .zoom-indicator,
-  .loading-indicator, #sheet-peek-tab { background-color: rgba(12, 17, 34, 0.96); }
+  .loading-indicator, #sheet-peek-tab,
+  .tour-dt, .tour-mob, .badge-email-card, .node-overlay-card, .bigscreen-hint {
+    background-color: rgba(12, 17, 34, 0.96);
+  }
   .glass-edge, .topbar, .toolbar, .layout-switcher__menu, .toast,
-  .zoom-indicator, .loading-indicator, #sheet-peek-tab {
+  .zoom-indicator, .loading-indicator, #sheet-peek-tab,
+  .tour-dt, .tour-mob, .badge-email-card, .node-overlay-card, .bigscreen-hint {
     -webkit-backdrop-filter: none; backdrop-filter: none;
   }
 }
@@ -492,6 +594,9 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
 @media (prefers-contrast: more) {
   :root { --lg-line: rgba(255,255,255,0.34); --lg-line-soft: rgba(255,255,255,0.22); }
   .sidebar-section, .stat-card, .layout-info, .bs-stats-row, .bs-params-block {
+    border-color: rgba(255,255,255,0.22);
+  }
+  .tour-dt, .tour-mob, .badge-email-card, .node-overlay-card, .bigscreen-hint {
     border-color: rgba(255,255,255,0.22);
   }
 }

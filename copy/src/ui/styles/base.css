@@ -20,7 +20,7 @@
     /* ════════════════════════════════════════════════════════════════════════════
        THEME — single source of truth for color story.
        ★ 切换主题只改一行：index.html 里的 <html data-theme="A|B|C|D|E">（也可用 class="theme-e"）。
-       不写 data-theme 时回退到 C（Aurora，`:root,` 所在的块）。
+       不写 data-theme 时回退到 E（Orchid 紫粉，`:root,` 所在的块）。
     
        A — Cold deep space   冷深空      deep indigo + ice cyan     (tech / Linear)
        B — Nebula            星云紫      violet #a78bfa + amber      (Hubble deep field)
@@ -95,8 +95,7 @@
       --stat-memory:      #f472b6;   /* 粉   — 内存指标 */
     }
     
-    /* Default = C (Aurora) — 极光（深靛 + 冷青 + 淡紫）*/
-    :root,
+    /* C — Aurora — 极光（深靛 + 冷青 + 淡紫）*/
     :root[data-theme="C"],
     :root.theme-c {
       --accent:      #c4b5fd;             /* violet-300 — lighter aurora */
@@ -105,19 +104,19 @@
       --accent-glow: rgba(196, 181, 253, 0.32);
       --accent-light:     #ddd6fe;
       --accent-light-rgb: 221, 214, 254;
-    
+
       --accent2:     #67e8f9;             /* cyan-300 — cold cyan */
       --accent2-rgb: 103, 232, 249;
       --accent2-soft: rgba(103, 232, 249, 0.18);
-    
+
       --halo-accent:      rgba(196, 181, 253, 0.24);
       --halo-accent2:     rgba(103, 232, 249, 0.18);
       --halo-accent-strong:  rgba(196, 181, 253, 0.38);
       --halo-accent2-strong: rgba(103, 232, 249, 0.30);
-    
+
       --scrollbar-thumb:  rgba(196, 181, 253, 0.45);
       --scrollbar-hover:  rgba(196, 181, 253, 0.70);
-    
+
       /* ── Stat indicator colors — four distinct hues, track the theme ────── */
       --stat-nodes:       #c4b5fd;   /* 淡紫 — 主色 */
       --stat-edges:       #67e8f9;   /* 冷青 — 辅色 */
@@ -136,19 +135,19 @@
       --accent-glow: rgba(96, 165, 250, 0.28);
       --accent-light:     #93c5fd;
       --accent-light-rgb: 147, 197, 253;
-    
+
       --accent2:     #f97316;             /* orange-500 — warm planet glow */
       --accent2-rgb: 249, 115, 22;
       --accent2-soft: rgba(249, 115, 22, 0.18);
-    
+
       --halo-accent:      rgba(96, 165, 250, 0.22);
       --halo-accent2:     rgba(249, 115, 22, 0.16);
       --halo-accent-strong:  rgba(96, 165, 250, 0.35);
       --halo-accent2-strong: rgba(249, 115, 22, 0.28);
-    
+
       --scrollbar-thumb:  rgba(96, 165, 250, 0.45);
       --scrollbar-hover:  rgba(96, 165, 250, 0.70);
-    
+
       /* ── Stat indicator colors — four distinct hues, track the theme ────── */
       --stat-nodes:       #60a5fa;   /* 蓝 — 主色 */
       --stat-edges:       #f97316;   /* 橙 — 辅色 */
@@ -158,7 +157,8 @@
       --stat-memory:      #f472b6;   /* 粉   — 内存指标 */
     }
 
-    /* E — Orchid — 紫粉（紫 + 粉，原顶栏徽章的紫粉配色）*/
+    /* Default = E (Orchid) — 紫粉（原顶栏徽章的紫粉配色）*/
+    :root,
     :root[data-theme="E"],
     :root.theme-e {
       --accent:      #c084fc;             /* purple-400 */
@@ -167,19 +167,19 @@
       --accent-glow: rgba(192, 132, 252, 0.28);
       --accent-light:     #e9d5ff;        /* purple-200 */
       --accent-light-rgb: 233, 213, 255;
-    
+
       --accent2:     #f472b6;             /* pink-400 */
       --accent2-rgb: 244, 114, 182;
       --accent2-soft: rgba(244, 114, 182, 0.18);
-    
+
       --halo-accent:      rgba(192, 132, 252, 0.22);
       --halo-accent2:     rgba(244, 114, 182, 0.16);
       --halo-accent-strong:  rgba(192, 132, 252, 0.35);
       --halo-accent2-strong: rgba(244, 114, 182, 0.28);
-    
+
       --scrollbar-thumb:  rgba(192, 132, 252, 0.45);
       --scrollbar-hover:  rgba(192, 132, 252, 0.70);
-    
+
       /* ── Stat indicator colors — four distinct hues, track the theme ────── */
       --stat-nodes:       #c084fc;   /* 紫 — 主色 */
       --stat-edges:       #f472b6;   /* 粉 — 辅色 */

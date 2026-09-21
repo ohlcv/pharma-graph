@@ -581,6 +581,27 @@ export interface AddElementsResult {
   skippedEdges: Array<{ id: string; source: string; target: string; err: string }>;
 }
 
+/** 「适应」在左右下三边留的空白（顶部另外要让开浮层）。 */
+const FIT_PADDING = 50;
+
+/**
+ * 浮在画布上方的固定 chrome（顶栏 + 工具栏）实际占掉的高度。
+ *
+ * 顶栏与工具栏是 position:fixed 的浮层，画布铺满整个视口、节点会伸到它们下面，
+ * 所以「适应」的顶部必须让开这段高度。这里按渲染结果实测而不是写死 100px：
+ * 大屏模式下两条 bar 都是 display:none，≤768px 时工具栏也是 display:none。
+ */
+function topChromeHeight(): number {
+  if (document.documentElement.classList.contains('bigscreen')) return 0;
+  let bottom = 0;
+  document.querySelectorAll<HTMLElement>('.topbar, .toolbar').forEach((el) => {
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden') return;
+    bottom = Math.max(bottom, el.getBoundingClientRect().bottom);
+  });
+  return Math.max(0, bottom);
+}
+
 export class Renderer {
   private cy: cytoscape.Core;
   private currentLayout = DEFAULT_LAYOUT;
@@ -867,7 +888,29 @@ export class Renderer {
   }
 
   fit(): void {
-    this.cy.fit(undefined, 50);
+    const eles = this.cy.elements();
+    if (eles.length === 0) return;
+
+    // cytoscape 的 cy.fit(eles, padding) 与布局的 padding 都只支持四边同值，
+    // 没法单独给顶部多留 100px，所以这里手算一次：把图谱的 boundingBox
+    // 居中放进「顶部让开浮层、其余三边各留 FIT_PADDING」的安全区。
+    const bb = eles.boundingBox();
+    const W = this.cy.width();
+    const H = this.cy.height();
+    const top = topChromeHeight() + FIT_PADDING;
+    const availW = Math.max(1, W - FIT_PADDING * 2);
+    const availH = Math.max(1, H - top - FIT_PADDING);
+
+    const zoom = Math.min(availW / Math.max(1, bb.w), availH / Math.max(1, bb.h));
+    const midX = (bb.x1 + bb.x2) / 2;
+    const midY = (bb.y1 + bb.y2) / 2;
+
+    // rendered = model * zoom + pan → 让图谱中心落到安全区中心
+    this.cy.zoom(zoom);
+    this.cy.pan({
+      x: W / 2 - midX * zoom,
+      y: top + availH / 2 - midY * zoom,
+    });
   }
 
   getCy(): cytoscape.Core {

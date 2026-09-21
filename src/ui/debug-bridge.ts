@@ -25,6 +25,8 @@ export interface DebugBridge {
   overlay: () => void;
   node: (id: string) => Record<string, unknown> | string;
   selected: () => Array<{ id: string; label: string; dimmed: boolean }>;
+  /** 图谱当前渲染出来的外接矩形（渲染坐标 px）。 */
+  bounds: () => { left: number; top: number; right: number; bottom: number; width: number; height: number };
   /** 预览漫游顺序。控制台调用：_dbg.previewSequence() / _dbg.previewSequence('has-dfs') */
   previewSequence: (strategyId?: string) => void;
 }
@@ -58,6 +60,19 @@ export function installDebugBridge(renderer: Renderer): void {
         label: n.data('label'),
         dimmed: n.hasClass('dimmed'),
       }));
+    },
+    // 顶栏 / 工具栏是浮层，画布铺满视口后节点会伸到它们下面。要看「适应」
+    // 有没有把图放进安全区（top 应 ≥ 浮层高度 + padding），读这个最直接。
+    bounds: () => {
+      const bb = cy.elements().renderedBoundingBox();
+      return {
+        left: Math.round(bb.x1),
+        top: Math.round(bb.y1),
+        right: Math.round(bb.x2),
+        bottom: Math.round(bb.y2),
+        width: Math.round(bb.w),
+        height: Math.round(bb.h),
+      };
     },
     previewSequence: (strategyId?: string) => {
       import('../core/tour.js').then(({ TourEngine }) => {
