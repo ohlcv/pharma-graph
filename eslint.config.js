@@ -90,6 +90,22 @@ export default [
       '@typescript-eslint/no-non-null-assertion': 'off', // lots of ! in cytoscape API
       'no-empty': ['warn', { allowEmptyCatch: true }],
 
+      // Safety net: production code must never import a test file. The
+      // test/ directory is fenced off — the only way a `.test.*` path
+      // shows up in production import is a mistake.
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/*.test', '**/*.test.*', '**/?(*.)test?(.*)'],
+              message:
+                'Production code must not import test files. Tests live under tests/{unit,component,e2e}/; see AGENTS.md §2.4.',
+            },
+          ],
+        },
+      ],
+
       // Prettier
       'prettier/prettier': [
         'warn',

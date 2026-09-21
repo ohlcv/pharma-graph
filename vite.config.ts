@@ -29,6 +29,12 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    // Safety net: refuse to bundle any test file. Even if a stray source
+    // file mistakenly `import`s a `.test.ts`, the path is treated as
+    // external so it cannot leak into `dist/`.
+    rollupOptions: {
+      external: (id: string): boolean => /\.test\./.test(id),
+    },
   },
   // Legacy JS bundle (ES5) for Safari <15 / iOS <15 / old Androids.
   // plugin-legacy generates a separate bundle transpiled to ES5 with only the
