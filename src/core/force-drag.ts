@@ -174,7 +174,9 @@ export function isActive(): boolean {
 // ── 内部实现 ────────────────────────────────────────────────────────────────
 
 function buildSession(grabbed: cytoscape.NodeCollection): Session | null {
-  const cy = grabbed.cy();
+  // NodeCollection 的类型声明没有暴露 cy()，但 Cytoscape 运行时是有的
+  // （collection.cy() 返回所属 core）。用 cast 打通类型缺口。
+  const cy = (grabbed as unknown as { cy(): cytoscape.Core }).cy();
   const roots = grabbed.filter((n) => !n.hasClass(CLASSES.LAYER_PARENT));
   if (roots.empty()) return null;
 
@@ -185,7 +187,7 @@ function buildSession(grabbed: cytoscape.NodeCollection): Session | null {
     if (list) list.push(b);
     else adj.set(a, [b]);
   };
-  cy.edges().forEach((e) => {
+  cy.edges().forEach((e: cytoscape.EdgeSingular) => {
     const s = e.data('source') as string;
     const t = e.data('target') as string;
     if (s === t) return;
@@ -215,7 +217,7 @@ function buildSession(grabbed: cytoscape.NodeCollection): Session | null {
   // 3) 仿真节点。
   const nodes: SimNode[] = [];
   const byId = new Map<string, SimNode>();
-  cy.nodes().forEach((n) => {
+  cy.nodes().forEach((n: cytoscape.NodeSingular) => {
     const hop = hops.get(n.id());
     if (hop === undefined || n.hasClass(CLASSES.LAYER_PARENT)) return;
     const p = n.position();
@@ -244,7 +246,7 @@ function buildSession(grabbed: cytoscape.NodeCollection): Session | null {
 
   // 4) 边 → 弹簧，静止长度取当前边长（起始即平衡态，避免整图漂移）。
   const links: SimLink[] = [];
-  cy.edges().forEach((e) => {
+  cy.edges().forEach((e: cytoscape.EdgeSingular) => {
     const s = byId.get(e.data('source') as string);
     const t = byId.get(e.data('target') as string);
     if (!s || !t || s === t) return;

@@ -32,7 +32,7 @@ export interface FocusOptions {
   /** Animation duration in ms. Defaults to {@link DEFAULT_FOCUS_DURATION}. */
   duration?: number;
   /** Easing passthrough for `cy.animate`. */
-  easing?: cytoscape.EasingFunction | string;
+  easing?: cytoscape.Css.TransitionTimingFunction;
   /** Skip the camera animation (useful when callers want to chain their own). */
   skipCamera?: boolean;
   /** Skip resetting other selection state (e.g. during roam-managed steps). */

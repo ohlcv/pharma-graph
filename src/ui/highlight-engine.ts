@@ -121,7 +121,9 @@ export class HighlightEngine {
 
       hits.addClass(CLASSES.HIGHLIGHTED).select();
       misses.addClass(CLASSES.DIMMED).unselect();
-      hits.forEach((n: cytoscape.NodeSingular) => results.push(n.id()));
+      hits.forEach((n: cytoscape.NodeSingular) => {
+        results.push(n.id());
+      });
 
       this.dimUnhighlightedEdges();
     });

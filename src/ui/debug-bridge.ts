@@ -75,9 +75,9 @@ export function installDebugBridge(renderer: Renderer): void {
       };
     },
     previewSequence: (strategyId?: string) => {
-      import('../core/tour.js').then(({ TourEngine }) => {
+      import('../core/tour.js').then(({ TourEngine, asStrategy }) => {
         const temp = new TourEngine(cy);
-        temp.previewSequence(strategyId as 'has-dfs' | 'topo-prereq' | undefined);
+        temp.previewSequence(strategyId ? asStrategy(strategyId) : undefined);
       });
     },
   };

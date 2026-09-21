@@ -809,7 +809,7 @@ function collectForensicData(renderer: Renderer): string {
       lines.push(`  .dimmed: ${checkNode.hasClass('dimmed')}`);
       lines.push(`  .highlighted: ${checkNode.hasClass('highlighted')}`);
       lines.push(`  .selected-node: ${checkNode.hasClass('selected-node')}`);
-      lines.push(`  所有class: [${checkNode.classNames().join(', ')}]`);
+      lines.push(`  所有class: [${checkNode.classes().join(', ')}]`);
       lines.push(`  opacity样式: ${checkNode.style('opacity')}`);
       lines.push(`  border-width样式: ${checkNode.style('border-width')}`);
       lines.push(`  border-color样式: ${checkNode.style('border-color')}`);
@@ -824,7 +824,7 @@ function collectForensicData(renderer: Renderer): string {
   lines.push('\n【所有非 .dimmed 节点（视觉真相）】');
   if (allNonDimmed.length > 0) {
     allNonDimmed.forEach((n: NodeSingular) => {
-      const classes = n.classNames().filter((c: string) => c !== 'dimmed').join(',') || '∅';
+      const classes = n.classes().filter((c: string) => c !== 'dimmed').join(',') || '∅';
       lines.push(`  - ${n.id()}: ${n.data('label') || '(无)'} [${classes}]`);
     });
   } else {

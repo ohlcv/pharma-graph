@@ -81,7 +81,7 @@ export function registerAppActions(
   });
 
   registerAction('pulse', () => {
-    animatePulse(renderer);
+    animatePulse(renderer.getCy());
   });
 
   registerAction('toggle-sidebar', () => {
