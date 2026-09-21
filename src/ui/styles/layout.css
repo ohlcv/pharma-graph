@@ -91,7 +91,10 @@
    resolves to a stale value. Flex's deterministic sizing eliminates this. */
 #main {
   display: flex;
-  overflow: hidden; height: calc(100vh - 56px - 44px);
+  /* 画布铺满整个视口：顶栏(56px)与工具栏(44px)已改成 position:fixed 浮在上面，
+   * 不再占文档流，所以这里不能再减掉它们的 100px。这样两条 bar 的玻璃才有
+   * 图谱可以透（#app::after 的光晕、星点层也一并铺满）。 */
+  overflow: hidden; height: 100vh;
   position: relative; min-width: 0;
 }
 /* #main.sidebar-hidden no longer collapses #sidebar's width — sidebar

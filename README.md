@@ -55,6 +55,23 @@
 
 这不是加载动画——是视觉隐喻。知识从混沌的奇点中涌现，在爆炸中自发组织成有结构的宇宙。星图命名不是噱头，它从第一个像素开始就是真的。
 
+### 🌠 背景层次
+画面从后到前叠了四层，全部 `pointer-events: none`，不拦任何交互：
+
+| 层 | 实现 | 位置 |
+|---|---|---|
+| **噪点** | 200×200 SVG `feTurbulence` 内联 data-URI 平铺，`mix-blend-mode: overlay` + opacity 0.04，用来破深色渐变的色带 | `layout.css` 的 `.noise-overlay`（body 直接子级）|
+| **星云光晕** | 两团 `radial-gradient` + 90s `nebula-drift` 缓慢漂移 | `layout.css` 的 `#app::after` |
+| **星点视差** | canvas 上三层 tile（896 / 768 / 1024 px）取模无限平铺，视差因子 0.10 / 0.22 / 0.45，随平移缩放同步跟帧 | `src/ui/starfield.ts` + `#starfield` |
+| **图谱 / UI** | Cytoscape 画布与各个面板 | `#main` 及各面板 |
+
+`#app` 用 `isolation: isolate` 建立自己的层叠上下文，光晕的 `z-index: -1` 因此相对 `#app` 生效，不会掉进根上下文被 `html/body` 的深色背景整层盖住。
+
+### 🪟 液态玻璃皮肤
+顶栏、工具栏、桌面侧栏、节点详情面板、移动端底部面板统一走同一套 Liquid Glass 材质：`backdrop-filter` 模糊 + 半透明染色 + 一圈「从左上亮起、向右下滑落、右下角回亮」的 1px 边缘高光。材质分三档——大面板 30px 模糊、条状（顶栏 / 工具栏）22px、浮层（菜单 / toast / 缩放提示）22px；面板内部卡片只用半透明填充、不再叠 `backdrop-filter`，避免重复采样同一片已模糊内容。
+
+规则全部收在 `src/ui/styles/glass.css` 的 `@layer glass` 里，并在 `index.css` 中作为**最后一条 import**：层级之间「后声明的层赢」，所以它既不需要 `!important`，也不会压过 `.u-hidden` 这类**未分层**的隐藏工具类。删掉那一行 import，界面立刻回到原样式。
+
 ### 🗺️ 多种布局算法
 通过布局切换器一键变换图谱形态，找到最适合当前学习场景的结构视图：
 
@@ -68,7 +85,7 @@
 | **Dagre** | 有向无环图，从上到下层级布局，适合前置依赖链阅读 |
 | **广度优先** | 从选中节点 BFS 展开，适合围绕核心药物做辐射学习 |
 
-每种布局均提供细粒度参数调整面板（引力、斥力、理想边长、迭代次数等），一键恢复库默认值或应用自定义参数。
+每种布局均提供细粒度参数调整面板（引力、斥力、理想边长、迭代次数等），一键恢复库默认值或应用自定义参数。切换入口在顶栏下拉；参数面板收在侧栏「高级设置 → 布局设置」里，手机端则连切换按钮一起收进抽屉的「高级设置 → 布局设置」。
 
 ### 🚶 漫游学习
 点击工具栏「漫游」按钮，系统按选定策略依次访问节点，像看教学动画一样自动遍历图谱：
@@ -88,10 +105,12 @@
 ### 📱 多端适配
 | 终端 | UI 结构 |
 |---|---|
-| **桌面端** | 左侧悬浮节点详情 + 右侧侧栏（图例 / 图谱统计 / 布局参数 / 快捷键） + 顶栏搜索 |
-| **移动端** | 底部可拖拽抽屉面板（图例 / 统计 / 布局 / 漫游参数） + 顶栏居中搜索框 + 展开手柄 |
+| **桌面端** | 顶栏（品牌词轮播 + 搜索）+ 工具栏（布局下拉 / 适应 / 随机 / 重置 / 脉冲 / 漫游 / 音乐 / 大屏）+ 右侧侧栏（图例说明 / 图谱状态 / 高级设置 → 布局设置 / 快捷键）+ 左侧节点详情面板 |
+| **移动端** | 顶栏居中搜索 + 底部可拖拽抽屉（节点本质 / 关联关系 / 图谱信息 / 快捷操作 / 高级设置 → 布局设置）+ 展开手柄 |
 
-侧栏各分区均支持折叠 / 展开，所有图例类型（形状 / 边框 / 填充 / 边）均为动态生成，随节点数量实时更新统计。
+- **布局切换入口**：桌面在顶栏下拉；手机在抽屉的「高级设置 → 布局设置」里平铺成一排按钮。桌面端的布局参数面板也收在同一处（侧栏「高级设置 → 布局设置」）。
+- **图谱状态**：桌面侧栏是 3 列 × 2 行卡片（节点 / 边 / 选中 / 高亮 / FPS / 内存，标签在左、数值在右）；手机统计条按同样顺序排成一行，末位是 FPS。
+- 侧栏各分区均支持折叠 / 展开，所有图例类型（形状 / 边框 / 填充 / 边）均为动态生成，随节点数量实时更新统计。
 
 ### ⌨️ 快捷键
 
@@ -147,7 +166,8 @@
 | **布局算法** | cytoscape-euler · cytoscape-cose-bilkent · cytoscape-dagre | 7 种布局引擎组合 |
 | **工具提示** | cytoscape-popper | 悬停节点弹出快速摘要卡片 |
 | **内容解析** | marked 18 + yaml 2 + DOMPurify 3 | 流式 Markdown frontmatter 解析 + XSS 清理 |
-| **测试框架** | Vitest 2 + jsdom 25 | 前端 DOM 仿真测试，23 测试文件 |
+| **样式分层** | 原生 CSS `@layer` | base → shared → … → bigscreen → glass 共 13 层，层级之间「后声明的层赢」；隐藏态工具类不进层，保证优先级 |
+| **测试框架** | Vitest 2 + jsdom 25 | 前端 DOM 仿真测试，30 个测试文件 / 315 用例 |
 | **代码质量** | ESLint 9 + Prettier 3 | @typescript-eslint + eslint-plugin-prettier |
 
 ---
@@ -157,41 +177,56 @@
 ```
 pharma-graph/
 ├── public/
-│   ├── content/                      # 全部知识节点 Markdown 文件
-│   │   ├── 药学专业知识一/            # 第一篇药剂学 / 第二篇药理 / ...
-│   │   ├── 药学专业知识二/            # 第一章中枢神经 / 第三章呼吸 / ...
+│   ├── content/                      # 全部知识节点 Markdown
+│   │   ├── 药学专业知识一/
+│   │   ├── 药学专业知识二/
 │   │   └── 药学综合知识与技能/
 │   ├── audio/                        # 背景 BGM
-│   ├── favicon.svg                   # 苯环六角图腾 favicon
-│   ├── robots.txt                    # 搜索引擎抓取规则
-│   ├── sitemap.xml                   # 构建时自动生成（1100+ URL）
-│   └── content-manifest.json         # 构建时生成的节点索引
+│   ├── images/  favicon.svg  robots.txt
+│   ├── graph-data.json               # 构建期预生成的整图数据（提交入库，保证协作一致）
+│   ├── sitemap.xml                   # 构建时生成，1100+ URL（不提交）
+│   └── content-manifest.json         # 构建时生成的节点索引（不提交）
 ├── src/
-│   ├── core/                         # 图谱核心逻辑
-│   │   ├── frontmatter.ts            # Markdown YAML 头部解析
-│   │   ├── content-loader.ts         # 节点 URL 编码与懒加载
-│   │   ├── graph-builder.ts          # Cytoscape 实例 + nodes/edges 注入
-│   │   ├── layouts/                  # 7 种布局参数预设
-│   │   ├── legends/                  # 四类图例（形状/边框/填充/边）动态生成
-│   │   └── tour/                     # 漫游学习引擎（策略/调度/播放控制）
-│   ├── ui/                           # 所有 UI 行为
-│   │   ├── main.ts                   # 入口 + 初始化编排
-│   │   ├── toolbar.ts                # 工具栏按钮 + 布局切换器
-│   │   ├── sidebar/                  # 桌面侧栏（图例/统计/参数/快捷键）
-│   │   ├── bottom-sheet.ts           # 移动端底部抽屉
-│   │   ├── node-panel.ts             # 节点详情面板（概览/正文/固定/缩放）
-│   │   ├── search.ts                 # 顶栏搜索 + 结果定位
-│   │   ├── bigscreen.ts              # 大屏影院模式
-│   │   ├── drag-manager.ts           # 侧栏折叠动画 + 分区高度 JS 测量
-│   │   ├── music.ts                  # BGM 控制（用户首次点击后才 preload）
-│   └── neighbor-tug.ts           # 节点拖拽时的轻量邻居牵引反馈（grab/drag/free 生命周期）
-│   └── style/
-│       ├── layout.css                # 主布局（Flex 代替 CSS Grid，画布高度无截断）
-│       └── components.css            # 侧栏/工具栏/抽屉/面板/快捷键卡片样式
-├── tests/                            # 23 个测试文件（235+ 测试用例）
-├── scripts/                          # 构建校验脚本（validate / audit / overlap）
-├── vite.config.ts                    # Vite 配置 + contentManifestPlugin
+│   ├── core/                         # 图谱核心（不含 UI）
+│   │   ├── config.ts                 # 视觉配置单一来源：fill / shape / stroke、边类型配色、7 种布局参数
+│   │   ├── edge-types.ts             # 5 种 OWL 风格边类型词表
+│   │   ├── theme-colors.ts           # 把 base.css 的主题变量读成 JS 颜色（canvas 上写不了 var()）
+│   │   ├── renderer.ts               # Cytoscape 实例与样式表（含主题切换监听）
+│   │   ├── glow-overlay.ts           # 光晕 / 流动光弧覆盖层 canvas
+│   │   ├── node-builder.ts / edge-builder.ts / node-shape-outline.ts
+│   │   ├── build-graph.ts / graph-manager.ts / graph.ts
+│   │   ├── prebuilt-loader.ts / optimized-content-loader.ts / content-loader.ts
+│   │   ├── force-drag.ts / device-capability.ts / performance-monitor.ts
+│   │   └── tour.ts                   # 漫游引擎（策略 / 调度 / 播放控制）
+│   ├── parser/                       # frontmatter / schema / content-manager：Markdown 解析与校验
+│   ├── data/                         # 领域词表（vocabulary）
+│   ├── types/                        # 第三方类型补丁
+│   └── ui/                           # 所有 UI 行为（测试文件与源码同目录）
+│       ├── main.ts                   # 入口与初始化编排
+│       ├── action-handlers.ts / action-dispatcher.ts    # data-action → 函数 的唯一映射
+│       ├── drag-manager.ts           # 侧栏折叠动画 / 抽屉拖拽 / 分区高度测量
+│       ├── detail-panel.ts / markdown.ts                # 节点详情面板与正文渲染
+│       ├── legend-manager.ts / legend-factory.ts        # 四类图例与手机端 chips
+│       ├── stats/                    # 状态卡、数字滚动、FPS / 内存采样
+│       ├── layout/                   # 布局状态、参数面板模板、设置持久化
+│       ├── starfield.ts / carousel.ts / music-player.ts / bigscreen.ts / search-ui.ts
+│       ├── graph-events.ts / highlight-engine.ts / neighbor-tug.ts / focus-node.ts
+│       ├── tour-controller.ts / speech.ts / keyboard-shortcuts.ts
+│       └── styles/
+│           ├── index.css             # @layer 声明 + 全部 import（glass 在最后一条）
+│           ├── base.css              # 主题变量（A–E 五套配色）与基础样式
+│           ├── layout.css            # #app / #main / #cy 骨架、背景层、toast、缩放提示
+│           ├── components.css        # 顶栏 / 工具栏 / 侧栏 / 详情面板 / 底部面板
+│           ├── glass.css             # Liquid Glass 皮肤（整层可移除）
+│           ├── shared.css / tour.css
+│           └── sidebar/              # sidebar-stats.css / sidebar-params.css
+├── docs/                             # 开发文档（见文末「更多文档」）
+├── ARD/                              # 架构决策与需求说明
+├── archive/                          # 历史版本快照
+├── copy/                             # UI 设计交付包（各面板源码副本 + SKILL.md + glass.css）
+├── scripts/                          # 构建与校验脚本（validate / audit / overlap）
 ├── index.html                        # 单页入口 + SEO meta + JSON-LD + noscript
+├── vite.config.ts / vitest.config.ts
 ├── eslint.config.js / .prettierrc.json
 └── package.json
 ```
@@ -209,9 +244,9 @@ pharma-graph/
 # 1. 安装依赖
 npm install
 
-# 2. 启动开发服务器（默认 5177 端口）
+# 2. 启动开发服务器（默认 5173 端口）
 npm run dev
-# → http://localhost:5177
+# → http://localhost:5173
 
 # 3. 生产构建
 npm run build
@@ -259,7 +294,7 @@ edges_out:                                 # 对外关联
 吗啡是阿片类生物碱的代表药物，通过激动中枢 μ 阿片受体产生强大的镇痛作用……
 ```
 
-> **命名约束**：内容文件名必须使用全角逗号（`，`）而非半角逗号（`,`）；id 字段必须存在且全局唯一。具体规则参见 [docs/SPLIT-RULES.md](docs/SPLIT-RULES.md) 与 [docs/frontmatter.md](docs/frontmatter.md)。
+> **命名约束**：内容文件名必须使用全角逗号（`，`）而非半角逗号（`,`）；id 字段必须存在且全局唯一。具体规则参见 [docs/SKILL.md](docs/SKILL.md) 与 [docs/frontmatter.md](docs/frontmatter.md)。
 
 ---
 
@@ -285,13 +320,16 @@ edges_out:                                 # 对外关联
 | 文档 | 说明 |
 |---|---|
 | [docs/frontmatter.md](docs/frontmatter.md) | Markdown frontmatter 字段详解 |
-| [docs/SPLIT-RULES.md](docs/SPLIT-RULES.md) | 节点拆分与文件命名规则 |
-| [docs/REFACTOR-RULES.md](docs/REFACTOR-RULES.md) | 重构规则与约定 |
+| [docs/SKILL.md](docs/SKILL.md) | 节点转录工作流、字段制作规范与质量检查清单 |
+| [docs/RULES.md](docs/RULES.md) | 药学领域特化参数（fill / stroke 取值与映射） |
 | [docs/Cytoscape.md](docs/Cytoscape.md) | Cytoscape.js 用法与踩坑记录 |
 | [docs/DEVELOP.md](docs/DEVELOP.md) | 开发模式与调试技巧 |
 | [docs/CODE-WIKI.md](docs/CODE-WIKI.md) | 代码结构速查 |
-| [docs/ARD/ADR-0001.md](docs/ARD/ADR-0001-层级关系统一使用isa方向.md) | 架构决策记录 |
-| [docs/DEBUG-sidebar-issues.md](docs/DEBUG-sidebar-issues.md) | 侧栏折叠/截断问题 debug 记录 |
+| [docs/布局参数清单.md](docs/布局参数清单.md) | 7 种布局的可调参数与默认值 |
+| [docs/ARD/](docs/ARD/) | 架构决策记录（ADR-0001 ~ 0004） |
+| [docs/DEBUG/](docs/DEBUG/) | 问题排查记录（侧栏、大屏、漫游、初始缩放等） |
+| [ARD/修改要求.md](ARD/修改要求.md) | 布局设置重构的改动说明 |
+| [copy/SKILL.md](copy/SKILL.md) | 前端设计指引（UI 改版时给设计用） |
 
 ---
 
