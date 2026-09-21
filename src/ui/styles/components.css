@@ -457,13 +457,19 @@
   background: rgba(var(--accent-rgb), 0.12);
   border-color: rgba(var(--accent-rgb), 0.4);
 }
-/* 侧栏标题可点击按钮化 */
-.sidebar-section__title {
+/* 侧栏标题 + 重音条：顶层 section（.sidebar-section__title）与图例子标题
+ * （.legend-section__title）共用同一套规格，避免两处规则各自漂移
+ * —— 统一前是 0.62rem / 12px条 11px / 间距8px vs 0.6rem / 0.1em / 条10px / 间距7px。
+ * 层级差异只由缩进体现（如「布局设置」+2px），不再由字号或条高体现。 */
+.sidebar-section__title,
+.legend-section__title {
   display: flex; align-items: center; gap: 8px;
-  font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted);
+  font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--muted);
 }
-.sidebar-section__title::before {
-  content: ''; display: block; width: 3px; height: 11px; border-radius: 2px;
+.sidebar-section__title::before,
+.legend-section__title::before {
+  content: ''; display: block; width: 3px; height: 10px; border-radius: 2px;
   background: var(--accent); flex-shrink: 0;
 }
 .sidebar-section__chevron { width: 14px; height: 14px; color: var(--muted); transition: transform 0.2s cubic-bezier(0.4,0,0.2,1), color 0.15s; flex-shrink: 0; }
@@ -486,8 +492,14 @@
  *    仍会露出 12px 的 padding-bottom —— 就是那条「半行」。
  * 2) #body-advanced 本身去掉左右内边距：它里面装的是另一个 .sidebar-section，
  *    若再加 14px，子级标题的竖条会比父级多缩进 14px，而「图例说明 → 节点本质」
- *    那层只差 2px。去掉后两级竖条对齐，和「图例说明」的视觉层级一致。 */
+ *    那层只差 2px。去掉后子级回到与顶层同一基准，再由下面那条规则精确对齐。 */
 #body-advanced { padding-left: 0; padding-right: 0; }
+
+/* 3) 嵌套的「布局设置」按图例子项（「节点本质」）对齐竖条 x：+2px
+ *    —— 顶层标题是 margin 6 + padding 14 = 20px，
+ *    图例子项是 body 内边距 14 + 头部 padding 8 = 22px，差 2px。
+ *    字号与条高已由上面的统一规格覆盖，这里只管缩进。 */
+[data-section="layout-setting"] > .sidebar-section__head { padding-left: 16px; }
 
 .node-type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
 .node-type-item {
@@ -528,14 +540,8 @@
   background: rgba(var(--accent-rgb), 0.12);
   border-color: rgba(var(--accent-rgb), 0.4);
 }
-.legend-section__title {
-  font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
-  color: var(--muted);
-}
-.legend-section__title::before {
-  content: ''; display: inline-block; width: 3px; height: 10px; border-radius: 2px;
-  background: var(--accent); margin-right: 7px; vertical-align: middle;
-}
+/* .legend-section__title / ::before 的规格已并入上方与
+ * .sidebar-section__title 共用的那条统一规则，此处不再重复定义。 */
 .legend-section__body {
   max-height: 0; overflow: hidden;
   transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1), padding 0.28s ease;
@@ -1082,12 +1088,15 @@
 .bs-stat__val--edges       { color: var(--stat-edges); }
 .bs-stat__val--selected    { color: var(--stat-selected); }
 .bs-stat__val--highlighted { color: var(--stat-highlighted); }
+.bs-stat__val--fps         { color: var(--stat-fps); }
 .bs-stat__val--memory     { color: var(--stat-memory); }
 .bs-stat__label { font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
 
 .bs-section + .bs-section { margin-top: 6px; }
 .bs-section { display: flex; flex-direction: column; gap: 8px; }
-.bs-section__label { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+/* 抽屉标题统一到与侧栏同一套规格：0.6rem / 700 / 0.1em / uppercase / --muted
+ * （见 @layer sidebar 里 .sidebar-section__title 与 .legend-section__title 共用的那条规则）。 */
+.bs-section__label { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
 .bs-section:has(.bs-layout-grid) { padding-bottom: 4px; }
 
 .bs-chips { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -1139,8 +1148,8 @@
 
 /* ── "高级设置"容器：把图谱布局 + 布局参数这两块放到一起，共享折叠记忆 ────── */
 .bs-advanced { display: flex; flex-direction: column; gap: 8px; }
-.bs-advanced__head { display: flex; align-items: center; justify-content: space-between; padding: 6px 4px 0; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
-.bs-advanced__title { display: flex; align-items: center; gap: 6px; }
+.bs-advanced__head { display: flex; align-items: center; justify-content: space-between; padding: 6px 4px 0; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.bs-advanced__title { display: flex; align-items: center; gap: 8px; }
 .bs-advanced__chev { width: 12px; height: 12px; color: var(--muted); transition: transform 0.2s ease; flex-shrink: 0; }
 .bs-advanced.open .bs-advanced__chev { transform: rotate(90deg); }
 .bs-advanced__hint { font-size: 0.6rem; font-weight: 500; color: var(--muted); letter-spacing: 0.04em; }
@@ -1150,7 +1159,7 @@
 .bs-advanced__head:active .bs-advanced__title { color: var(--accent); }
 
 .bs-layout-setting { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-.bs-layout-setting__head { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 14px; background: rgba(255,255,255,0.02); border: none; color: var(--text-2); font-size: 0.72rem; font-weight: 600; font-family: inherit; cursor: pointer; }
+.bs-layout-setting__head { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 14px; background: rgba(255,255,255,0.02); border: none; color: var(--muted); font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; font-family: inherit; cursor: pointer; }
 .bs-layout-setting__title { display: flex; align-items: center; gap: 8px; }
 .bs-layout-setting__chev { width: 14px; height: 14px; color: var(--muted); transition: transform 0.2s ease; }
 .bs-layout-setting.open .bs-layout-setting__chev { transform: rotate(90deg); }

@@ -59,10 +59,16 @@ function tick(now: number): void {
   _rafId = requestAnimationFrame(tick);
 }
 
+/** 桌面侧栏 #stat-fps 和手机抽屉 #bs-stat-fps 显示同一个读数。 */
+function setFpsText(text: string): void {
+  const desktop = document.getElementById('stat-fps');
+  const mobile = document.getElementById('bs-stat-fps');
+  if (desktop) desktop.textContent = text;
+  if (mobile) mobile.textContent = text;
+}
+
 function updateFpsDom(): void {
-  const el = document.getElementById('stat-fps');
-  if (!el) return;
-  el.textContent = _fps > 0 ? String(_fps) : '—';
+  setFpsText(_fps > 0 ? String(_fps) : '—');
 }
 
 function readMemoryMb(): number {
@@ -85,7 +91,6 @@ function pollMemory(): void {
 
 function updateMemoryDom(): void {
   const desktop = document.getElementById('stat-memory');
-  const mobile = document.getElementById('bs-stat-memory');
   let text: string;
   if (_memoryMb < 0) {
     text = '—';
@@ -95,7 +100,6 @@ function updateMemoryDom(): void {
     text = `${_memoryMb} MB`;
   }
   if (desktop) desktop.textContent = text;
-  if (mobile) mobile.textContent = text;
 }
 
 function startSampling(): void {
@@ -145,8 +149,7 @@ function onVisibilityChange(): void {
   if (document.hidden) {
     stopSampling();
     // Show "—" while hidden so the user doesn't read a stale value.
-    const el = document.getElementById('stat-fps');
-    if (el) el.textContent = '—';
+    setFpsText('—');
   } else {
     startSampling();
   }
