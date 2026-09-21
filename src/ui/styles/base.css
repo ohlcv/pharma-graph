@@ -59,6 +59,8 @@
       --stat-edges:       #fbbf24;   /* 暗金   — 辅色 */
       --stat-selected:    #60a5fa;   /* 蓝     — 冷色补 */
       --stat-highlighted: #34d399;   /* 绿     — 冷色补 */
+      --stat-fps:         #2dd4bf;   /* 冰青   — 性能指标 */
+      --stat-memory:      #f472b6;   /* 粉     — 内存指标 */
     }
     
     /* A — Cold deep space — 冷深空（靛蓝 + 冰青）*/
@@ -89,6 +91,8 @@
       --stat-edges:       #06b6d4;   /* 冰青 — 辅色 */
       --stat-selected:    #f472b6;   /* 粉   — 拉开与靛蓝的色相（原 #a78bfa 太近） */
       --stat-highlighted: #34d399;   /* 绿   — 辅色邻近 */
+      --stat-fps:         #2dd4bf;   /* 冰青 — 性能指标 */
+      --stat-memory:      #f472b6;   /* 粉   — 内存指标 */
     }
     
     /* Default = C (Aurora) — 极光（深靛 + 冷青 + 淡紫）*/
@@ -119,8 +123,10 @@
       --stat-edges:       #67e8f9;   /* 冷青 — 辅色 */
       --stat-selected:    #60a5fa;   /* 蓝   — 冷色补 */
       --stat-highlighted: #34d399;   /* 绿   — 冷色补 */
+      --stat-fps:         #2dd4bf;   /* 冰青 — 性能指标 */
+      --stat-memory:      #f472b6;   /* 粉   — 内存指标 */
     }
-    
+
     /* D — Cold-warm clash — 冷暖对撞（深冷蓝 + 暖橙）*/
     :root[data-theme="D"],
     :root.theme-d {
@@ -148,8 +154,10 @@
       --stat-edges:       #f97316;   /* 橙 — 辅色 */
       --stat-selected:    #a78bfa;   /* 紫 — 冷色补 */
       --stat-highlighted: #34d399;   /* 绿 — 拉开与橙/金的区分（原 #fbbf24 太近） */
+      --stat-fps:         #2dd4bf;   /* 冰青 — 性能指标 */
+      --stat-memory:      #f472b6;   /* 粉   — 内存指标 */
     }
-    
+
     /* E — Orchid — 紫粉（紫 + 粉，原顶栏徽章的紫粉配色）*/
     :root[data-theme="E"],
     :root.theme-e {
@@ -177,8 +185,10 @@
       --stat-edges:       #f472b6;   /* 粉 — 辅色 */
       --stat-selected:    #60a5fa;   /* 蓝 — 冷色补 */
       --stat-highlighted: #34d399;   /* 绿 — 冷色补 */
+      --stat-fps:         #2dd4bf;   /* 冰青 — 性能指标 */
+      --stat-memory:      #f472b6;   /* 粉   — 内存指标 */
     }
-    
+
     /* Structural tokens — theme-independent */
     :root {
       color-scheme: dark;                 /* 原生表单控件、滚动条、选择菜单跟随暗色 */

@@ -362,7 +362,7 @@
       <!-- Stats + Layout description merged -->
       <div class="sidebar-section" data-section="stats" data-section-state="open">
         <div class="sidebar-section__head" data-action="toggle-section" data-arg="stats" aria-expanded="true" aria-controls="body-stats">
-          <span class="sidebar-section__title">图谱与布局</span>
+          <span class="sidebar-section__title">图谱状态</span>
           <svg class="sidebar-section__chevron open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
         <div class="sidebar-section__body" id="body-stats">
@@ -383,6 +383,14 @@
             <div class="stat-card">
               <span class="stat-card__label">高亮</span>
               <span class="stat-card__value stat-card__value--highlighted" id="stat-highlighted">0</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-card__label">FPS</span>
+              <span class="stat-card__value stat-card__value--fps" id="stat-fps">—</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-card__label">内存</span>
+              <span class="stat-card__value stat-card__value--memory" id="stat-memory">—</span>
             </div>
           </div>
           <div class="layout-info">
@@ -544,6 +552,7 @@
         <div class="bs-stat"><span class="bs-stat__val bs-stat__val--selected" id="bs-stat-selected">0</span><span class="bs-stat__label">选中</span></div>
         <div class="bs-stat"><span class="bs-stat__val bs-stat__val--highlighted" id="bs-stat-highlighted">0</span><span class="bs-stat__label">高亮</span></div>
         <div class="bs-stat"><span class="bs-stat__val" id="bs-stat-layout">COSE</span><span class="bs-stat__label">布局</span></div>
+        <div class="bs-stat"><span class="bs-stat__val bs-stat__val--memory" id="bs-stat-memory">—</span><span class="bs-stat__label">内存</span></div>
       </div>
     </div>
 
