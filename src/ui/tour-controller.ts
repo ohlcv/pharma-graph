@@ -55,6 +55,15 @@ export class TourController {
   private _boundClick: ((e: MouseEvent) => void) | null = null;
   private _boundKeydown: ((e: KeyboardEvent) => void) | null = null;
 
+  /**
+   * Last state passed to applyStateClass(). Used to skip redundant
+   * classList churn when setRunningUI() is called from multiple paths
+   * (togglePause() + onEnginePause()) for what is functionally one user
+   * action. scheduleStartHint() is already rAF-coalesced so it's safe
+   * to keep calling unconditionally.
+   */
+  private _lastAppliedState: 'idle' | 'running' | 'paused' | null = null;
+
   constructor(
     private readonly cy: cytoscape.Core,
     private readonly renderer: Renderer,
@@ -1004,6 +1013,15 @@ export class TourController {
   }
 
   private applyStateClass(state: 'idle' | 'running' | 'paused'): void {
+    if (this._lastAppliedState === state) {
+      // Same state re-applied (e.g. togglePause()'s direct call racing
+      // the engine's onPause/onResume callback) — skip the redundant
+      // classList churn. scheduleStartHint() is already rAF-coalesced
+      // so it's safe to keep calling unconditionally.
+      this.scheduleStartHint();
+      return;
+    }
+    this._lastAppliedState = state;
     const root = document.documentElement;
     root.classList.remove('tour-state--idle', 'tour-state--running', 'tour-state--paused');
     root.classList.add(`tour-state--${state}`);
@@ -1024,7 +1042,12 @@ export class TourController {
 
   private setText(id: string, text: string): void {
     const el = document.getElementById(id);
-    if (el) el.textContent = text;
+    // Guard like setProgressRange() already does two methods below —
+    // renderTimeline() calls this 5x per tour step; skipping unchanged
+    // values avoids firing MutationObservers / a11y tree updates for
+    // no visual change (e.g. cumulative count staying flat while the
+    // user drags the depth slider mid-step).
+    if (el && el.textContent !== text) el.textContent = text;
   }
 
   private labelOf(nodeId: string): string {

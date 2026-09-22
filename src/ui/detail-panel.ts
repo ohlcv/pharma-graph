@@ -31,6 +31,25 @@ export class DetailPanel {
   private pinBtn!: HTMLElement;
   private pinToggle!: UiToggle;
 
+  /**
+   * Must match the `@media (max-width: 768px)` breakpoint used by
+   * components.css / tour.css / glass.css for the mobile layout switch.
+   * There is no CSS-custom-media in plain CSS, so this is the one place
+   * that breakpoint is allowed to be a literal — every other consumer
+   * (this file included) should import it from here rather than
+   * re-typing 768.
+   */
+  private static readonly MOBILE_BREAKPOINT_PX = 768;
+
+  /** Reads a length CSS custom property off :root as a px number.
+   *  Falls back to `fallback` if the property is unset/unparsable —
+   *  keeps this file working even if base.css's token block moves. */
+  private static readVar(name: string, fallback: number): number {
+    const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    const px = raw ? parseFloat(raw) : NaN;
+    return Number.isFinite(px) ? px : fallback;
+  }
+
   constructor(
     private cy: cytoscape.Core,
     private highlight: HighlightEngine,
@@ -188,7 +207,7 @@ export class DetailPanel {
     // (left: 8px, right: auto) and the reposition logic calculates wrong
     // left values for width:auto panels, causing the panel to appear
     // off-screen on first open.
-    if (window.innerWidth <= 768) return;
+    if (window.innerWidth <= DetailPanel.MOBILE_BREAKPOINT_PX) return;
 
     if (!this.panel.classList.contains('visible') || uiState.isPanelPinned) return;
 
@@ -197,20 +216,18 @@ export class DetailPanel {
     const vpW = window.innerWidth;
     const vpH = window.innerHeight;
     // glass 皮肤侧栏离右边缘 10px，面板要比侧栏左缘再留 16px 间隙。
-    // CSS 默认 right: calc(var(--sidebar-width) + 26px) 的构成 = 10px(glass) + 16px(gap)。
-    const GLASS_MARGIN = 10;
+    // CSS 默认 right: calc(var(--sidebar-width) + var(--chrome-gap) + 16px) 的构成
+    // = --chrome-gap(glass 边距) + 16px(panel gap)。JS 读 --chrome-gap 跟随 token。
+    const GLASS_MARGIN = DetailPanel.readVar('--chrome-gap', 10);
     const PANEL_GAP = 16;
     // 从 CSS 变量读真实侧栏宽度（components.css 的 --sidebar-width:
     // clamp(280px, 6vw + 248px, 320px)）。原来硬编码 260 在窄屏/glass 皮肤下
     // 会压到侧栏 30–70px。JS 读 CSS 变量而非复制数值，避免再次脱节。
-    const SIDEBAR_W = (() => {
-      const raw = window.getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width').trim();
-      const px = raw ? parseFloat(raw) : 260;
-      return Number.isFinite(px) ? px : 260;
-    })();
-    // Must sit below topbar(56) + toolbar(44) = 100px so panel header never
-    // overlaps the top bars visually or event-wise.
-    const MIN_TOP = 110;
+    const SIDEBAR_W = DetailPanel.readVar('--sidebar-width', 260);
+    // Must sit below the fixed topbar+toolbar chrome — read from the same
+    // --chrome-h-gapped token components.css / glass.css both position off
+    // of, so a future change to bar height never needs a second edit here.
+    const MIN_TOP = DetailPanel.readVar('--chrome-h-gapped', 110);
 
     // Once the user has dragged or resized the panel, leave it where they
     // put it. We only reposition when no saved bounds exist — i.e. the
@@ -221,9 +238,9 @@ export class DetailPanel {
     const sbW = sidebarHidden ? 0 : SIDEBAR_W;
     const glassOffset = sidebarHidden ? 0 : GLASS_MARGIN;
     const left = vpW - pW - PANEL_GAP - glassOffset - sbW;
-    // 默认位置：右上角——水平已经贴 viewport 右边缘 (PAD=8px)，垂直贴 toolbar 下方
-    // (topbar 56 + toolbar 44 = 100 + 10px 间距 = 110)。不再做垂直居中，避免面板
-    // 在小屏幕上盖住中心图，也跟用户预期"右上"一致。
+    // 默认位置：右上角——水平已经贴 viewport 右边缘 (PAD 见 --chrome-gap)，垂直贴
+    // toolbar 下方(顶栏 + 工具栏 + 间距，见 --chrome-h-gapped)。
+    // 不再做垂直居中，避免面板在小屏幕上盖住中心图，也跟用户预期"右上"一致。
     const top = MIN_TOP;
 
     this.panel.style.right = 'auto';

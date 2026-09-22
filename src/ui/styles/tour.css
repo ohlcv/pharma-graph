@@ -103,7 +103,7 @@
       bottom: 16px;
       left: 50%;
       transform: translateX(-50%);
-      z-index: 900;
+      z-index: var(--z-tour-bar);
       align-items: center;
       gap: 0;
       background: #1a1f35;
@@ -362,8 +362,8 @@
       /* 移动端 z-index 层级（root stacking context 下比较）：
          #app=1 < .tour-mob=30 < #bottom-sheet=50 < #app.sheet-open=60
          底部面板始终盖住漫游条，漫游条始终在画布之上。 */
-      .tour-mob { z-index: 30; }
-      #bottom-sheet { z-index: 50; }
+      .tour-mob { z-index: var(--z-node-panel); }
+      #bottom-sheet { z-index: var(--z-sheet); }
       .tour-mob.tour-visible { display: inline-flex; }
       .tour-mob {
         /* 注意：不写 display，由 JS 控制 */

@@ -1,3 +1,14 @@
+/* ══════════════════════════════════════════════════════════════════════
+   Layer order — explicit and authoritative.
+   CSS resolves @layer priority by order of first declaration, which
+   otherwise silently depends on @import order below. Declaring the
+   empty list here means glass.css (or any future skin file) no longer
+   has to be "the last @import" by convention — it wins because it's
+   declared last in this list, full stop, regardless of where its
+   @import line ends up.
+   To add a new layer: append its name here, then declare sub-rules in
+   `@layer <name> { … }` inside the relevant stylesheet.
+   ══════════════════════════════════════════════════════════════════════ */
 @layer base, shared, layout, topbar, toolbar, sidebar, sidebar-stats, sidebar-params, node-panel, bottom-sheet, tour, bigscreen, glass;
 
 @import "./base.css";

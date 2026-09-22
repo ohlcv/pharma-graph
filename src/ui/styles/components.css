@@ -30,7 +30,7 @@
    * UI panels > permanent chrome > canvas. */
   /* 浮在画布之上：不再占文档流，让 #main 能铺满整个视口，
    * 顶栏的玻璃里才有图谱可以透（详见 layout.css 的 #main 注释）。 */
-  position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+  position: fixed; top: 0; left: 0; right: 0; z-index: var(--z-topbar);
 }
 .topbar__logo {
   display: flex; align-items: center; gap: 10px;
@@ -210,7 +210,7 @@
   transform: translateY(-6px) scale(0.97);
   transform-origin: top right;
   transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0.28s;
-  z-index: 1000;
+  z-index: calc(var(--z-topbar) + 950); /* must clear topbar's own stack */
 }
 .badge-email-card.is-visible {
   /* Interactive while open: lets the pointer rest on the card (main.ts keeps
@@ -279,8 +279,8 @@
   display: flex; align-items: center; gap: 4px;
   padding: 0 16px; height: 44px; border-bottom: 1px solid var(--border);
   background: rgba(12, 18, 34, 0.6); overflow-x: auto;
-  /* 紧贴顶栏下方（顶栏 56px 高），同样浮在画布之上。 */
-  position: fixed; top: 56px; left: 0; right: 0; z-index: 25;
+  /* 紧贴顶栏下方，同样浮在画布之上。 */
+  position: fixed; top: var(--chrome-topbar-h); left: 0; right: 0; z-index: var(--z-toolbar);
 }
 .toolbar__sep    { width: 1px; height: 20px; background: var(--border); margin: 0 6px; flex-shrink: 0; }
 .toolbar__label  { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); padding: 0 4px; white-space: nowrap; flex-shrink: 0; }
@@ -358,7 +358,7 @@
 
 .layout-switcher__menu {
   position: fixed;
-  z-index: 30;
+  z-index: var(--z-menu);
   padding: 4px;
   display: flex; flex-direction: column; gap: 1px;
   background: rgba(12, 18, 34, 0.92);
@@ -426,8 +426,8 @@
    are visually covered by the sidebar when it's visible — but the user
    doesn't see that region anyway, so it's invisible overhead. */
 #sidebar {
-  /* 画布已铺满视口，侧栏要避开浮在上面的顶栏 + 工具栏（56 + 44 = 100px）。 */
-  position: absolute; top: 100px; right: 0; bottom: 0;
+  /* 画布已铺满视口，侧栏要避开浮在上面的顶栏 + 工具栏。 */
+  position: absolute; top: var(--chrome-h); right: 0; bottom: 0;
   width: var(--sidebar-width);
   --glass-bg: rgba(12, 18, 34, 0.7);
   backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
@@ -438,7 +438,7 @@
               opacity   0.28s ease;
   will-change: transform, opacity;
   padding-bottom: 16px;
-  z-index: 6;
+  z-index: var(--z-sidebar);
 }
 #sidebar.hidden {
   transform: translateX(100%); opacity: 0; pointer-events: none;
@@ -726,11 +726,11 @@
 @layer node-panel {
 
 #node-panel {
-  /* top 要让开浮在上面的顶栏 + 工具栏（56 + 44 = 100px）再留 10px。
-   * 手机端工具栏隐藏，下面的媒体查询里另有 top: 56px 的覆盖。 */
-  position: fixed; top: 110px; right: calc(var(--sidebar-width) + 16px); left: auto; z-index: 30;
+  /* top 让开顶栏 + 工具栏再留 10px。手机端工具栏隐藏，下面的媒体查询
+   * 里另有 top 覆盖。 */
+  position: fixed; top: var(--chrome-h-gapped); right: calc(var(--sidebar-width) + var(--chrome-gap) + 16px); left: auto; z-index: var(--z-node-panel);
   width: 360px; max-width: min(360px, calc(100vw - 24px));
-  max-height: calc(100vh - 134px);
+  max-height: calc(100vh - var(--chrome-h-gapped) - 24px);
   --glass-bg: rgba(10, 14, 28, 0.90); border-radius: 14px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.55), 0 0 40px rgba(var(--accent-rgb), 0.06);
   display: flex; flex-direction: column; overflow: hidden;
@@ -741,7 +741,7 @@
 /* ── Mobile: auto-sized panel, same drag/resize as desktop ─────────── */
 @media (max-width: 768px) {
   #node-panel {
-    top: 56px; right: auto; left: 8px;
+    top: var(--chrome-topbar-h); right: auto; left: 8px;
     width: auto;
     max-width: calc(100vw - 16px);
     height: auto;
@@ -891,7 +891,7 @@
 .np-question__label  { font-size: 0.65rem; font-weight: 700; color: var(--accent); line-height: 1.4; }
 .np-question__answer { font-size: 0.72rem; color: var(--text-2); line-height: 1.65; }
 
-.node-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: rgba(2,6,23,0.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); animation: overlay-in 0.2s ease; }
+.node-overlay { position: fixed; inset: 0; z-index: var(--z-overlay); display: flex; align-items: center; justify-content: center; background: rgba(2,6,23,0.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); animation: overlay-in 0.2s ease; }
 .node-overlay-card { position: relative; border-radius: 18px; padding: 22px; width: 310px; max-height: 72vh; overflow-y: auto; background: rgba(15,23,42,0.95); border: 1px solid var(--border-hi); box-shadow: 0 24px 64px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04) inset, 0 0 40px rgba(var(--accent-rgb), 0.08); animation: card-in 0.22s cubic-bezier(0.34,1.56,0.64,1); }
 .node-overlay-close { position: absolute; top: 12px; right: 12px; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; background: var(--border); color: var(--text-2); border: none; line-height: 1; transition: background 0.14s, color 0.14s; }
 .node-overlay-close:hover { background: var(--accent); color: #fff; }
@@ -1010,19 +1010,52 @@
 @layer bottom-sheet {
 
 .bottom-sheet {
-  display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+  display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: var(--z-sheet);
   --glass-bg: rgba(12, 18, 34, 0.88);
   backdrop-filter: blur(32px) saturate(180%); -webkit-backdrop-filter: blur(32px) saturate(180%);
   border-radius: 22px 22px 0 0;
   box-shadow: 0 -10px 40px rgba(0,0,0,0.35);
   flex-direction: column; gap: 0;
   padding: 0 0 max(16px, env(safe-area-inset-bottom));
-  max-height: 90dvh; overflow: hidden; overscroll-behavior: contain;
+  max-height: var(--sheet-max-h); overflow: hidden; overscroll-behavior: contain;
   touch-action: none; will-change: transform;
   transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1);
   transform: translateY(var(--sheet-offset, 100dvh));
 }
 .bottom-sheet.open { transform: translateY(0); }
+
+/* ── Short-viewport tiers ──────────────────────────────────────────────
+   Phones in landscape or small split-screen windows: the flat 90dvh cap
+   leaves almost no room for content above the fold, and the fixed-height
+   quick-action grid / advanced-settings accordion push the essential
+   search box off-screen. Two tiers:
+     ≤ 480px tall  → cap the sheet harder, shrink the drag handle and
+                     quick-action row so more of .bs-scroll is usable.
+     ≤ 360px tall  → very short (landscape phone): quick actions go from
+                     a 3-col grid to a horizontally scrolling row so they
+                     don't eat 3 full rows of vertical space. */
+@media (max-height: 480px) {
+  .bottom-sheet, #bottom-sheet {
+    max-height: 78dvh;
+  }
+  .bs-drag-handle { padding: 6px 0 2px; }
+  .bs-mobile-search { margin: 6px 16px 8px; }
+  .bs-quick-btn { padding: 7px 4px 6px; }
+  .bs-section + .bs-section { margin-top: 4px; }
+}
+@media (max-height: 360px) {
+  .bottom-sheet, #bottom-sheet {
+    max-height: 68dvh;
+  }
+  .bs-quick-row {
+    display: flex; overflow-x: auto; gap: 6px;
+    grid-template-columns: unset; /* abandon the grid for this tier */
+  }
+  .bs-quick-btn { flex: 0 0 auto; min-width: 68px; }
+  /* Advanced settings starts collapsed anyway (class="collapsed" in
+     index.html); nothing else needed — the accordion already won't
+     eat space unless the user opens it. */
+}
 
 .bs-drag-handle { display: flex; align-items: center; justify-content: center; padding: 12px 0 2px; cursor: grab; flex-shrink: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
 .bs-drag-handle:active { cursor: grabbing; }
@@ -1031,7 +1064,7 @@
 
 .bs-scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 0 16px; -webkit-overflow-scrolling: touch; }
 
-#sheet-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 49; pointer-events: none; opacity: 0; transition: opacity 0.38s cubic-bezier(0.32, 0.72, 0, 1); }
+#sheet-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: var(--z-sheet-backdrop); pointer-events: none; opacity: 0; transition: opacity 0.38s cubic-bezier(0.32, 0.72, 0, 1); }
 #sheet-backdrop.visible { opacity: 1; pointer-events: auto; }
 
 #sheet-peek-tab { display: none; position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); width: 44px; height: 44px; border-radius: 50%; z-index: 48; background: rgba(12,18,34,0.75); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); cursor: pointer; align-items: center; justify-content: center; box-shadow: 0 2px 12px rgba(0,0,0,0.4); pointer-events: none; opacity: 0; transition: opacity 0.38s cubic-bezier(0.32,0.72,0,1), transform 0.38s cubic-bezier(0.32,0.72,0,1); }
@@ -1044,7 +1077,7 @@
 #sheet-expand-bar:active svg { color: var(--accent); }
 #sheet-expand-bar.sheet-open svg { transform: rotate(180deg); }
 
-#sheet-close-bar { display: none; position: fixed; top: 0; left: 0; right: 0; height: 32px; align-items: center; justify-content: center; background: rgba(12,18,34,0.95); backdrop-filter: blur(24px) saturate(200%); -webkit-backdrop-filter: blur(24px) saturate(200%); border-radius: 0 0 22px 22px; box-shadow: 0 10px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.05) inset; cursor: pointer; color: var(--text-2); user-select: none; -webkit-tap-highlight-color: transparent; z-index: 50; transition: background 0.15s, color 0.15s; }
+#sheet-close-bar { display: none; position: fixed; top: 0; left: 0; right: 0; height: 32px; align-items: center; justify-content: center; background: rgba(12,18,34,0.95); backdrop-filter: blur(24px) saturate(200%); -webkit-backdrop-filter: blur(24px) saturate(200%); border-radius: 0 0 22px 22px; box-shadow: 0 10px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.05) inset; cursor: pointer; color: var(--text-2); user-select: none;   -webkit-tap-highlight-color: transparent; z-index: var(--z-sheet); transition: background 0.15s, color 0.15s; }
 #sheet-close-bar:active { background: rgba(var(--accent-rgb), 0.12); color: var(--accent); }
 #sheet-close-bar svg { width: 16px; height: 16px; color: var(--muted); transition: color 0.15s; }
 #sheet-close-bar:active svg { color: var(--accent); }
@@ -1063,8 +1096,8 @@
   --glass-bg: rgba(12, 18, 34, 0.97);
   border-radius: 22px 22px 0 0;
   box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
-  z-index: 50;
-  max-height: calc(88dvh - env(safe-area-inset-bottom, 0px));
+  z-index: var(--z-sheet);
+  max-height: calc(var(--sheet-max-h) - 2dvh - env(safe-area-inset-bottom, 0px));
   overflow-y: auto; touch-action: none; flex-direction: column;
   padding: 0 16px max(16px, env(safe-area-inset-bottom));
   /* Easing must NOT overshoot (y control points ≤ 1). The sheet is anchored
@@ -1241,8 +1274,8 @@
   #sidebar { display: none; }
   #main    { flex-direction: row; }
   #cy      { flex: 1 1 auto; }
-  .topbar  { z-index: 60; }
-  #app.sheet-open { z-index: 60; }
+  .topbar  { z-index: var(--z-mobile-topbar); }
+  #app.sheet-open { z-index: var(--z-mobile-topbar); }
   .toolbar { display: none; }
   #sheet-expand-bar { display: none; }
   #sheet-close-bar  { display: none; }
@@ -1380,7 +1413,7 @@ html.bigscreen .node-panel { z-index: 40; right: 16px; }
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255,255,255,0.12);
   color: rgba(255,255,255,0.75); font-size: 0.74rem;
-  pointer-events: none; opacity: 0; z-index: 200;
+  pointer-events: none; opacity: 0; z-index: var(--z-bigscreen-hint);
   animation: bigscreen-hint-in 1.5s ease-out 0.2s 1 forwards;
   white-space: nowrap;
 }

@@ -215,9 +215,9 @@ html[data-glass="lite"] {
 /* 离开屏幕边缘 10px，四角圆润；宽度不变，所以依赖 --sidebar-width 的地方不受影响。 */
 #sidebar {
   /* 画布铺满视口后侧栏的参照系是整屏，所以要跳过浮在上面的顶栏 + 工具栏
-   * （100px）再留 10px 边距。 */
-  top: 110px; right: 10px; bottom: 10px;
-  border-radius: 28px;
+   * 再留一点边距。 */
+  top: var(--chrome-h-gapped); right: var(--chrome-gap); bottom: var(--chrome-gap);
+  border-radius: var(--radius-xl);
   padding: 10px 10px 12px;
   gap: 8px;
   scrollbar-width: thin;
@@ -298,7 +298,7 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
    侧栏可见时）。JS 一旦写入 left/top（拖动过或 reposition），这条就不再起作用。 */
 @media (min-width: 769px) {
   html:not(.bigscreen) #node-panel:not(.sidebar-hidden-adjust) {
-    right: calc(var(--sidebar-width) + 26px);
+    right: calc(var(--sidebar-width) + var(--chrome-gap) + 16px);
   }
 }
 
