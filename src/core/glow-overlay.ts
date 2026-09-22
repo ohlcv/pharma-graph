@@ -133,10 +133,23 @@ export class GlowOverlay {
   private readonly emphCanvas: HTMLCanvasElement;
   private readonly emphCtx: CanvasRenderingContext2D | null;
   private emphRaf: number | null = null;
-  private emphStartedAt = 0;
+  /**
+   * 强调层的相位锚点：单调递增的毫秒数，作为呼吸/漫游脉冲 sin/cos 输入。
+   *
+   * 之前用 `emphStartedAt = performance.now()` 这种"墙钟起点 + 减法"做相位，
+   * 但 `ensureEmphLoop()` 在循环被 cancel/restart 反复触发时会把这个值重置——
+   * 结果用户选中一个节点后，phase 又从 0 开始跳 1.x ms，sin 永远≈0，呼吸就"不动"了。
+   * 现在改为：用 rAF 自己的 timestamp 累加得到 phaseMs，永远单调递增，
+   * 即使循环被 cancel/restart 也不会跳。`pauseEmphasis` 不复位 phaseMs，
+   * 暂停期间的相位也要继续走，恢复时不会突然跳一截。
+   */
+  private emphPhaseMs = 0;
+  private emphLastFrameMs: number | null = null;
   private emphLastDrawAt = 0;
   private emphNodes: cytoscape.NodeCollection | null = null;
   private emphDirty = true;
+  /** class 事件去抖窗口到期时间戳（性能原点）。0 表示未在窗口中。 */
+  private emphClassCoalesceUntil = 0;
   private readonly reducedMotion: boolean;
   private lastDrawAt = 0;
   private startedAt = 0;
@@ -184,6 +197,20 @@ export class GlowOverlay {
     // 大量节点批量加减 class 时这里会被调用上千次，所以只能是 O(1)：
     // 置脏 + 确保循环在跑，真正的集合查询留到下一帧、且一帧只做一次。
     this.emphDirty = true;
+    this.ensureEmphLoop();
+  };
+
+  /**
+   * cytoscape 的 `class` 事件代理：每次触发都把 emphDirty 置 true，但只在
+   * 30fps 窗口（约 33ms）内第一次触发时调 ensureEmphLoop()。cytoscape 在
+   * 样式 cascade 时会对每个元素触发此事件 —— 不去抖的话 1k 节点图能把这里
+   * 烧到几千次/秒。窗口去抖最多让一次选中晚一帧画，肉眼无感。
+   */
+  private readonly onEmphChangeClass = (): void => {
+    this.emphDirty = true;
+    const now = performance.now();
+    if (this.emphClassCoalesceUntil !== 0 && now < this.emphClassCoalesceUntil) return;
+    this.emphClassCoalesceUntil = now + this.frameInterval;
     this.ensureEmphLoop();
   };
   /**
@@ -317,7 +344,16 @@ export class GlowOverlay {
 
     document.addEventListener('visibilitychange', this.onVisibility);
     this.cy.on('add remove', this.onGraphChange);
-    this.cy.on('class select unselect add remove', this.onEmphChange);
+    // 注意：不要监听 `class` 事件 —— cytoscape 在样式 cascade 时会对每个元素触发它，
+    // 1k 节点的图每帧会触发 30+ 次，叠加在一起就是热路径。只听 select/unselect/
+    // add/remove，覆盖了"被选中节点加入/离开 .selected-node 集合"的全部情形。
+    // `class` 事件必须保留：tour.ts / focus-node.ts 是通过 addClass('.selected-node')
+    // 而不是 cy.select() 来表达"选中"的，所以 `select/unselect` 不会触发。
+    // 但 cytoscape 的 `class` 事件在样式 cascade 时会对每个元素触发 —— 1k 节点
+    // 图每帧可能触发 30+ 次。所以这里用 30fps 窗口去抖，把每个窗口内的
+    // 多次通知合并成一次 `ensureEmphLoop()`。
+    this.cy.on('select unselect add remove', this.onEmphChange);
+    this.cy.on('class', this.onEmphChangeClass);
     this.cy.on('render', this.onRender);
     // 构造时可能已经有选中的节点（例如重建覆盖层）。
     this.ensureEmphLoop();
@@ -402,9 +438,13 @@ export class GlowOverlay {
     // 但包一层以防万一。
     this.pauseEmphasis();
     this.emphSpriteCache.clear();
+    this.emphPhaseMs = 0;
+    this.emphLastFrameMs = null;
+    this.emphDirty = true;
     try {
       this.cy.off('add remove', this.onGraphChange);
-      this.cy.off('class select unselect add remove', this.onEmphChange);
+      this.cy.off('select unselect add remove', this.onEmphChange);
+      this.cy.off('class', this.onEmphChangeClass);
       this.cy.off('render', this.onRender);
     } catch {
       /* cy 已销毁 */
@@ -449,8 +489,10 @@ export class GlowOverlay {
 
   /** 确保强调层的 rAF 循环在跑。没有选中节点时循环会在下一帧自己停掉。 */
   private ensureEmphLoop(): void {
-    if (this.emphRaf !== null || !this.emphCtx || document.hidden) return;
-    this.emphStartedAt = performance.now();
+    if (this.emphRaf !== null || !this.emphCtx || document.hidden) {
+      return;
+    }
+    this.emphLastFrameMs = null; // 下一帧当作"第一次"，避免 dt 出现巨大跳变
     this.emphLastDrawAt = 0;
     this.emphRaf = requestAnimationFrame(this.emphTick);
   }
@@ -464,9 +506,18 @@ export class GlowOverlay {
 
   private readonly emphTick = (now: number): void => {
     this.emphRaf = requestAnimationFrame(this.emphTick);
+    // 单调累加 phaseMs；不依赖墙上时钟，不会被 ensureEmphLoop 反复 reset。
+    // 第一次帧（emphLastFrameMs === null）记起点但不累积相位，避免与上一段的
+    // 结尾产生巨大跳变。
+    if (this.emphLastFrameMs === null) {
+      this.emphLastFrameMs = now;
+    } else {
+      this.emphPhaseMs += now - this.emphLastFrameMs;
+      this.emphLastFrameMs = now;
+    }
     if (now - this.emphLastDrawAt < this.frameInterval) return;
     this.emphLastDrawAt = now;
-    this.drawEmphasis(now - this.emphStartedAt);
+    this.drawEmphasis(this.emphPhaseMs);
   };
 
   /**
@@ -546,13 +597,14 @@ export class GlowOverlay {
       this.emphDirty = false;
     }
 
+    // 注意：这里不暂停循环。一旦暂停，下一个 onEmphChange 来时重启循环，
+    // 但因为 phaseMs（emphPhaseMs）是单调累加的，重启不会让相位从 0
+    // 重新开始。本帧什么都不画就行——下次有节点加入时 onEmphChange 会把
+    // emphDirty 置回 true。
     this.clearEmph();
 
     const nodes = this.emphNodes;
-    if (!nodes || nodes.length === 0) {
-      this.pauseEmphasis();
-      return;
-    }
+    if (!nodes || nodes.length === 0) return;
 
     const w = this.cssWidth;
     const h = this.cssHeight;
