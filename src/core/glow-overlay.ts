@@ -88,6 +88,20 @@ const EMPH_PULSE_PERIOD_MS = 1000;
 /** 同时画强光的节点数上限（正常只有 1~2 个，防止有人一次选中上百个）。 */
 const EMPH_MAX_NODES = 24;
 /**
+ * 强调层 sprite 烘焙时固定使用的"基础亮度档位"。
+ *
+ * 之前呼吸动画完全靠 intensityBucket（0~7 共 8 档）驱动：漫游中 intensity
+ * 摆动范围大（0.55~1.0），能跨 4 个档位，看得出呼吸；但暂停/手动选中时
+ * intensity 摆动范围只有 0.82~1.0，round(intensity*8) 无论怎么算都落在
+ * 同一档（7），缓存命中同一张贴图，呼吸就"冻结"了——rAF 循环和相位其实
+ * 一直在正常跑，只是量化把变化吃掉了。
+ *
+ * 现在缓存只负责烘焙一个固定基础亮度，真正连续的呼吸幅度改用
+ * ctx.globalAlpha 在绘制时叠加（见 drawEmphasis）——globalAlpha 是浮点数，
+ * 不存在这个量化陷阱，且缓存 key 固定后 sprite 数量也变少了。
+ */
+const EMPH_SPRITE_BASE_BUCKET = 6;
+/**
  * 视口内 glow/flow 节点数不超过这个值时，基础光晕层在 cytoscape 每画完一帧后
  * 立刻同步重画（见 onRender）。超过就仍走 30fps 的 rAF 节流，避免几百个径向渐变
  * 每帧都画。漫游时镜头是放大聚焦的，视口内节点很少，正好落在这个范围里。
@@ -169,8 +183,10 @@ export class GlowOverlay {
   private nodesDirty = true;
 
   /**
-   * 强调层 sprite 缓存（按 color|quantizedRadius|intensityBucket 分档）。
-   * 强度量化成 8 档，肉眼分辨不出台阶，但缓存命中率大幅提升。
+   * 强调层 sprite 缓存（按 color|quantizedRadius|bucket 分档）。
+   * 强度档位现在固定为 EMPH_SPRITE_BASE_BUCKET 一档——呼吸的实际幅度由
+   * globalAlpha 在绘制时叠加承担，所以 sprite 不再需要量化亮度分档。
+   * key 形态保留 intensityBucket 字段是为了不让外部调用方改传参逻辑。
    */
   private emphSpriteCache = new Map<string, HTMLCanvasElement>();
 
@@ -630,8 +646,6 @@ export class GlowOverlay {
         ? 0.5
         : 0.5 + 0.5 * Math.sin((elapsedMs / (pulsing ? EMPH_PULSE_PERIOD_MS : this.glowPeriodMs)) * TWO_PI);
       const intensity = pulsing ? 0.55 + 0.45 * breath : 0.82 + 0.18 * breath;
-      // 强度量化成 8 档（0–7）作为 sprite 缓存键
-      const intensityBucket = Math.min(7, Math.max(0, Math.round(intensity * 8)));
 
       const wideBlur = Math.min(42, Math.max(14, maxHalf * 0.85 * (pulsing ? 0.85 + 0.3 * breath : 1)));
       const bandW = wideBlur * 0.6;
@@ -664,13 +678,20 @@ export class GlowOverlay {
 
       // 外/内光圈：各用一张离屏 sprite，每帧 drawImage（GPU 合成，零 shadowBlur）。
       const outerR = maxHalf + bandW + wideBlur;
-      const outerSprite = this.getEmphSprite(color, outerR, intensityBucket);
+      // 呼吸/脉冲的实际视觉变化现在完全由 globalAlpha 承担（连续值，
+      // 不再受 8 档量化影响）；alphaFloor 决定最暗点，1.0 是最亮点。
+      // 三种状态统一用 0.55 作为最暗点——pulsing 与非 pulsing（暂停/手动
+      // 选中）共用同一摆幅，确保任何状态下都能看出呼吸，而不是像之前那样
+      // 被量化吃掉。
+      const outerSprite = this.getEmphSprite(color, outerR, EMPH_SPRITE_BASE_BUCKET);
+      const alphaFloor = 0.55;
+      ctx.globalAlpha = alphaFloor + (1 - alphaFloor) * breath;
       ctx.drawImage(outerSprite, p.x - outerR, p.y - outerR, outerR * 2, outerR * 2);
 
       const innerR = maxHalf + wideBlur * 0.5;
-      const innerBucket = Math.min(7, Math.round(intensity * 7));
-      const innerSprite = this.getEmphSprite(color, innerR, innerBucket);
+      const innerSprite = this.getEmphSprite(color, innerR, EMPH_SPRITE_BASE_BUCKET);
       ctx.drawImage(innerSprite, p.x - innerR, p.y - innerR, innerR * 2, innerR * 2);
+      ctx.globalAlpha = 1; // 显式复位，避免影响下一个节点/下一帧的绘制
 
       drawn++;
     });
