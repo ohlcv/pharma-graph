@@ -747,7 +747,17 @@ export const LAYOUTS: Record<string, LayoutConfig> = {
     ],
     cytoscape: {
       name: 'euler',
-      animate: 'end',
+      // animate: true 让 cytoscape-euler 走它自己的 rAF 逐帧 multitick 路径
+      // （node_modules/cytoscape-euler/src/layout/index.js 的 animateContinuously 分支）：
+      //   - 每 rAF 跑 refresh 次物理迭代（默认 10 次/帧）
+      //   - 用 refreshPositions() 把 scratch 里的位置推到 cytoscape
+      //   - 下一帧继续 multitick，直到收敛 / maxIterations / maxSimulationTime
+      // 这是 euler 的"逐帧位置动画"，节点会从 halo 位置平滑收敛到拓扑结构。
+      //
+      // 注意：euler 的 'end' 在它的 layout 框架里被特殊处理 —— animateEnd=true &&
+      // animateContinuously=false 走的是同步 while(!done) 路径，整个仿真一帧内跑完，
+      // 没有任何动画；'end' 语义在 euler 里其实不是"结束时插值"。所以这里用 true。
+      animate: true,
       animationDuration: 600,
       fit: false,
       padding: 30,

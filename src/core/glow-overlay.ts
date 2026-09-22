@@ -133,7 +133,7 @@ export class GlowOverlay {
 
   private readonly glowPeriodMs: number;
   private readonly flowPeriodMs: number;
-  private readonly frameInterval: number;
+  private frameInterval: number;
   private readonly glowSpread: number;
   private readonly flowOffset: number;
   private readonly flowDroplets: number;
@@ -434,6 +434,15 @@ export class GlowOverlay {
       this.redrawTimer = null;
       this.resume();
     }, 260);
+  }
+
+  /**
+   * 临时调整帧率节流窗口。euler 大爆炸期间调 10fps（100ms）让 overlay 仍能跟上
+   * 节点位置，但避免 30fps × 50ms/帧 ≈ 1.5s/s 的主线程开销拖垮帧率。
+   * layout 结束后调回原 fps。
+   */
+  setFps(fps: number): void {
+    this.frameInterval = 1000 / Math.max(1, fps);
   }
 
   destroy(): void {

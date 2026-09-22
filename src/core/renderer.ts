@@ -901,9 +901,17 @@ export class Renderer {
     // 强制关闭 fit：所有布局都不自动 fit，完全由 main.ts 的 setInitialZoom
     // 和用户手动操作（适应/F键）控制摄像头，防止布局的 fit:true 覆盖 zoom。
     (base as Record<string, unknown>).fit = false;
-    // 默认打开 animate：让 euler/cose 等模拟退火布局走平滑过渡，
-    // 而不是把节点瞬间贴到收敛位置造成"啪"地一下全到位。
-    (base as Record<string, unknown>).animate = true;
+    // 不在这里覆盖 animate：每个布局 preset 决定自己的动画策略：
+    //   - euler preset 用 animate: true（详见 config.ts）走 cytoscape-euler
+    //     自己的 rAF 逐帧 multitick 路径 —— 每帧 refresh 次物理迭代 +
+    //     refreshPositions()，节点从 halo 位置平滑收敛到拓扑结构。
+    //   - 静态布局 preset（concentric / circle / grid / dagre / breadthfirst）
+    //     用 animate: true + animationDuration 在切换时做一段
+    //     ease-out-cubic 过渡。
+    // 之前这里强制 `animate = true` 会被 euler preset 的 animate: 'end'
+    // 覆盖，反而让 euler 走同步 while(!done) 路径（一帧内跑完 5000 次迭代），
+    // 看起来"直接就布局好了"没有任何动画 —— 'end' 在 euler 里的语义不是
+    // "结尾插值"而是"同步阻塞 + 不动画"。
 
     const nodes = this.cy.nodes().not(`.${CLASSES.LAYER_PARENT}`);
     const nodeCount = nodes.length;
@@ -979,9 +987,29 @@ export class Renderer {
       // Ignore the old instance's stop event: it must not settle the loading
       // state or overwrite overlap data for the active layout.
       if (this.currentLayoutInstance !== layoutInstance) return;
+      // 恢复 overlay 的标准 30fps 节流 + 启动 rAF。
+      // 注意：之前在这里调过 pause()/redraw()，但 pause 期间 overlay 完全
+      // 不画（`onRender` 同步路径只在 lastVisibleCount ≤ 120 时画，大爆炸
+      // 初始 zoom=0.08 时视口内 ~400 个 glow 节点 → 走静态图分支不画），
+      // 节点在 euler 期间移动时 canvas 上一直显示着 pause 前画的 halo 位置
+      // 旧光晕，看起来"光晕和节点分开"。
+      // 改用 10fps 节流代替 pause：overlay 仍每 100ms 重画一次跟节点动，
+      // 但开销只有 30fps × 50ms ≈ 1.5s/s 的 1/3。
+      this.glowOverlay?.setFps(30);
+      this.glowOverlay?.redraw();
       this.resolveOverlaps();
       opts?.onLayoutStop?.();
     });
+    // 布局期间把 overlay 节流降到 10fps 而不是 pause：
+    //   - 30fps × ~50ms/帧 ≈ 1.5s/s 主线程开销拖垮帧率（大爆炸期间节点移动
+    //     让每个 halo 半径每帧都变，sprite 缓存命中率为 0，每帧都是 1041 个
+    //     cytoscape getter + 几百次 createRadialGradient + canvas fill）。
+    //   - pause 完全不画 → overlay 不跟节点动 → 用户看到"节点移动但光晕
+    //     原地不动"的错位状态。
+    //   - 10fps（100ms）节流让 overlay 仍能跟上节点位置（10fps 光晕呼吸会
+    //     看起来"抖"，但在大爆炸本身已经抖的状态下不影响视觉），开销降到
+    //     ~50ms × 10fps = 500ms/s，省下的 1s/s 正好让 cytoscape 渲染跑顺。
+    this.glowOverlay?.setFps(10);
     layoutInstance.run();
   }
 

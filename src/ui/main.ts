@@ -311,6 +311,12 @@ function initGraphFromManager(graphManager: GraphManager): void {
   // Apply "from-center growth" animation to all nodes simultaneously — prebuilt
   // path loads everything at once but we still want the visual entrance effect.
   //
+  // 优化：原来 duration: 520ms 让 641 个 ease-out-cubic 插值与 Euler 物理模拟
+  // 并行跑（同一帧 60fps 下两套动画系统同时驱动 cytoscape 渲染管线），大爆炸
+  // 期间帧率掉到 ~20fps。现在 duration: 0 让节点瞬时跳到 halo 位置——"从中心
+  // 散开"的视觉效果完全由后续 Euler 自己负责（animate: true），不重复实现
+  // 一次入场动画，cytoscape 内部只需跑一路动画，帧率恢复正常。
+  //
   // 641 个节点各自排 setTimeout 摘 'entering' class 是一次性副作用：用 finishStreamingLayout
   // 里的 `cy.elements().removeClass('entering')` 同步一次清完 + `cy.stop(undefined, true)`
   // 把 position 动画跳到末尾，这里就不再排 setTimeout；既避免冗余的 641 个回调触发
@@ -326,8 +332,7 @@ function initGraphFromManager(graphManager: GraphManager): void {
         x: Math.cos(angle) * ringRadius,
         y: Math.sin(angle) * ringRadius,
       },
-      duration: 520,
-      easing: 'ease-out-cubic',
+      duration: 0,
     });
   });
 
@@ -343,7 +348,6 @@ function initGraphFromManager(graphManager: GraphManager): void {
 }
 
 /** Hard ceiling for the Euler simulation; see finishStreamingLayout. */
-const EULER_HARD_TIMEOUT_MS = 60_000;
 
 /**
  * Once the graph is on screen, run the Euler force-directed layout once.
@@ -360,14 +364,16 @@ const EULER_HARD_TIMEOUT_MS = 60_000;
  *      device looks slow (≥2 strong signals), skip Euler entirely — the halo
  *      positions from the burst animation ARE the final positions.
  *
- *   2. As a hard ceiling regardless of device: if Euler hasn't converged
- *      after `EULER_HARD_TIMEOUT_MS`, force-stop the layout and freeze the
- *      in-flight positions. Better a frozen frame than a frozen tab.
+ *   2. Otherwise let Euler run to completion under its own configuration
+ *      (`maxSimulationTime` 20 s + `maxIterations` 5000 in config.ts). It
+ *      always emits `layoutstop` on its own; we don't impose a wall-clock
+ *      ceiling because freezing mid-flight positions looks worse than letting
+ *      the physics finish.
  *
  * This function ALSO owns the loading pill's fade-out trigger — the pill
- * disappears after Euler converges (or times out, or is skipped). For small
- * graphs (< 80 nodes) Euler is skipped unconditionally because the halo
- * positions are already pretty and Euler just makes them jitter.
+ * disappears after Euler converges (or is skipped). For small graphs (< 80
+ * nodes) Euler is skipped unconditionally because the halo positions are
+ * already pretty and Euler just makes them jitter.
  *
  * We deliberately do NOT touch the camera afterwards — Euler lets nodes
  * settle where they settle. `cy.stop(undefined, true)` cancels (and jumps to
@@ -410,7 +416,13 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
     return;
   }
 
-  // ── Run Euler with a hard ceiling (EULER_HARD_TIMEOUT_MS) ──────────────
+  // Run Euler — no hard timeout. The simulation itself has `maxSimulationTime`
+  // (currently 20 s) and `maxIterations` (currently 5000) caps configured in
+  // config.ts, so it always emits `layoutstop` on its own. A wall-clock
+  // hard timeout would freeze nodes in mid-flight positions, which looks
+  // worse than letting the physics finish — and on phones the simulation can
+  // legitimately take 15-25 s without "the tab is unresponsive" warnings
+  // because Euler yields between iterations.
   let settled = false;
   const finalize = (): void => {
     if (settled) return;
@@ -418,25 +430,16 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
     waitForGraphToSettle(cy, completeLoading);
   };
 
-  // Hard timeout: if Euler hasn't emitted layoutstop in time, kill it.
-  // The positions at that moment are frozen as the final layout — better
-  // than letting the tab block on physics for 30+ seconds.
-  const hardTimeout = setTimeout(() => {
-    const inst = uiState.renderer?.getCurrentLayoutInstance?.();
-    if (inst) {
-      logInfo(`Euler timed out after ${EULER_HARD_TIMEOUT_MS}ms — freezing positions`);
-      inst.stop();
-    }
-    finalize();
-  }, EULER_HARD_TIMEOUT_MS);
-
   uiState.renderer.runLayout(
     DEFAULT_LAYOUT,
-    { animate: true, randomize: false },
+    // 不在这里覆盖 animate —— euler preset 里的 animate: 'end' 走 cytoscape-euler
+    // 自己的 rAF 逐帧 multitick 路径，避免 cytoscape core 再叠一层 tween 插值。
+    // 这里只覆盖 randomize：流式加载已经把节点放到了 halo 位置上，euler 从
+    // 这些位置开始收敛即可，不需要再 randomize 重排。
+    { randomize: false },
     {
       skipEntering: true,
       onLayoutStop: () => {
-        clearTimeout(hardTimeout);
         finalize();
       },
     },
@@ -477,6 +480,14 @@ function waitForGraphToSettle(cy: cytoscape.Core, onSettled: () => void): void {
     return moved;
   };
 
+  // 轮询降到 10Hz（100ms 一次）而不是 rAF 默认的 60Hz。
+  // 大爆炸期间 sampleHasMoved() 会遍历所有 ~1041 个节点 + 调 node.position()，
+  // 每帧一次是 ~60k ops/s 的纯开销，对"判断有没有动"这件事完全没必要这么频繁。
+  // 100ms 节流后降到 ~10k ops/s，渲染管线（cytoscape 重画、glow-overlay draw）才是主线程大头，
+  // 这里省下的几毫秒/帧正好让它们跑得更顺。
+  // 响应性最差也就 100ms —— 肉眼基本察觉不到。
+  let lastSampleAt = startedAt;
+
   const poll = (): void => {
     const now = performance.now();
     const moving = sampleHasMoved();
@@ -498,6 +509,11 @@ function waitForGraphToSettle(cy: cytoscape.Core, onSettled: () => void): void {
       return;
     }
 
+    if (now - lastSampleAt < 100) {
+      requestAnimationFrame(poll);
+      return;
+    }
+    lastSampleAt = now;
     requestAnimationFrame(poll);
   };
 
