@@ -44,6 +44,16 @@ class SpeechController {
   /** iOS Safari: speech engine must be unlocked once per page session. */
   private unlocked = false;
   /**
+   * Consecutive utterance-level failures (asynchronous `error` events).
+   * Real browsers fire `error` only on genuine failure; UC/Quark/X5 WebViews
+   * fire `error` for *every* speak() even when no audio is produced, so we
+   * require multiple consecutive failures before disabling. A single `end`
+   * resets the counter.
+   */
+  private failureStreak = 0;
+  /** Threshold of consecutive utterance errors before flipping supported=false. */
+  private static readonly FAILURE_THRESHOLD = 3;
+  /**
    * False on WebViews that expose `speechSynthesis` but never actually emit
    * audio (notably WeChat X5/TBS on Android). Detected lazily by checking
    * that the API object responds to its core methods without throwing.
@@ -141,6 +151,15 @@ class SpeechController {
    *
    * Safe to call from setTimeout / async callbacks on iOS because
    * unlockIOS() already ran inside the toggle() gesture.
+   *
+   * Failure handling:
+   *   - Synchronous throw on speak(): recorded as one failure but does NOT
+   *     immediately disable — some WebViews (UC/Quark) throw on the very
+   *     first call right after toggle but succeed on the next.
+   *   - Asynchronous `error` event on the utterance: increments the failure
+   *     streak. After FAILURE_THRESHOLD consecutive failures, we flip
+   *     supported=false and disable the button.
+   *   - Asynchronous `end` event: resets the failure streak to zero.
    */
   speak(text: string): void {
     if (!this.supported || !this.synth) return;
@@ -160,18 +179,36 @@ class SpeechController {
     const voice = this.pickVoice();
     if (voice) utterance.voice = voice;
 
-    utterance.addEventListener('end', () => { this.currentUtterance = null; });
-    utterance.addEventListener('error', () => { this.currentUtterance = null; });
+    utterance.addEventListener('end', () => {
+      this.currentUtterance = null;
+      // Successful playback — clear any previous failure streak.
+      this.failureStreak = 0;
+    });
+    utterance.addEventListener('error', () => {
+      this.currentUtterance = null;
+      // Async failure path: some WebViews always fire `error` even when they
+      // actually played audio. Require multiple consecutive failures before
+      // we conclude the engine is non-functional.
+      this.failureStreak += 1;
+      if (this.failureStreak >= SpeechController.FAILURE_THRESHOLD) {
+        this.supported = false;
+        this.active = false;
+        this.updateButtonState();
+      }
+    });
 
     this.currentUtterance = utterance;
     try {
       this.synth.speak(utterance);
     } catch {
-      // Some WebViews throw synchronously on speak() even though the API
-      // appears present. Disable further attempts and reflect in UI.
-      this.supported = false;
-      this.active = false;
-      this.updateButtonState();
+      // Synchronous throw — also counts as a failure but does not immediately
+      // disable. See failure-streak logic above.
+      this.failureStreak += 1;
+      if (this.failureStreak >= SpeechController.FAILURE_THRESHOLD) {
+        this.supported = false;
+        this.active = false;
+        this.updateButtonState();
+      }
     }
   }
 
@@ -182,6 +219,12 @@ class SpeechController {
    * We use a single space instead of `''` because some Android WebView forks
    * (notably X5/TBS) reject empty-text utterances synchronously, which would
    * abort the unlock before iOS even gets a chance.
+   *
+   * NOTE: unlock failures (synchronous throws, missing voices) do NOT flip
+   * `supported=false`. Some Android browsers (UC/Quark/U4) reject the
+   * zero-volume unlock utterance but still speak real text correctly. We
+   * reserve `supported=false` for repeated *real-utterance* failures — see
+   * the failure-streak logic in `speak()`.
    */
   private unlockIOS(): void {
     if (!this.synth) return;
@@ -190,8 +233,9 @@ class SpeechController {
       u.volume = 0;
       this.synth.speak(u);
     } catch {
-      this.supported = false;
-      this.updateButtonState();
+      // Intentionally swallow: the unlock utterance is a probe, not a real
+      // speak. If real utterances also fail later, the failure-streak in
+      // speak() will eventually disable the button.
     }
   }
 

@@ -88,6 +88,15 @@ const EMPH_PULSE_PERIOD_MS = 1000;
 /** 同时画强光的节点数上限（正常只有 1~2 个，防止有人一次选中上百个）。 */
 const EMPH_MAX_NODES = 24;
 /**
+ * 强调层呼吸/脉冲的最暗点（globalAlpha 下限）。
+ *
+ * 三种状态（选中 / 暂停 / 漫游）共用 0.55：摆幅 0.45，确保任何状态下
+ * 都能看出呼吸，而不是像之前那样被 8 档量化把小幅变化吃掉。改这个值
+ * 的设计取舍是"摆得越大越明显，但越接近 0 越像忽明忽暗"——和 glowPeriodMs
+ * 一起调更直观。
+ */
+const EMPH_ALPHA_FLOOR = 0.55;
+/**
  * 强调层 sprite 烘焙时固定使用的"基础亮度档位"。
  *
  * 之前呼吸动画完全靠 intensityBucket（0~7 共 8 档）驱动：漫游中 intensity
@@ -101,6 +110,22 @@ const EMPH_MAX_NODES = 24;
  * 不存在这个量化陷阱，且缓存 key 固定后 sprite 数量也变少了。
  */
 const EMPH_SPRITE_BASE_BUCKET = 6;
+/**
+ * sprite 缓存中 radius 字段的量化粒度。radius = maxHalf + bandW + wideBlur，
+ * 来自 n.renderedOuterWidth()/n.renderedOuterHeight()，随 cy.zoom() 连续变化；
+ * 不量化的话每次 pan/zoom tick 都会产生一个新浮点数 → emphSpriteCache 只增
+ * 不减（构造时不清、destroy 才清），长会话里缩放几十次能攒下几百张从未复用
+ * 的离屏 canvas。量到最近 4px 后 zoom 0.1~2.5 的常见区间里同一节点最多 30
+ * 档，对 EMPH_MAX_NODES=24 个强调节点来说总条目稳定在 ~2000 张以内。
+ */
+const EMPH_SPRITE_RADIUS_QUANTUM_PX = 4;
+/**
+ * emphSpriteCache 软上限：超过就 clear 重建，防止配置错误或极端 zoom
+ * 路径下还是慢慢涨。24 节点 × outer+inner × ~30 档 ≈ 1440，留 50% 余量给
+ * 多种颜色（每节点 border-color 一份）。
+ */
+const EMPH_SPRITE_CACHE_SOFT_CAP = 2048;
+
 /**
  * 视口内 glow/flow 节点数不超过这个值时，基础光晕层在 cytoscape 每画完一帧后
  * 立刻同步重画（见 onRender）。超过就仍走 30fps 的 rAF 节流，避免几百个径向渐变
@@ -552,31 +577,32 @@ export class GlowOverlay {
    * 强度量化成 8 档（bucket 0–7），肉眼分辨不出台阶，但缓存命中率大幅提升。
    */
   private getEmphSprite(color: string, radius: number, intensityBucket: number): HTMLCanvasElement {
-    const key = `${color}|${radius}|${intensityBucket}`;
+    const qRadius = this.quantizeRadius(radius);
+    const key = `${color}|${qRadius}|${intensityBucket}`;
     const cached = this.emphSpriteCache.get(key);
     if (cached) return cached;
 
-    const size = Math.ceil(radius * 2);
+    const size = Math.ceil(qRadius * 2);
     const sprite = document.createElement('canvas');
     sprite.width = size;
     sprite.height = size;
     const sctx = sprite.getContext('2d')!;
-    const cx = radius;
-    const cy = radius;
+    const cx = qRadius;
+    const cy = qRadius;
 
     // 外圈：大范围柔光，alpha 随强度档位变化
     const outerAlpha = 0.18 + intensityBucket * 0.07;
-    const outerGrad = sctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+    const outerGrad = sctx.createRadialGradient(cx, cy, 0, cx, cy, qRadius);
     outerGrad.addColorStop(0, withAlpha(color, outerAlpha));
     outerGrad.addColorStop(0.45, withAlpha(color, outerAlpha * 0.5));
     outerGrad.addColorStop(1, withAlpha(color, 0));
     sctx.fillStyle = outerGrad;
     sctx.beginPath();
-    sctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    sctx.arc(cx, cy, qRadius, 0, Math.PI * 2);
     sctx.fill();
 
     // 内圈：贴着边的亮圈
-    const innerR = radius * 0.4;
+    const innerR = qRadius * 0.4;
     const innerAlpha = 0.3 + intensityBucket * 0.06;
     const innerGrad = sctx.createRadialGradient(cx, cy, 0, cx, cy, innerR);
     innerGrad.addColorStop(0, withAlpha(color, innerAlpha));
@@ -586,8 +612,17 @@ export class GlowOverlay {
     sctx.arc(cx, cy, innerR, 0, Math.PI * 2);
     sctx.fill();
 
+    // 软上限：超过就整张清掉重建。下一次访问自然重新烘焙到更紧的占用。
+    if (this.emphSpriteCache.size >= EMPH_SPRITE_CACHE_SOFT_CAP) {
+      this.emphSpriteCache.clear();
+    }
     this.emphSpriteCache.set(key, sprite);
     return sprite;
+  }
+
+  /** 把半径量化到最近 4px，使 cache key 不再随 zoom 连续变化而无限增长。 */
+  private quantizeRadius(r: number): number {
+    return Math.round(r / EMPH_SPRITE_RADIUS_QUANTUM_PX) * EMPH_SPRITE_RADIUS_QUANTUM_PX;
   }
 
   /**
@@ -688,13 +723,9 @@ export class GlowOverlay {
       // 外/内光圈：各用一张离屏 sprite，每帧 drawImage（GPU 合成，零 shadowBlur）。
       const outerR = maxHalf + bandW + wideBlur;
       // 呼吸/脉冲的实际视觉变化现在完全由 globalAlpha 承担（连续值，
-      // 不再受 8 档量化影响）；alphaFloor 决定最暗点，1.0 是最亮点。
-      // 三种状态统一用 0.55 作为最暗点——pulsing 与非 pulsing（暂停/手动
-      // 选中）共用同一摆幅，确保任何状态下都能看出呼吸，而不是像之前那样
-      // 被量化吃掉。
+      // 不再受 8 档量化影响）；alphaFloor 见文件顶部 EMPH_ALPHA_FLOOR 常量。
       const outerSprite = this.getEmphSprite(color, outerR, EMPH_SPRITE_BASE_BUCKET);
-      const alphaFloor = 0.55;
-      ctx.globalAlpha = alphaFloor + (1 - alphaFloor) * breath;
+      ctx.globalAlpha = EMPH_ALPHA_FLOOR + (1 - EMPH_ALPHA_FLOOR) * breath;
       ctx.drawImage(outerSprite, p.x - outerR, p.y - outerR, outerR * 2, outerR * 2);
 
       const innerR = maxHalf + wideBlur * 0.5;

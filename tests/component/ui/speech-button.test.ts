@@ -108,23 +108,85 @@ describe('speech button DOM side-effects (jsdom)', () => {
     expect(btn.getAttribute('aria-disabled')).toBeNull();
   });
 
-  it('sets disabled when speak() throws mid-call (X5/TBS fail-silent)', async () => {
+  it('sets disabled after 3 consecutive speak() throws (failure streak)', async () => {
     installStub({ speakCalls: [], cancelCalls: 0 });
     const { speechController } = await import('@/ui/speech');
 
     expect(speechController.isSupported).toBe(true);
 
-    // Make the next speak() throw
+    // Make every speak() throw synchronously (simulates X5/TBS behavior
+    // where the API exists but speak() never produces audio).
     (globalThis.speechSynthesis as unknown as { speak: () => void }).speak = () => {
       throw new Error('speak boom');
     };
 
-    // Trigger toggle() so active=true, then speak() to throw
+    // Trigger toggle() so active=true, then speak() N times to exceed threshold.
     speechController.toggle();
-    speechController.speak('test');
 
-    const btn = document.querySelector<HTMLButtonElement>('[data-tour-action="toggle-speech"]')!;
+    // 1st failure: still supported (button not disabled)
+    speechController.speak('test 1');
+    let btn = document.querySelector<HTMLButtonElement>('[data-tour-action="toggle-speech"]')!;
+    expect(btn.disabled).toBe(false);
+    expect(speechController.isSupported).toBe(true);
+
+    // 2nd failure: still supported
+    speechController.speak('test 2');
+    btn = document.querySelector<HTMLButtonElement>('[data-tour-action="toggle-speech"]')!;
+    expect(btn.disabled).toBe(false);
+    expect(speechController.isSupported).toBe(true);
+
+    // 3rd failure: threshold reached, now disabled
+    speechController.speak('test 3');
+    btn = document.querySelector<HTMLButtonElement>('[data-tour-action="toggle-speech"]')!;
     expect(btn.disabled).toBe(true);
     expect(speechController.isSupported).toBe(false);
+  });
+
+  it('does NOT set disabled after a single speak() throw (recovery possible)', async () => {
+    // This is the Quark/UC scenario: first speak() throws but later calls
+    // succeed. We must not disable the button on a single failure.
+    installStub({ speakCalls: [], cancelCalls: 0 });
+    const { speechController } = await import('@/ui/speech');
+
+    speechController.toggle();
+
+    // First call throws
+    (globalThis.speechSynthesis as unknown as { speak: () => void }).speak = () => {
+      throw new Error('speak boom');
+    };
+    speechController.speak('test 1');
+
+    // Second call succeeds
+    (globalThis.speechSynthesis as unknown as { speak: (u: SpeechSynthesisUtterance) => void }).speak = () => {
+      // no-op
+    };
+    speechController.speak('test 2');
+
+    const btn = document.querySelector<HTMLButtonElement>('[data-tour-action="toggle-speech"]')!;
+    expect(btn.disabled).toBe(false);
+    expect(speechController.isSupported).toBe(true);
+  });
+
+  it('unlock utterance throwing does NOT disable the button', async () => {
+    // Quark/UC specifically: rejects unlock utterance (volume=0, single space)
+    // but actually speaks real text fine. We must not punish this with disable.
+    installStub({ speakCalls: [], cancelCalls: 0 });
+    const { speechController } = await import('@/ui/speech');
+
+    // unlock utterance throws; subsequent real-text speaks succeed
+    let callCount = 0;
+    (globalThis.speechSynthesis as unknown as { speak: (u: SpeechSynthesisUtterance) => void }).speak = () => {
+      callCount += 1;
+      if (callCount === 1) throw new Error('unlock boom');
+      // succeed otherwise
+    };
+
+    speechController.toggle();           // calls unlock → throws
+    speechController.speak('test 1');    // real speak → succeeds
+    speechController.speak('test 2');    // real speak → succeeds
+
+    const btn = document.querySelector<HTMLButtonElement>('[data-tour-action="toggle-speech"]')!;
+    expect(btn.disabled).toBe(false);
+    expect(speechController.isSupported).toBe(true);
   });
 });
