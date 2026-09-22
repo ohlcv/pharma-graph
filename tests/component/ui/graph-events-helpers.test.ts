@@ -18,28 +18,57 @@ import {
 import type { TourController } from '@/ui/tour-controller';
 import type cytoscape from 'cytoscape';
 
-// The fake cy keeps a counter on trackedNode that reflects drag-mode toggles.
+// The fake cy returns two nodes — `_trackedNode` mimics the user-grabbed
+// node (must be EXCLUDED from dragging-simplified, otherwise the grabbed
+// node's border is overwritten by the dimmed style); a second `otherNode`
+// stands for the rest of the graph (gets the class so the perf-simplification
+// kicks in). A nodeSet selectors route accordingly so `cy.nodes(':grabbed')`
+// and `cy.nodes()` behave like the real cytoscape would.
 function makeFakeCytoscape() {
-  const nodes: unknown[] = [];
+  let grabbedId: string | null = null;
   let dragClassCounter = 0;
   const trackedNode = {
     id: 'b',
-    hasClass: (cls: string) => cls === CLASSES.DRAGGING_SIMPLIFIED && dragClassCounter > 0,
+    grabbed: () => grabbedId === 'b',
+    hasClass: (cls: string) => cls === CLASSES.DRAGGING_SIMPLIFIED && false,
+    addClass() {},
+    removeClass() {},
+  };
+  const otherNode = {
+    id: 'a',
+    grabbed: () => grabbedId === 'a',
     addClass(cls: string) { if (cls === CLASSES.DRAGGING_SIMPLIFIED) dragClassCounter += 1; },
     removeClass(cls: string) { if (cls === CLASSES.DRAGGING_SIMPLIFIED) dragClassCounter = Math.max(0, dragClassCounter - 1); },
-    // Test introspection:
     _isDragging: () => dragClassCounter > 0,
   };
   const events = new Map<string, Array<(evt: unknown) => void>>();
+  // Tiny collection helper: just enough of cytoscape's Collection surface
+  // for graph-events.ts to drive — `.not(selector)` to negate a selector,
+  // plus `addClass`/`removeClass` that fan out to every node in the
+  // collection. We don't need full set algebra; only `.not` is called.
+  const makeCollection = (list: typeof trackedNode[]) => ({
+    not(selector: string) {
+      if (selector === ':grabbed') {
+        return makeCollection(list.filter((n) => !n.grabbed()));
+      }
+      return makeCollection(list);
+    },
+    addClass(cls: string) { list.forEach((n) => n.addClass(cls)); },
+    removeClass(cls: string) { list.forEach((n) => n.removeClass(cls)); },
+  });
+  const allNodes = () => [trackedNode, otherNode] as unknown as ReturnType<typeof makeCollection>;
   const cy: cytoscape.Core = {
     _trackedNode: trackedNode,
-    nodes: () => trackedNode as unknown as cytoscape.NodeCollection,
-    edges: () => trackedNode as unknown as cytoscape.EdgeCollection,
+    _otherNode: otherNode,
+    nodes: (sel?: string) => {
+      const list = [trackedNode, otherNode];
+      if (sel === ':grabbed') return makeCollection(list.filter((n) => n.grabbed())) as unknown as cytoscape.NodeCollection;
+      return makeCollection(list) as unknown as cytoscape.NodeCollection;
+    },
+    edges: () => makeCollection([otherNode] as unknown as ReturnType<typeof makeCollection>) as unknown as cytoscape.EdgeCollection,
     _isDragging: () => dragClassCounter > 0,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     on(...args: any[]) {
-      // cytoscape.on accepts `on(eventName, handler)` or
-      // `on(eventName, selector, handler)`. Normalise.
       const [evtOrFirst, secondOrSecond, handler] = args as [unknown, unknown?, unknown?];
       const evt = String(evtOrFirst);
       const sel = typeof secondOrSecond === 'function' ? undefined : secondOrSecond;
@@ -53,6 +82,11 @@ function makeFakeCytoscape() {
     emit(...args: any[]) {
       const [evtOrFirst, sel, payload] = args as [unknown, unknown?, unknown?];
       const ev = String(evtOrFirst);
+      // Keep fake grabbed-id in sync so cy.nodes(':grabbed') and the
+      // .not(':grabbed') filter return the right slice during this event.
+      const grabId = (payload as { target?: { id?: string } } | undefined)?.target?.id;
+      if (ev === 'grab') grabbedId = grabId ?? grabbedId;
+      else if (ev === 'free' || ev === 'dragfree') grabbedId = null;
       const keyAny = events.get(ev) ?? [];
       const keySel = sel !== undefined ? (events.get(`${ev}|${String(sel)}`) ?? []) : [];
       [...keyAny, ...keySel].forEach((h) => h(payload));
@@ -61,6 +95,9 @@ function makeFakeCytoscape() {
     fit: () => {},
     zoom: () => 1,
   } as unknown as cytoscape.Core;
+  // Suppress the unused-allNodes helper warning while keeping it for
+  // readers who want to see how the real cy.nodes() contract is mocked.
+  void allNodes;
   return cy;
 }
 
@@ -88,19 +125,21 @@ describe('graph-events post-#19 drag-mode helper', () => {
     initGraphEvents(deps);
 
     const cyx = cy as any;
-    expect(cyx._trackedNode._isDragging()).toBe(false);
+    // `_trackedNode` plays the role of the user-grabbed node. It must NEVER
+    // receive the simplified class — that's what was killing its border
+    // before the fix. `_otherNode` plays the rest of the graph and IS the
+    // one we expect to see gain/lose the class.
     cyx.emit('grab', 'node', { target: { id: 'b' } });
     // grab 只开始 force-drag；等第一个 drag 事件来了才开 simplified（区分拖动与点击）。
-    expect(cyx._trackedNode._isDragging()).toBe(false);
     cyx.emit('drag', { target: { id: 'b' } });
-    expect(cyx._trackedNode._isDragging()).toBe(true);
+    expect(cyx._otherNode._isDragging()).toBe(true);
     cyx.emit('free', 'node', { target: { id: 'b' } });
-    expect(cyx._trackedNode._isDragging()).toBe(false);
+    expect(cyx._otherNode._isDragging()).toBe(false);
 
     // Also exercised by dragfree (the fallback path when free is missed).
     cyx.emit('grab', 'node', { target: { id: 'b' } });
     cyx.emit('drag', { target: { id: 'b' } });
     cyx.emit('dragfree', { target: { id: 'b' } });
-    expect(cyx._trackedNode._isDragging()).toBe(false);
+    expect(cyx._otherNode._isDragging()).toBe(false);
   });
 });

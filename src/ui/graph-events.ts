@@ -54,12 +54,28 @@ function edgeMidpoint(edge: cytoscape.EdgeSingular): { x: number; y: number } {
 }
 
 function setCytoscapeDragMode(cy: cytoscape.Core, on: boolean): void {
-  // Adds/removes the simplified-visual CSS class on every node. Lives next
-  // to the `grab`/`free`/`dragfree` event bindings below because the toggle
-  // is meaningful only while a node is being dragged through cytoscape's
-  // own gesture pipeline.
+  // Adds/removes the simplified-visual CSS class on every NON-grabbed node.
+  // Lives next to the `grab`/`free`/`dragfree` event bindings below because
+  // the toggle is meaningful only while a node is being dragged through
+  // cytoscape's own gesture pipeline.
+  //
+  // Previously this hit `cy.nodes()` — i.e. EVERY node, including the one(s)
+  // the user is actually grabbing. The `.dragging-simplified` stylesheet rule
+  // declares `border-color: rgba(255,255,255,0.06)` + `border-width: 1`, and
+  // cytoscape's selector matching applied it to the grabbed node too,
+  // blowing away its `selected-node`/glow border. Visually: the grabbed
+  // node "lost its border" mid-drag.
+  //
+  // Why the `.not(':grabbed')` rather than `:ungrabbed`: cytoscape only
+  // ships `:grabbed` / `:selected` state selectors — there is no
+  // `:ungrabbed` and the selector parser rejects it (verified via runtime
+  // warning). `.not(...)` is cytoscape's idiomatic way to negate a
+  // collection filter and works on a vanilla collection of all nodes.
+  // Filtering this way keeps the performance simplification (the rest of
+  // the graph dims cheaply) while leaving the dragged node's own border
+  // intact.
   const op = on ? 'addClass' : 'removeClass';
-  cy.nodes()[op](CLASSES.DRAGGING_SIMPLIFIED);
+  cy.nodes().not(':grabbed')[op](CLASSES.DRAGGING_SIMPLIFIED);
 }
 
 export function initGraphEvents(deps: GraphEventDeps): void {
