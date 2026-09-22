@@ -14,7 +14,10 @@ export interface Point {
 
 const TWO_PI = Math.PI * 2;
 
-function ellipsePoints(halfW: number, halfH: number, n = 40): Point[] {
+/** 按 (shape, roundedHalfW, roundedHalfH) 缓存轮廓顶点，省掉漫游高频场景下每帧的重复计算。 */
+const outlineCache = new Map<string, Point[]>();
+
+function ellipsePoints(halfW: number, halfH: number, n = 20): Point[] {
   const pts: Point[] = [];
   for (let i = 0; i < n; i++) {
     const a = (i / n) * TWO_PI;
@@ -124,8 +127,22 @@ const CORNER_CUT = 0.28;
  * round-rectangle / bottom-round-rectangle / tag / rectangle / hexagon）。
  * 没列出的冷门形状（vee/barrel/cut-rectangle 等）统一退化成椭圆——比报错
  * 或留白好，代价只是那几种形状的光效不完全贴合轮廓。
+ *
+ * 结果按 (shape, 取整半宽, 取整半高) 缓存，缩放不变时直接复用，省掉漫游
+ * 高频场景下每帧数十次三角函数 + 对象分配。
  */
 export function getNodeOutline(shape: string | undefined, halfW: number, halfH: number): Point[] {
+  const key = `${shape ?? ''}|${Math.round(halfW)}|${Math.round(halfH)}`;
+  const cached = outlineCache.get(key);
+  if (cached) return cached;
+  const pts = computeOutline(shape, halfW, halfH);
+  if (outlineCache.size > 500) outlineCache.clear(); // 防止连续缩放时无限增长
+  outlineCache.set(key, pts);
+  return pts;
+}
+
+/** computeOutline：实际做 switch 分派的内部函数（getNodeOutline 包装了缓存）。 */
+function computeOutline(shape: string | undefined, halfW: number, halfH: number): Point[] {
   switch (shape) {
     case 'ellipse':
       return ellipsePoints(halfW, halfH);
@@ -136,7 +153,6 @@ export function getNodeOutline(shape: string | undefined, halfW: number, halfH: 
       return roundCorners(rectPoints(halfW, halfH), CORNER_CUT);
     case 'bottom-round-rectangle':
     case 'bottomroundrectangle':
-      // 只圆下面两个角——对应 rectPoints() 顺序里的下标 2、3。
       return roundCorners(rectPoints(halfW, halfH), CORNER_CUT, new Set([2, 3]));
     case 'hexagon':
       return regularPolygonPoints(6, halfW, halfH, 0);

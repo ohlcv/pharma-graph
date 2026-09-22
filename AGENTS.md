@@ -11,7 +11,7 @@
 - **构建期**：脚本把 Markdown 解析为 `public/graph-data.json` + `public/content-manifest.json` + `public/sitemap.xml`。
 - **运行期**：浏览器加载预生成 JSON，用 Cytoscape.js + dagre/euler/cose-bilkent 渲染。
 - **部署**：Vercel 自动构建 `dist/`，不入仓库。
-- **目录骨架**：`src/`（源码）· `build/`（共享构建库）· `scripts/`（构建/治理入口）· `tools/`（一次性迁移）· `docs/`（文档 + ARD 决策）· `public/`（内容 + 预生成）· `archive/`（已弃用）。
+- **目录骨架**：`src/`（源码）· `build/`（共享构建库）· `scripts/`（构建/治理入口）· `tools/`（一次性迁移）· `docs/`（文档 + ARD 决策）· `public/`（内容 + 预生成）· `tests/`（**独立于 src/** 的测试树，详见 §2.4）· `archive/`（已弃用）。
 - **结构地图**：见 [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)。新文件 / 新目录前先翻一遍。
 
 ---
@@ -121,7 +121,18 @@ Markdown ──[scripts/build-graph-data.ts]──> graph-data.json ──> 浏�
 - 新增的 `__tests__/` 文件夹**不再使用**——`tests/` 已经替它实现统一收纳。
 - 业务源码**禁止** `import './xxx.test'` 或 `import from '@/**/xxx.test'`。ESLint `no-restricted-imports` 守门（见 §3.4 末）。
 
-**怎么写 import**：从 `src/parser/frontmatter.test.ts` 迁到 `tests/unit/parser/frontmatter.test.ts` 后，被测代码的相对路径**深一层**——`from '../core/build-graph.js'` 变成 `from '../../src/core/build-graph.js'`。迁移时批量改。**优先用 `@/` 别名**：`from '@/core/build-graph.js'`（跨层级目录更稳）。
+**怎么写 import**：测试一律用 `@/` 别名（`vitest.config.ts` 已经注入 `@ → src/`），**避免相对路径跨层级**。例如：
+
+```ts
+// ✅ 跨任意目录层级都稳
+import { buildGraph } from '@/core/build-graph';
+import { UiToggle } from '@/ui/ui-toggle';
+
+// ❌ 写相对路径也能跑，但迁移一次就破一次
+import { buildGraph } from '../../src/core/build-graph.js';
+```
+
+**唯一例外**：`await import('./xxx.js')` 这种 dynamic import 用在 `vi.resetModules()` 重置模块缓存的代码里（见 `tests/component/ui/state.test.ts` 模式），保留相对路径——别名会破坏模块缓存语义。
 
 ---
 
@@ -164,11 +175,13 @@ Markdown ──[scripts/build-graph-data.ts]──> graph-data.json ──> 浏�
     - `npx vitest run tests/component`（DOM，需要 jsdom，会比 unit 慢）
 - **覆盖率**：`npm run test:coverage`。`vitest.config.ts` 已排除 `scripts/`、`src/types/`、`src/ui/styles/`、`tests/**`（防止把测试自己算进覆盖率）。
 
-**安全网**（防止测试代码误进 `dist/`）：
+**安全网**（防止测试代码误进 `dist/` 或被业务源码误 `import`）——三道都已落地：
 
-- `vite.config.ts` 已配 `build.rollupOptions.external: (id) => /\.test\./.test(id)`——test 文件对 vite 不可见。
-- `eslint.config.*` 已加 `no-restricted-imports` 规则禁止业务源码 `import` 测试文件（路径含 `.test` 的都拒绝）。
-- 这两道是双保险：CI 通过 ESLint 检查源码 + Vite 端排除测试路径。
+- **Vite 端**：`vite.config.ts` 的 `build.rollupOptions.external` 配 `(id) => /\.test\./.test(id)`——测试文件对 vite 不可见，物理阻断进 `dist/`。
+- **ESLint 端**：`eslint.config.js` 加 `no-restricted-imports` 规则，**禁止业务源码 import 任何 `*.test.*` 文件**（错误等级 `error`，PR 阶段就 fail）。
+- **vitest coverage**：`vitest.config.ts` 已把 `tests/**` 加进 `coverage.exclude`——测试自己不进覆盖率统计。
+
+三道是双保险：CI 通过 ESLint 检查源码 + Vite 端排除测试路径 + coverage 不污染。
 
 **判定辅助**（写新测试前自问）：
 

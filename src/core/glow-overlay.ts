@@ -155,6 +155,12 @@ export class GlowOverlay {
   private flowNodes: cytoscape.NodeCollection | null = null;
   private nodesDirty = true;
 
+  /**
+   * 强调层 sprite 缓存（按 color|quantizedRadius|intensityBucket 分档）。
+   * 强度量化成 8 档，肉眼分辨不出台阶，但缓存命中率大幅提升。
+   */
+  private emphSpriteCache = new Map<string, HTMLCanvasElement>();
+
   /** 上一帧画过的区域，用来做局部清除（避免每帧 clearRect 整张画布）。 */
   private lastDirty: { x: number; y: number; w: number; h: number } | null = null;
 
@@ -181,27 +187,26 @@ export class GlowOverlay {
     this.ensureEmphLoop();
   };
   /**
-   * cytoscape 每画完一帧就同步重画覆盖层。
+   * cytoscape 每画完一帧就同步重画覆盖层（基础层）。
    *
    * 覆盖层有自己的 rAF（30fps 节流），和 cytoscape 的渲染循环互不同步：镜头在
    * pan/zoom 动画中时，节点已经被 cytoscape 画到新位置，覆盖层还停在上一帧甚至上上一帧，
    * 光晕就和节点错开。漫游每一步都有 600ms 的 pan+zoom 动画，所以最明显。
    * cy 的 'render' 事件在它画完一帧后同步触发，此时 renderedPosition() 与刚画出的
    * 画面一致；在这里立即重画，两张画布就落在同一帧里。
+   *
+   * 强调层（选中强光 / 漫游脉冲）由它自己的 emphTick rAF 循环负责——这里不同步画，
+   * 否则会被 30fps 节流在 ProMotion 高帧率场景下漏帧（节流期内的 render 事件全部跳过，
+   * 强光就"暂停呼吸"了）。
    */
   private readonly onRender = (): void => {
     if (document.hidden) return;
     const now = performance.now();
 
-    // 强调层（选中强光 / 漫游脉冲）：只有 1~2 个节点，直接同步画。
-    if (this.emphRaf !== null) {
-      this.emphLastDrawAt = now;
-      this.drawEmphasis(now - this.emphStartedAt);
-    }
-
     // 基础层（所有 glow / flow 节点的呼吸光晕）。
     if (!this.started) return;
     if (this.lastVisibleCount <= SYNC_DRAW_MAX_NODES) {
+      if (now - this.lastDrawAt < this.frameInterval) return; // 帧率节流：把有效重画频率锁回设计好的 30fps
       this.lastDrawAt = now; // 让紧随其后的 rAF tick 跳过这一帧，不重复画
       this.draw(this.reducedMotion ? 0 : now - this.startedAt);
       return;
@@ -396,6 +401,7 @@ export class GlowOverlay {
     // cy 可能已经被 destroy 了，off() 在那之后调用是安全的 no-op，
     // 但包一层以防万一。
     this.pauseEmphasis();
+    this.emphSpriteCache.clear();
     try {
       this.cy.off('add remove', this.onGraphChange);
       this.cy.off('class select unselect add remove', this.onEmphChange);
@@ -464,6 +470,51 @@ export class GlowOverlay {
   };
 
   /**
+   * 按当前强度分档生成/复用离屏 canvas sprite。
+   * 用 createRadialGradient 一次性画好（GPU 友好），每帧只做 drawImage，
+   * 完全规避 shadowBlur 在 iOS Safari 上的 CPU 软件光栅化。
+   * 强度量化成 8 档（bucket 0–7），肉眼分辨不出台阶，但缓存命中率大幅提升。
+   */
+  private getEmphSprite(color: string, radius: number, intensityBucket: number): HTMLCanvasElement {
+    const key = `${color}|${radius}|${intensityBucket}`;
+    const cached = this.emphSpriteCache.get(key);
+    if (cached) return cached;
+
+    const size = Math.ceil(radius * 2);
+    const sprite = document.createElement('canvas');
+    sprite.width = size;
+    sprite.height = size;
+    const sctx = sprite.getContext('2d')!;
+    const cx = radius;
+    const cy = radius;
+
+    // 外圈：大范围柔光，alpha 随强度档位变化
+    const outerAlpha = 0.18 + intensityBucket * 0.07;
+    const outerGrad = sctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+    outerGrad.addColorStop(0, withAlpha(color, outerAlpha));
+    outerGrad.addColorStop(0.45, withAlpha(color, outerAlpha * 0.5));
+    outerGrad.addColorStop(1, withAlpha(color, 0));
+    sctx.fillStyle = outerGrad;
+    sctx.beginPath();
+    sctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    sctx.fill();
+
+    // 内圈：贴着边的亮圈
+    const innerR = radius * 0.4;
+    const innerAlpha = 0.3 + intensityBucket * 0.06;
+    const innerGrad = sctx.createRadialGradient(cx, cy, 0, cx, cy, innerR);
+    innerGrad.addColorStop(0, withAlpha(color, innerAlpha));
+    innerGrad.addColorStop(1, withAlpha(color, 0));
+    sctx.fillStyle = innerGrad;
+    sctx.beginPath();
+    sctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+    sctx.fill();
+
+    this.emphSpriteCache.set(key, sprite);
+    return sprite;
+  }
+
+  /**
    * 整张强调层清空。
    * 这里刻意不用"脏矩形"只擦上一帧画过的区域：阴影的高斯尾巴会延伸到估算的矩形之外，
    * 尾巴每一帧都叠一层、永远擦不掉，最后在矩形边缘露出一圈细细的方框线——这层画布
@@ -474,13 +525,17 @@ export class GlowOverlay {
   }
 
   /**
-   * 给选中的节点画强光——纯光，没有任何实线，节点内部实心染色（原因见下面循环里的说明）。
+   * 给选中的节点画强光——纯光，没有任何实线，节点内部实心染色。
    *  - 实心底：整个节点内部均匀的主题色。
    *  - 外圈：大范围的柔光，形状贴合节点轮廓。
    *  - 内圈：贴着节点边缘的一圈更亮的光。
    *  - 起伏：普通选中随基础呼吸周期轻微起伏；漫游当前节点（class tour-pulsing）
    *          按 1Hz 起伏、幅度更大；系统开了"减少动态效果"则保持恒定亮度。
    * 颜色读节点当前的 border-color（选中态由样式表给出主题辅色）。
+   *
+   * 实现：外/内光圈各用 createRadialGradient 一次性画成离屏 sprite（GPU 合成），
+   * 每帧只做 drawImage，完全规避 iOS Safari 上 shadowBlur 的 CPU 软件光栅化。
+   * 强度量化成 8 档（bucket 0–7）做缓存键，视觉上无台阶感。
    */
   private drawEmphasis(elapsedMs: number): void {
     const ctx = this.emphCtx;
@@ -523,11 +578,12 @@ export class GlowOverlay {
         ? 0.5
         : 0.5 + 0.5 * Math.sin((elapsedMs / (pulsing ? EMPH_PULSE_PERIOD_MS : this.glowPeriodMs)) * TWO_PI);
       const intensity = pulsing ? 0.55 + 0.45 * breath : 0.82 + 0.18 * breath;
-      const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
-      const wideBlur = clamp(maxHalf * 0.85, 14, 42) * (pulsing ? 0.85 + 0.3 * breath : 1);
-      const tightBlur = clamp(maxHalf * 0.3, 6, 14);
+      // 强度量化成 8 档（0–7）作为 sprite 缓存键
+      const intensityBucket = Math.min(7, Math.max(0, Math.round(intensity * 8)));
+
+      const wideBlur = Math.min(42, Math.max(14, maxHalf * 0.85 * (pulsing ? 0.85 + 0.3 * breath : 1)));
       const bandW = wideBlur * 0.6;
-      // 只用于屏幕外剔除：阴影的可见范围约为光源带外沿 + 1.5 倍模糊半径，取 2 倍留足余量。
+      // 只用于屏幕外剔除：sprite 的可见范围约为外沿 + 模糊尾巴，留足余量。
       const reach = maxHalf + bandW + wideBlur * 2;
 
       if (p.x + reach < 0 || p.x - reach > w || p.y + reach < 0 || p.y - reach > h) return;
@@ -536,14 +592,10 @@ export class GlowOverlay {
       const shape = n.style('shape') as string | undefined;
 
       // 只画"光"，不画任何一条线；并且是"实心"的，不是空心的。
-      // 1) 不画线：旧实现在节点外描了一圈亮边，紧贴样式表里 4px 的选中边框，读起来像
-      //    "双线边框"（和 stroke=double 的重点节点撞车）。
-      // 2) 不空心：这里的轮廓多边形只是真实节点形状的近似（圆角是用切角凑的）。如果把
-      //    节点内部"擦空"，近似形状和真实形状之间会露出一圈颜色不同的框；所以节点内部
-      //    整个染上主题色（实心），近似误差只出现在被模糊掉的边缘，看不出来。
-      // 做法：把"光源"画到画布左侧之外，用 shadowOffsetX 把它的阴影（只有柔光、没有实线）
-      // 投回节点位置——光的形状贴合节点、边缘天然柔和，屏幕上看不到光源本身。
+      // 原因见原实现注释（轮廓近似与真实形状的误差只出现在被模糊掉的边缘）。
+      // 做法：用 shadowBlur 把"光源"（画在节点外侧）的阴影投回节点位置——
       // shadowBlur / shadowOffset 是设备像素，不受 ctx.scale 影响，所以乘 dpr。
+      // 基础实心底用 shadowBlur（只用一次，节点尺寸通常很小，开销可控）。
       const off = p.x + halfW + wideBlur * 2 + 60;
       ctx.save();
       ctx.shadowOffsetX = off * dpr;
@@ -551,23 +603,22 @@ export class GlowOverlay {
       ctx.fillStyle = '#000';
       ctx.strokeStyle = '#000';
       ctx.lineJoin = 'round';
-      // 实心底：整个节点内部均匀染上主题色，边缘只软化几像素。
       ctx.shadowColor = withAlpha(color, 0.42 * intensity);
-      ctx.shadowBlur = clamp(maxHalf * 0.18, 4, 9) * dpr;
+      ctx.shadowBlur = Math.min(9, Math.max(4, maxHalf * 0.18)) * dpr;
       ctx.beginPath();
       this.traceOutline(ctx, p.x - off, p.y, getNodeOutline(shape, halfW, halfH));
       ctx.fill();
-      const glowBand = (bandWidth: number, blurPx: number, alpha: number, passes: number): void => {
-        ctx.lineWidth = bandWidth;
-        ctx.shadowColor = withAlpha(color, alpha);
-        ctx.shadowBlur = blurPx * dpr;
-        ctx.beginPath();
-        this.traceOutline(ctx, p.x - off, p.y, getNodeOutline(shape, halfW + bandWidth / 2, halfH + bandWidth / 2));
-        for (let i = 0; i < passes; i++) ctx.stroke();
-      };
-      glowBand(bandW, wideBlur, 0.85 * intensity, 2); // 外圈：大范围、柔
-      glowBand(4, tightBlur, 0.95 * intensity, 2);    // 内圈：贴边、亮
       ctx.restore();
+
+      // 外/内光圈：各用一张离屏 sprite，每帧 drawImage（GPU 合成，零 shadowBlur）。
+      const outerR = maxHalf + bandW + wideBlur;
+      const outerSprite = this.getEmphSprite(color, outerR, intensityBucket);
+      ctx.drawImage(outerSprite, p.x - outerR, p.y - outerR, outerR * 2, outerR * 2);
+
+      const innerR = maxHalf + wideBlur * 0.5;
+      const innerBucket = Math.min(7, Math.round(intensity * 7));
+      const innerSprite = this.getEmphSprite(color, innerR, innerBucket);
+      ctx.drawImage(innerSprite, p.x - innerR, p.y - innerR, innerR * 2, innerR * 2);
 
       drawn++;
     });
