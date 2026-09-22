@@ -44,19 +44,14 @@ class SpeechController {
   /** iOS Safari: speech engine must be unlocked once per page session. */
   private unlocked = false;
   /**
-   * Consecutive utterance-level failures (asynchronous `error` events).
-   * Real browsers fire `error` only on genuine failure; UC/Quark/X5 WebViews
-   * fire `error` for *every* speak() even when no audio is produced, so we
-   * require multiple consecutive failures before disabling. A single `end`
-   * resets the counter.
-   */
-  private failureStreak = 0;
-  /** Threshold of consecutive utterance errors before flipping supported=false. */
-  private static readonly FAILURE_THRESHOLD = 3;
-  /**
    * False on WebViews that expose `speechSynthesis` but never actually emit
    * audio (notably WeChat X5/TBS on Android). Detected lazily by checking
    * that the API object responds to its core methods without throwing.
+   *
+   * NOTE: We do NOT disable the toggle button when this is false. The button
+   * stays clickable so users can still toggle the active state (the visual
+   * `active` highlight works regardless of audio). Disabling caused more
+   * problems than it solved — see git log for context.
    */
   private supported = false;
   /** Cached speechSynthesis reference; null when unsupported. */
@@ -152,14 +147,11 @@ class SpeechController {
    * Safe to call from setTimeout / async callbacks on iOS because
    * unlockIOS() already ran inside the toggle() gesture.
    *
-   * Failure handling:
-   *   - Synchronous throw on speak(): recorded as one failure but does NOT
-   *     immediately disable — some WebViews (UC/Quark) throw on the very
-   *     first call right after toggle but succeed on the next.
-   *   - Asynchronous `error` event on the utterance: increments the failure
-   *     streak. After FAILURE_THRESHOLD consecutive failures, we flip
-   *     supported=false and disable the button.
-   *   - Asynchronous `end` event: resets the failure streak to zero.
+   * Failure handling is intentionally minimal: we swallow any errors from
+   * the speech engine (some Android WebViews — UC/Quark — throw or fire
+   * spurious `error` events even when audio actually plays). The button
+   * stays clickable in all cases; users see the `active` highlight
+   * regardless of whether audio actually emits.
    */
   speak(text: string): void {
     if (!this.supported || !this.synth) return;
@@ -179,36 +171,16 @@ class SpeechController {
     const voice = this.pickVoice();
     if (voice) utterance.voice = voice;
 
-    utterance.addEventListener('end', () => {
-      this.currentUtterance = null;
-      // Successful playback — clear any previous failure streak.
-      this.failureStreak = 0;
-    });
-    utterance.addEventListener('error', () => {
-      this.currentUtterance = null;
-      // Async failure path: some WebViews always fire `error` even when they
-      // actually played audio. Require multiple consecutive failures before
-      // we conclude the engine is non-functional.
-      this.failureStreak += 1;
-      if (this.failureStreak >= SpeechController.FAILURE_THRESHOLD) {
-        this.supported = false;
-        this.active = false;
-        this.updateButtonState();
-      }
-    });
+    utterance.addEventListener('end', () => { this.currentUtterance = null; });
+    utterance.addEventListener('error', () => { this.currentUtterance = null; });
 
     this.currentUtterance = utterance;
     try {
       this.synth.speak(utterance);
     } catch {
-      // Synchronous throw — also counts as a failure but does not immediately
-      // disable. See failure-streak logic above.
-      this.failureStreak += 1;
-      if (this.failureStreak >= SpeechController.FAILURE_THRESHOLD) {
-        this.supported = false;
-        this.active = false;
-        this.updateButtonState();
-      }
+      // Some WebViews throw synchronously on speak(). Safe to ignore — the
+      // user can still toggle TTS on/off, and the active-state highlight
+      // reflects intent regardless of audio emission.
     }
   }
 
@@ -220,11 +192,8 @@ class SpeechController {
    * (notably X5/TBS) reject empty-text utterances synchronously, which would
    * abort the unlock before iOS even gets a chance.
    *
-   * NOTE: unlock failures (synchronous throws, missing voices) do NOT flip
-   * `supported=false`. Some Android browsers (UC/Quark/U4) reject the
-   * zero-volume unlock utterance but still speak real text correctly. We
-   * reserve `supported=false` for repeated *real-utterance* failures — see
-   * the failure-streak logic in `speak()`.
+   * Failures here (synchronous throws, missing voices) are swallowed. The
+   * button stays clickable regardless — see updateButtonState().
    */
   private unlockIOS(): void {
     if (!this.synth) return;
@@ -251,15 +220,15 @@ class SpeechController {
     document.querySelectorAll<HTMLButtonElement>('[data-tour-action="toggle-speech"]').forEach((btn) => {
       btn.classList.toggle('active', this.active);
       btn.setAttribute('aria-pressed', String(this.active));
-      if (!this.supported) {
-        btn.disabled = true;
-        btn.setAttribute('aria-disabled', 'true');
-        btn.title = '当前浏览器不支持朗读（请用 Chrome/Safari 打开）';
-      } else {
-        btn.disabled = false;
-        btn.removeAttribute('aria-disabled');
-        btn.title = this.active ? '关闭朗读' : '开启朗读';
-      }
+      // We never set `btn.disabled = true`. On WebViews whose speechSynthesis
+      // is broken (X5/TBS, U4/Quark, etc.), users can still toggle the active
+      // state — the visual highlight works regardless of audio emission.
+      // The title hints at browser compatibility without disabling interaction.
+      btn.disabled = false;
+      btn.removeAttribute('aria-disabled');
+      btn.title = !this.supported
+        ? '当前浏览器可能不支持朗读（推荐用 Chrome/Safari 打开）'
+        : this.active ? '关闭朗读' : '开启朗读';
     });
   }
 }

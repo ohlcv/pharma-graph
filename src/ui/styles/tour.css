@@ -333,8 +333,8 @@
     [data-tour-action="toggle-speech"]:is(.active, .tour-active, [aria-pressed="true"]) .spk-off { display: none; }
     [data-tour-action="toggle-speech"]:is(.active, .tour-active, [aria-pressed="true"]) .spk-on  { display: inline; }
     .tour-dt__btn--speech[aria-pressed="true"] { color: var(--accent); }
-    /* 朗读按钮在 Web Speech API 不可用时（安卓微信 X5/TBS 等）的禁用样式。
-       视觉上明显区别于可点击态：灰 + 半透明 + not-allowed 光标。 */
+    /* 朗读按钮被显式禁用时的样式（一般不会触发——朗读按钮永远可点击，
+       只在 title 里提示兼容性。但保留样式以防 HTML 模板上写了 disabled 属性）。 */
     [data-tour-action="toggle-speech"]:disabled,
     [data-tour-action="toggle-speech"][aria-disabled="true"] {
       opacity: 0.45;

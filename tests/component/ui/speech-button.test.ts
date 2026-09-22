@@ -4,15 +4,17 @@
 // file covers the *button* side effects (classList, aria-pressed, disabled,
 // title) which require a real DOM.
 //
-// Specifically: when speechSynthesis is unsupported (e.g. WeChat X5/TBS on
-// Android), updateButtonState() must set the button to `disabled` so users
-// see a clear visual cue instead of wondering why clicks have no effect.
+// Design note: We deliberately do NOT set btn.disabled = true when the API
+// is unsupported (X5/TBS, U4/Quark, etc.). Disabling caused more problems
+// than it solved:
+//   - On Quark (U4), unlock throws synchronously; previously this flipped
+//     supported=false and greyed out the button — the user couldn't toggle.
+//   - On X5/TBS, the API exists but produces no audio; previously greyed
+//     out after a failure-streak of 3.
+// Now: button stays clickable in all cases. The title hints at compatibility
+// ("当前浏览器可能不支持朗读"), but the active-state visual highlight always works.
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-
-/**
- * @vitest-environment jsdom
- */
 
 /**
  * @vitest-environment jsdom
@@ -69,7 +71,6 @@ function installStub(stub: SpeechStub | null) {
 
 describe('speech button DOM side-effects (jsdom)', () => {
   beforeEach(() => {
-    // Reset the button between tests
     document.body.innerHTML = `
       <button class="tour-dt__btn tour-dt__btn--speech" data-tour-action="toggle-speech">
         <span class="spk-off">off</span>
@@ -83,110 +84,81 @@ describe('speech button DOM side-effects (jsdom)', () => {
     vi.resetModules();
   });
 
-  it('sets disabled=true and aria-disabled=true when API is unsupported', async () => {
+  it('button is NEVER disabled, even when API is unsupported', async () => {
     installStub(null);
     const { speechController } = await import('@/ui/speech');
 
-    // The constructor ran probeSpeechApi() which returned false because we
-    // deleted speechSynthesis. Calling toggle() exercises updateButtonState().
+    expect(speechController.isSupported).toBe(false);
     speechController.toggle();
 
     const btn = document.querySelector<HTMLButtonElement>('[data-tour-action="toggle-speech"]')!;
-    expect(btn.disabled).toBe(true);
-    expect(btn.getAttribute('aria-disabled')).toBe('true');
-    expect(btn.classList.contains('active')).toBe(false);
-    expect(btn.getAttribute('aria-pressed')).toBe('false');
+    expect(btn.disabled).toBe(false);
+    expect(btn.hasAttribute('aria-disabled')).toBe(false);
+    // Title still hints at the compatibility issue
     expect(btn.title).toMatch(/不支持朗读/);
   });
 
-  it('does NOT set disabled when API is supported and toggle was never called', async () => {
-    installStub({ speakCalls: [], cancelCalls: 0 });
-    await import('@/ui/speech');
-
-    const btn = document.querySelector<HTMLButtonElement>('[data-tour-action="toggle-speech"]')!;
-    expect(btn.disabled).toBe(false);
-    expect(btn.getAttribute('aria-disabled')).toBeNull();
-  });
-
-  it('sets disabled after 3 consecutive speak() throws (failure streak)', async () => {
+  it('button gets active class + aria-pressed=true when toggled ON (supported API)', async () => {
     installStub({ speakCalls: [], cancelCalls: 0 });
     const { speechController } = await import('@/ui/speech');
 
-    expect(speechController.isSupported).toBe(true);
-
-    // Make every speak() throw synchronously (simulates X5/TBS behavior
-    // where the API exists but speak() never produces audio).
-    (globalThis.speechSynthesis as unknown as { speak: () => void }).speak = () => {
-      throw new Error('speak boom');
-    };
-
-    // Trigger toggle() so active=true, then speak() N times to exceed threshold.
     speechController.toggle();
-
-    // 1st failure: still supported (button not disabled)
-    speechController.speak('test 1');
-    let btn = document.querySelector<HTMLButtonElement>('[data-tour-action="toggle-speech"]')!;
+    const btn = document.querySelector<HTMLButtonElement>('[data-tour-action="toggle-speech"]')!;
+    expect(btn.classList.contains('active')).toBe(true);
+    expect(btn.getAttribute('aria-pressed')).toBe('true');
     expect(btn.disabled).toBe(false);
-    expect(speechController.isSupported).toBe(true);
-
-    // 2nd failure: still supported
-    speechController.speak('test 2');
-    btn = document.querySelector<HTMLButtonElement>('[data-tour-action="toggle-speech"]')!;
-    expect(btn.disabled).toBe(false);
-    expect(speechController.isSupported).toBe(true);
-
-    // 3rd failure: threshold reached, now disabled
-    speechController.speak('test 3');
-    btn = document.querySelector<HTMLButtonElement>('[data-tour-action="toggle-speech"]')!;
-    expect(btn.disabled).toBe(true);
-    expect(speechController.isSupported).toBe(false);
   });
 
-  it('does NOT set disabled after a single speak() throw (recovery possible)', async () => {
-    // This is the Quark/UC scenario: first speak() throws but later calls
-    // succeed. We must not disable the button on a single failure.
+  it('button stays enabled even after speak() throws (Quark/UC scenario)', async () => {
     installStub({ speakCalls: [], cancelCalls: 0 });
     const { speechController } = await import('@/ui/speech');
 
     speechController.toggle();
 
-    // First call throws
+    // Simulate Quark: every speak() throws synchronously
     (globalThis.speechSynthesis as unknown as { speak: () => void }).speak = () => {
       throw new Error('speak boom');
     };
-    speechController.speak('test 1');
 
-    // Second call succeeds
-    (globalThis.speechSynthesis as unknown as { speak: (u: SpeechSynthesisUtterance) => void }).speak = () => {
-      // no-op
-    };
-    speechController.speak('test 2');
+    // Even after many failures the button must stay enabled
+    for (let i = 0; i < 10; i += 1) {
+      speechController.speak(`test ${i}`);
+    }
 
     const btn = document.querySelector<HTMLButtonElement>('[data-tour-action="toggle-speech"]')!;
     expect(btn.disabled).toBe(false);
-    expect(speechController.isSupported).toBe(true);
+    expect(btn.classList.contains('active')).toBe(true); // user intent preserved
   });
 
-  it('unlock utterance throwing does NOT disable the button', async () => {
-    // Quark/UC specifically: rejects unlock utterance (volume=0, single space)
-    // but actually speaks real text fine. We must not punish this with disable.
+  it('toggle works as expected on a normal browser (iOS/Chrome)', async () => {
     installStub({ speakCalls: [], cancelCalls: 0 });
     const { speechController } = await import('@/ui/speech');
 
-    // unlock utterance throws; subsequent real-text speaks succeed
+    expect(speechController.isActive).toBe(false);
+    speechController.toggle();
+    expect(speechController.isActive).toBe(true);
+    speechController.toggle();
+    expect(speechController.isActive).toBe(false);
+
+    const btn = document.querySelector<HTMLButtonElement>('[data-tour-action="toggle-speech"]')!;
+    expect(btn.classList.contains('active')).toBe(false);
+    expect(btn.disabled).toBe(false);
+  });
+
+  it('unlock utterance throwing does not affect button state', async () => {
+    installStub({ speakCalls: [], cancelCalls: 0 });
+    const { speechController } = await import('@/ui/speech');
+
     let callCount = 0;
     (globalThis.speechSynthesis as unknown as { speak: (u: SpeechSynthesisUtterance) => void }).speak = () => {
       callCount += 1;
       if (callCount === 1) throw new Error('unlock boom');
-      // succeed otherwise
     };
 
-    speechController.toggle();           // calls unlock → throws
-    speechController.speak('test 1');    // real speak → succeeds
-    speechController.speak('test 2');    // real speak → succeeds
+    speechController.toggle();           // unlock → throws
 
     const btn = document.querySelector<HTMLButtonElement>('[data-tour-action="toggle-speech"]')!;
     expect(btn.disabled).toBe(false);
-    expect(speechController.isSupported).toBe(true);
+    expect(btn.classList.contains('active')).toBe(true); // active state still applied
   });
 });
