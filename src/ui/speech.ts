@@ -8,13 +8,32 @@
 //   overlapping voices from rapid step transitions.
 // - Voice selection: prefers zh-CN voices, falls back to any available voice.
 // - iOS Safari: first speechSynthesis.speak() must be a user gesture AND must
-//   use a real (even zero-volume) utterance. Fix: prime the engine with an
-//   empty utterance in the toggle() handler (deferred via microtask if voices
-//   are still loading so iOS does not silently drop the unlock utterance).
-// - Rate: 1.0 (default). Could be exposed as a setting in future.
+//   use a real (even zero-volume) utterance. Fix: prime the engine with a
+//   single-space utterance in the toggle() handler (deferred via microtask if
+//   voices are still loading so iOS does not silently drop the unlock
+//   utterance).
+// - Rate: 1.25 (slightly faster than default for Chinese pacing). Could be
+//   exposed as a setting in future.
 // - State is NOT persisted — TTS is off by default on every page load.
+// - Graceful degradation on WebViews that expose `speechSynthesis` but never
+//   actually produce audio (e.g. WeChat X5/TBS on Android). We probe the API
+//   once at boot and short-circuit speak() if it's a stub — see
+//   `isSpeechSupported()`. The toggle button then reflects unsupported state
+//   in its title so users know to open in a real browser.
 
 type Voice = SpeechSynthesisVoice | null;
+
+/** Resolve `speechSynthesis` from whatever host object we're running under.
+ *  In real browsers this is on `window`; in Node/jsdom test envs we may
+ *  install it on `globalThis` instead. */
+function getSpeechSynthesis(): SpeechSynthesis | null {
+  if (typeof speechSynthesis !== 'undefined') return speechSynthesis;
+  if (typeof globalThis !== 'undefined') {
+    const g = globalThis as { speechSynthesis?: SpeechSynthesis };
+    if (g.speechSynthesis) return g.speechSynthesis;
+  }
+  return null;
+}
 
 class SpeechController {
   private active = false;
@@ -24,16 +43,27 @@ class SpeechController {
   private voicesReady = false;
   /** iOS Safari: speech engine must be unlocked once per page session. */
   private unlocked = false;
+  /**
+   * False on WebViews that expose `speechSynthesis` but never actually emit
+   * audio (notably WeChat X5/TBS on Android). Detected lazily by checking
+   * that the API object responds to its core methods without throwing.
+   */
+  private supported = false;
+  /** Cached speechSynthesis reference; null when unsupported. */
+  private readonly synth: SpeechSynthesis | null;
 
   constructor() {
-    if (typeof speechSynthesis === 'undefined') return;
+    this.synth = getSpeechSynthesis();
+    if (!this.synth) return;
+    this.supported = probeSpeechApi(this.synth);
+    if (!this.supported) return;
     // Some browsers load voices asynchronously (Chrome loads from network).
-    if (speechSynthesis.getVoices().length > 0) {
-      this.voices = speechSynthesis.getVoices();
+    if (this.synth.getVoices().length > 0) {
+      this.voices = this.synth.getVoices();
       this.voicesReady = true;
     }
-    speechSynthesis.addEventListener('voiceschanged', () => {
-      this.voices = speechSynthesis.getVoices();
+    this.synth.addEventListener('voiceschanged', () => {
+      this.voices = this.synth!.getVoices();
       this.voicesReady = true;
     });
   }
@@ -44,16 +74,34 @@ class SpeechController {
   }
 
   /**
+   * Returns whether the underlying Web Speech API can be used at all.
+   * False on WebViews that expose a stub `speechSynthesis` (WeChat X5 etc.).
+   */
+  get isSupported(): boolean {
+    return this.supported;
+  }
+
+  /**
    * Toggle TTS on/off.
    *
    * iOS Safari: the first time we turn TTS ON, we send a zero-volume
-   * utterance to "unlock" the speech engine. This MUST happen inside the
-   * user-gesture call stack (click handler).  If voices are still loading
-   * (iOS loads them asynchronously), we defer via queueMicrotask — this
-   * keeps the gesture context alive while the event loop processes the
+   * single-space utterance to "unlock" the speech engine. This MUST happen
+   * inside the user-gesture call stack (click handler).  If voices are still
+   * loading (iOS loads them asynchronously), we defer via queueMicrotask —
+   * this keeps the gesture context alive while the event loop processes the
    * voiceschanged notification.
+   *
+   * If the API is not supported, toggle is a no-op and returns false so
+   * callers can update UI to show "朗读不可用".
    */
   toggle(): boolean {
+    if (!this.supported || !this.synth) {
+      // Surface the failure once, in the button title, so the user knows why
+      // clicking has no audible effect. We do NOT flip `active` so the state
+      // model stays consistent.
+      this.updateButtonState();
+      return false;
+    }
     this.active = !this.active;
     this.updateButtonState();
     if (!this.active) {
@@ -76,8 +124,13 @@ class SpeechController {
 
   /** Turn TTS off without changing the toggle state. */
   stop(): void {
-    if (typeof speechSynthesis === 'undefined') return;
-    speechSynthesis.cancel();
+    if (!this.synth) return;
+    try {
+      this.synth.cancel();
+    } catch {
+      // Some WebView stubs throw on cancel(). Safe to ignore — we just want
+      // to stop emitting.
+    }
     this.currentUtterance = null;
   }
 
@@ -90,8 +143,13 @@ class SpeechController {
    * unlockIOS() already ran inside the toggle() gesture.
    */
   speak(text: string): void {
-    if (!this.active || !text.trim() || typeof speechSynthesis === 'undefined') return;
-    speechSynthesis.cancel();
+    if (!this.supported || !this.synth) return;
+    if (!this.active || !text.trim()) return;
+    try {
+      this.synth.cancel();
+    } catch {
+      /* see stop() */
+    }
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'zh-CN';
@@ -106,17 +164,35 @@ class SpeechController {
     utterance.addEventListener('error', () => { this.currentUtterance = null; });
 
     this.currentUtterance = utterance;
-    speechSynthesis.speak(utterance);
+    try {
+      this.synth.speak(utterance);
+    } catch {
+      // Some WebViews throw synchronously on speak() even though the API
+      // appears present. Disable further attempts and reflect in UI.
+      this.supported = false;
+      this.active = false;
+      this.updateButtonState();
+    }
   }
 
   /**
    * iOS Safari: send a silent zero-volume utterance to unlock the engine.
    * Must be called inside a user-gesture call stack.
+   *
+   * We use a single space instead of `''` because some Android WebView forks
+   * (notably X5/TBS) reject empty-text utterances synchronously, which would
+   * abort the unlock before iOS even gets a chance.
    */
   private unlockIOS(): void {
-    const u = new SpeechSynthesisUtterance('');
-    u.volume = 0;
-    speechSynthesis.speak(u);
+    if (!this.synth) return;
+    try {
+      const u = new SpeechSynthesisUtterance(' ');
+      u.volume = 0;
+      this.synth.speak(u);
+    } catch {
+      this.supported = false;
+      this.updateButtonState();
+    }
   }
 
   private pickVoice(): Voice {
@@ -131,8 +207,34 @@ class SpeechController {
     document.querySelectorAll<HTMLElement>('[data-tour-action="toggle-speech"]').forEach((btn) => {
       btn.classList.toggle('active', this.active);
       btn.setAttribute('aria-pressed', String(this.active));
-      btn.title = this.active ? '关闭朗读' : '开启朗读';
+      btn.title = !this.supported
+        ? '当前浏览器不支持朗读（请用 Chrome/Safari 打开）'
+        : this.active ? '关闭朗读' : '开启朗读';
     });
+  }
+}
+
+/**
+ * Detect whether the host's `speechSynthesis` is a working implementation
+ * or a non-functional stub. The probe checks:
+ *   - API object exists and is non-null
+ *   - `getVoices`, `speak`, `cancel` are callable functions
+ *   - `new SpeechSynthesisUtterance(' ')` does not throw
+ * Failing any of these means we should not attempt to use TTS.
+ */
+function probeSpeechApi(api: SpeechSynthesis): boolean {
+  if (!api) return false;
+  if (typeof api.getVoices !== 'function') return false;
+  if (typeof api.speak !== 'function') return false;
+  if (typeof api.cancel !== 'function') return false;
+  if (typeof SpeechSynthesisUtterance === 'undefined') return false;
+  try {
+    // Constructing an utterance exercises the constructor; some stubs expose
+    // the speak/cancel methods but their constructor throws.
+    new SpeechSynthesisUtterance(' ');
+    return true;
+  } catch {
+    return false;
   }
 }
 

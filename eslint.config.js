@@ -70,6 +70,12 @@ export default [
         Math: 'readonly',
         Date: 'readonly',
         JSON: 'readonly',
+        // Web Speech API (TTS) — used by src/ui/speech.ts
+        SpeechSynthesis: 'readonly',
+        SpeechSynthesisUtterance: 'readonly',
+        SpeechSynthesisVoice: 'readonly',
+        speechSynthesis: 'readonly',
+        queueMicrotask: 'readonly',
         // Node
         process: 'readonly',
         Buffer: 'readonly',
