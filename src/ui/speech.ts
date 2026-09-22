@@ -204,12 +204,18 @@ class SpeechController {
   }
 
   private updateButtonState(): void {
-    document.querySelectorAll<HTMLElement>('[data-tour-action="toggle-speech"]').forEach((btn) => {
+    document.querySelectorAll<HTMLButtonElement>('[data-tour-action="toggle-speech"]').forEach((btn) => {
       btn.classList.toggle('active', this.active);
       btn.setAttribute('aria-pressed', String(this.active));
-      btn.title = !this.supported
-        ? '当前浏览器不支持朗读（请用 Chrome/Safari 打开）'
-        : this.active ? '关闭朗读' : '开启朗读';
+      if (!this.supported) {
+        btn.disabled = true;
+        btn.setAttribute('aria-disabled', 'true');
+        btn.title = '当前浏览器不支持朗读（请用 Chrome/Safari 打开）';
+      } else {
+        btn.disabled = false;
+        btn.removeAttribute('aria-disabled');
+        btn.title = this.active ? '关闭朗读' : '开启朗读';
+      }
     });
   }
 }

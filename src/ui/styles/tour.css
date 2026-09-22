@@ -333,6 +333,20 @@
     [data-tour-action="toggle-speech"]:is(.active, .tour-active, [aria-pressed="true"]) .spk-off { display: none; }
     [data-tour-action="toggle-speech"]:is(.active, .tour-active, [aria-pressed="true"]) .spk-on  { display: inline; }
     .tour-dt__btn--speech[aria-pressed="true"] { color: var(--accent); }
+    /* 朗读按钮在 Web Speech API 不可用时（安卓微信 X5/TBS 等）的禁用样式。
+       视觉上明显区别于可点击态：灰 + 半透明 + not-allowed 光标。 */
+    [data-tour-action="toggle-speech"]:disabled,
+    [data-tour-action="toggle-speech"][aria-disabled="true"] {
+      opacity: 0.45;
+      cursor: not-allowed;
+      filter: grayscale(0.6);
+    }
+    [data-tour-action="toggle-speech"]:disabled:hover,
+    [data-tour-action="toggle-speech"][aria-disabled="true"]:hover {
+      background: transparent;
+      border-color: transparent;
+      color: var(--text-2);
+    }
     /* 手机版按钮开启时的高亮（原先没有对应样式） */
     .tour-mob__badge[data-tour-action="toggle-speech"]:is(.active, [aria-pressed="true"]) {
       background: rgba(var(--accent-rgb), 0.25);
