@@ -11,9 +11,9 @@
  * 和「64 MB」这种带空格的值被挤成两行，看起来忽横忽纵。改成 3 列后每格 ~90px，
  * 并加 nowrap，数值再长（如 149 MB）也不会换行或跳动。 */
 .stat-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, 1fr); grid-auto-flow: column; gap: 6px; }
-.stat-card  { background: rgba(255,255,255,0.025); border: 1px solid var(--border); border-radius: 9px; padding: 7px 10px; display: flex; flex-direction: row; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
-.stat-card__label { font-size: 0.55rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
-.stat-card__value { font-size: 0.95rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; font-family: var(--font-mono); letter-spacing: -0.03em; line-height: 1; white-space: nowrap; }
+.stat-card  { background: rgba(255,255,255,0.025); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 7px 10px; display: flex; flex-direction: row; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
+.stat-card__label { font-size: var(--text-3xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+.stat-card__value { font-size: var(--text-lg); font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; font-family: var(--font-mono); letter-spacing: -0.03em; line-height: 1; white-space: nowrap; }
 .stat-card__value--nodes       { color: var(--stat-nodes); }
 .stat-card__value--edges       { color: var(--stat-edges); }
 .stat-card__value--selected    { color: var(--stat-selected); }
@@ -21,10 +21,10 @@
 .stat-card__value--fps         { color: var(--stat-fps); }
 .stat-card__value--memory      { color: var(--stat-memory); }
 
-.layout-info { margin-top: 8px; padding: 10px 12px; background: rgba(255,255,255,0.025); border: 1px solid var(--border); border-radius: 9px; display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
+.layout-info { margin-top: 8px; padding: 10px 12px; background: rgba(255,255,255,0.025); border: 1px solid var(--border); border-radius: var(--radius-lg); display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
 .layout-info__header { display: flex; align-items: center; gap: 6px; }
-.layout-info__label  { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); flex-shrink: 0; }
+.layout-info__label  { font-size: var(--text-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); flex-shrink: 0; }
 .layout-info__badge  { font-size: 1.05rem; font-weight: 800; letter-spacing: 0.04em; color: var(--text); font-family: var(--font-mono); line-height: 1; }
-.layout-info__desc   { font-size: 0.68rem; color: var(--muted); line-height: 1.6; }
+.layout-info__desc   { font-size: var(--text-sm); color: var(--muted); line-height: 1.6; }
 
 }

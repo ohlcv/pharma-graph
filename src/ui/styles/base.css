@@ -225,7 +225,27 @@
       --hover-transition:          140ms;
       --hover-transition-strong:   180ms;
       --hover-ease:                var(--ease-out);
-    
+
+      /* ── Active-state tokens — 统一「选中/激活」视觉 ──────────────────
+         chip 类（toggle filter）：bg 0.18 + border 0.5 + glow 0.25
+         btn  类（按下 toggle）：   bg 0.15 + border 0.4 + glow 0.22
+         badge类（单色徽章）：     bg 0.12 + border accent 实色
+         后续禁止新定义 active 三件套（bg α / border α / glow α）。 */
+      --active-chip-bg-α:           0.18;
+      --active-chip-border-α:       0.5;
+      --active-chip-glow-α:         0.25;
+      --active-btn-bg-α:            0.15;
+      --active-btn-border-α:        0.4;
+      --active-btn-glow-α:          0.22;
+      --active-badge-bg-α:          0.12;
+
+      /* ── Focus ring — 全项目 :focus-visible 唯一来源 ──────────────────
+         不允许在其他选择器里再次声明 outline-color，避免和这里打架。 */
+      --focus-ring-width:           2px;
+      --focus-ring-offset:          2px;
+      --focus-ring-color:           rgba(var(--accent-rgb), 0.95);
+      --focus-ring-inset-color:     rgba(var(--accent-rgb), 0.35);
+
       /* ── Debug palette */
       --debug-red:    #f87171;
       --debug-green:  #4ade80;
@@ -247,6 +267,20 @@
       --font-mono:    'Space Mono', 'SF Mono', 'Fira Code', 'Cascadia Code',
                       ui-monospace, 'Menlo', 'Consolas', monospace;
 
+      /* ── Type scale — 7 档，禁止裸 font-size: 0.Xrem ──────────────
+         之前散落 22 档（0.46/0.55/0.56/0.58/0.6/0.62/0.64/0.65/0.66/
+         0.68/0.7/0.72/0.73/0.74/0.76/0.78/0.8/0.82/0.85/0.92/0.95/1.1）
+         同样"标签"含义出现 0.58/0.6/0.62/0.64/0.65 5 种，毫无章法。
+         收成 7 档并标注语义，调用方只能选语义对得上的那个。 */
+      --text-3xs:  0.55rem;   /* 8.8px  — 微小提示（游标标签/极少信息） */
+      --text-2xs:  0.6rem;    /* 9.6px  — uppercase label (toolbar/legend section) */
+      --text-xs:   0.65rem;   /* 10.4px — secondary chip text (np-tag/tag) */
+      --text-sm:   0.7rem;    /* 11.2px — body small (tag/btn default) */
+      --text-base: 0.72rem;   /* 11.5px — body baseline（最常用的"正文"） */
+      --text-md:   0.78rem;   /* 12.5px — summary body (np-summary/markdown body) */
+      --text-lg:   0.85rem;   /* 13.6px — emphasized heading (h3/badge-meow) */
+      /* 真实字号 ≤ 9px 时浏览器/cytoscape 直接跳过渲染，UI 实际不会用到更小 */
+
       /* ── Chrome geometry — single source of truth for topbar/toolbar
          offsets. Every file that currently hand-computes 56+44=100,
          100+10=110, 100+34=134 etc. should consume these instead. ── */
@@ -256,13 +290,18 @@
       --chrome-gap:        10px;   /* breathing room below the bars */
       --chrome-h-gapped:   calc(var(--chrome-h) + var(--chrome-gap));              /* 110px */
 
-      /* ── Radius scale ── */
-      --radius-xs:   4px;
-      --radius-sm:   8px;
-      --radius-md:   14px;
-      --radius-lg:   20px;
-      --radius-xl:   28px;
-      --radius-pill: 999px;
+      /* ── Radius scale — 9 档。散落的具体 px 值一律查表 ──────────
+         之前 border-radius: 2/3/4/5/6/7/8/9/10/12/14/16/18/20/22/24/28px
+         17 档同时存在，没有设计意图。收成 9 档并标注典型用途。 */
+      --radius-2xs: 2px;     /* 微型 dot、slider thumb 内层指示 */
+      --radius-xs:  4px;     /* 标签/小标签/code block */
+      --radius-sm:  6px;     /* 24px 方按钮、close/pin/tab */
+      --radius-md:  8px;     /* row、chip、输入框、scrollbar */
+      --radius-lg:  10px;    /* 大按钮、quick btn */
+      --radius-xl:  14px;    /* 面板、大卡片 */
+      --radius-2xl: 20px;    /* 胶囊 tag、stat-card */
+      --radius-3xl: 24px;    /* overlay panel、sheet 顶部 */
+      --radius-pill: 999px;  /* pill / 圆形按钮 */
 
       /* ── Elevation / z-index scale — replaces the flat literal list
          (25/30/40/49/50/60/100/200/900/9999) scattered across
@@ -364,8 +403,8 @@
     
     /* ── Focus ring — uses theme accent so it tracks the color story ──────── */
     :focus-visible {
-      outline: 2px solid rgba(var(--accent-rgb), 0.95);
-      outline-offset: 2px;
+      outline: var(--focus-ring-width) solid var(--focus-ring-color);
+      outline-offset: var(--focus-ring-offset);
     }
     :focus:not(:focus-visible) { outline: none; }
     
