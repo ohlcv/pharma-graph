@@ -514,7 +514,7 @@
   transition: background var(--hover-transition) var(--hover-ease), border-color var(--hover-transition) var(--hover-ease), transform 0.12s;
   user-select: none; position: relative; overflow: hidden;
 }
-.node-type-item::before { content: ''; position: absolute; inset: 0; background: var(--accent); opacity: 0; transition: opacity var(--hover-transition); border-radius: inherit; }
+.node-type-item::before { content: ''; position: absolute; inset: 0; background: var(--accent); opacity: 0; transition: opacity var(--hover-transition); border-radius: inherit; pointer-events: none; }
 .node-type-item:hover { background: rgba(255,255,255,0.06); border-color: var(--border-hi); transform: translateY(-1px); }
 .node-type-item:hover::before { opacity: 0.04; }
 .node-type-item.active { border-color: rgba(var(--accent-rgb), 0.5); background: rgba(var(--accent-rgb), 0.18); box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.25); }
@@ -571,14 +571,16 @@
   display: flex; align-items: center; gap: 7px;
   padding: 5px 8px; border-radius: 7px;
   cursor: pointer; border: 1px solid transparent;
-  transition: background var(--hover-transition) var(--hover-ease), border-color var(--hover-transition) var(--hover-ease);
-  user-select: none;
+  transition: background var(--hover-transition) var(--hover-ease), border-color var(--hover-transition) var(--hover-ease), transform 0.12s;
+  user-select: none; position: relative; overflow: hidden;
   /* Prevent long labels from expanding the row past its grid column,
    * which pushes the count off-screen before overflow-x: auto fires.
    * The label inside handles its own text ellipsis. */
   min-width: 0;
 }
-.legend-row:hover { background: rgba(255,255,255,0.06); border-color: var(--border-hi); }
+.legend-row::before { content: ''; position: absolute; inset: 0; background: var(--accent); opacity: 0; transition: opacity var(--hover-transition); border-radius: inherit; pointer-events: none; }
+.legend-row:hover { background: rgba(255,255,255,0.06); border-color: var(--border-hi); transform: translateY(-1px); }
+.legend-row:hover::before { opacity: 0.04; }
 
 .legend-node { flex-shrink: 0; width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
 .legend-node--shape {
@@ -661,11 +663,13 @@
   padding: 5px 8px; border-radius: 7px;
   font-size: 0.68rem; color: var(--text-2); font-weight: 500;
   cursor: pointer; border: 1px solid transparent;
-  transition: background var(--hover-transition) var(--hover-ease), border-color var(--hover-transition) var(--hover-ease);
+  transition: background var(--hover-transition) var(--hover-ease), border-color var(--hover-transition) var(--hover-ease), transform 0.12s;
   /* Same as .legend-row: prevent the row itself from expanding past its
    * grid column on long Chinese labels like "局部→整体". */
   min-width: 0;
+  position: relative; overflow: hidden;
 }
+.legend-edge-row::before { content: ''; position: absolute; inset: 0; background: var(--accent); opacity: 0; transition: opacity var(--hover-transition); border-radius: inherit; pointer-events: none; }
 .legend-edge-row.active {
   background: rgba(var(--accent-rgb), 0.18);
   border-color: rgba(var(--accent-rgb), 0.5);
@@ -674,7 +678,8 @@
 .legend-edge-row.active .legend-edge-row__label {
   color: var(--accent);
 }
-.legend-edge-row:hover { background: rgba(255,255,255,0.06); border-color: var(--border-hi); }
+.legend-edge-row:hover { background: rgba(255,255,255,0.06); border-color: var(--border-hi); transform: translateY(-1px); }
+.legend-edge-row:hover::before { opacity: 0.04; }
 
 .legend-edge-row svg { flex-shrink: 0; }
 .legend-edge-row__label {
@@ -702,8 +707,10 @@
 /* .layout-params | #layout-params-rows | .param-row | .param-slider | .btn--apply … */
 
 .shape-filter-list { display: flex; flex-direction: column; gap: 3px; }
-.shape-filter-item { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; transition: background var(--hover-transition) var(--hover-ease), border-color var(--hover-transition) var(--hover-ease); user-select: none; }
-.shape-filter-item:hover { background: rgba(255,255,255,0.06); border-color: var(--border-hi); }
+.shape-filter-item { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; transition: background var(--hover-transition) var(--hover-ease), border-color var(--hover-transition) var(--hover-ease), transform 0.12s; user-select: none; position: relative; overflow: hidden; }
+.shape-filter-item::before { content: ''; position: absolute; inset: 0; background: var(--accent); opacity: 0; transition: opacity var(--hover-transition); border-radius: inherit; pointer-events: none; }
+.shape-filter-item:hover { background: rgba(255,255,255,0.06); border-color: var(--border-hi); transform: translateY(-1px); }
+.shape-filter-item:hover::before { opacity: 0.04; }
 .shape-filter-item.active { background: rgba(var(--accent-rgb), 0.18); border-color: rgba(var(--accent-rgb), 0.5); box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.25); }
 .shape-filter-item__shape { flex-shrink: 0; }
 .shape-filter-item__label { font-size: 0.72rem; color: var(--text-2); font-weight: 500; }
