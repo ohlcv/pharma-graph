@@ -315,10 +315,10 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         'text-margin-y': 6,
         'text-wrap': 'wrap',
         'text-max-width': '120px',
-        // 星图式标注：细描边代替实心背景块。text-outline 只沿字形描边，
-        // 不额外画圆角矩形，标签更轻、更贴合"星图标注"的观感。
-        'text-outline-width': 2,
-        'text-outline-color': 'rgba(15,17,23,0.85)',
+        // 缩小到屏幕字号小于 9px 时 cytoscape 直接跳过整个标签绘制，
+        // 全图俯视时的重绘成本能掉一大截。
+        'min-zoomed-font-size': 9,
+        'text-outline-width': 0,
         // 缩小到屏幕字号小于 9px 时 cytoscape 直接跳过整个标签绘制，
         // 全图俯视时的重绘成本能掉一大截。
         'min-zoomed-font-size': 9,
@@ -412,7 +412,6 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         'transition-duration': 0,
         opacity: 0.1,
         'border-color': 'rgba(255,255,255,0.06)',
-        'text-outline-color': 'rgba(15,17,23,0.5)',
         'line-color': 'transparent',
         'line-opacity': 0.1,
         'source-arrow-color': 'transparent',
@@ -460,8 +459,6 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         width: 2.5,
         'line-color': accent2,
         'target-arrow-color': accent2,
-        'text-outline-width': 2,
-        'text-outline-color': 'rgba(15,17,23,0.85)',
         label: 'data(reason)',
         'font-size': 10,
         color: '#f1f5f9',
@@ -489,7 +486,6 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         opacity: 0.22,
         'border-color': 'rgba(255,255,255,0.06)',
         'border-width': 1,
-        'text-outline-color': 'rgba(15,17,23,0.5)',
         'line-opacity': 0.08,
         color: 'rgba(226,232,240,0.25)',
       },
