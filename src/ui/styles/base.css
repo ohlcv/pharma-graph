@@ -210,6 +210,21 @@
       --blue:        #60a5fa;
       --purple:      #a78bfa;
       --pink:        #f472b6;             /* edge category accent */
+
+      /* ── Hover tokens — 统一整个项目的 hover 颜色与时序 ────────────────
+         全项目 hover 只能用这三档 accent alpha，不允许裸 rgba：
+           --hover-accent-bg-α       卡片/列表 hover（最轻底色）
+           --hover-accent-bg-α-strong 按钮/tab hover（更明显）
+           --hover-accent-border-α   hover 边框（搭配 bg 用）
+         Danger hover 走 --danger + --danger-α，不再分散硬编码红。 */
+      --hover-accent-bg-α:         0.06;
+      --hover-accent-bg-α-strong:  0.12;
+      --hover-accent-border-α:     0.4;
+      --danger-α:                  0.12;
+      --danger-border-α:           0.4;
+      --hover-transition:          140ms;
+      --hover-transition-strong:   180ms;
+      --hover-ease:                var(--ease-out);
     
       /* ── Debug palette */
       --debug-red:    #f87171;

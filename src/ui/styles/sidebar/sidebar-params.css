@@ -14,14 +14,16 @@
 .param-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%; background: var(--accent); border: 2px solid var(--panel); box-shadow: 0 0 8px var(--accent-glow), 0 2px 6px rgba(0,0,0,0.4); cursor: pointer; transition: transform 0.1s, box-shadow 0.1s; }
 .param-slider::-webkit-slider-thumb:hover { transform: scale(1.2); box-shadow: 0 0 14px var(--accent-glow), 0 2px 8px rgba(0,0,0,0.5); }
 .param-slider::-moz-range-thumb { width: 15px; height: 15px; border-radius: 50%; background: var(--accent); border: 2px solid var(--panel); cursor: pointer; }
-.param-select { background: rgba(255,255,255,0.04); color: var(--text); border: 1px solid var(--border); border-radius: 7px; padding: 5px 9px; font-size: 0.72rem; width: 100%; cursor: pointer; font-family: inherit; outline: none; transition: border-color 0.14s, background 0.14s; }
+.param-select { background: rgba(255,255,255,0.04); color: var(--text); border: 1px solid var(--border); border-radius: 7px; padding: 5px 9px; font-size: 0.72rem; width: 100%; cursor: pointer; font-family: inherit; outline: none; transition: border-color var(--hover-transition) var(--hover-ease), background var(--hover-transition) var(--hover-ease); }
 .param-select:focus { border-color: var(--accent); background: rgba(255,255,255,0.06); }
 .no-params { font-size: 0.72rem; font-style: italic; color: var(--muted); }
 .btn--apply { margin-top: 6px; width: 100%; justify-content: center; border-color: var(--border-hi); font-weight: 600; }
 .param-actions { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
 .param-actions .btn--apply { margin-top: 0; flex: 1 1 auto; width: auto; }
 .btn--ghost { background: transparent; color: var(--muted); border-color: var(--border); }
-.btn--ghost:hover { color: var(--text); border-color: var(--border-hi); background: rgba(255,255,255,0.04); }
+/* 与 components.css 的 .btn--ghost:hover 完全一致（0.08/--border-hi/var(--text)）。
+   此前的 0.04 让 sidebar 里的 ghost 看上去比 toolbar 里的更暗。 */
+.btn--ghost:hover { color: var(--text); border-color: var(--border-hi); background: rgba(255,255,255,0.08); }
 .btn--sm { padding: 5px 10px; font-size: 0.7rem; }
 .btn--sm svg { width: 12px; height: 12px; }
 

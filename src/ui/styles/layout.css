@@ -178,6 +178,7 @@
   cursor: pointer;
   padding: 0;
   display: inline-flex; align-items: center; justify-content: center;
+  transition: background var(--hover-transition) var(--hover-ease), border-color var(--hover-transition) var(--hover-ease), color var(--hover-transition) var(--hover-ease);
 }
 .dbg-header__copy {
   margin-left: auto;
@@ -190,10 +191,11 @@
   cursor: pointer;
   padding: 0;
   display: inline-flex; align-items: center; justify-content: center;
+  transition: background var(--hover-transition) var(--hover-ease), border-color var(--hover-transition) var(--hover-ease), color var(--hover-transition) var(--hover-ease);
 }
 .dbg-header__copy:hover {
-  background: rgba(192, 132, 252, 0.18);
-  border-color: rgba(192, 132, 252, 0.45);
+  background: rgba(192, 132, 252, var(--hover-accent-bg-α-strong));
+  border-color: rgba(192, 132, 252, 0.5);
   color: #d8b4fe;
 }
 .dbg-header__copy:focus-visible {
@@ -201,8 +203,8 @@
   outline-offset: 1px;
 }
 .dbg-header__close:hover {
-  background: rgba(248,113,113,0.18);
-  border-color: rgba(248,113,113,0.45);
+  background: rgba(248, 113, 113, var(--danger-α));
+  border-color: rgba(248, 113, 113, var(--danger-border-α));
   color: #fecaca;
 }
 .dbg-header__close:focus-visible {

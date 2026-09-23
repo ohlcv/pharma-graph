@@ -319,9 +319,6 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         // 全图俯视时的重绘成本能掉一大截。
         'min-zoomed-font-size': 9,
         'text-outline-width': 0,
-        // 缩小到屏幕字号小于 9px 时 cytoscape 直接跳过整个标签绘制，
-        // 全图俯视时的重绘成本能掉一大截。
-        'min-zoomed-font-size': 9,
         'border-width': 1,
         'border-color': '#475569',
         'background-color': FILL_DEFAULT,
@@ -426,6 +423,11 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         opacity: 1,
         'border-width': 3,
         'border-color': accent,
+        // 不动 overlay-opacity：cytoscape 的 overlay 按节点 bounding-box(矩形) 画，
+        // 椭圆/八边形/星形节点外面罩个矩形光晕，与"沿 shape 描边"的视觉矛盾。
+        // hover vs 选中：靠 border 宽度区分 (3px hover / 4px selected)
+        // + 颜色区分 (accent / accent2)，详见 ADR-0002。
+        'overlay-opacity': 0,
       },
     },
     {

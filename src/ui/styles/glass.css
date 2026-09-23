@@ -323,12 +323,14 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
     inset 0 1px 3px rgba(0,0,0,0.5),
     inset 0 0 0 1px rgba(255,255,255,0.06);
 }
+/* :hover 故意省略：glass.css 与 components.css 同时定义 .node-panel__tab，
+   后者才是 index.html 实际渲染的那套（见 index.html:496-500）。
+   让 components.css 的 hover 唯一生效。 */
 .node-panel__tab {
   width: 30px; height: 24px; border-radius: 999px;
   border-color: transparent; background: transparent;
   transition: background 0.2s, color 0.2s, box-shadow 0.25s;
 }
-.node-panel__tab:hover:not(.active) { background: rgba(255,255,255,0.09); border-color: transparent; }
 .node-panel__tab.active {
   color: #fff; border-color: transparent;
   background: linear-gradient(180deg, rgba(255,255,255,0.30), rgba(255,255,255,0.14));

@@ -283,10 +283,10 @@
       padding: 5px 8px; border-radius: 8px; border: 1px solid transparent;
       background: transparent; color: var(--text-2); cursor: pointer;
       font-size: 0.7rem; font-weight: 500; font-family: inherit;
-      transition: background 0.14s, border-color 0.14s, color 0.14s, box-shadow 0.14s, transform 0.1s;
+      transition: background var(--hover-transition) var(--hover-ease), border-color var(--hover-transition) var(--hover-ease), color var(--hover-transition) var(--hover-ease), box-shadow var(--hover-transition) var(--hover-ease), transform 0.1s;
       position: relative; overflow: hidden; white-space: nowrap; flex-shrink: 0;
     }
-    .tour-dt__btn::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, var(--accent), var(--accent2)); opacity: 0; transition: opacity 0.14s; }
+    .tour-dt__btn::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, var(--accent), var(--accent2)); opacity: 0; transition: opacity var(--hover-transition); }
     .tour-dt__btn:hover::after  { opacity: 0.12; }
     .tour-dt__btn:active::after { opacity: 0.2; transform: scale(0.97); }
     .tour-dt__btn > * { position: relative; z-index: 1; }
@@ -300,14 +300,15 @@
     }
     .tour-dt__btn--prev:hover,
     .tour-dt__btn--next:hover {
-      background: rgba(var(--accent-rgb), 0.12);
-      border-color: rgba(var(--accent-rgb), 0.35);
+      background: rgba(var(--accent-rgb), var(--hover-accent-bg-α-strong));
+      border-color: rgba(var(--accent-rgb), 0.4);
       color: var(--accent);
     }
     .tour-dt__btn--play  { background: rgba(var(--accent-rgb), 0.15); border-color: rgba(var(--accent-rgb), 0.4); color: var(--accent); }
     .tour-dt__btn--play:hover  { background: rgba(var(--accent-rgb), 0.2); border-color: var(--tour-accent); box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.25); }
     .tour-dt__btn--play.active { background: rgba(var(--accent-rgb), 0.25); border-color: var(--tour-accent); box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.4), 0 0 0 2px rgba(var(--accent-rgb), 0.2); }
-    .tour-dt__btn--close:hover { background: rgba(239,68,68,0.1); border-color: rgba(239,68,113,0.3); color: #f87171; }
+    /* 危险色 hover 与 .btn--danger / .node-panel__close / .dbg-header__close 统一 */
+    .tour-dt__btn--close:hover { background: rgba(248, 113, 113, var(--danger-α)); border-color: rgba(248, 113, 113, var(--danger-border-α)); color: var(--red); }
 
     /* 朗读按钮 */
     .tour-dt__btn--speech {
@@ -451,18 +452,18 @@
       .tour-mob__close {
         display: flex; align-items: center; justify-content: center;
         padding: 6px 10px; margin: 4px 0;
-        background: rgba(239,68,113,0.1); border: 1px solid rgba(239,68,113,0.3);
-        border-radius: 7px; color: #f87171; cursor: pointer; flex-shrink: 0;
+        background: rgba(248, 113, 113, var(--danger-α)); border: 1px solid rgba(248, 113, 113, var(--danger-border-α));
+        border-radius: 7px; color: var(--red); cursor: pointer; flex-shrink: 0;
         font-size: 0.66rem; font-weight: 500; font-family: inherit;
         touch-action: manipulation;
-        transition: background 0.14s, border-color 0.14s, color 0.14s, box-shadow 0.14s;
+        transition: background var(--hover-transition) var(--hover-ease), border-color var(--hover-transition) var(--hover-ease), color var(--hover-transition) var(--hover-ease), box-shadow var(--hover-transition) var(--hover-ease);
         position: relative; overflow: hidden;
       }
-      .tour-mob__close::after { content: ''; position: absolute; inset: 0; background: rgba(239,68,113,0.2); opacity: 0; transition: opacity 0.14s; }
+      .tour-mob__close::after { content: ''; position: absolute; inset: 0; background: rgba(248, 113, 113, var(--danger-α)); opacity: 0; transition: opacity var(--hover-transition); }
       .tour-mob__close:hover::after { opacity: 1; }
-      .tour-mob__close:active { transform: scale(0.96); box-shadow: 0 0 0 2px rgba(239,68,113,0.3); }
+      .tour-mob__close:active { transform: scale(0.96); box-shadow: 0 0 0 2px rgba(248, 113, 113, var(--danger-border-α)); }
       .tour-mob__close > * { position: relative; z-index: 1; }
-      .tour-mob__close:hover { border-color: rgba(239,68,113,0.5); box-shadow: 0 0 10px rgba(239,68,113,0.2); }
+      .tour-mob__close:hover { border-color: rgba(248, 113, 113, var(--danger-border-α)); box-shadow: 0 0 10px rgba(248, 113, 113, 0.2); }
       .tour-mob__close svg { width: 12px; height: 12px; stroke: currentColor; }
 
       .tour-mob__badge {
@@ -472,10 +473,10 @@
         border-radius: 7px; color: var(--accent); cursor: pointer; flex-shrink: 0;
         font-size: 0.66rem; font-weight: 500; font-family: inherit;
         touch-action: manipulation;
-        transition: background 0.14s, border-color 0.14s, color 0.14s, box-shadow 0.14s;
+        transition: background var(--hover-transition) var(--hover-ease), border-color var(--hover-transition) var(--hover-ease), color var(--hover-transition) var(--hover-ease), box-shadow var(--hover-transition) var(--hover-ease);
         position: relative; overflow: hidden;
       }
-      .tour-mob__badge::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, var(--accent), var(--accent2)); opacity: 0; transition: opacity 0.14s; }
+      .tour-mob__badge::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, var(--accent), var(--accent2)); opacity: 0; transition: opacity var(--hover-transition); }
       .tour-mob__badge:hover::after { opacity: 0.12; }
       .tour-mob__badge:active { transform: scale(0.96); box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.3); }
       .tour-mob__badge > * { position: relative; z-index: 1; }
@@ -492,14 +493,14 @@
         border-radius: 7px;
         font-size: 0.66rem; font-weight: 500; font-family: inherit;
         touch-action: manipulation;
-        transition: background 0.14s, border-color 0.14s, color 0.14s, box-shadow 0.14s;
+        transition: background var(--hover-transition) var(--hover-ease), border-color var(--hover-transition) var(--hover-ease), color var(--hover-transition) var(--hover-ease), box-shadow var(--hover-transition) var(--hover-ease);
         position: relative; overflow: hidden;
       }
       .tour-mob__badge--prev::after,
-      .tour-mob__badge--next::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, var(--accent), var(--accent2)); opacity: 0; transition: opacity 0.14s; }
+      .tour-mob__badge--next::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, var(--accent), var(--accent2)); opacity: 0; transition: opacity var(--hover-transition); }
       .tour-mob__badge--prev:hover,
       .tour-mob__badge--next:hover {
-        background: rgba(var(--accent-rgb), 0.15);
+        background: rgba(var(--accent-rgb), var(--hover-accent-bg-α-strong));
         border-color: rgba(var(--accent-rgb), 0.4);
         color: var(--accent);
       }
