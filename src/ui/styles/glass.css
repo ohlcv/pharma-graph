@@ -112,17 +112,17 @@ html[data-glass="lite"] {
     var(--lg-tint-dense);
   -webkit-backdrop-filter: var(--lg-filter);
   backdrop-filter: var(--lg-filter);
-  border-bottom: 1px solid var(--lg-line-soft);
+  border-bottom: var(--space-3xs) solid var(--lg-line-soft);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.18),
     0 12px 32px -14px rgba(0,0,0,0.6);
 }
 
 /* 搜索框：下陷的玻璃槽，聚焦时亮起一圈强调色光环。 */
-.topbar__search-icon { left: 12px; }
+.topbar__search-icon { left: var(--space-lg); }
 .topbar__search-input {
   height: 32px;
-  padding: 0 14px 0 34px;
+  padding: 0 var(--space-lg) 0 34px;
   border-radius: var(--radius-pill);
   border: 1px solid transparent;
   background: rgba(255, 255, 255, 0.07);
@@ -146,26 +146,26 @@ html[data-glass="lite"] {
    ══════════════════════════════════════════════════════════════════════════ */
 
 .toolbar {
-  gap: 8px;
+  gap: var(--space-md);
   background:
     linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.015) 100%),
     var(--lg-tint);
   -webkit-backdrop-filter: var(--lg-filter);
   backdrop-filter: var(--lg-filter);
-  border-bottom: 1px solid var(--lg-line-soft);
+  border-bottom: var(--space-3xs) solid var(--lg-line-soft);
   /* 工具栏自己是 overflow-x:auto，外阴影会被裁掉，所以只用内阴影。 */
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
 }
 
 .toolbar__sep {
-  width: 1px; height: 22px; margin: 0 4px;
+  width: 1px; height: 22px; margin: 0 var(--space-xs);
   background: linear-gradient(180deg, transparent, rgba(255,255,255,0.22), transparent);
 }
 
 /* 成组按钮：一颗玻璃胶囊。里面的 .btn 保持原来的透明底和悬停/激活态。 */
 .toolbar__group {
-  display: inline-flex; align-items: center; gap: 2px;
-  padding: 3px; flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: var(--space-2xs);
+  padding: var(--space-xs); flex-shrink: 0;
   border-radius: var(--radius-pill);
   background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03));
   box-shadow:
@@ -196,7 +196,7 @@ html[data-glass="lite"] {
 
 /* 布局选择器的弹出菜单。 */
 .layout-switcher__menu {
-  padding: 6px; gap: 2px;
+  padding: var(--space-sm); gap: var(--space-2xs);
   border-radius: var(--radius-2xl);
   border: 1px solid var(--lg-line);
   background:
@@ -206,7 +206,7 @@ html[data-glass="lite"] {
   backdrop-filter: var(--lg-filter-lg);
   box-shadow: var(--lg-bevel), var(--lg-shadow);
 }
-.layout-switcher__item { border-radius: var(--radius-md); padding: 7px 12px; }
+.layout-switcher__item { border-radius: var(--radius-md); padding: var(--space-sm) var(--space-lg); }
 
 /* ══════════════════════════════════════════════════════════════════════════
    4. 桌面侧栏：悬浮玻璃卡片
@@ -218,8 +218,8 @@ html[data-glass="lite"] {
    * 再留一点边距。 */
   top: var(--chrome-h-gapped); right: var(--chrome-gap); bottom: var(--chrome-gap);
   border-radius: var(--radius-xl);
-  padding: 10px 10px 12px;
-  gap: 8px;
+  padding: var(--space-md) var(--space-md) var(--space-lg);
+  gap: var(--space-md);
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.22) transparent;
 }
@@ -239,16 +239,16 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
   background: linear-gradient(180deg, rgba(255,255,255,0.065), rgba(255,255,255,0.022));
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.11);
 }
-.sidebar-section__head { margin: 0; border-radius: var(--radius-2xl); padding: 11px 14px; }
+.sidebar-section__head { margin: 0; border-radius: var(--radius-2xl); padding: var(--space-lg) var(--space-lg); }
 /* 必须用直接子代选择器。用后代选择器时，外层分区展开会给**嵌套且已折叠**的
  * #body-layout-setting 也加上 12px padding-bottom；max-height: 0 只压内容盒、
  * 不压 padding，折叠后就会露出半行（与 components.css 里那条修正是同一个坑）。 */
-.sidebar-section[data-section-state="open"] > .sidebar-section__body { padding: 0 12px 12px; }
+.sidebar-section[data-section-state="open"] > .sidebar-section__body { padding: 0 var(--space-lg) var(--space-lg); }
 /* 嵌套的「布局设置」要和图例子项「节点本质」的竖条同 x。
  * 两者父容器的左内边距在 glass 下同为 12px，但「布局设置」外面还套了一层
  * .sidebar-section 卡片，多出 1px 边框，所以头部内边距取 8-1 = 7px 才能对齐。
  * （components.css 里那条对齐规则是按 glass 之前的几何算的，这里以 glass 为准。） */
-[data-section="layout-setting"] > .sidebar-section__head { padding-left: 7px; }
+[data-section="layout-setting"] > .sidebar-section__head { padding-left: var(--space-sm); }
 
 #sidebar .btn { border-radius: var(--radius-pill); }
 
@@ -285,8 +285,8 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
   box-shadow: 0 2px 6px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(0,0,0,0.25);
 }
 .param-label__val,
-.bs-param-label__val { border-radius: var(--radius-pill); padding: 1px 8px; }
-.param-select { border-radius: var(--radius-md); padding: 6px 12px; }
+.bs-param-label__val { border-radius: var(--radius-pill); padding: var(--space-3xs) var(--space-md); }
+.param-select { border-radius: var(--radius-md); padding: var(--space-sm) var(--space-lg); }
 
 /* ══════════════════════════════════════════════════════════════════════════
    5. 节点详情面板
@@ -310,14 +310,14 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
 #node-panel.visible { animation: lg-pop 0.42s var(--lg-spring) both; }
 
 .node-panel__header {
-  padding: 12px 14px 10px;
-  border-bottom: 1px solid var(--lg-line-soft);
+  padding: var(--space-lg) var(--space-lg) var(--space-md);
+  border-bottom: var(--space-3xs) solid var(--lg-line-soft);
   background: linear-gradient(180deg, rgba(255,255,255,0.075), transparent);
 }
 
 /* 概 / 文：分段控件。凹槽里浮着一块亮的玻璃滑块。 */
 .node-panel__tabs {
-  gap: 2px; padding: 2px; border-radius: var(--radius-pill);
+  gap: var(--space-2xs); padding: var(--space-2xs); border-radius: var(--radius-pill);
   background: rgba(0, 0, 0, 0.30);
   box-shadow:
     inset 0 1px 3px rgba(0,0,0,0.5),
@@ -346,26 +346,26 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.20);
 }
 
-.node-panel__body { padding: 14px 16px 18px; }
+.node-panel__body { padding: var(--space-lg) var(--space-xl) 18px; }
 .node-panel__body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.22); }
 
 /* 面板里的卡片：半透明填充 + 内高光，不叠 backdrop-filter。 */
 .np-edge-item,
 .np-page .np-edge-item {
-  border-radius: var(--radius-xl); padding: 8px 12px;
+  border-radius: var(--radius-xl); padding: var(--space-md) var(--space-lg);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
 }
 .np-summary,
 .np-page .np-summary {
-  padding: 11px 14px;
+  padding: var(--space-lg) var(--space-lg);
   border: 1px solid rgba(255,255,255,0.07);
-  border-left: 1px solid rgba(255,255,255,0.07);
+  border-left: var(--space-3xs) solid rgba(255,255,255,0.07);
   border-radius: var(--radius-xl);
   background: linear-gradient(135deg, rgba(var(--lg-accent), 0.13), rgba(255,255,255,0.03) 70%);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
 }
-.np-badge { border-radius: var(--radius-pill); padding: 2px 10px; }
-.np-summary__toggle { border-radius: var(--radius-pill); padding: 2px 10px; }
+.np-badge { border-radius: var(--radius-pill); padding: var(--space-2xs) var(--space-md); }
+.np-summary__toggle { border-radius: var(--radius-pill); padding: var(--space-2xs) var(--space-md); }
 .np-markdown pre { border-radius: var(--radius-md); }
 .np-markdown blockquote { border-radius: 0 12px 12px 0; }
 
@@ -392,7 +392,7 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
     0 1px 0 rgba(255,255,255,0.06);
 }
 .bs-mobile-search__input { padding-left: 38px; }
-.bs-mobile-search__icon { left: 14px; }
+.bs-mobile-search__icon { left: var(--space-lg); }
 
 /* 快捷操作：每颗按钮一块玻璃瓦片。用 ::before 铺底，z-index:-1 配合 isolation
    放在文字后面，不影响 .active 的强调色底。 */
@@ -466,7 +466,7 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
 .toast--info    { border-color: rgba(var(--lg-accent), 0.45); }
 .toast--success { border-color: rgba(52, 211, 153, 0.45); }
 .toast--error   { border-color: rgba(248, 113, 113, 0.45); }
-.zoom-indicator { border-radius: var(--radius-pill); padding: 5px 12px; }
+.zoom-indicator { border-radius: var(--radius-pill); padding: var(--space-sm) var(--space-lg); }
 
 /* ══════════════════════════════════════════════════════════════════════════
    8. 漫游条（发展趋势）—— 玻璃材质

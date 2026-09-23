@@ -197,12 +197,23 @@
       --bg-sub:      #0c1222;
       --panel:       #0c1222;
       --panel-alt:   #0f172a;
+      /* ── Border / separator palette ────────────────────────────────
+         --border：默认分隔线 / 输入框默认边框（最常见）
+         --border-hi：分隔线高亮变体（更亮的层级分隔，选中卡片、强调区） */
       --border:      #1e2d45;
       --border-hi:   #2d3f5a;
+
+      /* ── Text palette — 三档亮度（数字越大越亮，并非越弱） ──────
+         --text：   #f1f5f9  主体正文，正常阅读
+         --text-2： #94a3b8  次级正文（legend 标签/chip 文字/tag/可点 list 项文字）
+         --text-3： #cbd5e1  强调正文（比 text-2 还要亮，用于"次级但要看得清"）
+         --muted：  #7f8ea3  装饰性（placeholder/icon/uppercase label/count/chevron）
+                    在 --bg / --panel 上约 5.5:1 对比度，满足 AA 小字 4.5:1
+         调用方按语义选，不是按"看起来差不多"。 */
       --text:        #f1f5f9;
-      --text-2:      #94a3b8;             /* 次级文字 */
-      --text-3:      #cbd5e1;             /* 比 --text-2 更亮的次级文字（注意：并非"更弱"） */
-      --muted:       #7f8ea3;             /* 在 --bg / --panel 上约 5.5:1，满足 AA 小字 4.5:1 */
+      --text-2:      #94a3b8;
+      --text-3:      #cbd5e1;
+      --muted:       #7f8ea3;
       --green:       #34d399;
       --yellow:      #fbbf24;
       --amber:       #f59e0b;             /* warning / pending state */
@@ -245,6 +256,34 @@
       --focus-ring-offset:          2px;
       --focus-ring-color:           rgba(var(--accent-rgb), 0.95);
       --focus-ring-inset-color:     rgba(var(--accent-rgb), 0.35);
+
+      /* ── Disabled state — 统一「禁用」视觉 ────────────────────────────
+         --disabled-α：文字/前景 α（整体降透明度）
+         --disabled-bg-α：禁用态背景加深 α（区别于 hover 的"亮"）
+         调用方在 :disabled / [aria-disabled="true"] 上消费这两档。 */
+      --disabled-α:                0.4;
+      --disabled-bg-α:             0.02;
+
+      /* ── Spacing scale — 8 档，对齐视觉系统（4 的倍数基础 + 微调） ──
+         之前 padding/margin 散落 1/2/3/4/5/6/7/8/9/10/11/12/14/16/22px
+         15 档同时存在，1-2px 差异肉眼无感。收成 8 档：
+            --space-3xs:  1px  极小（badge 内 padding）
+            --space-2xs:  2px  微观（dot 间距、tag 内 padding）
+            --space-xs:   4px  紧凑（list item 内、cell 间距）
+            --space-sm:   6px  标准（btn/chip 内 padding）
+            --space-md:   8px  卡片（row/card 内 padding）
+            --space-lg:   12px section（panel 内边距）
+            --space-xl:   16px 块级（section 外 padding、toolbar 内边距）
+            --space-2xl:  22px 装饰（sheet 顶部额外留白、特殊面板）
+         5/7/9/10/11/14 等奇数档全部就近归并到偶数档（最大 2px 偏差）。 */
+      --space-3xs:  1px;
+      --space-2xs:  2px;
+      --space-xs:   4px;
+      --space-sm:   6px;
+      --space-md:   8px;
+      --space-lg:   12px;
+      --space-xl:   16px;
+      --space-2xl:  22px;
 
       /* ── Debug palette */
       --debug-red:    #f87171;
@@ -407,5 +446,14 @@
       outline-offset: var(--focus-ring-offset);
     }
     :focus:not(:focus-visible) { outline: none; }
-    
+
+    /* ── Disabled default — any element in disabled state picks up the
+       canonical "muted + non-interactive" look automatically. Specific
+       components (e.g. tour toggle-speech) can still override. */
+    :disabled,
+    [aria-disabled="true"]:not(a):not(button):not(input):not(select):not(textarea):not([role="button"]) {
+      opacity: var(--disabled-α);
+      cursor: not-allowed;
+    }
+
     } /* end @layer base */

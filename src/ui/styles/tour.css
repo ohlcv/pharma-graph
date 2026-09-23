@@ -100,7 +100,7 @@
     .tour-dt {
       display: none;
       position: fixed;
-      bottom: 16px;
+      bottom: var(--space-xl);
       left: 50%;
       transform: translateX(-50%);
       z-index: var(--z-tour-bar);
@@ -109,7 +109,7 @@
       background: #1a1f35;
       border: 1px solid rgba(var(--accent-rgb), 0.25);
       border-radius: var(--radius-xl);
-      padding: 6px 10px;
+      padding: var(--space-sm) var(--space-md);
       box-shadow: 0 4px 20px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06);
       white-space: nowrap;
       overflow: hidden;
@@ -125,7 +125,7 @@
     }
     
     /* ── 桌面版内部组件样式 ─────────────────────────────────────────────────── */
-    .tour-dt__status { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding-right: 4px; }
+    .tour-dt__status { display: flex; align-items: center; gap: var(--space-sm); flex-shrink: 0; padding-right: var(--space-xs); }
     .tour-dt__dot {
       width: 7px; height: 7px; border-radius: 50%;
       background: var(--tour-accent); box-shadow: 0 0 6px var(--tour-accent);
@@ -135,7 +135,7 @@
     .tour-dt__dot.stopped { background: rgba(148,163,184,0.5); box-shadow: none; animation: none; }
     .tour-dt__label { font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--tour-accent); }
     
-    .tour-dt__node      { display: flex; align-items: center; gap: 5px; flex-shrink: 0; padding: 0 4px; width: 120px; min-width: 120px; max-width: 120px; }
+    .tour-dt__node      { display: flex; align-items: center; gap: var(--space-sm); flex-shrink: 0; padding: 0 var(--space-xs); width: 120px; min-width: 120px; max-width: 120px; }
     .tour-dt__node-icon { width: 15px; height: 15px; stroke: var(--tour-accent); flex-shrink: 0; }
     .tour-dt__node-name {
       font-size: var(--text-base); font-weight: 600; color: var(--text);
@@ -145,21 +145,21 @@
       transition: opacity 0.2s;
     }
     
-    .tour-dt__sep { width: 1px; height: 20px; background: rgba(255,255,255,0.08); margin: 0 8px; flex-shrink: 0; }
+    .tour-dt__sep { width: 1px; height: 20px; background: rgba(255,255,255,0.08); margin: 0 var(--space-md); flex-shrink: 0; }
     /* 策略 (.tour-dt__strategy) 已 display:none。
        - sep #2（stats 和 strategy 之间）：紧邻隐藏的 strategy，视觉上紧贴 stats 边缘无意义 → 隐藏
        - sep #3（strategy 和 params 之间）：左邻居隐藏后变成 stats 和 params 之间的唯一分隔线 → 保留
        :has(+ .tour-dt__strategy) 匹配"后面紧跟 strategy 的 sep"，恰好命中 sep #2。 */
     .tour-dt__sep:has(+ .tour-dt__strategy) { display: none; }
     
-    .tour-dt__stats     { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-    .tour-dt__stat      { display: flex; align-items: center; gap: 4px; font-size: var(--text-sm); }
+    .tour-dt__stats     { display: flex; align-items: center; gap: var(--space-md); flex-shrink: 0; }
+    .tour-dt__stat      { display: flex; align-items: center; gap: var(--space-xs); font-size: var(--text-sm); }
     .tour-dt__stat svg  { width: 14px; height: 14px; stroke: currentColor; flex-shrink: 0; }
     .tour-dt__stat-label { color: rgba(226,232,240,0.55); }
     .tour-dt__stat-val   { font-weight: 700; color: rgba(226,232,240,0.9); font-variant-numeric: tabular-nums; }
 
-    .tour-dt__params      { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
-    .tour-dt__param-label { display: flex; align-items: center; gap: 3px; font-size: var(--text-2xs); color: rgba(226,232,240,0.55); white-space: nowrap; }
+    .tour-dt__params      { display: flex; align-items: center; gap: var(--space-sm); flex-shrink: 0; }
+    .tour-dt__param-label { display: flex; align-items: center; gap: var(--space-xs); font-size: var(--text-2xs); color: rgba(226,232,240,0.55); white-space: nowrap; }
     .tour-dt__param-label svg { width: 12px; height: 12px; stroke: currentColor; flex-shrink: 0; }
     /* 参数滑条（桌面/手机共用）：
        - 桌面端 .tour-dt__range：宽 60×4 横条，thumb 12×12（鼠标）
@@ -195,7 +195,7 @@
     /*
     .tour-dt__progress-frac {
       display: flex; flex-direction: column; align-items: center;
-      gap: 2px; line-height: 1; flex-shrink: 0;
+      gap: var(--space-2xs); line-height: 1; flex-shrink: 0;
       min-width: 18px;
     }
     .tour-dt__progress-frac .tour-dt__stat-num {
@@ -212,7 +212,7 @@
     #tour-depth-val-dt { min-width: 24px; }
 
     /* Strategy selector */
-    .tour-dt__strategy { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+    .tour-dt__strategy { display: flex; align-items: center; gap: var(--space-sm); flex-shrink: 0; }
     /* 2026-09-11: 策略切换控件全局隐藏（默认策略 has-dfs，详见 tour-controller.ts setStrategy） */
     .tour-dt__strategy { display: none !important; }
     .tour-mob__strategy { display: none !important; }
@@ -224,7 +224,7 @@
       font-size: var(--text-xs);
       font-weight: 600;
       font-family: inherit;
-      padding: 3px 20px 3px 7px;
+      padding: var(--space-xs) 20px var(--space-xs) var(--space-sm);
       cursor: pointer;
       outline: none;
       height: 24px;
@@ -267,11 +267,11 @@
       animation: strategyFlash 0.6s ease-out forwards;
     }
 
-    .tour-dt__ctrl { display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: auto; }
+    .tour-dt__ctrl { display: flex; align-items: center; gap: var(--space-xs); flex-shrink: 0; margin-left: auto; }
     /* 起点提示在播放按钮右侧 */
     .tour-start-hint {
-      flex-shrink: 0; margin-left: 2px;
-      display: none; align-items: center; gap: 2px;
+      flex-shrink: 0; margin-left: var(--space-2xs);
+      display: none; align-items: center; gap: var(--space-2xs);
       color: #6ee7b7; font-size: var(--text-xs); font-weight: 700;
       font-family: inherit; white-space: nowrap;
       animation: hintPulse 1.8s ease-in-out infinite;
@@ -280,7 +280,7 @@
     .tour-start-hint.show { display: flex; }
     .tour-dt__btn {
       display: flex; align-items: center; justify-content: center;
-      padding: 5px 8px; border-radius: var(--radius-md); border: 1px solid transparent;
+      padding: var(--space-sm) var(--space-md); border-radius: var(--radius-md); border: 1px solid transparent;
       background: transparent; color: var(--text-2); cursor: pointer;
       font-size: var(--text-sm); font-weight: 500; font-family: inherit;
       transition: background var(--hover-transition) var(--hover-ease), border-color var(--hover-transition) var(--hover-ease), color var(--hover-transition) var(--hover-ease), box-shadow var(--hover-transition) var(--hover-ease), transform 0.1s;
@@ -294,7 +294,7 @@
     .tour-dt__btn:active { transform: scale(0.96); box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.3); }
     .tour-dt__btn--prev,
     .tour-dt__btn--next {
-      padding: 5px 7px;
+      padding: var(--space-sm) var(--space-sm);
       background: rgba(255,255,255,0.05);
       border-color: rgba(255,255,255,0.1);
     }
@@ -312,7 +312,7 @@
 
     /* 朗读按钮 */
     .tour-dt__btn--speech {
-      padding: 3px 5px;
+      padding: var(--space-xs) var(--space-sm);
       background: transparent;
       border-color: transparent;
       color: var(--text-2);
@@ -338,7 +338,7 @@
        只在 title 里提示兼容性。但保留样式以防 HTML 模板上写了 disabled 属性）。 */
     [data-tour-action="toggle-speech"]:disabled,
     [data-tour-action="toggle-speech"][aria-disabled="true"] {
-      opacity: 0.45;
+      opacity: var(--disabled-α);
       cursor: not-allowed;
       filter: grayscale(0.6);
     }
@@ -386,10 +386,10 @@
         align-items: center;
         position: fixed;
         /* 顶部 topbar 下方右侧，远离底部面板 */
-        top: 100px; left: auto; right: 8px; bottom: auto;
+        top: 100px; left: auto; right: var(--space-md); bottom: auto;
         /* 用 fit-content 让漫游条收缩到最宽子元素，不会被背景撑大 */
         width: fit-content; min-width: 0; max-width: calc(100vw - 16px);
-        padding: 8px;
+        padding: var(--space-md);
         border-radius: var(--radius-xl);
         background: #1a1f35;
         border: 1px solid rgba(var(--accent-rgb), 0.25);
@@ -397,13 +397,13 @@
         touch-action: none;
         user-select: none;
         overflow: visible;
-        gap: 4px;
+        gap: var(--space-xs);
       }
     
       /* 折叠把手：固定尺寸，便于点击和识别 */
       .tour-mob__handle {
         display: flex; align-items: center; justify-content: center;
-        padding: 8px 12px; cursor: pointer; min-height: 32px; min-width: 48px;
+        padding: var(--space-md) var(--space-lg); cursor: pointer; min-height: 32px; min-width: 48px;
         flex-shrink: 0;
         color: rgba(148,163,184,0.5); transition: color 0.15s, background 0.15s;
         touch-action: manipulation;
@@ -436,7 +436,7 @@
          用淡入动画让内容区展开时平滑浮现。 */
       .tour-mob__inner {
         display: flex; flex-direction: column; align-items: center;
-        padding: 4px 4px 6px; gap: 6px;
+        padding: var(--space-xs) var(--space-xs) var(--space-sm); gap: var(--space-sm);
         height: auto; overflow-y: visible;
         animation: tourMobIn 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
       }
@@ -451,7 +451,7 @@
       }
       .tour-mob__close {
         display: flex; align-items: center; justify-content: center;
-        padding: 6px 10px; margin: 4px 0;
+        padding: var(--space-sm) var(--space-md); margin: var(--space-xs) 0;
         background: rgba(248, 113, 113, var(--danger-α)); border: 1px solid rgba(248, 113, 113, var(--danger-border-α));
         border-radius: var(--radius-md); color: var(--red); cursor: pointer; flex-shrink: 0;
         font-size: var(--text-sm); font-weight: 500; font-family: inherit;
@@ -468,7 +468,7 @@
 
       .tour-mob__badge {
         display: flex; align-items: center; justify-content: center;
-        padding: 6px 10px; margin: 4px 0;
+        padding: var(--space-sm) var(--space-md); margin: var(--space-xs) 0;
         background: rgba(var(--accent-rgb), 0.12); border: 1px solid rgba(var(--accent-rgb), 0.3);
         border-radius: var(--radius-md); color: var(--accent); cursor: pointer; flex-shrink: 0;
         font-size: var(--text-sm); font-weight: 500; font-family: inherit;
@@ -486,7 +486,7 @@
 
       .tour-mob__badge--prev,
       .tour-mob__badge--next {
-        padding: 5px 8px; margin: 4px 0;
+        padding: var(--space-sm) var(--space-md); margin: var(--space-xs) 0;
         background: rgba(255,255,255,0.05);
         border: 1px solid rgba(255,255,255,0.1);
         color: rgba(var(--accent-rgb), 0.7);
@@ -511,27 +511,27 @@
 
       /* 起点提示：嵌在控制按钮行内（column 模式下自动在按钮下方），默认隐藏 */
       .tour-start-hint {
-        display: none; align-items: center; gap: 2px;
+        display: none; align-items: center; gap: var(--space-2xs);
         color: #6ee7b7; font-size: var(--text-xs); font-weight: 700;
         font-family: inherit; white-space: nowrap;
         animation: hintPulse 1.8s ease-in-out infinite;
-        padding: 4px 6px;
+        padding: var(--space-xs) var(--space-sm);
         background: rgba(52,211,153,0.1);
         border: 1px solid rgba(52,211,153,0.3);
         border-radius: var(--radius-sm);
-        margin-top: 2px;
+        margin-top: var(--space-2xs);
       }
       .tour-start-hint svg { width: 11px; height: 11px; animation: hintBounce 1.8s ease-in-out infinite; }
       .tour-start-hint.show { display: flex; }
 
       /* 策略切换器（移动端紧凑） */
       .tour-mob__strategy {
-        display: flex; flex-direction: column; align-items: center; gap: 2px;
+        display: flex; flex-direction: column; align-items: center; gap: var(--space-2xs);
         padding: 0;
       }
       .tour-mob__strategy-toggle {
         display: inline-flex; align-items: center; justify-content: center;
-        height: auto; min-width: 40px; min-height: 24px; padding: 4px 8px;
+        height: auto; min-width: 40px; min-height: 24px; padding: var(--space-xs) var(--space-md);
         background: rgba(255,255,255,0.06);
         border: 1px solid rgba(var(--accent-rgb), 0.25); border-radius: var(--radius-sm);
         color: rgba(226,232,240,0.85); font-size: var(--text-xs); font-weight: 600;
@@ -550,20 +550,20 @@
       }
 
       /* 统计数字 */
-      .tour-mob__stats { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0; }
-      .tour-mob__stat-item { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+      .tour-mob__stats { display: flex; flex-direction: column; align-items: center; gap: var(--space-xs); padding: 0; }
+      .tour-mob__stat-item { display: flex; flex-direction: column; align-items: center; gap: var(--space-3xs); }
       .tour-mob__stat-num  { font-size: var(--text-md); font-weight: 600; color: rgba(226,232,240,0.9); font-variant-numeric: tabular-nums; line-height: 1; white-space: nowrap; }
       /* 节点进度：分子上、分母下，中间一根细分隔线（复用下面的 .tour-mob__stat-rule） */
-      .tour-mob__progress-frac { display: flex; flex-direction: column; align-items: center; gap: 2px; line-height: 1; flex-shrink: 0; }
+      .tour-mob__progress-frac { display: flex; flex-direction: column; align-items: center; gap: var(--space-2xs); line-height: 1; flex-shrink: 0; }
       .tour-mob__progress-frac .tour-mob__stat-num { font-size: var(--text-sm); }
       .tour-mob__stat-rule { width: 100%; min-width: 14px; height: 1px; background: rgba(226,232,240,0.45); }
       .tour-mob__stat-item svg { width: 10px; height: 10px; stroke: currentColor; color: rgba(226,232,240,0.55); flex-shrink: 0; }
       .tour-mob__stat-lbl  { font-size: var(--text-3xs); color: rgba(226,232,240,0.28); user-select: none; letter-spacing: 0.02em; }
 
       /* 滑块区 */
-      .tour-mob__sliders { display: flex; flex-direction: column; align-items: center; gap: 10px; flex-shrink: 0; padding: 0; }
+      .tour-mob__sliders { display: flex; flex-direction: column; align-items: center; gap: var(--space-md); flex-shrink: 0; padding: 0; }
       .tour-mob__cell {
-        display: flex; flex-direction: column; align-items: center; gap: 4px;
+        display: flex; flex-direction: column; align-items: center; gap: var(--space-xs);
         position: relative;
         /* auto 让 fit-content 容器自然收缩到子元素宽度 */
         width: auto; min-height: auto;
@@ -574,7 +574,7 @@
       .tour-mob__lbl {
         font-size: var(--text-3xs); color: rgba(226,232,240,0.28);
         user-select: none; letter-spacing: 0.02em;
-        display: flex; align-items: center; justify-content: center; gap: 2px;
+        display: flex; align-items: center; justify-content: center; gap: var(--space-2xs);
         line-height: 1;
       }
       .tour-mob__lbl svg {
@@ -604,8 +604,7 @@
         position: absolute;
         left: 50%; bottom: 0;             /* 横向居中 + 贴底 */
         width: 4px; height: 100%;          /* 与 track 同宽同高 */
-        transform: translateX(-50%);       /* 配合 left:50% 精确居中 */
-        transform-origin: bottom center;
+        transform: translateX(-50%);       /* 配合 left: 50% 精确居中 */ transform-origin: bottom center;
         /* JS 动态设置 scaleY(0~1) 控制填充比例。
            注意：上面用了 translateX(-50%) 后，再写 transform 会覆盖 translateX。
            所以 JS 用 transformOriginTranslate 单独处理 scaleY，且要在 CSS 里覆盖。 */
