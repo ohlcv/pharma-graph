@@ -30,12 +30,30 @@
 //      The structural probe alone can't see this; it only shows up once we
 //      actually call speak() and wait to see if *anything* happens.
 //
-//      If a real speak() call produces no event at all within
-//      SILENT_ENGINE_TIMEOUT_MS, we treat the engine as a silent stub: turn
-//      TTS off automatically, update the button, and tell the user via a
-//      toast — instead of leaving the button in a confusing dead "toggled
-//      on but nothing happens" (or, before the structural probe even runs,
-//      a stuck-gray "toggled but never went active") state.
+//      Three hard-won constraints on this live probe, learned from a real
+//      regression against iOS Safari:
+//
+//        a) The timeout must be generous. iOS Safari can legitimately take
+//           several seconds to fire its first `start` event — especially
+//           right after the tab returns from background, or on a cold
+//           voice load for zh-CN — so a short timeout produces false
+//           positives on a browser that was never actually broken.
+//
+//        b) A "probably silent" verdict must NEVER cancel the in-flight
+//           utterance. Calling `cancel()` on a guess is a self-fulfilling
+//           prophecy: if the engine was just slow rather than mute, the
+//           cancel kills the one utterance that would have proven it
+//           alive. The live probe only stops *future* speak() calls and
+//           flips the UI off — it never reaches back and silences a
+//           genuinely in-flight utterance.
+//
+//        c) The detector is armed once per "unknown" phase, not re-armed
+//           on every speak() call. If it re-armed every time, a tour
+//           stepping faster than the timeout would perpetually reset the
+//           clock and the detector would never get a chance to complete —
+//           exactly backwards from what we want against a truly silent
+//           engine (which never sends a wake-up event to cancel the
+//           detector anyway).
 
 import { showToast } from './ui-helpers.js';
 
@@ -54,13 +72,18 @@ function getSpeechSynthesis(): SpeechSynthesis | null {
 }
 
 /**
- * How long we wait after speak() for ANY event (`start`/`boundary`/`end`/
- * `error`) before concluding the engine is a silent stub. 1.5s is generous
- * enough to survive slow voice-loading on first speak, but short enough
- * that the user doesn't sit through several silent tour steps wondering
- * why nothing is being read.
+ * How long we wait, from the FIRST speak() call while state is still
+ * 'unknown', for ANY event (`start`/`boundary`/`end`/`error`) — from that
+ * utterance or any that superseded it — before concluding the engine is a
+ * silent stub.
+ *
+ * 5s is deliberately generous. It's long enough to comfortably cover iOS
+ * Safari's worst-case cold-start latency (observed up to ~2-3s in the wild),
+ * while still being short enough that a genuinely mute WebView (Quark/UC/
+ * WeChat X5) gets caught and disabled within a few tour steps rather than
+ * silently failing for the whole session.
  */
-const SILENT_ENGINE_TIMEOUT_MS = 1500;
+const SILENT_ENGINE_TIMEOUT_MS = 5000;
 
 class SpeechController {
   private active = false;
@@ -86,9 +109,12 @@ class SpeechController {
    *   - 'unknown'  — haven't gotten a real event back yet, can't tell
    *   - 'verified' — at least one speak() produced start/end/error: the
    *                  engine is alive (even if a given utterance errored)
-   *   - 'silent'   — a speak() call produced no event at all within the
-   *                  timeout; engine is judged a mute stub and TTS has
-   *                  been auto-disabled
+   *   - 'silent'   — no speak() call produced any event within the
+   *                  detection window; engine is judged a mute stub and
+   *                  TTS has been auto-disabled for future utterances
+   *                  (any utterance already in flight is left alone —
+   *                  see the file-level comment on why we never cancel
+   *                  on a guess)
    */
   private engineState: 'unknown' | 'verified' | 'silent' = 'unknown';
   private silentCheckTimer: ReturnType<typeof setTimeout> | null = null;
@@ -137,7 +163,7 @@ class SpeechController {
   /**
    * True once we've concluded the engine is a "calls succeed, nothing ever
    * plays and no event ever fires" stub (the Quark/WeChat X5 case) and have
-   * auto-disabled TTS because of it.
+   * auto-disabled future speak() calls because of it.
    */
   get isSilentStub(): boolean {
     return this.engineState === 'silent';
@@ -166,9 +192,9 @@ class SpeechController {
     }
     this.active = !this.active;
     // Give a previously-judged-silent engine another chance on a fresh
-    // manual toggle — a one-off event-delivery hiccup shouldn't permanently
-    // lock the user out of retrying, and this keeps the automatic
-    // downgrade from being a one-way door the user can't undo.
+    // manual toggle — a one-off detection hiccup shouldn't permanently lock
+    // the user out of retrying, and this keeps the automatic downgrade from
+    // being a one-way door the user can't undo.
     if (this.active && this.engineState === 'silent') {
       this.engineState = 'unknown';
     }
@@ -191,7 +217,13 @@ class SpeechController {
     return this.active;
   }
 
-  /** Turn TTS off without changing the toggle state. */
+  /**
+   * Turn TTS off without changing the toggle state.
+   *
+   * Only called from a deliberate user action (manual toggle-off) or full
+   * teardown — NEVER from the silent-engine guess, which must not cancel an
+   * utterance it isn't sure is actually dead. See the file-level comment.
+   */
   stop(): void {
     this.clearSilentCheck();
     if (!this.synth) return;
@@ -215,8 +247,8 @@ class SpeechController {
    * Failure handling is intentionally minimal for real errors: we swallow
    * synchronous throws from the speech engine (some Android WebViews —
    * UC/Quark — throw or fire spurious `error` events even when audio
-   * actually plays). What we don't swallow is *total silence*: see
-   * scheduleSilentCheck().
+   * actually plays). What we don't swallow is *total, sustained* silence:
+   * see scheduleSilentCheck().
    */
   speak(text: string): void {
     if (!this.supported || !this.synth) return;
@@ -240,9 +272,10 @@ class SpeechController {
     const voice = this.pickVoice();
     if (voice) utterance.voice = voice;
 
-    // Any of these firing proves the engine is actually alive and
-    // responding — that's enough to cancel the silent-stub timeout, even
-    // if this particular utterance went on to error.
+    // Any of these firing — from THIS utterance or one that superseded it —
+    // proves the engine is actually alive and responding. That's enough to
+    // cancel the silent-stub timer, even if this particular utterance went
+    // on to error.
     const markAlive = (): void => {
       this.engineState = 'verified';
       this.clearSilentCheck();
@@ -268,26 +301,29 @@ class SpeechController {
       return;
     }
 
-    // Only arm the timeout while we genuinely don't know yet — once
-    // verified, every subsequent utterance skips the timer entirely.
-    if (this.engineState === 'unknown') this.scheduleSilentCheck();
+    // Arm the detector exactly once per "unknown" phase. Re-arming on every
+    // speak() call would mean a tour advancing faster than the timeout keeps
+    // resetting the clock and the window never completes — see the
+    // file-level comment (c).
+    if (this.engineState === 'unknown' && this.silentCheckTimer === null) {
+      this.scheduleSilentCheck();
+    }
   }
 
   /**
-   * Start (or restart) the countdown that decides "this engine never says
-   * anything back". If no start/boundary/end/error event arrives before
-   * this fires, we conclude the engine is a mute stub, turn TTS off, and
-   * tell the user — rather than leaving them staring at a toggled-on
-   * button that never produces sound.
+   * Start the one-shot countdown that decides "this engine never says
+   * anything back". If no start/boundary/end/error event arrives — from any
+   * utterance spoken while this timer is pending, not just the one that
+   * armed it — before this fires, we conclude the engine is a mute stub and
+   * turn off future speak() calls. We deliberately do NOT cancel whatever is
+   * currently queued; see the file-level comment for why.
    */
   private scheduleSilentCheck(): void {
-    this.clearSilentCheck();
     this.silentCheckTimer = setTimeout(() => {
       this.silentCheckTimer = null;
       if (this.engineState !== 'unknown') return; // an event already arrived
       this.engineState = 'silent';
       this.active = false;
-      this.stop();
       this.updateButtonState();
       showToast(
         '当前浏览器的朗读引擎无法输出声音，已自动关闭朗读（推荐用 Chrome/Safari 打开）',
