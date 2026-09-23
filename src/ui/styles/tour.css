@@ -110,12 +110,12 @@
       border: 1px solid rgba(var(--accent-rgb), 0.25);
       border-radius: var(--radius-xl);
       padding: var(--space-sm) var(--space-md);
-      box-shadow: 0 4px 20px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06);
+      box-shadow: 0 4px 20px var(--shadow-α-xl), inset 0 1px 0 var(--surface-α-md);
       white-space: nowrap;
       overflow: hidden;
       min-width: 0;
       height: 44px;
-      animation: tourStatusIn 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
+      animation: tourStatusIn var(--t-normal) cubic-bezier(0.34, 1.4, 0.64, 1);
       touch-action: none;
     }
     
@@ -142,10 +142,10 @@
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       min-width: 0; /* flex item needs min-width:0 to allow ellipsis to take effect */
       flex: 1 1 auto; /* fill remaining space inside fixed-width container */
-      transition: opacity 0.2s;
+      transition: opacity var(--t-normal);
     }
     
-    .tour-dt__sep { width: 1px; height: 20px; background: rgba(255,255,255,0.08); margin: 0 var(--space-md); flex-shrink: 0; }
+    .tour-dt__sep { width: 1px; height: 20px; background: var(--surface-α-lg); margin: 0 var(--space-md); flex-shrink: 0; }
     /* 策略 (.tour-dt__strategy) 已 display:none。
        - sep #2（stats 和 strategy 之间）：紧邻隐藏的 strategy，视觉上紧贴 stats 边缘无意义 → 隐藏
        - sep #3（strategy 和 params 之间）：左邻居隐藏后变成 stats 和 params 之间的唯一分隔线 → 保留
@@ -168,7 +168,7 @@
        大小由 --thumb-size 驱动。 */
     .tour-dt__range {
       width: 60px; height: 4px; -webkit-appearance: none; appearance: none;
-      border-radius: var(--radius-2xs); outline: none; cursor: pointer; background: rgba(255,255,255,0.15);
+      border-radius: var(--radius-2xs); outline: none; cursor: pointer; background: var(--surface-α-xl);
       --thumb-size: 12px;
     }
     /* 桌面 + 手机共用 thumb 视觉：颜色/阴影/hover scale/cursor/transition。
@@ -177,14 +177,14 @@
       -webkit-appearance: none;
       width: var(--thumb-size); height: var(--thumb-size); border-radius: 50%;
       background: var(--tour-accent); border: none; margin: 0;
-      box-shadow: var(--thumb-glow, 0 0 6px rgba(var(--accent-rgb), 0.7), 0 1px 2px rgba(0,0,0,0.4));
-      cursor: pointer; transition: transform 0.1s;
+      box-shadow: var(--thumb-glow, 0 0 6px rgba(var(--accent-rgb), 0.7), 0 1px 2px var(--shadow-α-xl));
+      cursor: pointer; transition: transform var(--t-fast);
     }
     .tour-dt__range::-webkit-slider-thumb:hover { transform: scale(1.2); }
     .tour-dt__range::-moz-range-thumb {
       width: var(--thumb-size); height: var(--thumb-size); border: none; border-radius: 50%;
       background: var(--tour-accent);
-      box-shadow: var(--thumb-glow, 0 0 6px rgba(var(--accent-rgb), 0.7), 0 1px 2px rgba(0,0,0,0.4));
+      box-shadow: var(--thumb-glow, 0 0 6px rgba(var(--accent-rgb), 0.7), 0 1px 2px var(--shadow-α-xl));
       cursor: pointer;
     }
     /* ─────────────────────────────────────────────────────────────────────────
@@ -234,7 +234,7 @@
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
       background-repeat: no-repeat;
       background-position: right 5px center;
-      transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s, color 0.15s;
+      transition: border-color var(--t-fast), background-color var(--t-fast), box-shadow var(--t-fast), color var(--t-fast);
       letter-spacing: 0.01em;
     }
     .tour-dt__select:hover {
@@ -264,7 +264,7 @@
       50%       { transform: translateX(3px); }
     }
     .tour-dt__select.strategy-switched {
-      animation: strategyFlash 0.6s ease-out forwards;
+      animation: strategyFlash 600ms ease-out forwards;
     }
 
     .tour-dt__ctrl { display: flex; align-items: center; gap: var(--space-xs); flex-shrink: 0; margin-left: auto; }
@@ -283,20 +283,20 @@
       padding: var(--space-sm) var(--space-md); border-radius: var(--radius-md); border: 1px solid transparent;
       background: transparent; color: var(--text-2); cursor: pointer;
       font-size: var(--text-sm); font-weight: 500; font-family: inherit;
-      transition: background var(--hover-transition) var(--hover-ease), border-color var(--hover-transition) var(--hover-ease), color var(--hover-transition) var(--hover-ease), box-shadow var(--hover-transition) var(--hover-ease), transform 0.1s;
+      transition: background var(--hover-transition) var(--hover-ease), border-color var(--hover-transition) var(--hover-ease), color var(--hover-transition) var(--hover-ease), box-shadow var(--hover-transition) var(--hover-ease), transform var(--t-fast);
       position: relative; overflow: hidden; white-space: nowrap; flex-shrink: 0;
     }
     .tour-dt__btn::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, var(--accent), var(--accent2)); opacity: 0; transition: opacity var(--hover-transition); }
     .tour-dt__btn:hover::after  { opacity: 0.12; }
     .tour-dt__btn:active::after { opacity: 0.2; transform: scale(0.97); }
     .tour-dt__btn > * { position: relative; z-index: 1; }
-    .tour-dt__btn:hover  { background: rgba(255,255,255,0.07); color: var(--text); }
+    .tour-dt__btn:hover  { background: var(--surface-α-md); color: var(--text); }
     .tour-dt__btn:active { transform: scale(0.96); box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.3); }
     .tour-dt__btn--prev,
     .tour-dt__btn--next {
       padding: var(--space-sm) var(--space-sm);
-      background: rgba(255,255,255,0.05);
-      border-color: rgba(255,255,255,0.1);
+      background: var(--surface-α-sm);
+      border-color: var(--surface-α-lg);
     }
     .tour-dt__btn--prev:hover,
     .tour-dt__btn--next:hover {
@@ -319,8 +319,8 @@
       flex-shrink: 0;
     }
     .tour-dt__btn--speech:hover {
-      background: rgba(255,255,255,0.07);
-      border-color: rgba(255,255,255,0.1);
+      background: var(--surface-α-md);
+      border-color: var(--surface-α-lg);
       color: var(--text);
     }
     .tour-dt__btn--speech.active {
@@ -393,7 +393,7 @@
         border-radius: var(--radius-xl);
         background: #1a1f35;
         border: 1px solid rgba(var(--accent-rgb), 0.25);
-        box-shadow: 0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(var(--accent-rgb), 0.12);
+        box-shadow: 0 4px 24px var(--shadow-α-2xl), 0 0 0 1px rgba(var(--accent-rgb), 0.12);
         touch-action: none;
         user-select: none;
         overflow: visible;
@@ -405,11 +405,11 @@
         display: flex; align-items: center; justify-content: center;
         padding: var(--space-md) var(--space-lg); cursor: pointer; min-height: 32px; min-width: 48px;
         flex-shrink: 0;
-        color: rgba(148,163,184,0.5); transition: color 0.15s, background 0.15s;
+        color: rgba(148,163,184,0.5); transition: color var(--t-fast), background var(--t-fast);
         touch-action: manipulation;
       }
-      .tour-mob__handle:hover { color: rgba(226,232,240,0.8); background: rgba(255,255,255,0.04); }
-      .tour-mob__chev { pointer-events: none; transition: transform 0.28s cubic-bezier(0.34,1.4,0.64,1), color 0.15s; flex-shrink: 0; }
+      .tour-mob__handle:hover { color: rgba(226,232,240,0.8); background: var(--surface-α-xs); }
+      .tour-mob__chev { pointer-events: none; transition: transform var(--t-slow) cubic-bezier(0.34,1.4,0.64,1), color var(--t-fast); flex-shrink: 0; }
       .tour-mob__chev.collapsed { transform: rotate(180deg); }
       .tour-mob__handle:hover .tour-mob__chev { color: rgba(226,232,240,0.8); }
 
@@ -423,7 +423,7 @@
         padding: 0;
         border-radius: var(--radius-3xl);
         background:
-          radial-gradient(130% 90% at 0% 0%, rgba(255,255,255,0.12) 0%, transparent 56%),
+          radial-gradient(130% 90% at 0% 0%, var(--surface-α-xl) 0%, transparent 56%),
           var(--lg-tint-dense);
         -webkit-backdrop-filter: var(--lg-filter);
         backdrop-filter: var(--lg-filter);
@@ -438,11 +438,11 @@
         display: flex; flex-direction: column; align-items: center;
         padding: var(--space-xs) var(--space-xs) var(--space-sm); gap: var(--space-sm);
         height: auto; overflow-y: visible;
-        animation: tourMobIn 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
+        animation: tourMobIn var(--t-normal) cubic-bezier(0.34, 1.4, 0.64, 1);
       }
       .tour-mob__inner::-webkit-scrollbar { width: 3px; }
       .tour-mob__inner::-webkit-scrollbar-track { background: transparent; }
-      .tour-mob__inner::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: var(--radius-2xs); }
+      .tour-mob__inner::-webkit-scrollbar-thumb { background: var(--surface-α-lg); border-radius: var(--radius-2xs); }
     
       /* 控制按钮：间距 auto（用 row-gap: auto 让按钮之间自动均分剩余空间） */
       .tour-mob__ctrl {
@@ -487,8 +487,8 @@
       .tour-mob__badge--prev,
       .tour-mob__badge--next {
         padding: var(--space-sm) var(--space-md); margin: var(--space-xs) 0;
-        background: rgba(255,255,255,0.05);
-        border: 1px solid rgba(255,255,255,0.1);
+        background: var(--surface-α-sm);
+        border: 1px solid var(--surface-α-lg);
         color: rgba(var(--accent-rgb), 0.7);
         border-radius: var(--radius-md);
         font-size: var(--text-sm); font-weight: 500; font-family: inherit;
@@ -532,13 +532,13 @@
       .tour-mob__strategy-toggle {
         display: inline-flex; align-items: center; justify-content: center;
         height: auto; min-width: 40px; min-height: 24px; padding: var(--space-xs) var(--space-md);
-        background: rgba(255,255,255,0.06);
+        background: var(--surface-α-md);
         border: 1px solid rgba(var(--accent-rgb), 0.25); border-radius: var(--radius-sm);
         color: rgba(226,232,240,0.85); font-size: var(--text-xs); font-weight: 600;
         font-family: inherit; line-height: 1; cursor: pointer; outline: none;
         /* 父容器 touch-action: none 会延迟 click，这里强制 manipulation 恢复即时响应 */
         touch-action: manipulation;
-        transition: transform 0.08s ease, border-color 0.15s ease, background 0.15s ease;
+        transition: transform var(--t-instant) ease, border-color var(--t-fast) ease, background var(--t-fast) ease;
       }
       .tour-mob__strategy-toggle:active { transform: scale(0.96); }
       .tour-mob__strategy-toggle.strategy-switched {
@@ -595,7 +595,7 @@
         left: 50%; top: 0; bottom: 0;
         width: 4px;
         transform: translateX(-50%);
-        background: rgba(255,255,255,0.08); border-radius: var(--radius-2xs);
+        background: var(--surface-α-lg); border-radius: var(--radius-2xs);
         overflow: hidden;                  /* 限制 fill 不溢出圆角 */
         pointer-events: none;
       }
@@ -609,7 +609,7 @@
            注意：上面用了 translateX(-50%) 后，再写 transform 会覆盖 translateX。
            所以 JS 用 transformOriginTranslate 单独处理 scaleY，且要在 CSS 里覆盖。 */
         background: linear-gradient(to top, color-mix(in srgb, var(--accent) 65%, #000), var(--accent)); border-radius: var(--radius-2xs);
-        transition: transform 0.08s ease;
+        transition: transform var(--t-instant) ease;
         box-shadow: 0 0 6px rgba(var(--accent-rgb), 0.6);
       }
       /* 取消之前的 translateX，让 JS 端能安全地只写 scaleY */
@@ -637,14 +637,14 @@
          大小 18×18（触摸热区），box-shadow 0.9/4px（更亮的发光感）。 */
       .tour-mob__range {
         --thumb-size: 18px;
-        --thumb-glow: 0 0 8px rgba(var(--accent-rgb), 0.9), 0 1px 4px rgba(0,0,0,0.4);
+        --thumb-glow: 0 0 8px rgba(var(--accent-rgb), 0.9), 0 1px 4px var(--shadow-α-xl);
       }
       .tour-mob__range::-webkit-slider-thumb {
         -webkit-appearance: none;
         width: var(--thumb-size); height: var(--thumb-size); border-radius: 50%;
         background: var(--tour-accent); border: none;
         box-shadow: var(--thumb-glow);
-        cursor: pointer; margin: 0; transition: transform 0.1s;
+        cursor: pointer; margin: 0; transition: transform var(--t-fast);
       }
       .tour-mob__range::-webkit-slider-thumb:hover { transform: scale(1.2); }
       .tour-mob__range::-moz-range-thumb {

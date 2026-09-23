@@ -298,6 +298,59 @@
       --dur-fast:    150ms;
       --dur-normal:  250ms;
 
+      /* ── Transition timing scale — 7 档，替代裸 ms/s ─────────────────
+         --hover-transition (140ms) / -strong (180ms) 已存在 (上方)，下面是新档：
+            --t-instant: 80ms  微反馈（slider thumb 缩放）
+            --t-fast:    150ms 快速属性过渡（颜色/边框/缩放）——与 --dur-fast 同值
+            --t-normal:  200ms 标准过渡（chip/btn 背景）
+            --t-slow:    280ms 中速（panel 展开 / 抽屉高度变化）
+            --t-slower:  380ms 慢速（sheet snap、layout 切换）
+            --t-slowest: 500ms 极慢（fade out / 大型过渡）
+
+         调用方用 var(--t-fast) var(--ease-out) 形式。
+         0.15s 用户已经看了 N 个月，迁到 --t-fast (150ms) 0ms 偏差，等价。 */
+      --t-instant: 80ms;
+      --t-fast:    150ms;
+      --t-normal:  200ms;
+      --t-slow:    280ms;
+      --t-slower:  380ms;
+      --t-slowest: 500ms;
+
+      /* ── Surface (白色) α 梯度 — 替代 rgba(255,255,255, 0.X) ────────
+         之前散落 22 档（0.015/0.018/0.022/0.025/0.04/0.05/0.055/0.06/0.07/
+         0.08/0.09/0.10/0.11/0.12/0.13/0.14/0.15/0.18/0.20/0.22/0.24/0.26/
+         0.28/0.30/0.32/0.34/0.35/0.40/0.55/0.58/0.75/0.95）。
+         收成 11 档语义命名（按用途维度，从微深到极亮）。 */
+      --surface-α-2xs:  0.025;    /* 极轻铺垫 */
+      --surface-α-xs:   0.04;     /* 默认 chip/btn 背景 */
+      --surface-α-sm:   0.06;     /* card/section hover */
+      --surface-α-md:   0.08;     /* active/selected 略亮 */
+      --surface-α-lg:   0.12;     /* 高亮区 */
+      --surface-α-xl:   0.18;     /* hero / 强亮背景 */
+      --surface-α-2xl:  0.24;     /* 最高亮（rare） */
+      --surface-α-3xl:  0.34;     /* glass 装饰渐变端点 */
+      --surface-α-4xl:  0.55;     /* glass 高光线 */
+      --surface-α-5xl:  0.75;     /* 前景高亮（logo/icon） */
+      --surface-α-6xl:  0.95;     /* 全白近乎 */
+
+      /* ── Shadow (黑色) α 梯度 — 替代 box-shadow 里的 rgba(0,0,0, 0.X) ──
+         实际项目里出现 0.10/0.25/0.34/0.35/0.4/0.45/0.5/0.55/0.6/0.7
+         10 档。语义按"阴影深度"分：
+            --shadow-α-sm:    0.10  轻落影（slider thumb tip）
+            --shadow-α-md:    0.25  标准卡（chip raise）
+            --shadow-α-lg:    0.35  中等浮层（dropdown）
+            --shadow-α-xl:    0.4   抽屉/fab 圆钮
+            --shadow-α-2xl:   0.5   大浮层（sheet）
+            --shadow-α-3xl:   0.55  modal
+            --shadow-α-4xl:   0.7   最高浮层（overlay card）*/
+      --shadow-α-sm:   0.10;
+      --shadow-α-md:   0.25;
+      --shadow-α-lg:   0.35;
+      --shadow-α-xl:   0.40;
+      --shadow-α-2xl:  0.50;
+      --shadow-α-3xl:  0.55;
+      --shadow-α-4xl:  0.70;
+
       /* ── Typography ────────────────────────────────────────────────
          --font-display：几何无衬线，用于标题 / logo（中文回退到系统黑体）
          --font-mono：等宽，用于数字 / 计数 / 参数值 */

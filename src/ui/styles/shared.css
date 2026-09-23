@@ -22,8 +22,8 @@
   font-size: var(--text-base);
   color: var(--text-2);
   font-family: var(--font-mono);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
-  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+  box-shadow: 0 4px 18px var(--shadow-α-lg);
+  transition: opacity var(--t-slowest) ease-out, transform var(--t-slowest) ease-out;
   pointer-events: none;
 }
 .loading-indicator.hidden {
@@ -44,7 +44,7 @@
 }
 /* No extra transition-delay on .complete: main.ts already holds the pill for
  * 800ms before adding `.hidden`, then removes it from layout after 600ms.
- * A CSS delay on top of that (it used to be 0.6s) pushed the fade past the
+ * A CSS delay on top of that (it used to be 600ms) pushed the fade past the
  * moment the element was taken out of layout, so the pill just vanished. */
 .loading-label { letter-spacing: 0.04em; }
 .loading-count {
@@ -83,9 +83,9 @@
     linear-gradient(var(--glass-bg, rgba(12, 18, 34, 0.9)),
                     var(--glass-bg, rgba(12, 18, 34, 0.9))),
     linear-gradient(135deg,
-      rgba(255,255,255,0.24) 0%,
-      rgba(255,255,255,0.06) 45%,
-      rgba(0,0,0,0.34) 100%);
+      var(--surface-α-2xl) 0%,
+      var(--surface-α-md) 45%,
+      var(--shadow-α-lg) 100%);
   background-clip: padding-box, border-box;
   background-origin: padding-box, border-box;
 }
@@ -166,9 +166,9 @@
 }
 /* Key badge inside toolbar buttons — lighter weight to stay in the background */
 .btn .key {
-  background: rgba(255,255,255,0.08);
-  border-color: rgba(255,255,255,0.12);
-  border-bottom-color: rgba(255,255,255,0.18);
+  background: var(--surface-α-lg);
+  border-color: var(--surface-α-xl);
+  border-bottom-color: var(--surface-α-2xl);
   color: var(--muted);
   font-size: var(--text-3xs);
 }
