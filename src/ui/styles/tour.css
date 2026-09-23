@@ -290,7 +290,7 @@
     .tour-dt__btn:hover::after  { opacity: 0.12; }
     .tour-dt__btn:active::after { opacity: 0.2; transform: scale(0.97); }
     .tour-dt__btn > * { position: relative; z-index: 1; }
-    .tour-dt__btn:hover  { background: rgba(255,255,255,0.07); border-color: var(--border-hi); color: var(--text); }
+    .tour-dt__btn:hover  { background: rgba(255,255,255,0.07); color: var(--text); }
     .tour-dt__btn:active { transform: scale(0.96); box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.3); }
     .tour-dt__btn--prev,
     .tour-dt__btn--next {
@@ -305,10 +305,10 @@
       color: var(--accent);
     }
     .tour-dt__btn--play  { background: rgba(var(--accent-rgb), 0.15); border-color: rgba(var(--accent-rgb), 0.4); color: var(--accent); }
-    .tour-dt__btn--play:hover  { background: rgba(var(--accent-rgb), 0.2); border-color: var(--tour-accent); box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.25); }
+    .tour-dt__btn--play:hover  { background: rgba(var(--accent-rgb), 0.2); box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.25); }
     .tour-dt__btn--play.active { background: rgba(var(--accent-rgb), 0.25); border-color: var(--tour-accent); box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.4), 0 0 0 2px rgba(var(--accent-rgb), 0.2); }
     /* 危险色 hover 与 .btn--danger / .node-panel__close / .dbg-header__close 统一 */
-    .tour-dt__btn--close:hover { background: rgba(248, 113, 113, var(--danger-α)); border-color: rgba(248, 113, 113, var(--danger-border-α)); color: var(--red); }
+    .tour-dt__btn--close:hover { background: rgba(248, 113, 113, var(--danger-α)); color: var(--red); }
 
     /* 朗读按钮 */
     .tour-dt__btn--speech {
@@ -463,7 +463,7 @@
       .tour-mob__close:hover::after { opacity: 1; }
       .tour-mob__close:active { transform: scale(0.96); box-shadow: 0 0 0 2px rgba(248, 113, 113, var(--danger-border-α)); }
       .tour-mob__close > * { position: relative; z-index: 1; }
-      .tour-mob__close:hover { border-color: rgba(248, 113, 113, var(--danger-border-α)); box-shadow: 0 0 10px rgba(248, 113, 113, 0.2); }
+      .tour-mob__close:hover { box-shadow: 0 0 10px rgba(248, 113, 113, 0.2); }
       .tour-mob__close svg { width: 12px; height: 12px; stroke: currentColor; }
 
       .tour-mob__badge {
@@ -480,7 +480,7 @@
       .tour-mob__badge:hover::after { opacity: 0.12; }
       .tour-mob__badge:active { transform: scale(0.96); box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.3); }
       .tour-mob__badge > * { position: relative; z-index: 1; }
-      .tour-mob__badge:hover { background: rgba(var(--accent-rgb), 0.2); border-color: rgba(var(--accent-rgb), 0.5); box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.2); color: var(--accent); }
+      .tour-mob__badge:hover { background: rgba(var(--accent-rgb), 0.2); box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.2); color: var(--accent); }
       .tour-mob__badge.tour-active { background: rgba(var(--accent-rgb), 0.25) !important; border-color: var(--tour-accent) !important; box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.4); color: var(--tour-accent) !important; }
       .tour-mob__badge svg { width: 13px; height: 13px; stroke: currentColor; }
 

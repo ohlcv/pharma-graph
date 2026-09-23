@@ -156,7 +156,7 @@
   border-radius: 6px; padding: 6px 10px; font-size: 0.7rem;
   font-family: inherit; color: var(--muted); cursor: pointer; text-align: left;
 }
-#debug-toggle:hover  { background: rgba(192, 132, 252, 0.25); border-color: rgba(192, 132, 252, 0.5); color: var(--text); }
+#debug-toggle:hover  { background: rgba(192, 132, 252, 0.25); color: var(--text); }
 #debug-toggle.active { background: rgba(192, 132, 252, 0.3);  border-color: var(--debug-purple); color: #d8b4fe; }
 
 /* ── Forensic panel ──────────────────────────────────────────────────── */

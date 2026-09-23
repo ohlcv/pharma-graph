@@ -191,8 +191,8 @@ html[data-glass="lite"] {
   pointer-events: none;
 }
 
-/* 悬停高光：顶部一抹镜面反光（不改 background，避免和强调色打架）。 */
-.toolbar .btn:hover { border-color: rgba(255,255,255,0.18); }
+/* 悬停高光：toolbar 上的按钮已经由 components.css 的 .btn:hover 提供背景变化。
+   这里玻璃风 skin 不再覆盖 border，让底色透出来即可。 */
 
 /* 布局选择器的弹出菜单。 */
 .layout-switcher__menu {
