@@ -40,21 +40,21 @@
   --lg-tint-panel: rgba(13, 18, 36, 0.52);  /* 大面板：侧栏 / 底部面板 */
   --lg-tint-dense: rgba(11, 16, 32, 0.66);  /* 文字密集的面板：详情 */
 
-  --lg-line: var(--surface-α-xl);
-  --lg-line-soft: var(--surface-α-md);
+  --lg-line: rgba(255, 255, 255, 0.14);
+  --lg-line-soft: rgba(255, 255, 255, 0.07);
   --lg-fill: rgba(255, 255, 255, 0.055);    /* 面板内的卡片 */
-  --lg-fill-hi: var(--surface-α-xl);
+  --lg-fill-hi: rgba(255, 255, 255, 0.10);
   --lg-accent: var(--accent-rgb, 129, 140, 248);
 
-  --lg-shadow: 0 28px 64px -18px var(--shadow-α-4xl), 0 6px 18px var(--shadow-α-lg);
-  --lg-shadow-sm: 0 12px 32px -10px var(--shadow-α-3xl), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --lg-shadow: 0 28px 64px -18px rgba(0, 0, 0, 0.68), 0 6px 18px rgba(0, 0, 0, 0.34);
+  --lg-shadow-sm: 0 12px 32px -10px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.3);
   --lg-spring: cubic-bezier(0.32, 1.35, 0.5, 1);
 
   /* 内高光：顶部一条亮线 + 底部一条暗线，让玻璃有"厚度"。 */
   --lg-bevel:
-    inset 0 1px 0 var(--surface-α-3xl),
-    inset 0 0 0 1px var(--surface-α-2xs),
-    inset 0 -14px 22px -14px var(--shadow-α-lg);
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+    inset 0 -14px 22px -14px rgba(0, 0, 0, 0.32);
 
   --lg-filter-lg: blur(var(--lg-blur-lg)) saturate(var(--lg-sat)) brightness(var(--lg-bright));
   --lg-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
@@ -82,15 +82,15 @@ html[data-glass="lite"] {
      背景是元素自己的背景而不是 ::before：#sidebar / #bottom-sheet 是滚动容器，
      绝对定位的伪元素会跟着内容滚走，轮廓就和面板边缘脱开了。 */
   background-image:
-    radial-gradient(130% 80% at 0% 0%, var(--surface-α-xl) 0%, var(--surface-α-xs) 40%, transparent 64%),
+    radial-gradient(130% 80% at 0% 0%, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.04) 40%, transparent 64%),
     radial-gradient(90% 60% at 100% 100%, rgba(var(--lg-accent), 0.13) 0%, transparent 62%),
     linear-gradient(var(--glass-bg), var(--glass-bg)),
     linear-gradient(140deg,
       rgba(255,255,255,0.58) 0%,
-      var(--surface-α-2xl) 20%,
-      var(--surface-α-sm) 52%,
-      var(--surface-α-xl) 80%,
-      var(--surface-α-4xl) 100%);
+      rgba(255,255,255,0.18) 20%,
+      rgba(255,255,255,0.05) 52%,
+      rgba(255,255,255,0.10) 80%,
+      rgba(255,255,255,0.26) 100%);
   background-clip: padding-box, padding-box, padding-box, border-box;
   background-origin: padding-box, padding-box, padding-box, border-box;
   -webkit-backdrop-filter: var(--lg-filter-lg);
@@ -107,36 +107,36 @@ html[data-glass="lite"] {
 
 .topbar {
   background:
-    linear-gradient(180deg, var(--surface-α-xl) 0%, var(--surface-α-3xs) 100%),
+    linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.02) 100%),
     radial-gradient(60% 140% at 12% 0%, rgba(var(--lg-accent), 0.14) 0%, transparent 70%),
     var(--lg-tint-dense);
   -webkit-backdrop-filter: var(--lg-filter);
   backdrop-filter: var(--lg-filter);
-  border-bottom: var(--space-3xs) solid var(--lg-line-soft);
+  border-bottom: 1px solid var(--lg-line-soft);
   box-shadow:
-    inset 0 1px 0 var(--surface-α-2xl),
-    0 12px 32px -14px var(--shadow-α-3xl);
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    0 12px 32px -14px rgba(0,0,0,0.6);
 }
 
 /* 搜索框：下陷的玻璃槽，聚焦时亮起一圈强调色光环。 */
-.topbar__search-icon { left: var(--space-lg); }
+.topbar__search-icon { left: 12px; }
 .topbar__search-input {
   height: 32px;
-  padding: 0 var(--space-lg) 0 34px;
+  padding: 0 14px 0 34px;
   border-radius: var(--radius-pill);
   border: 1px solid transparent;
-  background: var(--surface-α-md);
+  background: rgba(255, 255, 255, 0.07);
   box-shadow:
-    inset 0 1px 3px var(--shadow-α-xl),
-    inset 0 0 0 1px var(--surface-α-lg),
-    0 1px 0 var(--surface-α-md);
-  transition: background var(--t-fast), box-shadow var(--t-normal), width var(--t-slow) var(--lg-spring);
+    inset 0 1px 3px rgba(0,0,0,0.45),
+    inset 0 0 0 1px rgba(255,255,255,0.09),
+    0 1px 0 rgba(255,255,255,0.06);
+  transition: background 0.18s, box-shadow 0.22s, width 0.24s var(--lg-spring);
 }
 .topbar__search-input:focus {
-  background: var(--surface-α-xl);
+  background: rgba(255, 255, 255, 0.11);
   border-color: transparent;
   box-shadow:
-    inset 0 1px 3px var(--shadow-α-lg),
+    inset 0 1px 3px rgba(0,0,0,0.35),
     inset 0 0 0 1px rgba(var(--lg-accent), 0.75),
     0 0 0 4px rgba(var(--lg-accent), 0.20);
 }
@@ -146,31 +146,31 @@ html[data-glass="lite"] {
    ══════════════════════════════════════════════════════════════════════════ */
 
 .toolbar {
-  gap: var(--space-md);
+  gap: 8px;
   background:
-    linear-gradient(180deg, var(--surface-α-sm) 0%, var(--surface-α-2xs) 100%),
+    linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.015) 100%),
     var(--lg-tint);
   -webkit-backdrop-filter: var(--lg-filter);
   backdrop-filter: var(--lg-filter);
-  border-bottom: var(--space-3xs) solid var(--lg-line-soft);
+  border-bottom: 1px solid var(--lg-line-soft);
   /* 工具栏自己是 overflow-x:auto，外阴影会被裁掉，所以只用内阴影。 */
-  box-shadow: inset 0 1px 0 var(--surface-α-sm);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
 }
 
 .toolbar__sep {
-  width: 1px; height: 22px; margin: 0 var(--space-xs);
-  background: linear-gradient(180deg, transparent, var(--surface-α-3xl), transparent);
+  width: 1px; height: 22px; margin: 0 4px;
+  background: linear-gradient(180deg, transparent, rgba(255,255,255,0.22), transparent);
 }
 
 /* 成组按钮：一颗玻璃胶囊。里面的 .btn 保持原来的透明底和悬停/激活态。 */
 .toolbar__group {
-  display: inline-flex; align-items: center; gap: var(--space-2xs);
-  padding: var(--space-xs); flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 3px; flex-shrink: 0;
   border-radius: var(--radius-pill);
-  background: linear-gradient(180deg, var(--surface-α-xl), var(--surface-α-2xs));
+  background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03));
   box-shadow:
-    inset 0 1px 0 var(--surface-α-2xl),
-    inset 0 0 0 1px var(--surface-α-md),
+    inset 0 1px 0 rgba(255,255,255,0.24),
+    inset 0 0 0 1px rgba(255,255,255,0.07),
     inset 0 -8px 12px -8px rgba(0,0,0,0.3);
 }
 /* 布局选择器本身已经是一颗强调色胶囊，不再套一层。 */
@@ -184,10 +184,10 @@ html[data-glass="lite"] {
    不碰 background / box-shadow，所以 .active、:hover 的强调色照常叠在下面。 */
 .toolbar > .btn::before {
   content: ''; position: absolute; inset: 0; border-radius: inherit;
-  background: linear-gradient(180deg, var(--surface-α-xl), var(--surface-α-2xs));
+  background: linear-gradient(180deg, rgba(255,255,255,0.11), rgba(255,255,255,0.03));
   box-shadow:
-    inset 0 1px 0 var(--surface-α-2xl),
-    inset 0 0 0 1px var(--surface-α-md);
+    inset 0 1px 0 rgba(255,255,255,0.24),
+    inset 0 0 0 1px rgba(255,255,255,0.07);
   pointer-events: none;
 }
 
@@ -196,17 +196,17 @@ html[data-glass="lite"] {
 
 /* 布局选择器的弹出菜单。 */
 .layout-switcher__menu {
-  padding: var(--space-sm); gap: var(--space-2xs);
+  padding: 6px; gap: 2px;
   border-radius: var(--radius-2xl);
   border: 1px solid var(--lg-line);
   background:
-    radial-gradient(120% 70% at 0% 0%, var(--surface-α-xl) 0%, transparent 60%),
+    radial-gradient(120% 70% at 0% 0%, rgba(255,255,255,0.13) 0%, transparent 60%),
     var(--lg-tint-dense);
   -webkit-backdrop-filter: var(--lg-filter-lg);
   backdrop-filter: var(--lg-filter-lg);
   box-shadow: var(--lg-bevel), var(--lg-shadow);
 }
-.layout-switcher__item { border-radius: var(--radius-md); padding: var(--space-sm) var(--space-lg); }
+.layout-switcher__item { border-radius: var(--radius-md); padding: 7px 12px; }
 
 /* ══════════════════════════════════════════════════════════════════════════
    4. 桌面侧栏：悬浮玻璃卡片
@@ -218,10 +218,10 @@ html[data-glass="lite"] {
    * 再留一点边距。 */
   top: var(--chrome-h-gapped); right: var(--chrome-gap); bottom: var(--chrome-gap);
   border-radius: var(--radius-xl);
-  padding: var(--space-md) var(--space-md) var(--space-lg);
-  gap: var(--space-md);
+  padding: 10px 10px 12px;
+  gap: 8px;
   scrollbar-width: thin;
-  scrollbar-color: var(--surface-α-3xl) transparent;
+  scrollbar-color: rgba(255,255,255,0.22) transparent;
 }
 /* 隐藏时要多滑出 10px 的边距，否则会在屏幕边缘露出一条玻璃边。 */
 #sidebar.hidden { transform: translateX(calc(100% + 24px)); }
@@ -229,36 +229,36 @@ html[data-glass="lite"] {
 html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
 
 #sidebar::-webkit-scrollbar { width: 6px; }
-#sidebar::-webkit-scrollbar-thumb { background: var(--surface-α-2xl); border-radius: var(--radius-xs); }
+#sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.20); border-radius: var(--radius-xs); }
 #sidebar::-webkit-scrollbar-track { background: transparent; }
 
 /* 每个分区是一张内嵌的半透明卡片，取代原来的整行分隔线。 */
 .sidebar-section {
-  border: 1px solid var(--surface-α-md);
+  border: 1px solid rgba(255,255,255,0.07);
   border-radius: var(--radius-2xl);
-  background: linear-gradient(180deg, rgba(255,255,255,0.065), var(--surface-α-2xs));
-  box-shadow: inset 0 1px 0 var(--surface-α-xl);
+  background: linear-gradient(180deg, rgba(255,255,255,0.065), rgba(255,255,255,0.022));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.11);
 }
-.sidebar-section__head { margin: 0; border-radius: var(--radius-2xl); padding: var(--space-lg) var(--space-lg); }
+.sidebar-section__head { margin: 0; border-radius: var(--radius-2xl); padding: 11px 14px; }
 /* 必须用直接子代选择器。用后代选择器时，外层分区展开会给**嵌套且已折叠**的
  * #body-layout-setting 也加上 12px padding-bottom；max-height: 0 只压内容盒、
  * 不压 padding，折叠后就会露出半行（与 components.css 里那条修正是同一个坑）。 */
-.sidebar-section[data-section-state="open"] > .sidebar-section__body { padding: 0 var(--space-lg) var(--space-lg); }
+.sidebar-section[data-section-state="open"] > .sidebar-section__body { padding: 0 12px 12px; }
 /* 嵌套的「布局设置」要和图例子项「节点本质」的竖条同 x。
  * 两者父容器的左内边距在 glass 下同为 12px，但「布局设置」外面还套了一层
  * .sidebar-section 卡片，多出 1px 边框，所以头部内边距取 8-1 = 7px 才能对齐。
  * （components.css 里那条对齐规则是按 glass 之前的几何算的，这里以 glass 为准。） */
-[data-section="layout-setting"] > .sidebar-section__head { padding-left: var(--space-sm); }
+[data-section="layout-setting"] > .sidebar-section__head { padding-left: 7px; }
 
 #sidebar .btn { border-radius: var(--radius-pill); }
 
 /* 统计小块 / 布局说明：更深一点的下陷小块。 */
 .stat-card,
 .layout-info {
-  border: 1px solid var(--surface-α-md);
+  border: 1px solid rgba(255,255,255,0.06);
   border-radius: var(--radius-xl);
-  background: linear-gradient(180deg, var(--surface-α-md), var(--surface-α-2xs));
-  box-shadow: inset 0 1px 0 var(--surface-α-xl);
+  background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.025));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
 }
 
 .legend-row, .legend-edge-row { border-radius: var(--radius-lg); }
@@ -273,20 +273,20 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
   background: linear-gradient(180deg, #ffffff, #e6eaf4);
   border: 0;
   box-shadow:
-    0 2px 6px var(--shadow-α-2xl),
-    0 0 0 0.5px var(--shadow-α-md),
-    inset 0 -1px 0 var(--shadow-α-sm);
+    0 2px 6px rgba(0,0,0,0.5),
+    0 0 0 0.5px rgba(0,0,0,0.25),
+    inset 0 -1px 0 rgba(0,0,0,0.10);
 }
-.param-slider::-webkit-slider-thumb:hover { transform: scale(1.08); box-shadow: 0 3px 9px var(--shadow-α-3xl), 0 0 0 0.5px var(--shadow-α-md), inset 0 -1px 0 var(--shadow-α-sm); }
+.param-slider::-webkit-slider-thumb:hover { transform: scale(1.08); box-shadow: 0 3px 9px rgba(0,0,0,0.55), 0 0 0 0.5px rgba(0,0,0,0.25), inset 0 -1px 0 rgba(0,0,0,0.10); }
 .param-slider::-moz-range-thumb,
 .bs-param-slider::-moz-range-thumb {
   width: 24px; height: 15px; border-radius: var(--radius-md); border: 0;
   background: linear-gradient(180deg, #ffffff, #e6eaf4);
-  box-shadow: 0 2px 6px var(--shadow-α-2xl), 0 0 0 0.5px var(--shadow-α-md);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(0,0,0,0.25);
 }
 .param-label__val,
-.bs-param-label__val { border-radius: var(--radius-pill); padding: var(--space-3xs) var(--space-md); }
-.param-select { border-radius: var(--radius-md); padding: var(--space-sm) var(--space-lg); }
+.bs-param-label__val { border-radius: var(--radius-pill); padding: 1px 8px; }
+.param-select { border-radius: var(--radius-md); padding: 6px 12px; }
 
 /* ══════════════════════════════════════════════════════════════════════════
    5. 节点详情面板
@@ -307,21 +307,21 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
   0%   { opacity: 0; transform: translateY(10px) scale(0.955); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
-#node-panel.visible { animation: lg-pop var(--t-slower) var(--lg-spring) both; }
+#node-panel.visible { animation: lg-pop 0.42s var(--lg-spring) both; }
 
 .node-panel__header {
-  padding: var(--space-lg) var(--space-lg) var(--space-md);
-  border-bottom: var(--space-3xs) solid var(--lg-line-soft);
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--lg-line-soft);
   background: linear-gradient(180deg, rgba(255,255,255,0.075), transparent);
 }
 
 /* 概 / 文：分段控件。凹槽里浮着一块亮的玻璃滑块。 */
 .node-panel__tabs {
-  gap: var(--space-2xs); padding: var(--space-2xs); border-radius: var(--radius-pill);
-  background: var(--shadow-α-lg);
+  gap: 2px; padding: 2px; border-radius: var(--radius-pill);
+  background: rgba(0, 0, 0, 0.30);
   box-shadow:
-    inset 0 1px 3px var(--shadow-α-2xl),
-    inset 0 0 0 1px var(--surface-α-md);
+    inset 0 1px 3px rgba(0,0,0,0.5),
+    inset 0 0 0 1px rgba(255,255,255,0.06);
 }
 /* :hover 故意省略：glass.css 与 components.css 同时定义 .node-panel__tab，
    后者才是 index.html 实际渲染的那套（见 index.html:496-500）。
@@ -329,43 +329,43 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
 .node-panel__tab {
   width: 30px; height: 24px; border-radius: var(--radius-pill);
   border-color: transparent; background: transparent;
-  transition: background var(--t-normal), color var(--t-normal), box-shadow var(--t-normal);
+  transition: background 0.2s, color 0.2s, box-shadow 0.25s;
 }
 .node-panel__tab.active {
   color: #fff; border-color: transparent;
-  background: linear-gradient(180deg, rgba(255,255,255,0.30), var(--surface-α-xl));
+  background: linear-gradient(180deg, rgba(255,255,255,0.30), rgba(255,255,255,0.14));
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.55),
-    0 2px 8px var(--shadow-α-xl);
+    0 2px 8px rgba(0,0,0,0.4);
 }
 
 /* 固定 / 关闭：圆形玻璃按钮。只加高光和圆角，背景与悬停色沿用原来的。 */
 .node-panel__pin,
 .node-panel__close {
   width: 26px; height: 26px; border-radius: 50%;
-  box-shadow: inset 0 1px 0 var(--surface-α-2xl);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.20);
 }
 
-.node-panel__body { padding: var(--space-lg) var(--space-xl) 18px; }
-.node-panel__body::-webkit-scrollbar-thumb { background: var(--surface-α-3xl); }
+.node-panel__body { padding: 14px 16px 18px; }
+.node-panel__body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.22); }
 
 /* 面板里的卡片：半透明填充 + 内高光，不叠 backdrop-filter。 */
 .np-edge-item,
 .np-page .np-edge-item {
-  border-radius: var(--radius-xl); padding: var(--space-md) var(--space-lg);
-  box-shadow: inset 0 1px 0 var(--surface-α-lg);
+  border-radius: var(--radius-xl); padding: 8px 12px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
 }
 .np-summary,
 .np-page .np-summary {
-  padding: var(--space-lg) var(--space-lg);
-  border: 1px solid var(--surface-α-md);
-  border-left: var(--space-3xs) solid var(--surface-α-md);
+  padding: 11px 14px;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-left: 1px solid rgba(255,255,255,0.07);
   border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, rgba(var(--lg-accent), 0.13), var(--surface-α-2xs) 70%);
-  box-shadow: inset 0 1px 0 var(--surface-α-xl);
+  background: linear-gradient(135deg, rgba(var(--lg-accent), 0.13), rgba(255,255,255,0.03) 70%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
 }
-.np-badge { border-radius: var(--radius-pill); padding: var(--space-2xs) var(--space-md); }
-.np-summary__toggle { border-radius: var(--radius-pill); padding: var(--space-2xs) var(--space-md); }
+.np-badge { border-radius: var(--radius-pill); padding: 2px 10px; }
+.np-summary__toggle { border-radius: var(--radius-pill); padding: 2px 10px; }
 .np-markdown pre { border-radius: var(--radius-md); }
 .np-markdown blockquote { border-radius: 0 12px 12px 0; }
 
@@ -385,14 +385,14 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
 
 .bs-mobile-search {
   border-radius: var(--radius-pill); border: 1px solid transparent;
-  background: var(--surface-α-md);
+  background: rgba(255,255,255,0.07);
   box-shadow:
-    inset 0 1px 3px var(--shadow-α-xl),
-    inset 0 0 0 1px var(--surface-α-lg),
-    0 1px 0 var(--surface-α-md);
+    inset 0 1px 3px rgba(0,0,0,0.45),
+    inset 0 0 0 1px rgba(255,255,255,0.09),
+    0 1px 0 rgba(255,255,255,0.06);
 }
 .bs-mobile-search__input { padding-left: 38px; }
-.bs-mobile-search__icon { left: var(--space-lg); }
+.bs-mobile-search__icon { left: 14px; }
 
 /* 快捷操作：每颗按钮一块玻璃瓦片。用 ::before 铺底，z-index:-1 配合 isolation
    放在文字后面，不影响 .active 的强调色底。 */
@@ -402,45 +402,45 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
 }
 .bs-quick-btn::before {
   content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit;
-  background: linear-gradient(180deg, var(--surface-α-xl), var(--surface-α-2xs));
+  background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03));
   box-shadow:
-    inset 0 1px 0 var(--surface-α-3xl),
-    inset 0 0 0 1px var(--surface-α-md);
+    inset 0 1px 0 rgba(255,255,255,0.22),
+    inset 0 0 0 1px rgba(255,255,255,0.06);
   pointer-events: none;
 }
 
 .bs-chip {
-  border-color: var(--surface-α-lg);
-  box-shadow: inset 0 1px 0 var(--surface-α-xl);
+  border-color: rgba(255,255,255,0.09);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
 }
 .bs-chip.active {
-  box-shadow: inset 0 1px 0 var(--surface-α-5xl), 0 0 14px rgba(var(--lg-accent), 0.32);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.28), 0 0 14px rgba(var(--lg-accent), 0.32);
 }
 
 .bs-stats-row {
-  border-radius: var(--radius-2xl); border-color: var(--surface-α-md);
-  background: linear-gradient(180deg, rgba(255,255,255,0.065), var(--surface-α-3xs));
-  box-shadow: inset 0 1px 0 var(--surface-α-xl);
+  border-radius: var(--radius-2xl); border-color: rgba(255,255,255,0.07);
+  background: linear-gradient(180deg, rgba(255,255,255,0.065), rgba(255,255,255,0.02));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.11);
 }
-.bs-stat { border-right-color: var(--surface-α-md); background: transparent; }
+.bs-stat { border-right-color: rgba(255,255,255,0.07); background: transparent; }
 
 .bs-params-block {
-  border-radius: var(--radius-2xl); border-color: var(--surface-α-md);
-  background: linear-gradient(180deg, rgba(255,255,255,0.055), var(--surface-α-2xs));
-  box-shadow: inset 0 1px 0 var(--surface-α-xl);
+  border-radius: var(--radius-2xl); border-color: rgba(255,255,255,0.07);
+  background: linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.018));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
 }
 .bs-params-toggle { background: transparent; }
-.bs-params-body { border-top-color: var(--surface-α-md); }
+.bs-params-body { border-top-color: rgba(255,255,255,0.07); }
 
-.bs-layout-btn { border-radius: var(--radius-xl); border-color: var(--surface-α-lg); box-shadow: inset 0 1px 0 var(--surface-α-lg); }
-.bs-layout-btn.active { box-shadow: inset 0 1px 0 var(--surface-α-4xl), 0 0 14px rgba(var(--lg-accent), 0.3); }
+.bs-layout-btn { border-radius: var(--radius-xl); border-color: rgba(255,255,255,0.09); box-shadow: inset 0 1px 0 rgba(255,255,255,0.09); }
+.bs-layout-btn.active { box-shadow: inset 0 1px 0 rgba(255,255,255,0.26), 0 0 14px rgba(var(--lg-accent), 0.3); }
 .bs-apply-btn { border-radius: var(--radius-pill); }
 
 /* 展开面板的小圆钮。transform 里带 translateX(-50%)，所以这里不碰 transform。 */
 #sheet-peek-tab {
   border: 1px solid var(--lg-line);
   background:
-    radial-gradient(120% 90% at 20% 0%, var(--surface-α-2xl) 0%, transparent 62%),
+    radial-gradient(120% 90% at 20% 0%, rgba(255,255,255,0.20) 0%, transparent 62%),
     var(--lg-tint-dense);
   -webkit-backdrop-filter: var(--lg-filter);
   backdrop-filter: var(--lg-filter);
@@ -456,7 +456,7 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
 .loading-indicator {
   border: 1px solid var(--lg-line);
   background:
-    radial-gradient(120% 90% at 0% 0%, var(--surface-α-xl) 0%, transparent 60%),
+    radial-gradient(120% 90% at 0% 0%, rgba(255,255,255,0.13) 0%, transparent 60%),
     var(--lg-tint-dense);
   -webkit-backdrop-filter: var(--lg-filter);
   backdrop-filter: var(--lg-filter);
@@ -466,7 +466,7 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
 .toast--info    { border-color: rgba(var(--lg-accent), 0.45); }
 .toast--success { border-color: rgba(52, 211, 153, 0.45); }
 .toast--error   { border-color: rgba(248, 113, 113, 0.45); }
-.zoom-indicator { border-radius: var(--radius-pill); padding: var(--space-sm) var(--space-lg); }
+.zoom-indicator { border-radius: var(--radius-pill); padding: 5px 12px; }
 
 /* ══════════════════════════════════════════════════════════════════════════
    8. 漫游条（发展趋势）—— 玻璃材质
@@ -480,7 +480,7 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
 .tour-dt,
 .tour-mob {
   background:
-    radial-gradient(130% 90% at 0% 0%, var(--surface-α-xl) 0%, transparent 56%),
+    radial-gradient(130% 90% at 0% 0%, rgba(255,255,255,0.12) 0%, transparent 56%),
     var(--lg-tint-dense);
   -webkit-backdrop-filter: var(--lg-filter);
   backdrop-filter: var(--lg-filter);
@@ -493,7 +493,7 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
 @media (max-width: 768px) {
   .tour-mob {
     background:
-      radial-gradient(130% 90% at 0% 0%, var(--surface-α-xl) 0%, transparent 56%),
+      radial-gradient(130% 90% at 0% 0%, rgba(255,255,255,0.12) 0%, transparent 56%),
       var(--lg-tint-dense);
     -webkit-backdrop-filter: var(--lg-filter);
     backdrop-filter: var(--lg-filter);
@@ -512,7 +512,7 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
    - 按钮沿用工具栏的做法——用 ::before 铺一层玻璃底，不碰
      background / box-shadow，所以 .active、:hover 的强调色照常生效。
      tour.css 已给按钮内容抬了 z-index:1，玻璃层自然压在下面。 */
-.tour-dt__range { background: var(--surface-α-lg); }
+.tour-dt__range { background: rgba(255,255,255,0.08); }
 /* 显式压回透明：glass 层优先级高于 tour.css，不写这条就会把整块触摸热区染白。 */
 .tour-mob__range { background: transparent; }
 .tour-dt__range::-webkit-slider-thumb,
@@ -522,17 +522,17 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
   background: rgba(var(--accent-rgb), 0.55);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.35),
-    0 1px 4px var(--shadow-α-lg),
+    0 1px 4px rgba(0,0,0,0.35),
     0 0 8px rgba(var(--accent-rgb), 0.55);
 }
 
 .tour-dt__btn::before,
 .tour-mob__badge::before {
   content: ''; position: absolute; inset: 0; border-radius: inherit;
-  background: linear-gradient(180deg, var(--surface-α-xl), var(--surface-α-2xs));
+  background: linear-gradient(180deg, rgba(255,255,255,0.11), rgba(255,255,255,0.03));
   box-shadow:
-    inset 0 1px 0 var(--surface-α-3xl),
-    inset 0 0 0 1px var(--surface-α-md);
+    inset 0 1px 0 rgba(255,255,255,0.22),
+    inset 0 0 0 1px rgba(255,255,255,0.06);
   pointer-events: none;
 }
 
@@ -541,7 +541,7 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
 .badge-email-card,
 .bigscreen-hint {
   background:
-    radial-gradient(120% 90% at 0% 0%, var(--surface-α-xl) 0%, transparent 58%),
+    radial-gradient(120% 90% at 0% 0%, rgba(255,255,255,0.11) 0%, transparent 58%),
     var(--lg-tint-dense);
   border-color: var(--lg-line);
   box-shadow: var(--lg-bevel), var(--lg-shadow-sm);
@@ -553,7 +553,7 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
    文字密集，用密色调（同 #node-panel 的 --lg-tint-dense），可读性优先。 */
 .node-overlay-card {
   background:
-    radial-gradient(120% 90% at 0% 0%, var(--surface-α-xl) 0%, transparent 58%),
+    radial-gradient(120% 90% at 0% 0%, rgba(255,255,255,0.10) 0%, transparent 58%),
     var(--lg-tint-dense);
   border-color: var(--lg-line);
   box-shadow: var(--lg-bevel), var(--lg-shadow-sm);
@@ -594,12 +594,12 @@ html.bigscreen #sidebar { border-width: 0; box-shadow: none; }
 
 /* 系统"增强对比度"：轮廓和分隔线更亮。 */
 @media (prefers-contrast: more) {
-  :root { --lg-line: rgba(255,255,255,0.34); --lg-line-soft: var(--surface-α-3xl); }
+  :root { --lg-line: rgba(255,255,255,0.34); --lg-line-soft: rgba(255,255,255,0.22); }
   .sidebar-section, .stat-card, .layout-info, .bs-stats-row, .bs-params-block {
-    border-color: var(--surface-α-3xl);
+    border-color: rgba(255,255,255,0.22);
   }
   .tour-dt, .tour-mob, .badge-email-card, .node-overlay-card, .bigscreen-hint {
-    border-color: var(--surface-α-3xl);
+    border-color: rgba(255,255,255,0.22);
   }
 }
 
