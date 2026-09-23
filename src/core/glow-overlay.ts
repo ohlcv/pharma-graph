@@ -582,11 +582,20 @@ export class GlowOverlay {
     const cached = this.emphSpriteCache.get(key);
     if (cached) return cached;
 
-    const size = Math.ceil(qRadius * 2);
+    // sprite 是离屏位图，必须按设备像素建；否则在 dpr=2~3 的屏上 drawImage
+    // 时浏览器做"放大插值"，径向渐变的同心圆台阶被插值磨掉、光晕边缘发虚。
+    // 主 canvas 在 drawEmphasis 里已经 ctx.scale(dpr, dpr)，所以绘制坐标传
+    // CSS px 即可；sprite 内部用 sctx.scale(dpr, dpr) 把相同的 CSS 坐标映射
+    // 到更大的设备像素网格。dpr 跟随 this.dpr（同一次 syncSize 内取值保持一致）。
+    const dpr = this.dpr;
+    const sizeCss = qRadius * 2;
+    const sizeDev = Math.ceil(sizeCss * dpr);
     const sprite = document.createElement('canvas');
-    sprite.width = size;
-    sprite.height = size;
+    sprite.width = sizeDev;
+    sprite.height = sizeDev;
     const sctx = sprite.getContext('2d')!;
+    sctx.scale(dpr, dpr);
+
     const cx = qRadius;
     const cy = qRadius;
 
