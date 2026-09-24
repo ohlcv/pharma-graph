@@ -370,6 +370,29 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         shape: 'rectangle' as cytoscape.Css.NodeShape,
       },
     },
+    // 太极八卦：本体已被 .layer-parent 隐藏，但 .selected-node / .highlighted
+    // 会以 border-width:4 + accent2 把它"点亮"成 1×1 矩形 + 强光边框——盖在
+    // canvas 画的图案正中央。再叠一条强 selector 强制压回去：
+    //   border / 阴影 / opacity / 自身尺寸全部透明。
+    // glow-overlay 仍然按节点位置画强光（这是预期的"选中态"反馈），但节点
+    // 本体不再画出任何东西，不再遮图案。
+    {
+      selector: '.celestial-emblem-node',
+      style: {
+        'background-color': 'rgba(0,0,0,0)',
+        'background-opacity': 0,
+        'border-width': 0,
+        'border-color': 'rgba(0,0,0,0)',
+        'border-opacity': 0,
+        'overlay-color': 'rgba(0,0,0,0)',
+        'overlay-opacity': 0,
+        opacity: 0,
+        label: '',
+        width: 1,
+        height: 1,
+        events: 'yes' as cytoscape.Css.Event,
+      },
+    },
     // 边默认样式
     {
       selector: 'edge',
@@ -418,7 +441,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
     },
     { selector: '.entering', style: { opacity: 0 } },
     {
-      selector: '.hovered',
+      selector: '.hovered:not(.celestial-emblem-node)',
       style: {
         opacity: 1,
         'border-width': 3,
@@ -431,7 +454,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
       },
     },
     {
-      selector: '.selected-node, .highlighted',
+      selector: '.selected-node:not(.celestial-emblem-node), .highlighted:not(.celestial-emblem-node)',
       style: {
         opacity: 1,
         'border-width': 4,

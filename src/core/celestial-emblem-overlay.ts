@@ -28,6 +28,7 @@
 // euler 之【前】——即加在 initGraphFromManager() 函数体的最后几行。
 
 import type cytoscape from 'cytoscape';
+import { parse as yamlParse } from 'yaml';
 
 // ── 数据：原样迁自 data.js ───────────────────────────────────────────────
 
@@ -125,17 +126,163 @@ function pickSpawnPoint(cy: cytoscape.Core): { x: number; y: number } {
 /**
  * 往图里加这个孤立节点（如果已存在则直接复用）。不 lock()：交给 euler 的
  * 斥力物理去决定它最终落在哪——见文件头注释。
+ *
+ * 内容（shortSummary / fullSummary / body）从对应的 Markdown 文件加载，
+ * 与其他所有节点走同一套内容管道（写入 node data，供 DetailPanel 渲染）。
+ * 节点本身在图中已存在；fetch 失败时静默降级，详情面板只显示基本信息。
  */
-export function spawnCelestialEmblemNode(cy: cytoscape.Core): cytoscape.NodeSingular {
+export async function spawnCelestialEmblemNode(cy: cytoscape.Core): Promise<cytoscape.NodeSingular> {
   const existing = cy.getElementById(CELESTIAL_EMBLEM_ID);
-  if (existing.nonempty()) return existing;
+  if (existing.nonempty()) {
+    stripNodeChrome(existing);
+    return existing;
+  }
+
   const { x, y } = pickSpawnPoint(cy);
-  return cy.add({
+  const node = cy.add({
     group: 'nodes',
     data: { id: CELESTIAL_EMBLEM_ID, label: '太极八卦' },
     position: { x, y },
     classes: `layer-parent ${EMBLEM_CLASS}`,
   });
+  // canvas overlay 自己画图，不依赖 cytoscape 的文本标签；关掉避免 4 字 label
+  // 叠在装饰画上，盖住内圈八卦/太极。label 仍保留在 data.label，详情面板照样读得到。
+  stripNodeChrome(node);
+
+  fetchEmblemContent(node);
+  return node;
+}
+
+/**
+ * 抹掉 cytoscape 自身画的所有可见 chrome：fill 的 defaultStroke="glow" 会让规则
+ * `node[stroke = "glow"]` 命中并画 `border-color: accent` + `border-width: 2`，
+ * 那条玫红描边就出现在 canvas 画出的图案上。`node.style()` 是 cytoscape 里高于
+ * stylesheet 的最终来源（per-element style 始终盖过选择器命中），用它把所有
+ * "会画边"的属性一次性塞成 0/transparent / 1px，节点本体彻底隐形。
+ *
+ * 注意：`events: 'yes'` 不在这里关——否则点击不到节点。pointer 命中沿用 cytoscape
+ * 节点的 bounding-box（1×1），配 `min-zoomed-size` 已经够小，不再扩。
+ */
+function stripNodeChrome(node: cytoscape.NodeSingular): void {
+  // 抹掉属性，让所有 [stroke=...] / [defaultStroke=...] 选择器不命中
+  node.data('stroke', '');
+  node.data('defaultStroke', '');
+
+  // 抹掉样式：cytoscape.style() 是逐元素生效 + 高于 stylesheet 的最终值。
+  // background / border / overlay / background-blacken 全压成 0 / transparent。
+  node.style({
+    // ── 本体：完全透明 ───────────────────────────────────────
+    'background-color': 'rgba(0,0,0,0)',
+    'background-opacity': 0,
+    'background-fill': 'solid' as cytoscape.Css.BackgroundFill,
+    'background-blacken': 0,
+    'background-gradient-stop-colors': '',
+    'background-gradient-stop-positions': '',
+    'background-gradient-direction': '',
+
+    // ── 边框：0px + 完全透明 ──────────────────────────────────
+    'border-width': 0,
+    'border-color': 'rgba(0,0,0,0)',
+    'border-opacity': 0,
+    'border-style': 'solid' as cytoscape.Css.LineStyle,
+
+    // ── overlay（二次描边层）：透明 ─────────────────────────
+    'overlay-color': 'rgba(0,0,0,0)',
+    'overlay-opacity': 0,
+    'overlay-shape': 'ellipse' as cytoscape.Css.NodeShape,
+    'overlay-padding': 0,
+
+    // ── 文本：空 → cytoscape 不画 ────────────────────────────
+    label: '',
+    'text-opacity': 0,
+    'text-events': 'no' as cytoscape.Css.TextEvents,
+
+    // ── 尺寸：覆盖整张图案 + 一圈点击余量。
+    //   cytoscape 的 pointer hit 用 bounding-box，"画多大就能点多大的范围"。
+    //   border / background / overlay / label 全部 transparent + opacity 0，
+    //   所以节点本身不会被画出来；用户视觉看到的还是 canvas overlay 那张图。
+    //   modelRadius 取 140–340，260 ≈ 中位数 × 1.6，能覆盖"图案 + 外圈光晕"。
+    //   比这更大的盒子会吞掉周围真实节点的 hit 区，反而麻烦；260 是权衡。
+    width: 260,
+    height: 260,
+    'min-width': 1,
+    'min-height': 1,
+
+    // ── 其它可能的可见副产物：清掉 ───────────────────────────
+    'compound-sizing-w-b': 0,
+    'compound-sizing-w-h': 0,
+    'padding': 0,
+    'shape': 'rectangle' as cytoscape.Css.NodeShape,
+    opacity: 0,
+    // 注意：不能写 visibility:hidden——cytoscape 会同时让 pointer 命中失效，
+    // 节点就没法被点击打开详情面板。要"不画"靠 border/bg/overlay 全 transparent
+    // + opacity 压 0 已经够了。
+    'ghost': 'no' as cytoscape.Css.Ghost,
+    'ghost-color': 'rgba(0,0,0,0)',
+    'ghost-opacity': 0,
+    'ghost-shape': 'ellipse' as cytoscape.Css.NodeShape,
+    'ghost-offset-x': 0,
+    'ghost-offset-y': 0,
+  });
+}
+
+/** 非阻塞加载——fetch + 解析成功后把内容写入 node data。失败时静默。 */
+async function fetchEmblemContent(node: cytoscape.NodeSingular): Promise<void> {
+  try {
+    const rel = '个人成长与生存策略/太极八卦.md';
+    const url = '/content/' + rel.split('/').map(
+      (s) => encodeURI(s).replace(/#/g, '%23').replace(/\?/g, '%3F'),
+    ).join('/');
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const text = await res.text();
+    const parsed = parseFrontmatter(text);
+    if (!parsed) return;
+    node.data('shortSummary', parsed.shortSummary ?? undefined);
+    node.data('fullSummary', parsed.fullSummary ?? undefined);
+    node.data('body', parsed.body ?? undefined);
+    node.data('sourcePath', rel);
+  } catch {
+    /* fetch / 解析失败不影响图功能，静默降级 */
+  }
+}
+
+/**
+ * 解析 Markdown 内容（供运行时 fetch 使用）。
+ * 复制自 build/build-content.ts 的解析逻辑，与构建期保持一致。
+ */
+function parseFrontmatter(raw: string): {
+  shortSummary?: string;
+  fullSummary?: string;
+  body?: string;
+} | null {
+  const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!match) return null;
+  try {
+    const fm = yamlParse(match[1]) as Record<string, unknown> | null;
+    if (!fm || typeof fm !== 'object') return null;
+    const rawSummary = fm['summary'] as Record<string, unknown> | string | undefined;
+    let shortSummary: string | undefined;
+    let fullSummary: string | undefined;
+    if (typeof rawSummary === 'object' && rawSummary !== null) {
+      shortSummary = typeof rawSummary['short'] === 'string'
+        ? String(rawSummary['short']).trim()
+        : undefined;
+      fullSummary = typeof rawSummary['full'] === 'string'
+        ? String(rawSummary['full']).trim()
+        : undefined;
+    } else if (typeof rawSummary === 'string') {
+      shortSummary = rawSummary.trim();
+    }
+    if (fullSummary === undefined) {
+      fullSummary = typeof fm['full'] === 'string' ? String(fm['full']).trim() : undefined;
+    }
+    const bodyMatch = raw.match(/\n---\r?\n([\s\S]*)$/);
+    const body = bodyMatch ? bodyMatch[1].trim() : undefined;
+    return { shortSummary, fullSummary, body };
+  } catch {
+    return null;
+  }
 }
 
 export interface CelestialEmblemOverlayOptions {
