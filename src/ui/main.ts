@@ -70,6 +70,7 @@ import { initSearchUI } from './search-ui.js';
 import { initMusicPlayer } from './music-player.js';
 import { installDebugBridge } from './debug-bridge.js';
 import { initStarfield } from './starfield.js';
+import { createCelestialEmblemOverlay } from '../core/celestial-emblem-overlay.js';
 
 let tourController: TourController;
 
@@ -335,6 +336,15 @@ function initGraphFromManager(graphManager: GraphManager): void {
       duration: 0,
     });
   });
+
+  // Celestial emblem: a real cytoscape node with `layer-parent` class (so it
+  // is invisible to search/stats/tour/force-drag) but still participates in
+  // Euler's repulsion physics. Must come AFTER the halo loop above (which
+  // blindly touches every node including this one) and BEFORE
+  // finishStreamingLayout() triggers the first Euler run — so it has a
+  // position from the very first physics tick. See celestial-emblem-overlay.ts
+  // header for the full rationale.
+  createCelestialEmblemOverlay({ container, cy });
 
   // ── Populate sidebar the moment the graph is ready — not after layout settles.
   // stats (node/edge/selected/highlighted + essence/edge legend) are accurate as
