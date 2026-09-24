@@ -267,10 +267,12 @@ export class CelestialEmblemOverlay {
 
     const p = node.renderedPosition();
     const zoom = this.cy.zoom();
-    const rx = p.x, ry = p.y, R = this.modelRadius * zoom;
+    // 缩小到一定程度后整体不再继续收缩：作为"一颗很亮的星"留在线索里。
+    // 最外圈半径 floor 在 ~7 CSS px（包含一像素描边 + 几像素光晕），比完全消失好。
+    const R = Math.max(this.modelRadius * zoom, 7);
+    const rx = p.x, ry = p.y;
 
     const reach = R * 1.15 + 20;
-    if (R < 3) return;
     if (rx + reach < 0 || rx - reach > this.cssWidth || ry + reach < 0 || ry - reach > this.cssHeight) return;
 
     const breathe = this.reducedMotion ? 1 : 1 + 0.02 * Math.sin(t * 0.4);
@@ -369,27 +371,33 @@ export class CelestialEmblemOverlay {
   }
 
   /**
-   * 太极。之前是"正 S"：右半白、左半黑，两个鼓包做出 S 形分界。
-   * "倒 S"就是把这里所有的 light/dark 赋值整体互换一次——分界曲线的镜像，
-   * 不用动任何角度/坐标，颜色对调，S 自然就翻了个面。
+   * 太极。整体在中心自转；每次绘制时套一层 ctx.scale(-1, 1)，让画好的
+   * 几何按 x 轴翻一次，于是 S 分界线在画面上变成"倒 S"。颜色赋值与
+   * 原始版相同——镜像由变换矩阵承担，而不是把 light/dark 颜色
+   * 互换（互换在大 lobe / 小点的耦合关系上容易出错）。
    */
   private drawTaiji(ctx: CanvasRenderingContext2D, r: number): void {
     const light = this.ink, dark = 'rgba(5,5,5,0.92)';
+    // 水平镜像：scale(-1, 1) 让 x 轴反向，几何上的"倒 S"等价于
+    // 把已经画好的图像左右翻转一次。比改 arc 起止角度更不容易出错。
+    ctx.save();
+    ctx.scale(-1, 1);
     ctx.beginPath(); ctx.arc(0, 0, r, -Math.PI / 2, Math.PI / 2);
-    ctx.fillStyle = dark; ctx.fill();
+    ctx.fillStyle = light; ctx.fill();
     ctx.beginPath(); ctx.arc(0, 0, r, Math.PI / 2, -Math.PI / 2);
-    ctx.fillStyle = light; ctx.fill();
+    ctx.fillStyle = dark; ctx.fill();
     ctx.beginPath(); ctx.arc(0, -r / 2, r / 2, 0, Math.PI * 2);
-    ctx.fillStyle = dark; ctx.fill();
+    ctx.fillStyle = light; ctx.fill();
     ctx.beginPath(); ctx.arc(0, r / 2, r / 2, 0, Math.PI * 2);
-    ctx.fillStyle = light; ctx.fill();
-    ctx.beginPath(); ctx.arc(0, -r / 2, r * 0.15, 0, Math.PI * 2);
-    ctx.fillStyle = light; ctx.fill();
-    ctx.beginPath(); ctx.arc(0, r / 2, r * 0.15, 0, Math.PI * 2);
     ctx.fillStyle = dark; ctx.fill();
+    ctx.beginPath(); ctx.arc(0, -r / 2, r * 0.15, 0, Math.PI * 2);
+    ctx.fillStyle = dark; ctx.fill();
+    ctx.beginPath(); ctx.arc(0, r / 2, r * 0.15, 0, Math.PI * 2);
+    ctx.fillStyle = light; ctx.fill();
     ctx.lineWidth = Math.max(0.6, r * 0.02);
     ctx.strokeStyle = light;
     ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
   }
 }
 
