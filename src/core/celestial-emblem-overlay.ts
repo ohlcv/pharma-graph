@@ -3,10 +3,7 @@
 //
 // 十二重同心环，由内向外：八卦 · 十天干 · 十二地支 · 十二律 · 十二长生 ·
 // 二十四节气 · 二十八宿 · 六十甲子 · 六十四卦 · 六十四卦名 · 七十二候 ·
-// 三百六十度。数据照搬原版 data.js（TRI / BAGUA / GAN / ZHI / LV / CS /
-// JIEQI / XIU / GUA / HOU 均为原样迁入），只是渲染从"12 重 3D 网格纹理"
-// 换成了"每帧直接在一张 2D canvas 上按角度画"，因为这里要的是一个能跟着
-// cytoscape 缩放/平移的轻量奇观，不是独立的 WebGL 场景。
+// 三百六十度。数据照搬原版 data.js。
 //
 // 为什么是"真节点 + 覆盖层"：
 //   - cytoscape 节点没法逐帧换贴图，旋转动画只能靠独立 canvas 画。
@@ -14,12 +11,18 @@
 //     zoom/pan 都算进去了，跟其它节点是同一套换算。
 //   - 孤立 = 不接任何边。不 lock()——让 euler 布局把它当成真实的力学
 //     参与者：没有弹簧拉着它，只受全图所有节点的斥力，物理模拟会把它推向
-//     "最空旷的方向"。每次真正重新跑一次 euler 它都可能落在不同地方。
+//     "最空旷的方向"。
 //   - 排除出"知识"：打上 `layer-parent` class——项目里已经在用的基础设施，
 //     几十处 `.not('.layer-parent')`（搜索 / 统计 / 图例计数 / 漫游序列 /
-//     dimUnhighlighted / force-drag 的手动拖拽模拟）自动把它排除，不需要
-//     改任何一处现有逻辑。这不影响 renderer.ts 里 euler 自动布局——那是对
-//     `this.cy`（全部元素）跑的，layer-parent 节点照样参与力学。
+//     dimUnhighlighted / force-drag 的手动拖拽模拟）自动把它排除。这不影响
+//     renderer.ts 里 euler 自动布局——那是对 `this.cy`（全部元素）跑的，
+//     layer-parent 节点照样参与力学。
+//   - 但它又是"可点开的"：cytoscape 自己的可见样式（背景/边框/overlay/
+//     label）全部通过 stripNodeChrome() 压成透明，只留 canvas 画的图案；
+//     命中盒（width/height + shape:ellipse）则按视觉半径同步设置，保证
+//     "看起来能点的地方"和"真的点得到的地方"是同一块。点击后走正常的
+//     detailPanel 流程，内容来自 fetchEmblemContent() 异步拉取的一份
+//     Markdown（跟其它节点用同一套 frontmatter 解析器）。
 //
 // ⚠️ 接入时机：main.ts 的 initGraphFromManager() 末尾有一段"从中心爆出"的
 // 入场动画，会遍历 cy.nodes()（不筛选 layer-parent）把每个节点摆到 halo
@@ -28,7 +31,7 @@
 // euler 之【前】——即加在 initGraphFromManager() 函数体的最后几行。
 
 import type cytoscape from 'cytoscape';
-import { parse as yamlParse } from 'yaml';
+import { parseFrontmatter } from '../parser/frontmatter.js';
 
 // ── 数据：原样迁自 data.js ───────────────────────────────────────────────
 
@@ -94,6 +97,10 @@ const RINGS_DEF: RingDef[] = [
 /** 图上这个节点固定用这个 id，找它/避免重复添加都靠它。 */
 export const CELESTIAL_EMBLEM_ID = 'celestial-emblem';
 const EMBLEM_CLASS = 'celestial-emblem-node';
+/** 拉取内容用的 md 路径——按项目内容目录惯例存放。这份 .md 的 frontmatter
+ *  需要带 id（哪怕这里用不上）：下面复用的是项目唯一的正式解析器
+ *  （src/parser/frontmatter.ts），它对缺 id 的文件会直接抛错。 */
+const CONTENT_REL_PATH = '个人成长与生存策略/太极八卦.md';
 
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
@@ -115,6 +122,14 @@ function pickRadius(cy: cytoscape.Core): number {
   return clamp(graphSpread(cy).spread * 0.075, 140, 340);
 }
 
+/** 命中盒边长——直接从视觉半径换算，而不是写死一个数字。
+ *  0.92 是留给最外圈光晕/描边的一点余量：看起来比实际能点的范围略大一点，
+ *  好过反过来（点不到自己眼睛看到的图案）。半径变（reroll / 不同图谱规模）
+ *  时这个值要跟着重算，否则命中盒和画面会对不上——这也是上一版的问题所在。 */
+function hitboxSize(radius: number): number {
+  return radius * 2 * 0.92;
+}
+
 function pickSpawnPoint(cy: cytoscape.Core): { x: number; y: number } {
   const { bb } = graphSpread(cy);
   return {
@@ -127,14 +142,17 @@ function pickSpawnPoint(cy: cytoscape.Core): { x: number; y: number } {
  * 往图里加这个孤立节点（如果已存在则直接复用）。不 lock()：交给 euler 的
  * 斥力物理去决定它最终落在哪——见文件头注释。
  *
- * 内容（shortSummary / fullSummary / body）从对应的 Markdown 文件加载，
- * 与其他所有节点走同一套内容管道（写入 node data，供 DetailPanel 渲染）。
- * 节点本身在图中已存在；fetch 失败时静默降级，详情面板只显示基本信息。
+ * 内容（shortSummary / fullSummary / body）从对应的 Markdown 文件异步加载，
+ * 走跟其他所有节点完全相同的 frontmatter 解析器。节点本身在图中已经存在、
+ * 可点开；fetch 还没回来之前详情面板只显示基本信息（标题 + 无摘要），
+ * fetch 失败也是同样静默降级，不影响图的其它功能。
  */
-export async function spawnCelestialEmblemNode(cy: cytoscape.Core): Promise<cytoscape.NodeSingular> {
+export function spawnCelestialEmblemNode(cy: cytoscape.Core): cytoscape.NodeSingular {
+  const size = hitboxSize(pickRadius(cy));
+
   const existing = cy.getElementById(CELESTIAL_EMBLEM_ID);
   if (existing.nonempty()) {
-    stripNodeChrome(existing);
+    stripNodeChrome(existing, size);
     return existing;
   }
 
@@ -147,9 +165,11 @@ export async function spawnCelestialEmblemNode(cy: cytoscape.Core): Promise<cyto
   });
   // canvas overlay 自己画图，不依赖 cytoscape 的文本标签；关掉避免 4 字 label
   // 叠在装饰画上，盖住内圈八卦/太极。label 仍保留在 data.label，详情面板照样读得到。
-  stripNodeChrome(node);
+  stripNodeChrome(node, size);
 
-  fetchEmblemContent(node);
+  // 不 await：主线程不为一次网络请求等待，节点先以"基本信息"可点开，
+  // 内容到了再补上去（fetchEmblemContent 内部直接写 node.data(...)）。
+  void fetchEmblemContent(node);
   return node;
 }
 
@@ -158,23 +178,31 @@ export async function spawnCelestialEmblemNode(cy: cytoscape.Core): Promise<cyto
  * `node[stroke = "glow"]` 命中并画 `border-color: accent` + `border-width: 2`，
  * 那条玫红描边就出现在 canvas 画出的图案上。`node.style()` 是 cytoscape 里高于
  * stylesheet 的最终来源（per-element style 始终盖过选择器命中），用它把所有
- * "会画边"的属性一次性塞成 0/transparent / 1px，节点本体彻底隐形。
+ * "会画边"的属性一次性塞成 0/transparent，节点本体彻底隐形。
  *
- * 注意：`events: 'yes'` 不在这里关——否则点击不到节点。pointer 命中沿用 cytoscape
- * 节点的 bounding-box（1×1），配 `min-zoomed-size` 已经够小，不再扩。
+ * `size` 是命中盒边长（像素级会再乘 zoom），必须跟视觉半径同步——见
+ * hitboxSize() 的注释：这正是上一版"命中盒写死 260、跟实际画出来的
+ * 140~340 对不上"那个问题的修复点。shape 用 ellipse 而不是 rectangle：
+ * 视觉是个圆盘，命中区跟着做成圆形，才没有方框四角的"看得见点不到 /
+ * 点得到却是空的"错位。
+ *
+ * 注意：`events`/pointer 相关属性不在这里关——否则点击不到节点，详情面板
+ * 也就永远打不开了。
  */
-function stripNodeChrome(node: cytoscape.NodeSingular): void {
+function stripNodeChrome(node: cytoscape.NodeSingular, size: number): void {
   // 抹掉属性，让所有 [stroke=...] / [defaultStroke=...] 选择器不命中
   node.data('stroke', '');
   node.data('defaultStroke', '');
 
-  // 抹掉样式：cytoscape.style() 是逐元素生效 + 高于 stylesheet 的最终值。
-  // background / border / overlay / background-blacken 全压成 0 / transparent。
   node.style({
     // ── 本体：完全透明 ───────────────────────────────────────
     'background-color': 'rgba(0,0,0,0)',
     'background-opacity': 0,
-    'background-fill': 'solid' as cytoscape.Css.BackgroundFill,
+    // `as cytoscape.Css.BackgroundFill` 等 cast 删掉——cytoscape 的 d.ts 没导出
+    // BackgroundFill/TextEvents/Ghost 这些命名别名（ghost 是 inline
+    // `"yes" | "no"`），强行 cast 会被 TS 拒绝（"neither type sufficiently
+    // overlaps"）。这里直接写字符串字面量，TS 会按上下文推出正确的 narrow type。
+    'background-fill': 'solid' as const,
     'background-blacken': 0,
     'background-gradient-stop-colors': '',
     'background-gradient-stop-positions': '',
@@ -195,29 +223,24 @@ function stripNodeChrome(node: cytoscape.NodeSingular): void {
     // ── 文本：空 → cytoscape 不画 ────────────────────────────
     label: '',
     'text-opacity': 0,
-    'text-events': 'no' as cytoscape.Css.TextEvents,
+    'text-events': 'no' as const,
 
-    // ── 尺寸：覆盖整张图案 + 一圈点击余量。
-    //   cytoscape 的 pointer hit 用 bounding-box，"画多大就能点多大的范围"。
-    //   border / background / overlay / label 全部 transparent + opacity 0，
-    //   所以节点本身不会被画出来；用户视觉看到的还是 canvas overlay 那张图。
-    //   modelRadius 取 140–340，260 ≈ 中位数 × 1.6，能覆盖"图案 + 外圈光晕"。
-    //   比这更大的盒子会吞掉周围真实节点的 hit 区，反而麻烦；260 是权衡。
-    width: 260,
-    height: 260,
+    // ── 尺寸：跟视觉半径同步的命中盒，圆形贴合圆形的画面 ──────
+    width: size,
+    height: size,
     'min-width': 1,
     'min-height': 1,
+    shape: 'ellipse' as cytoscape.Css.NodeShape,
 
     // ── 其它可能的可见副产物：清掉 ───────────────────────────
     'compound-sizing-w-b': 0,
     'compound-sizing-w-h': 0,
-    'padding': 0,
-    'shape': 'rectangle' as cytoscape.Css.NodeShape,
+    padding: 0,
     opacity: 0,
     // 注意：不能写 visibility:hidden——cytoscape 会同时让 pointer 命中失效，
     // 节点就没法被点击打开详情面板。要"不画"靠 border/bg/overlay 全 transparent
     // + opacity 压 0 已经够了。
-    'ghost': 'no' as cytoscape.Css.Ghost,
+    ghost: 'no' as const,
     'ghost-color': 'rgba(0,0,0,0)',
     'ghost-opacity': 0,
     'ghost-shape': 'ellipse' as cytoscape.Css.NodeShape,
@@ -226,62 +249,24 @@ function stripNodeChrome(node: cytoscape.NodeSingular): void {
   });
 }
 
-/** 非阻塞加载——fetch + 解析成功后把内容写入 node data。失败时静默。 */
+/** 非阻塞加载——fetch + 用项目正式的 frontmatter 解析器解析成功后，
+ *  把内容写入 node data（跟其它节点走的是完全相同的字段/详情面板渲染路径）。
+ *  失败（网络、404、frontmatter 缺 id 等）一律静默降级。 */
 async function fetchEmblemContent(node: cytoscape.NodeSingular): Promise<void> {
   try {
-    const rel = '个人成长与生存策略/太极八卦.md';
-    const url = '/content/' + rel.split('/').map(
+    const url = '/content/' + CONTENT_REL_PATH.split('/').map(
       (s) => encodeURI(s).replace(/#/g, '%23').replace(/\?/g, '%3F'),
     ).join('/');
     const res = await fetch(url);
     if (!res.ok) return;
     const text = await res.text();
-    const parsed = parseFrontmatter(text);
-    if (!parsed) return;
-    node.data('shortSummary', parsed.shortSummary ?? undefined);
-    node.data('fullSummary', parsed.fullSummary ?? undefined);
-    node.data('body', parsed.body ?? undefined);
-    node.data('sourcePath', rel);
+    const fm = parseFrontmatter(text, CONTENT_REL_PATH);
+    node.data('shortSummary', fm.shortSummary);
+    node.data('fullSummary', fm.fullSummary);
+    node.data('body', fm.body);
+    node.data('sourcePath', CONTENT_REL_PATH);
   } catch {
     /* fetch / 解析失败不影响图功能，静默降级 */
-  }
-}
-
-/**
- * 解析 Markdown 内容（供运行时 fetch 使用）。
- * 复制自 build/build-content.ts 的解析逻辑，与构建期保持一致。
- */
-function parseFrontmatter(raw: string): {
-  shortSummary?: string;
-  fullSummary?: string;
-  body?: string;
-} | null {
-  const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!match) return null;
-  try {
-    const fm = yamlParse(match[1]) as Record<string, unknown> | null;
-    if (!fm || typeof fm !== 'object') return null;
-    const rawSummary = fm['summary'] as Record<string, unknown> | string | undefined;
-    let shortSummary: string | undefined;
-    let fullSummary: string | undefined;
-    if (typeof rawSummary === 'object' && rawSummary !== null) {
-      shortSummary = typeof rawSummary['short'] === 'string'
-        ? String(rawSummary['short']).trim()
-        : undefined;
-      fullSummary = typeof rawSummary['full'] === 'string'
-        ? String(rawSummary['full']).trim()
-        : undefined;
-    } else if (typeof rawSummary === 'string') {
-      shortSummary = rawSummary.trim();
-    }
-    if (fullSummary === undefined) {
-      fullSummary = typeof fm['full'] === 'string' ? String(fm['full']).trim() : undefined;
-    }
-    const bodyMatch = raw.match(/\n---\r?\n([\s\S]*)$/);
-    const body = bodyMatch ? bodyMatch[1].trim() : undefined;
-    return { shortSummary, fullSummary, body };
-  } catch {
-    return null;
   }
 }
 
@@ -352,12 +337,15 @@ export class CelestialEmblemOverlay {
     this.start();
   }
 
+  /** 传送到新的随机起点；命中盒跟着新半径重新同步，否则换了地方之后
+   *  点击区还留在旧尺寸上。 */
   reroll(): void {
     const node = this.cy.getElementById(CELESTIAL_EMBLEM_ID);
     if (node.empty()) return;
     const { x, y } = pickSpawnPoint(this.cy);
     node.position({ x, y });
     this.modelRadius = pickRadius(this.cy);
+    stripNodeChrome(node, hitboxSize(this.modelRadius));
   }
 
   destroy(): void {
@@ -414,8 +402,8 @@ export class CelestialEmblemOverlay {
 
     const p = node.renderedPosition();
     const zoom = this.cy.zoom();
-    // 缩小到一定程度后整体不再继续收缩：作为"一颗很亮的星"留在线索里。
-    // 最外圈半径 floor 在 ~7 CSS px（包含一像素描边 + 几像素光晕），比完全消失好。
+    // 缩小到一定程度后整体不再继续收缩：作为"一颗很亮的星"留在线索里，
+    // 而不是彻底消失。最外圈半径 floor 在 ~7 CSS px。
     const R = Math.max(this.modelRadius * zoom, 7);
     const rx = p.x, ry = p.y;
 
@@ -518,15 +506,15 @@ export class CelestialEmblemOverlay {
   }
 
   /**
-   * 太极。整体在中心自转；每次绘制时套一层 ctx.scale(-1, 1)，让画好的
-   * 几何按 x 轴翻一次，于是 S 分界线在画面上变成"倒 S"。颜色赋值与
-   * 原始版相同——镜像由变换矩阵承担，而不是把 light/dark 颜色
-   * 互换（互换在大 lobe / 小点的耦合关系上容易出错）。
+   * 太极。整体在中心自转；绘制时套一层 ctx.scale(-1, 1)，让画好的几何
+   * 按 x 轴翻一次，S 分界线在画面上就变成"倒 S"。镜像只包在这个函数
+   * 自己的 save/restore 里，不影响外面的自转角度（先应用的 rotate 在
+   * 变换矩阵里位于 scale 之后，等价于"先镜像好静态图形，再整体旋转"，
+   * 自转方向不受镜像影响）。颜色赋值维持原样，形状变换承担镜像，比
+   * 对调 light/dark 颜色更不容易在大瓣/小点的配对关系上出错。
    */
   private drawTaiji(ctx: CanvasRenderingContext2D, r: number): void {
     const light = this.ink, dark = 'rgba(5,5,5,0.92)';
-    // 水平镜像：scale(-1, 1) 让 x 轴反向，几何上的"倒 S"等价于
-    // 把已经画好的图像左右翻转一次。比改 arc 起止角度更不容易出错。
     ctx.save();
     ctx.scale(-1, 1);
     ctx.beginPath(); ctx.arc(0, 0, r, -Math.PI / 2, Math.PI / 2);
