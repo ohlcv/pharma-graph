@@ -7,7 +7,4 @@
 // from action-handlers.ts and main.ts continue to work during the migration
 // window. Please migrate imports to the new paths and remove this file.
 
-export {
-  updateStats,
-  syncBottomSheetStats,
-} from './stats/stat-cards.js';
+export { updateStats, syncBottomSheetStats } from './stats/stat-cards.js';

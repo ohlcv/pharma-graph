@@ -233,7 +233,7 @@ export function buildGraph(
     const fill = fm.fill || '';
     const stroke = fm.stroke;
     const shape = fm.shape;
-    
+
     nodes.push({
       id: fm.id,
       label: fm.label,
@@ -338,7 +338,7 @@ export function buildGraphFromPrebuilt(prebuilt: PrebuiltGraphData): BuildResult
   return {
     nodes,
     edges: prebuilt.edges,
-    danglingEdges: [],  // dangling edges were already filtered at build time
+    danglingEdges: [], // dangling edges were already filtered at build time
     maxDepth,
   };
 }

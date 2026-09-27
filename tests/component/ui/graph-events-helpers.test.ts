@@ -11,10 +11,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 import { CLASSES } from '@/core/renderer';
-import {
-  initGraphEvents,
-  type GraphEventDeps,
-} from '@/ui/graph-events';
+import { initGraphEvents, type GraphEventDeps } from '@/ui/graph-events';
 import type { TourController } from '@/ui/tour-controller';
 import type cytoscape from 'cytoscape';
 
@@ -37,8 +34,12 @@ function makeFakeCytoscape() {
   const otherNode = {
     id: 'a',
     grabbed: () => grabbedId === 'a',
-    addClass(cls: string) { if (cls === CLASSES.DRAGGING_SIMPLIFIED) dragClassCounter += 1; },
-    removeClass(cls: string) { if (cls === CLASSES.DRAGGING_SIMPLIFIED) dragClassCounter = Math.max(0, dragClassCounter - 1); },
+    addClass(cls: string) {
+      if (cls === CLASSES.DRAGGING_SIMPLIFIED) dragClassCounter += 1;
+    },
+    removeClass(cls: string) {
+      if (cls === CLASSES.DRAGGING_SIMPLIFIED) dragClassCounter = Math.max(0, dragClassCounter - 1);
+    },
     _isDragging: () => dragClassCounter > 0,
   };
   const events = new Map<string, Array<(evt: unknown) => void>>();
@@ -46,15 +47,19 @@ function makeFakeCytoscape() {
   // for graph-events.ts to drive — `.not(selector)` to negate a selector,
   // plus `addClass`/`removeClass` that fan out to every node in the
   // collection. We don't need full set algebra; only `.not` is called.
-  const makeCollection = (list: typeof trackedNode[]) => ({
+  const makeCollection = (list: (typeof trackedNode)[]) => ({
     not(selector: string) {
       if (selector === ':grabbed') {
         return makeCollection(list.filter((n) => !n.grabbed()));
       }
       return makeCollection(list);
     },
-    addClass(cls: string) { list.forEach((n) => n.addClass(cls)); },
-    removeClass(cls: string) { list.forEach((n) => n.removeClass(cls)); },
+    addClass(cls: string) {
+      list.forEach((n) => n.addClass(cls));
+    },
+    removeClass(cls: string) {
+      list.forEach((n) => n.removeClass(cls));
+    },
   });
   const allNodes = () => [trackedNode, otherNode] as unknown as ReturnType<typeof makeCollection>;
   const cy: cytoscape.Core = {
@@ -62,17 +67,25 @@ function makeFakeCytoscape() {
     _otherNode: otherNode,
     nodes: (sel?: string) => {
       const list = [trackedNode, otherNode];
-      if (sel === ':grabbed') return makeCollection(list.filter((n) => n.grabbed())) as unknown as cytoscape.NodeCollection;
+      if (sel === ':grabbed')
+        return makeCollection(
+          list.filter((n) => n.grabbed()),
+        ) as unknown as cytoscape.NodeCollection;
       return makeCollection(list) as unknown as cytoscape.NodeCollection;
     },
-    edges: () => makeCollection([otherNode] as unknown as ReturnType<typeof makeCollection>) as unknown as cytoscape.EdgeCollection,
+    edges: () =>
+      makeCollection([otherNode] as unknown as ReturnType<
+        typeof makeCollection
+      >) as unknown as cytoscape.EdgeCollection,
     _isDragging: () => dragClassCounter > 0,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     on(...args: any[]) {
       const [evtOrFirst, secondOrSecond, handler] = args as [unknown, unknown?, unknown?];
       const evt = String(evtOrFirst);
       const sel = typeof secondOrSecond === 'function' ? undefined : secondOrSecond;
-      const cb = (typeof secondOrSecond === 'function' ? secondOrSecond : handler) as (e: unknown) => void;
+      const cb = (typeof secondOrSecond === 'function' ? secondOrSecond : handler) as (
+        e: unknown,
+      ) => void;
       const key = sel === undefined ? evt : `${evt}|${String(sel)}`;
       const list = events.get(key) ?? [];
       list.push(cb);

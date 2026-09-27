@@ -69,7 +69,8 @@ function decorateRowA11y(row: HTMLElement): void {
   if (row.getAttribute('role') === 'button') return;
   row.setAttribute('role', 'button');
   row.tabIndex = 0;
-  const syncAria = () => row.setAttribute('aria-pressed', row.classList.contains('active') ? 'true' : 'false');
+  const syncAria = () =>
+    row.setAttribute('aria-pressed', row.classList.contains('active') ? 'true' : 'false');
   syncAria();
   // Stay in sync with subsequent toggleFilter() calls. Cheap: a single classList
   // read per mutation on a container that holds at most a few dozen rows.
@@ -135,11 +136,7 @@ function openSelectedNodeDetail(): void {
   panel.show(selected[0].id());
 }
 
-function updateCount(
-  key: string,
-  cy: Core,
-  descriptor: LegendAxisDescriptor,
-): number {
+function updateCount(key: string, cy: Core, descriptor: LegendAxisDescriptor): number {
   const selector = descriptor.countSelector.replace(/\$\{key\}/g, key);
   const scope = descriptor.countScope === 'nodes' ? cy.nodes() : cy.edges();
   return scope.filter(selector).not('.layer-parent').length;
@@ -166,15 +163,11 @@ export function buildLegend(cy: Core, descriptor: LegendAxisDescriptor): void {
   invalidateStatic();
 
   if (desktop && desktop.children.length === 0) {
-    desktop.innerHTML = entries
-      .map(([k, v]) => descriptor.desktopRow(k, v))
-      .join('');
+    desktop.innerHTML = entries.map(([k, v]) => descriptor.desktopRow(k, v)).join('');
     Array.from(desktop.children).forEach((c) => decorateRowA11y(c as HTMLElement));
   }
   if (mobile && mobile.children.length === 0) {
-    mobile.innerHTML = entries
-      .map(([k, v]) => descriptor.mobileChip(k, v))
-      .join('');
+    mobile.innerHTML = entries.map(([k, v]) => descriptor.mobileChip(k, v)).join('');
     Array.from(mobile.children).forEach((c) => decorateRowA11y(c as HTMLElement));
   }
 

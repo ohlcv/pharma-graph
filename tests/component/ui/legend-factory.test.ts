@@ -26,11 +26,13 @@ function makeContainer(rows: HTMLElement[]): HTMLElement {
 }
 
 function fireKey(target: HTMLElement, key: string): void {
-  target.dispatchEvent(new KeyboardEvent('keydown', {
-    key,
-    bubbles: true,
-    cancelable: true,
-  }));
+  target.dispatchEvent(
+    new KeyboardEvent('keydown', {
+      key,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
 }
 
 describe('attachDelegated keyboard navigation', () => {

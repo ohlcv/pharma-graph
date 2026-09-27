@@ -1,6 +1,7 @@
 # 药学领域特化参数（RULES）
 
 > 本文件是 **frontmatter.md 在药学领域的特化参数文档**，定义：
+>
 > - 药学顶层类（fill 取值）
 > - fill 默认外观配置（形状/背景色/默认边框）
 > - stroke 渲染参数（边框样式组合值）
@@ -33,31 +34,31 @@
 
 以下 10 个顶层类本身也是 `shape: class` 的节点，作为 `fill` 的引用目标。
 
-| fill 值 | 名称 | 包含的节点 |
-|---|---|---|
-| `cls-structure` | 组织结构 | 书/篇/章/节入口 |
-| `cls-classification` | 药物分类 | 粗分类/细分类/亚类 |
-| `cls-drug` | 药物 | 具体药物（重点+普通） |
-| `cls-disease` | 疾病 | 疾病/症状/综合征 |
-| `cls-biomolecule` | 生物实体 | 靶点/受体/酶/转运体/基因 |
-| `cls-feature` | 作用特点/临床评价 | 作用特点/临床用药评价/选药原则 |
-| `cls-adverse` | 不良反应/禁忌 | 典型不良反应/禁忌/毒性 |
-| `cls-concept` | 抽象概念/总论 | 定义性概念/总论/术语 |
-| `cls-summary` | 总结 | 节内总结/跨节大总结/表格 |
-| `cls-mnemonic` | 口诀 | 记忆口诀/顺口溜 |
+| fill 值              | 名称              | 包含的节点                     |
+| -------------------- | ----------------- | ------------------------------ |
+| `cls-structure`      | 组织结构          | 书/篇/章/节入口                |
+| `cls-classification` | 药物分类          | 粗分类/细分类/亚类             |
+| `cls-drug`           | 药物              | 具体药物（重点+普通）          |
+| `cls-disease`        | 疾病              | 疾病/症状/综合征               |
+| `cls-biomolecule`    | 生物实体          | 靶点/受体/酶/转运体/基因       |
+| `cls-feature`        | 作用特点/临床评价 | 作用特点/临床用药评价/选药原则 |
+| `cls-adverse`        | 不良反应/禁忌     | 典型不良反应/禁忌/毒性         |
+| `cls-concept`        | 抽象概念/总论     | 定义性概念/总论/术语           |
+| `cls-summary`        | 总结              | 节内总结/跨节大总结/表格       |
+| `cls-mnemonic`       | 口诀              | 记忆口诀/顺口溜                |
 
 ---
 
 ## 三、OWL2 实体类型 → 几何形状映射（shape 显式填写时生效）
 
-| shape 取值 | OWL2 原名 | 几何形状 | 设计意图 |
-|---|---|---|---|
-| `class` | owl:Class | round-rectangle | 类用圆角矩形——比纯矩形柔和，比椭圆正式 |
-| `named_individual` | owl:NamedIndividual | ellipse | 实例用椭圆——最通用的具体物形状 |
-| `object_property` | owl:ObjectProperty | hexagon | 实体化的关系用六边形——视觉区分于实例 |
-| `data_property` | owl:DatatypeProperty | rectangle | 数据属性用纯矩形——紧凑、突出数值感 |
-| `annotation_property` | owl:AnnotationProperty | tag | 注释用标签形——视觉上像"附加的注释标签" |
-| `auto` | — | 由 fill 决定 | 留空走 fill 默认（可为 vee / tag / barrel / star 等扩展形状）|
+| shape 取值            | OWL2 原名              | 几何形状        | 设计意图                                                      |
+| --------------------- | ---------------------- | --------------- | ------------------------------------------------------------- |
+| `class`               | owl:Class              | round-rectangle | 类用圆角矩形——比纯矩形柔和，比椭圆正式                        |
+| `named_individual`    | owl:NamedIndividual    | ellipse         | 实例用椭圆——最通用的具体物形状                                |
+| `object_property`     | owl:ObjectProperty     | hexagon         | 实体化的关系用六边形——视觉区分于实例                          |
+| `data_property`       | owl:DatatypeProperty   | rectangle       | 数据属性用纯矩形——紧凑、突出数值感                            |
+| `annotation_property` | owl:AnnotationProperty | tag             | 注释用标签形——视觉上像"附加的注释标签"                        |
+| `auto`                | —                      | 由 fill 决定    | 留空走 fill 默认（可为 vee / tag / barrel / star 等扩展形状） |
 
 > **覆盖规则**：显式填写 `shape: <owl2类型>` → 用映射表的固定形状，**覆盖** fill 的默认形状。
 > 留空时 → 用 fill 默认形状（FILL_CONFIG 可提供 vee / tag / barrel / star 等扩展形状）。
@@ -68,6 +69,7 @@
 ## 四、fill 默认外观配置表
 
 > **原则**：fill 只管背景色 + 默认形状 + **默认 stroke**。边框色由 `stroke` 方案决定：
+>
 > 1. 节点显式 `stroke`（double/glow/flow/fallback）→ `STROKE_CONFIG[stroke].color` + 对应特效
 > 2. 节点没填 `stroke` → 用 `FILL_CONFIG[fill].defaultStroke`（所有 fill 均默认为 `glow`）
 > 3. 节点填了 `stroke="auto"` 或没 fill → 走 subtreeRoot 色 / fill 兜底边框色 fallback
@@ -77,19 +79,19 @@
 > **"默认 stroke"** = 节点不填 stroke 时使用的值（统一为 `glow`，详见 4.4）。
 > **"fill 兜底边框色"** = 节点显式 `stroke: auto` 且无 subtreeRoot 时，按 fill 取的边框色（`FILL_BORDER_HINTS[fill]`）。
 
-| fill | 中文含义 | 形状 | 背景色 | 默认 stroke | fill 兜底边框色 |
-|---|---|---|---|---|---|
-| `cls-structure` | 组织结构 | round-pentagon（五边形） | `#fae8e3` 柔奶杏粉 | `glow` | `#c89b8a` 浅棕 |
-| `cls-classification` | 药物分类 | octagon（八边形） | `#ffe4b5` 柔莫兰迪黄 | `glow` | `#c9a06a` 莫兰迪棕黄 |
-| `cls-drug` | 药物 | ellipse（椭圆） | `#dbeafe` 柔天空蓝 | `glow` | `#7aa8d9` 浅蓝 |
-| `cls-disease` | 疾病 | diamond（菱形） | `#fce7f3` 柔樱花粉 | `glow` | `#e89bb8` 浅粉 |
-| `cls-biomolecule` | 生物实体 | round-triangle（圆角三角） | `#d1fae5` 柔薄荷绿 | `glow` | `#6dbfa0` 浅绿 |
-| `cls-feature` | 作用特点/临床评价 | star（星形） | `#cffafe` 柔湖青 | `glow` | `#7db8c4` 浅青 |
-| `cls-adverse` | 不良反应/禁忌 | round-hexagon（圆角六边形） | `#ffe4e6` 柔玫瑰粉 | `glow` | `#d4868f` 浅玫 |
-| `cls-concept` | 抽象概念/总论 | round-rectangle（圆角矩形） | `#e0e7ff` 柔雾紫蓝 | `glow` | `#818cf8` 浅紫 |
-| `cls-summary` | 总结 | bottom-round-rectangle（下圆矩形） | `#fef9c3` 柔麦穗黄 | `glow` | `#c9b96a` 浅黄 |
-| `cls-mnemonic` | 口诀 | tag（标签形） | `#fed7aa` 柔蜜桃橙 | `glow` | `#d4884e` 浅橙 |
-| `owl:Thing`（兜底） | 默认 | ellipse | `#f9fafb` 极浅灰 | `glow` | `#9ca3af`（`FILL_BORDER_DEFAULT`） |
+| fill                 | 中文含义          | 形状                               | 背景色               | 默认 stroke | fill 兜底边框色                    |
+| -------------------- | ----------------- | ---------------------------------- | -------------------- | ----------- | ---------------------------------- |
+| `cls-structure`      | 组织结构          | round-pentagon（五边形）           | `#fae8e3` 柔奶杏粉   | `glow`      | `#c89b8a` 浅棕                     |
+| `cls-classification` | 药物分类          | octagon（八边形）                  | `#ffe4b5` 柔莫兰迪黄 | `glow`      | `#c9a06a` 莫兰迪棕黄               |
+| `cls-drug`           | 药物              | ellipse（椭圆）                    | `#dbeafe` 柔天空蓝   | `glow`      | `#7aa8d9` 浅蓝                     |
+| `cls-disease`        | 疾病              | diamond（菱形）                    | `#fce7f3` 柔樱花粉   | `glow`      | `#e89bb8` 浅粉                     |
+| `cls-biomolecule`    | 生物实体          | round-triangle（圆角三角）         | `#d1fae5` 柔薄荷绿   | `glow`      | `#6dbfa0` 浅绿                     |
+| `cls-feature`        | 作用特点/临床评价 | star（星形）                       | `#cffafe` 柔湖青     | `glow`      | `#7db8c4` 浅青                     |
+| `cls-adverse`        | 不良反应/禁忌     | round-hexagon（圆角六边形）        | `#ffe4e6` 柔玫瑰粉   | `glow`      | `#d4868f` 浅玫                     |
+| `cls-concept`        | 抽象概念/总论     | round-rectangle（圆角矩形）        | `#e0e7ff` 柔雾紫蓝   | `glow`      | `#818cf8` 浅紫                     |
+| `cls-summary`        | 总结              | bottom-round-rectangle（下圆矩形） | `#fef9c3` 柔麦穗黄   | `glow`      | `#c9b96a` 浅黄                     |
+| `cls-mnemonic`       | 口诀              | tag（标签形）                      | `#fed7aa` 柔蜜桃橙   | `glow`      | `#d4884e` 浅橙                     |
+| `owl:Thing`（兜底）  | 默认              | ellipse                            | `#f9fafb` 极浅灰     | `glow`      | `#9ca3af`（`FILL_BORDER_DEFAULT`） |
 
 > 边框色名称统一：**"fill 兜底边框色"** = stroke=auto 链路无 subtreeRoot 时的边框色 = `FILL_BORDER_HINTS[fill]` 值。
 > 该色同时被 `stroke: fallback` 链路使用（详见 5.1 完整链路）。
@@ -98,13 +100,14 @@
 
 > **核心原则**：三个字段都是"我要这个节点长什么样"——用户显式填写的值就是最终决定；不填时由 `fill` 兜底。
 
-| 字段 | 用户显式值 | 用户不填（undefined/字段缺失） |
-|---|---|---|
-| `fill` | 用用户填的 fill | 节点归入通用类（不参与 fill 配置；边框色降级到 `FILL_BORDER_DEFAULT`） |
-| `shape` | 用用户填的 shape | `FILL_CONFIG[fill].shape`（fill 缺失时用 `ellipse`） |
-| `stroke` | 用用户填的 stroke（含 `'auto'` / `'glow'` / `'flow'` / `'fallback'` / `'double'`） | `FILL_CONFIG[fill].defaultStroke`（统一为 `'glow'`） |
+| 字段     | 用户显式值                                                                         | 用户不填（undefined/字段缺失）                                         |
+| -------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `fill`   | 用用户填的 fill                                                                    | 节点归入通用类（不参与 fill 配置；边框色降级到 `FILL_BORDER_DEFAULT`） |
+| `shape`  | 用用户填的 shape                                                                   | `FILL_CONFIG[fill].shape`（fill 缺失时用 `ellipse`）                   |
+| `stroke` | 用用户填的 stroke（含 `'auto'` / `'glow'` / `'flow'` / `'fallback'` / `'double'`） | `FILL_CONFIG[fill].defaultStroke`（统一为 `'glow'`）                   |
 
 **关键点**：
+
 - `fill` 是**推荐字段**而非必填——不填时节点仍可渲染（通用外观），但失去 fill 提供的语义色
 - `shape` 不填 → 用 `FILL_CONFIG[fill].shape`
 - `stroke` 不填 → 用 `FILL_CONFIG[fill].defaultStroke`（统一为 `glow`，呼吸光晕）
@@ -113,6 +116,7 @@
 - 合并方式由 `STROKE_MERGE_MODE` 控制：默认 `coexist`（并存）；改为 `override` 后，md 填 stroke 时 defaultStroke 才让位
 
 **示例**（假设 fill=cls-drug）：
+
 - `fill: cls-drug`（无 shape/stroke）→ 椭圆药物 + 默认边框（`glow`，呼吸光晕）
 - `fill: cls-drug, shape: object_property` → 六边形药物 + 默认边框（shape 显式覆盖为六边形，stroke 仍走 glow）
 - `fill: cls-drug, stroke: auto` → 椭圆药物 + fill 兜底边框色（subtreeRoot 色优先，无则 `#7aa8d9`）
@@ -129,9 +133,9 @@
 
 ### 4.4 默认 stroke 设计意图
 
-| fill | defaultStroke | 理由 |
-|---|---|---|
-| 所有 fill | `glow` | 所有 fill 统一默认 `glow`（呼吸光晕）；重点节点需在 frontmatter 中显式写 `stroke: double` |
+| fill      | defaultStroke | 理由                                                                                      |
+| --------- | ------------- | ----------------------------------------------------------------------------------------- |
+| 所有 fill | `glow`        | 所有 fill 统一默认 `glow`（呼吸光晕）；重点节点需在 frontmatter 中显式写 `stroke: double` |
 
 > **为什么统一为 glow？** 呼吸光晕作为所有节点的默认底色，让普通节点也保留轻微动感；重点节点（临床用药评价分支下的重点药/重点分类）则显式写 `stroke: double`，用双线边框进一步强调。
 >
@@ -147,6 +151,7 @@
 > 调色流程：先在 `FILL_BORDER_HINTS` 调色，覆盖的是 stroke=auto 默认外观和 stroke=fallback 默认外观（共用一张表）；如需特殊边框（比如某节点想用 subtreeRoot 色），节点填 `stroke: auto` 后由 subtreeRoot 接管，无需改 hints。
 >
 > **覆盖规则**：
+>
 > - 显式填写 `shape: hexagon` → 覆盖 fill 的默认几何形状
 > - 显式填写 `stroke: double` → 覆盖 fill 的默认边框（双线边框）
 > - 不填 → 使用 fill 的默认配置（`defaultStroke: glow`，呼吸光晕）
@@ -157,22 +162,22 @@
 
 ### 5.1 stroke 组合值
 
-| stroke 值 | 边框色 | 线型 | 特效 | 适用场景 |
-|---|---|---|---|---|
-| `auto` | subtreeRoot 色 或 `FILL_BORDER_HINTS[fill]` | solid 实线 | 无 | 跟子树走 |
-| `fallback` | `FILL_BORDER_HINTS[fill]`（不查 subtreeRoot） | solid 实线 | 无 | 按 fill 自身颜色着色的节点 |
-| `glow` | 固定紫 #818cf8（有子树时被子树色覆盖） | solid 实线 | **呼吸脉冲光晕** | 默认 stroke（所有 fill 的 defaultStroke） |
-| `flow` | 同 auto（subtreeRoot 色 / fill 兜底） | solid 实线 | 绕节点旋转的流动光点 | 需要"流动"强调的节点 |
-| `double` | 同 auto（subtreeRoot 色 / fill 兜底） | double 双线 | 无 | **重点节点**：临床用药评价分支下的重点药（med-）/重点分类 |
+| stroke 值  | 边框色                                        | 线型        | 特效                 | 适用场景                                                  |
+| ---------- | --------------------------------------------- | ----------- | -------------------- | --------------------------------------------------------- |
+| `auto`     | subtreeRoot 色 或 `FILL_BORDER_HINTS[fill]`   | solid 实线  | 无                   | 跟子树走                                                  |
+| `fallback` | `FILL_BORDER_HINTS[fill]`（不查 subtreeRoot） | solid 实线  | 无                   | 按 fill 自身颜色着色的节点                                |
+| `glow`     | 固定紫 #818cf8（有子树时被子树色覆盖）        | solid 实线  | **呼吸脉冲光晕**     | 默认 stroke（所有 fill 的 defaultStroke）                 |
+| `flow`     | 同 auto（subtreeRoot 色 / fill 兜底）         | solid 实线  | 绕节点旋转的流动光点 | 需要"流动"强调的节点                                      |
+| `double`   | 同 auto（subtreeRoot 色 / fill 兜底）         | double 双线 | 无                   | **重点节点**：临床用药评价分支下的重点药（med-）/重点分类 |
 
 **什么是重点节点（stroke: double）？**
 
 临床用药评价分支下独立成框的节点：
 
-| 节点类型 | 示例 | 判定标准 |
-|---|---|---|
-| **重点药** | 地西泮、唑吡坦、巴氯芬 | 纸质版"临床用药评价"分支下有该药的独立框（含作用特点/临床应用/不良反应正文） |
-| **重点分类** | 巴比妥类、苯二氮䓬类 | 纸质版"临床用药评价"分支下直接出现该分类名，且其下有作用特点/不良反应 |
+| 节点类型     | 示例                   | 判定标准                                                                     |
+| ------------ | ---------------------- | ---------------------------------------------------------------------------- |
+| **重点药**   | 地西泮、唑吡坦、巴氯芬 | 纸质版"临床用药评价"分支下有该药的独立框（含作用特点/临床应用/不良反应正文） |
+| **重点分类** | 巴比妥类、苯二氮䓬类   | 纸质版"临床用药评价"分支下直接出现该分类名，且其下有作用特点/不良反应        |
 
 > **关键区分**：double 的判定依据是"该节点是否出现在纸质版'临床用药评价'分支下"，不是"该分类下有没有药"或"该分类有没有代表药"。分类与作用机制分支里的分类，即使列出了代表药，也不加 double。
 >
@@ -193,6 +198,7 @@
 > 合并方式由 `STROKE_MERGE_MODE` 决定：`coexist`（默认）两者并存；`override` 时 md 填了 stroke 就完全接管，defaultStroke 不再生效。
 
 **`auto` vs `fallback` 的区别**：
+
 - `auto`：先查 subtreeRoot，有就用子树色（保持同子树视觉统一）；无才用 fill 兜底边框色
 - `fallback`：**永远**按 fill 兜底边框色着色，subtreeRoot 完全不参与
 
@@ -202,22 +208,22 @@
 
 ## 六、药学概念 → fill/stroke 映射表
 
-| 药学概念 | fill | 普通节点 stroke | 重点节点 stroke |
-|---|---|---|---|
-| 书/篇/章/节入口 | `cls-structure` | 不填 | — |
-| 药物分类（无临床评价） | `cls-classification` | 不填 | — |
-| 药物分类（有临床评价） | `cls-classification` | — | `double` |
-| 普通药（仅提名） | `cls-drug` | 不填 | — |
-| 重点药（有药理卡片） | `cls-drug` | — | `double` |
-| 疾病/症状 | `cls-disease` | 不填 | — |
-| 靶点/受体/酶 | `cls-biomolecule` | 不填 | — |
-| 作用特点/临床评价 | `cls-feature` | 不填 | — |
-| 选药原则/用药注意 | `cls-feature` | 不填 | — |
-| 典型不良反应 | `cls-adverse` | 不填 | — |
-| 禁忌 | `cls-adverse` | 不填 | — |
-| 抽象概念/总论 | `cls-concept` | 不填 | — |
-| 节内总结 | `cls-summary` | 不填 | — |
-| 跨节大总结/表格 | `cls-summary` | — | `double` |
-| 口诀 | `cls-mnemonic` | 不填 | — |
+| 药学概念               | fill                 | 普通节点 stroke | 重点节点 stroke |
+| ---------------------- | -------------------- | --------------- | --------------- |
+| 书/篇/章/节入口        | `cls-structure`      | 不填            | —               |
+| 药物分类（无临床评价） | `cls-classification` | 不填            | —               |
+| 药物分类（有临床评价） | `cls-classification` | —               | `double`        |
+| 普通药（仅提名）       | `cls-drug`           | 不填            | —               |
+| 重点药（有药理卡片）   | `cls-drug`           | —               | `double`        |
+| 疾病/症状              | `cls-disease`        | 不填            | —               |
+| 靶点/受体/酶           | `cls-biomolecule`    | 不填            | —               |
+| 作用特点/临床评价      | `cls-feature`        | 不填            | —               |
+| 选药原则/用药注意      | `cls-feature`        | 不填            | —               |
+| 典型不良反应           | `cls-adverse`        | 不填            | —               |
+| 禁忌                   | `cls-adverse`        | 不填            | —               |
+| 抽象概念/总论          | `cls-concept`        | 不填            | —               |
+| 节内总结               | `cls-summary`        | 不填            | —               |
+| 跨节大总结/表格        | `cls-summary`        | —               | `double`        |
+| 口诀                   | `cls-mnemonic`       | 不填            | —               |
 
 > "重点"判定标准：教材中有详细药理卡片/临床用药评价单独讲解的药物或分类。

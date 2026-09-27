@@ -124,7 +124,10 @@ describe('randomize (issue #17 fix)', () => {
 
   it('calls renderer.fit() after positioning so the camera shows the new spread', () => {
     const cy = makeCy();
-    cy.add([{ group: 'nodes', data: { id: 'a' } }, { group: 'nodes', data: { id: 'b' } }]);
+    cy.add([
+      { group: 'nodes', data: { id: 'a' } },
+      { group: 'nodes', data: { id: 'b' } },
+    ]);
 
     const renderer = asRenderer(makeStubRenderer(cy));
     randomize(renderer, stubHighlight);
@@ -137,7 +140,11 @@ describe('randomize (issue #17 fix)', () => {
     cy.add([{ group: 'nodes', data: { id: 'a' } }]);
 
     let resetCalled = 0;
-    const highlight = { reset: () => { resetCalled++; } } as unknown as HighlightEngine;
+    const highlight = {
+      reset: () => {
+        resetCalled++;
+      },
+    } as unknown as HighlightEngine;
 
     randomize(asRenderer(makeStubRenderer(cy)), highlight);
     expect(resetCalled).toBe(1);

@@ -56,13 +56,17 @@ function installStub(stub: SpeechStub | null) {
         volume: (u as Record<string, unknown>).volume as number,
       });
     },
-    cancel() { stub.cancelCalls += 1; },
+    cancel() {
+      stub.cancelCalls += 1;
+    },
     pause() {},
     resume() {},
     onvoiceschanged: null,
     addEventListener() {},
     removeEventListener() {},
-    dispatchEvent() { return false; },
+    dispatchEvent() {
+      return false;
+    },
   };
 
   (globalThis as Record<string, unknown>).SpeechSynthesisUtterance = UtteranceCtor;
@@ -150,12 +154,14 @@ describe('speech button DOM side-effects (jsdom)', () => {
     const { speechController } = await import('@/ui/speech');
 
     let callCount = 0;
-    (globalThis.speechSynthesis as unknown as { speak: (u: SpeechSynthesisUtterance) => void }).speak = () => {
+    (
+      globalThis.speechSynthesis as unknown as { speak: (u: SpeechSynthesisUtterance) => void }
+    ).speak = () => {
       callCount += 1;
       if (callCount === 1) throw new Error('unlock boom');
     };
 
-    speechController.toggle();           // unlock → throws
+    speechController.toggle(); // unlock → throws
 
     const btn = document.querySelector<HTMLButtonElement>('[data-tour-action="toggle-speech"]')!;
     expect(btn.disabled).toBe(false);

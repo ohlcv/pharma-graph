@@ -33,9 +33,7 @@ const DEFAULT_OPTIONS: Required<CarouselOptions> = {
 };
 
 function buildFlatList(messages: DisciplineLayer[]): string[] {
-  return messages.flatMap((l) =>
-    l.disciplines.flatMap((d) => d.terms.map((t) => t.name))
-  );
+  return messages.flatMap((l) => l.disciplines.flatMap((d) => d.terms.map((t) => t.name)));
 }
 
 export const brandCarousel = (() => {
@@ -89,8 +87,14 @@ export const brandCarousel = (() => {
     },
 
     stop(): void {
-      if (timer !== null) { clearInterval(timer); timer = null; }
-      if (fadeTimer !== null) { clearTimeout(fadeTimer); fadeTimer = null; }
+      if (timer !== null) {
+        clearInterval(timer);
+        timer = null;
+      }
+      if (fadeTimer !== null) {
+        clearTimeout(fadeTimer);
+        fadeTimer = null;
+      }
       running = false;
     },
 

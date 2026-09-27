@@ -36,7 +36,11 @@ export type ProgressCallback = (progress: LoadProgress) => void;
  * progressive "节点一颗颗长出来" experience instead of a blank
  * screen for the entire fetch duration.
  */
-export type BatchCallback = (batchFiles: Record<string, string>, batchLoaded: number, batchTotal: number) => void;
+export type BatchCallback = (
+  batchFiles: Record<string, string>,
+  batchLoaded: number,
+  batchTotal: number,
+) => void;
 
 /**
  * Concurrency-limited parallel fetch with progress + streaming batches.
@@ -176,10 +180,13 @@ function saveToCache(files: Record<string, string>): void {
       console.warn('[loader] Cache too large, skipping localStorage');
       return;
     }
-    localStorage.setItem(CACHE_KEY, JSON.stringify({
-      data: files,
-      timestamp: Date.now(),
-    }));
+    localStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({
+        data: files,
+        timestamp: Date.now(),
+      }),
+    );
   } catch (err) {
     console.warn('[loader] Failed to cache:', err);
   }
@@ -195,9 +202,10 @@ function deviceProfile(): { concurrency: number; batchSize: number } {
     connection?: { effectiveType?: string; saveData?: boolean };
   };
   const memory = nav.deviceMemory || 4;
-  const isSlowNet = nav.connection?.effectiveType === 'slow-2g' ||
-                    nav.connection?.effectiveType === '2g' ||
-                    nav.connection?.effectiveType === '3g';
+  const isSlowNet =
+    nav.connection?.effectiveType === 'slow-2g' ||
+    nav.connection?.effectiveType === '2g' ||
+    nav.connection?.effectiveType === '3g';
   const isSaveData = nav.connection?.saveData === true;
   const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
 
@@ -239,7 +247,7 @@ export async function loadContentStreaming(
   if (!manifestRes.ok) {
     throw new Error(`Manifest fetch failed: ${manifestRes.status}`);
   }
-  const manifest = await manifestRes.json() as { files: string[] };
+  const manifest = (await manifestRes.json()) as { files: string[] };
 
   // Cache disabled — 临时禁用，跳过 localStorage 缓存命中。
   // 调试后端改动时每次刷新都重新拉取，避免看到陈旧的 streaming 行为。
@@ -259,17 +267,25 @@ export async function loadContentStreaming(
     stream(cached.files, Object.keys(cached.files).length, manifest.files.length);
 
     requestAnimationFrame(() => {
-      report({ phase: 'done', loaded: manifest.files.length, total: manifest.files.length, message: '准备就绪' });
+      report({
+        phase: 'done',
+        loaded: manifest.files.length,
+        total: manifest.files.length,
+        message: '准备就绪',
+      });
     });
 
     return { files: cached.files, count: Object.keys(cached.files).length };
   }
 
   // Build URLs (parallel to manifest)
-  const urls = manifest.files.map((rel) =>
-    '/content/' + rel.split('/').map(
-      (s) => encodeURI(s).replace(/#/g, '%23').replace(/\?/g, '%3F'),
-    ).join('/')
+  const urls = manifest.files.map(
+    (rel) =>
+      '/content/' +
+      rel
+        .split('/')
+        .map((s) => encodeURI(s).replace(/#/g, '%23').replace(/\?/g, '%3F'))
+        .join('/'),
   );
 
   // Adaptive concurrency / batch size from device profile
@@ -306,14 +322,11 @@ export async function loadContent(onProgress?: ProgressCallback): Promise<Loaded
   let allFiles: Record<string, string> = {};
   let finalCount = 0;
 
-  await loadContentStreaming(
-    onProgress,
-    (batchFiles, _loaded, _total) => {
-      // Accumulate all batches without rendering progressively
-      Object.assign(allFiles, batchFiles);
-      finalCount = Object.keys(allFiles).length;
-    },
-  );
+  await loadContentStreaming(onProgress, (batchFiles, _loaded, _total) => {
+    // Accumulate all batches without rendering progressively
+    Object.assign(allFiles, batchFiles);
+    finalCount = Object.keys(allFiles).length;
+  });
 
   // Final pass — call once with everything collected
   void finalCount;

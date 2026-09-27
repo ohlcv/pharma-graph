@@ -1,12 +1,12 @@
 # ADR-0001: 层级关系统一使用 `isa`（子→父）方向
 
-| 字段 | 值 |
-|---|---|
-| **状态** | Accepted · Implemented |
-| **日期** | 2026-07-14 |
-| **决策者** | 项目所有者 |
-| **影响范围** | `public/content/**` 所有 frontmatter、`src/parser/frontmatter.ts`、`scripts/validate.ts`、`docs/frontmatter.md` |
-| **实施** | 迁移脚本 `archive/scripts/migrate-isa.ts` 已执行，has 边从 384 清零、isa 边新增 356 条（167 由 has 改写 + 189 子节点补），详见 `docs/migration-report.md` |
+| 字段         | 值                                                                                                                                                        |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **状态**     | Accepted · Implemented                                                                                                                                    |
+| **日期**     | 2026-07-14                                                                                                                                                |
+| **决策者**   | 项目所有者                                                                                                                                                |
+| **影响范围** | `public/content/**` 所有 frontmatter、`src/parser/frontmatter.ts`、`scripts/validate.ts`、`docs/frontmatter.md`                                           |
+| **实施**     | 迁移脚本 `archive/scripts/migrate-isa.ts` 已执行，has 边从 384 清零、isa 边新增 356 条（167 由 has 改写 + 189 子节点补），详见 `docs/migration-report.md` |
 
 ## 一、背景（Context）
 
@@ -31,10 +31,10 @@
 
 以《第一章 精神与中枢神经系统用药》为例，**7 节全部都写了反向 `has → cns-drugs-y2`**：
 
-| 节点 | 边的写法 |
-|---|---|
-| `cns-drugs-y2`（章） | `has → anti-dementia-drugs`（父→子） |
-| `anti-dementia-drugs`（节） | `has → cns-drugs-y2`（子→父） |
+| 节点                        | 边的写法                             |
+| --------------------------- | ------------------------------------ |
+| `cns-drugs-y2`（章）        | `has → anti-dementia-drugs`（父→子） |
+| `anti-dementia-drugs`（节） | `has → cns-drugs-y2`（子→父）        |
 
 类似情况在全书普遍存在：第二章 3 节、第八章 N 节都写了"本节属于 XXX 章"的反向 `has` 边。
 
@@ -59,10 +59,10 @@ section  ──isa──>  chapter  ──isa──>  part  ──isa──>  bo
 
 ### 2.2 边的语义分工
 
-| 边类型 | 方向 | 适用场景 | 示例 |
-|---|---|---|---|
-| **`isa`** | **子→父**（强制） | 层级归属、分类归类 | 节 → 章、具体药 → 药理类 |
-| **`has`** | **整体→部分**（强制） | 物理/组合组成 | 制剂 → 辅料、人体 → 器官 |
+| 边类型    | 方向                  | 适用场景           | 示例                     |
+| --------- | --------------------- | ------------------ | ------------------------ |
+| **`isa`** | **子→父**（强制）     | 层级归属、分类归类 | 节 → 章、具体药 → 药理类 |
+| **`has`** | **整体→部分**（强制） | 物理/组合组成      | 制剂 → 辅料、人体 → 器官 |
 
 ### 2.3 关键规则
 
@@ -133,11 +133,11 @@ W3C 标准体系、知识图谱惯例、面向对象设计等反复验证"子→
 
 ### 4.1 W3C / RDF / OWL
 
-| 体系 | 关系 | 方向 |
-|---|---|---|
-| RDF Schema | `rdfs:subClassOf` | 子类 → 父类 |
-| OWL 2 | `owl:subClassOf` | 子类 → 父类 |
-| SKOS | `skos:broader` / `skos:narrower` | 推荐只存 `broader`（子→父），`narrower` 由推理得到 |
+| 体系       | 关系                             | 方向                                               |
+| ---------- | -------------------------------- | -------------------------------------------------- |
+| RDF Schema | `rdfs:subClassOf`                | 子类 → 父类                                        |
+| OWL 2      | `owl:subClassOf`                 | 子类 → 父类                                        |
+| SKOS       | `skos:broader` / `skos:narrower` | 推荐只存 `broader`（子→父），`narrower` 由推理得到 |
 
 ### 4.2 知识库 / 本体
 
@@ -249,6 +249,6 @@ npm run dev
 
 ## 八、变更历史（Change History）
 
-| 日期 | 版本 | 变更 |
-|---|---|---|
-| 2026-07-14 | 1.0 | 初稿，状态 Accepted |
+| 日期       | 版本 | 变更                |
+| ---------- | ---- | ------------------- |
+| 2026-07-14 | 1.0  | 初稿，状态 Accepted |

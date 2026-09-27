@@ -38,7 +38,12 @@
 //          匀速旋转。无渐变对象，成本最低。
 
 import type cytoscape from 'cytoscape';
-import { getNodeOutline, polygonPerimeter, pointAtPerimeterDistance, type Point } from './node-shape-outline.js';
+import {
+  getNodeOutline,
+  polygonPerimeter,
+  pointAtPerimeterDistance,
+  type Point,
+} from './node-shape-outline.js';
 import { readThemeColors } from './theme-colors.js';
 
 export interface GlowOverlayOptions {
@@ -697,10 +702,15 @@ export class GlowOverlay {
       const pulsing = n.hasClass('tour-pulsing');
       const breath = this.reducedMotion
         ? 0.5
-        : 0.5 + 0.5 * Math.sin((elapsedMs / (pulsing ? EMPH_PULSE_PERIOD_MS : this.glowPeriodMs)) * TWO_PI);
+        : 0.5 +
+          0.5 *
+            Math.sin((elapsedMs / (pulsing ? EMPH_PULSE_PERIOD_MS : this.glowPeriodMs)) * TWO_PI);
       const intensity = pulsing ? 0.55 + 0.45 * breath : 0.82 + 0.18 * breath;
 
-      const wideBlur = Math.min(42, Math.max(14, maxHalf * 0.85 * (pulsing ? 0.85 + 0.3 * breath : 1)));
+      const wideBlur = Math.min(
+        42,
+        Math.max(14, maxHalf * 0.85 * (pulsing ? 0.85 + 0.3 * breath : 1)),
+      );
       const bandW = wideBlur * 0.6;
       // 只用于屏幕外剔除：sprite 的可见范围约为外沿 + 模糊尾巴，留足余量。
       const reach = maxHalf + bandW + wideBlur * 2;
@@ -790,7 +800,7 @@ export class GlowOverlay {
     };
 
     if (halos.length > 0) {
-      const opacity = 0.34 + 0.12 * glowSine;          // 0.22 ↔ 0.46
+      const opacity = 0.34 + 0.12 * glowSine; // 0.22 ↔ 0.46
       const spreadScale = 1 + this.glowSpread * (1 + 0.18 * glowSine);
       for (const h of halos) {
         // 按节点真实形状外扩后整体实心填充：径向渐变从中心到边缘淡出
@@ -914,7 +924,10 @@ export class GlowOverlay {
     return this.collectRenderedNodes(this.flowNodes, 0.15);
   }
 
-  private collectRenderedNodes(nodes: cytoscape.NodeCollection | null, reachSpread: number): RenderedNode[] {
+  private collectRenderedNodes(
+    nodes: cytoscape.NodeCollection | null,
+    reachSpread: number,
+  ): RenderedNode[] {
     if (!nodes || nodes.length === 0) return [];
 
     const out: RenderedNode[] = [];

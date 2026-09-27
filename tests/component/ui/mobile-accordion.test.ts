@@ -22,10 +22,10 @@ import {
   resetBsAdvancedPrefs,
 } from '@/ui/layout/layout-params';
 import {
-  getMobileAdvancedOpen,
-  getMobileLayoutSettingOpen,
-  setMobileAdvancedOpen,
-  setMobileLayoutSettingOpen,
+  getAdvancedOpen,
+  getAdvancedLayoutParamsOpen,
+  setAdvancedOpen,
+  setAdvancedLayoutParamsOpen,
 } from '@/ui/layout/layout-store';
 
 function setupDom(): void {
@@ -63,13 +63,13 @@ describe('mobile bottom-sheet accordions', () => {
     expect(adv().classList.contains('open')).toBe(true);
     expect(adv().classList.contains('collapsed')).toBe(false);
     expect(advHead().getAttribute('aria-expanded')).toBe('true');
-    expect(getMobileAdvancedOpen()).toBe(true);
+    expect(getAdvancedOpen()).toBe(true);
 
     toggleBsAdvanced();
     expect(adv().classList.contains('open')).toBe(false);
     expect(adv().classList.contains('collapsed')).toBe(true);
     expect(advHead().getAttribute('aria-expanded')).toBe('false');
-    expect(getMobileAdvancedOpen()).toBe(false);
+    expect(getAdvancedOpen()).toBe(false);
   });
 
   it('布局设置: same contract for the nested sub-accordion', () => {
@@ -77,7 +77,7 @@ describe('mobile bottom-sheet accordions', () => {
     expect(sub().classList.contains('open')).toBe(true);
     expect(sub().classList.contains('collapsed')).toBe(false);
     expect(subHead().getAttribute('aria-expanded')).toBe('true');
-    expect(getMobileLayoutSettingOpen()).toBe(true);
+    expect(getAdvancedLayoutParamsOpen()).toBe(true);
 
     toggleBsLayoutSetting();
     expect(sub().classList.contains('open')).toBe(false);
@@ -86,8 +86,8 @@ describe('mobile bottom-sheet accordions', () => {
   });
 
   it('restore replays the stored preference into classes + aria', () => {
-    setMobileAdvancedOpen(true);
-    setMobileLayoutSettingOpen(true);
+    setAdvancedOpen(true);
+    setAdvancedLayoutParamsOpen(true);
     restoreBsAdvancedPrefs();
 
     expect(adv().classList.contains('open')).toBe(true);
@@ -114,8 +114,8 @@ describe('mobile bottom-sheet accordions', () => {
 
     resetBsAdvancedPrefs();
 
-    expect(getMobileAdvancedOpen()).toBe(false);
-    expect(getMobileLayoutSettingOpen()).toBe(false);
+    expect(getAdvancedOpen()).toBe(false);
+    expect(getAdvancedLayoutParamsOpen()).toBe(false);
     expect(adv().classList.contains('open')).toBe(false);
     expect(adv().classList.contains('collapsed')).toBe(true);
     expect(advHead().getAttribute('aria-expanded')).toBe('false');
@@ -125,7 +125,7 @@ describe('mobile bottom-sheet accordions', () => {
   });
 
   it('restoreBsLayoutSettingPrefs only touches the sub-accordion', () => {
-    setMobileLayoutSettingOpen(true);
+    setAdvancedLayoutParamsOpen(true);
     restoreBsLayoutSettingPrefs();
 
     expect(sub().classList.contains('open')).toBe(true);

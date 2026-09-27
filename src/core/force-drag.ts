@@ -271,12 +271,18 @@ function buildSession(grabbed: cytoscape.NodeCollection): Session | null {
         .id((d) => d.id)
         .distance((l) => l.rest),
     )
-    .force('charge', forceManyBody<SimNode>().strength(CHARGE).distanceMax(CHARGE_MAX_DIST).theta(0.9))
-    .force('ax', forceX<SimNode>((d) => d.ox).strength((d) => anchorStrength(d.hop)))
-    .force('ay', forceY<SimNode>((d) => d.oy).strength((d) => anchorStrength(d.hop))) as Simulation<
-    SimNode,
-    SimLink
-  >;
+    .force(
+      'charge',
+      forceManyBody<SimNode>().strength(CHARGE).distanceMax(CHARGE_MAX_DIST).theta(0.9),
+    )
+    .force(
+      'ax',
+      forceX<SimNode>((d) => d.ox).strength((d) => anchorStrength(d.hop)),
+    )
+    .force(
+      'ay',
+      forceY<SimNode>((d) => d.oy).strength((d) => anchorStrength(d.hop)),
+    ) as Simulation<SimNode, SimLink>;
 
   const s: Session = {
     cy,

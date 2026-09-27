@@ -10,12 +10,7 @@ import type { Core } from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
 import { staticEls } from './dom-cache.js';
 import { uiState } from './state.js';
-import {
-  SHAPE_LABEL,
-  EDGE_TYPE_STYLE,
-  EDGE_TYPE_LABEL,
-  FILL_CONFIG,
-} from '../core/config.js';
+import { SHAPE_LABEL, EDGE_TYPE_STYLE, EDGE_TYPE_LABEL, FILL_CONFIG } from '../core/config.js';
 import { DEFAULT_EDGE_TYPE, isEdgeType } from '../core/edge-types.js';
 import { buildLegend } from './legend-factory.js';
 import { updateStats, syncBottomSheetStats } from './graph-stats.js';
@@ -37,10 +32,9 @@ export function clearShapeFilter(): void {
 export function clearAllFilters(): void {
   activeShapeFilter = null;
   activeEdgeFilter = null;
-  staticEls(
-    '.legend-row', '.legend-edge-row',
-    '.shape-filter-item', '.bs-chip',
-  ).forEach((el) => el.classList.remove('active'));
+  staticEls('.legend-row', '.legend-edge-row', '.shape-filter-item', '.bs-chip').forEach((el) =>
+    el.classList.remove('active'),
+  );
 }
 
 // ── Axis populators ────────────────────────────────────────────────────────────
@@ -77,10 +71,14 @@ export function populateEssenceLegend(cy: Core): void {
     mobileCountPrefix: 'bs-essence-count-',
     rowClass: 'legend-row',
     dataKey: 'data-type',
-    desktopRow: (k, label) => `<div class="legend-row" data-type="${k}">${makeFillSwatch(k)}<span class="legend-row__label">${label}</span><span class="legend-row__count" id="legend-essence-count-${k}"></span></div>`,
-    mobileChip: (k, label) => `<div class="bs-chip" data-type="${k}">${makeFillSwatch(k)}<span>${label}</span><span class="bs-chip__count" id="bs-essence-count-${k}"></span></div>`,
+    desktopRow: (k, label) =>
+      `<div class="legend-row" data-type="${k}">${makeFillSwatch(k)}<span class="legend-row__label">${label}</span><span class="legend-row__count" id="legend-essence-count-${k}"></span></div>`,
+    mobileChip: (k, label) =>
+      `<div class="bs-chip" data-type="${k}">${makeFillSwatch(k)}<span>${label}</span><span class="bs-chip__count" id="bs-essence-count-${k}"></span></div>`,
     onClick: (key, highlight) => highlightFillFilter(key, highlight),
-    onCycle: (_key, delta, highlight) => { cycleHighlightedNodes(delta, highlight); },
+    onCycle: (_key, delta, highlight) => {
+      cycleHighlightedNodes(delta, highlight);
+    },
   });
 }
 
@@ -128,7 +126,9 @@ export function populateEdgeLegend(cy: Core): void {
       return `<div class="bs-chip" data-edge="${k}"><svg width="24" height="10" viewBox="0 0 24 10" style="flex-shrink:0"><line x1="2" y1="5" x2="22" y2="5" stroke="${style.color}" stroke-width="2" ${dashAttr(style.lineStyle)}/>${arrowSvg(style, 22)}</svg><span>${label}</span><span class="bs-chip__count" id="bs-edge-count-${k}"></span></div>`;
     },
     onClick: (key, highlight) => highlightEdgeTypeFilter(key, highlight),
-    onCycle: (_key, delta, highlight) => { cycleHighlightedNodes(delta, highlight); },
+    onCycle: (_key, delta, highlight) => {
+      cycleHighlightedNodes(delta, highlight);
+    },
   });
 }
 
@@ -146,10 +146,7 @@ export function populateEdgeLegend(cy: Core): void {
  * - If the set is empty (filter not active), the keypress is a no-op (but
  *   still swallows the default scroll behaviour upstream).
  */
-export function cycleHighlightedNodes(
-  delta: -1 | 1,
-  highlight: HighlightEngine,
-): boolean {
+export function cycleHighlightedNodes(delta: -1 | 1, highlight: HighlightEngine): boolean {
   const cy = highlight.getCy();
   const LAYER_PARENT = 'layer-parent';
   const HIGHLIGHTED = 'highlighted';

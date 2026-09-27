@@ -10,7 +10,11 @@ import { parse as yamlParse } from 'yaml';
 
 const CONTENT_DIR = path.resolve('public/content');
 
-interface EdgeDef { target: string; type: string; reason?: string; }
+interface EdgeDef {
+  target: string;
+  type: string;
+  reason?: string;
+}
 interface ParsedFM {
   id?: string;
   label?: string;
@@ -32,19 +36,26 @@ function parseFile(content: string): ParsedFM & { edgesFromRoot: EdgeDef[] } {
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       root = parsed as Record<string, unknown>;
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
-  const fm = (root['data'] && typeof root['data'] === 'object' && !Array.isArray(root['data']))
-    ? (root['data'] as Record<string, unknown>)
-    : root;
+  const fm =
+    root['data'] && typeof root['data'] === 'object' && !Array.isArray(root['data'])
+      ? (root['data'] as Record<string, unknown>)
+      : root;
 
   const rootEdges = (root['edges_out'] as unknown[]) ?? [];
   const dataEdges = (fm['edges_out'] as unknown[]) ?? [];
   const edgesRaw = rootEdges.length > 0 ? rootEdges : dataEdges;
   const edges: EdgeDef[] = Array.isArray(edgesRaw)
-    ? edgesRaw.filter((e): e is Record<string, unknown> =>
-        typeof e === 'object' && e !== null && !Array.isArray(e) &&
-        typeof e['target'] === 'string')
+    ? edgesRaw.filter(
+        (e): e is Record<string, unknown> =>
+          typeof e === 'object' &&
+          e !== null &&
+          !Array.isArray(e) &&
+          typeof e['target'] === 'string',
+      )
     : [];
 
   return { ...(fm as ParsedFM), edgesFromRoot: edges };
@@ -82,32 +93,34 @@ async function main() {
     }
   }
 
-  const allIds = new Set(nodes.map(n => n.id).filter(id => id && id !== 'PARSE_ERROR'));
-  const idToNode = new Map(nodes.map(n => [n.id, n]));
+  const allIds = new Set(nodes.map((n) => n.id).filter((id) => id && id !== 'PARSE_ERROR'));
+  const idToNode = new Map(nodes.map((n) => [n.id, n]));
 
   console.log(`\n=== 总览 ===`);
   console.log(`节点总数: ${nodes.length}`);
   console.log(`有效 ID 数: ${allIds.size}`);
-  console.log(`ID 重复: ${nodes.length - allIds.size - (nodes.filter(n => !n.id || n.id === 'PARSE_ERROR').length)}`);
+  console.log(
+    `ID 重复: ${nodes.length - allIds.size - nodes.filter((n) => !n.id || n.id === 'PARSE_ERROR').length}`,
+  );
 
   // 问题1: 非英文ID
-  const nonEnglishIds = nodes.filter(n => n.id && !isEnglishId(n.id));
+  const nonEnglishIds = nodes.filter((n) => n.id && !isEnglishId(n.id));
   console.log(`\n=== 问题1: 非英文 ID (${nonEnglishIds.length} 个) ===`);
-  nonEnglishIds.forEach(n => {
+  nonEnglishIds.forEach((n) => {
     console.log(`  ❌ ${n.file}`);
     console.log(`     id="${n.id}" label="${n.label}"`);
   });
 
   // 问题2: 缺失ID
-  const missingId = nodes.filter(n => !n.id || n.id === 'PARSE_ERROR');
+  const missingId = nodes.filter((n) => !n.id || n.id === 'PARSE_ERROR');
   console.log(`\n=== 问题2: 缺失或错误 ID (${missingId.length} 个) ===`);
-  missingId.forEach(n => {
+  missingId.forEach((n) => {
     console.log(`  ❌ ${n.file} (解析结果: "${n.id}")`);
   });
 
   // 问题3: ID重复
   const idCount = new Map<string, NodeInfo[]>();
-  nodes.forEach(n => {
+  nodes.forEach((n) => {
     if (n.id && n.id !== 'PARSE_ERROR') {
       if (!idCount.has(n.id)) idCount.set(n.id, []);
       idCount.get(n.id)!.push(n);
@@ -117,13 +130,13 @@ async function main() {
   console.log(`\n=== 问题3: ID 重复 (${duplicates.length} 组) ===`);
   duplicates.forEach(([id, arr]) => {
     console.log(`  ❌ id="${id}" 出现 ${arr.length} 次:`);
-    arr.forEach(n => console.log(`     - ${n.file} (label="${n.label}")`));
+    arr.forEach((n) => console.log(`     - ${n.file} (label="${n.label}")`));
   });
 
   // 问题4: 悬空边
   const danglingEdges: { file: string; id: string; label: string; edge: EdgeDef }[] = [];
-  nodes.forEach(n => {
-    n.edges.forEach(edge => {
+  nodes.forEach((n) => {
+    n.edges.forEach((edge) => {
       if (!allIds.has(edge.target)) {
         danglingEdges.push({ file: n.file, id: n.id, label: n.label, edge });
       }
@@ -141,7 +154,7 @@ async function main() {
   // 非英文ID修复建议
   if (nonEnglishIds.length > 0) {
     console.log('\n## 非英文 ID 修复建议:');
-    nonEnglishIds.forEach(n => {
+    nonEnglishIds.forEach((n) => {
       // 简单转换: 中文/拼音 → 英文
       const suggested = suggestEnglishId(n.label, n.file);
       console.log(`  - ${n.file}: "${n.id}" → "${suggested}"`);
@@ -163,34 +176,38 @@ async function main() {
 
   // 输出所有ID列表供参考
   console.log(`\n=== 所有有效 ID 列表 ===`);
-  [...allIds].sort().forEach(id => console.log(`  ${id}`));
+  [...allIds].sort().forEach((id) => console.log(`  ${id}`));
 
-  fs.writeFileSync('docs/audit-report.md', generateReport(nodes, nonEnglishIds, duplicates, danglingEdges, allIds), 'utf8');
+  fs.writeFileSync(
+    'docs/audit-report.md',
+    generateReport(nodes, nonEnglishIds, duplicates, danglingEdges, allIds),
+    'utf8',
+  );
   console.log('\n报告已保存到 docs/audit-report.md');
 }
 
 function suggestEnglishId(label: string, file: string): string {
   // 常见中文词根映射
   const map: Record<string, string> = {
-    '药学专业知识一': 'book-yaoxue-yi',
-    '药学专业知识二': 'book-yaoxue-er',
-    '药学综合知识与技能': 'book-yaoxue-zonghe',
-    '精神与中枢神经系统用药': 'cns-drugs',
-    '第一章': 'chapter-01',
-    '第二章': 'chapter-02',
-    '第三章': 'chapter-03',
-    '第四章': 'chapter-04',
-    '第五章': 'chapter-05',
-    '第六章': 'chapter-06',
-    '第七章': 'chapter-07',
-    '第八章': 'chapter-08',
-    '第九章': 'chapter-09',
-    '第十章': 'chapter-10',
-    '第十一章': 'chapter-11',
-    '第十二章': 'chapter-12',
-    '第十三章': 'chapter-13',
-    '第十四章': 'chapter-14',
-    '第十五章': 'chapter-15',
+    药学专业知识一: 'book-yaoxue-yi',
+    药学专业知识二: 'book-yaoxue-er',
+    药学综合知识与技能: 'book-yaoxue-zonghe',
+    精神与中枢神经系统用药: 'cns-drugs',
+    第一章: 'chapter-01',
+    第二章: 'chapter-02',
+    第三章: 'chapter-03',
+    第四章: 'chapter-04',
+    第五章: 'chapter-05',
+    第六章: 'chapter-06',
+    第七章: 'chapter-07',
+    第八章: 'chapter-08',
+    第九章: 'chapter-09',
+    第十章: 'chapter-10',
+    第十一章: 'chapter-11',
+    第十二章: 'chapter-12',
+    第十三章: 'chapter-13',
+    第十四章: 'chapter-14',
+    第十五章: 'chapter-15',
   };
 
   if (map[label]) return map[label];
@@ -210,15 +227,23 @@ function suggestEnglishId(label: string, file: string): string {
 function findSimilarIds(target: string, allIds: Set<string>): string[] {
   const t = target.toLowerCase();
   return [...allIds]
-    .filter(id => {
+    .filter((id) => {
       const i = id.toLowerCase();
-      return i.includes(t.substring(0, Math.min(5, t.length))) ||
-             t.includes(i.substring(0, Math.min(5, i.length)));
+      return (
+        i.includes(t.substring(0, Math.min(5, t.length))) ||
+        t.includes(i.substring(0, Math.min(5, i.length)))
+      );
     })
     .slice(0, 5);
 }
 
-function generateReport(nodes: any[], nonEnglishIds: any[], duplicates: any[], danglingEdges: any[], allIds: Set<string>): string {
+function generateReport(
+  nodes: any[],
+  nonEnglishIds: any[],
+  duplicates: any[],
+  danglingEdges: any[],
+  allIds: Set<string>,
+): string {
   let md = '# 节点审计报告\n\n';
   md += `> 生成于 ${new Date().toLocaleString('zh-CN')}\n\n`;
 
@@ -233,7 +258,7 @@ function generateReport(nodes: any[], nonEnglishIds: any[], duplicates: any[], d
   if (nonEnglishIds.length === 0) {
     md += `✅ 无\n\n`;
   } else {
-    nonEnglishIds.forEach(n => {
+    nonEnglishIds.forEach((n) => {
       const suggested = suggestEnglishId(n.label, n.file);
       md += `- **${n.file}**\n`;
       md += `  - 当前 id: \`${n.id}\`\n`;
@@ -248,7 +273,7 @@ function generateReport(nodes: any[], nonEnglishIds: any[], duplicates: any[], d
   } else {
     duplicates.forEach(([id, arr]) => {
       md += `- id=\`${id}\` (${arr.length} 次)\n`;
-      arr.forEach((n: any) => md += `  - ${n.file} (label="${n.label}")\n`);
+      arr.forEach((n: any) => (md += `  - ${n.file} (label="${n.label}")\n`));
       md += '\n';
     });
   }
@@ -263,7 +288,7 @@ function generateReport(nodes: any[], nonEnglishIds: any[], duplicates: any[], d
       md += `  - 边: → ${edge.target} (${edge.type})\n`;
       const candidates = findSimilarIds(edge.target, allIds);
       if (candidates.length > 0) {
-        md += `  - 可能的候选: ${candidates.map(c => `\`${c}\``).join(', ')}\n`;
+        md += `  - 可能的候选: ${candidates.map((c) => `\`${c}\``).join(', ')}\n`;
       }
       md += '\n';
     });

@@ -116,7 +116,9 @@ CSS Grid 的 `1fr` 不是"弹性占满剩余空间"，而是 `minmax(auto, 1fr)`
   min-width: 0;
 }
 
-#main.sidebar-hidden { grid-template-columns: minmax(0, 1fr) 0; }
+#main.sidebar-hidden {
+  grid-template-columns: minmax(0, 1fr) 0;
+}
 ```
 
 **`src/ui/styles/components.css`** — `html.bigscreen #main` 和 `@media (max-width: 768px)` 里的 `1fr` 同样改：
@@ -128,7 +130,9 @@ html.bigscreen #main {
 }
 
 @media (max-width: 768px) {
-  #main { grid-template-columns: minmax(0, 1fr); }
+  #main {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 ```
 

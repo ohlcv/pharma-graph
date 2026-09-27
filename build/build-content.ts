@@ -116,12 +116,14 @@ export function parseFrontmatter(raw: string): {
     let fullSummary: string | undefined;
 
     if (typeof rawSummary === 'object' && rawSummary !== null) {
-      shortSummary = typeof (rawSummary as Record<string, unknown>)['short'] === 'string'
-        ? String((rawSummary as Record<string, unknown>)['short']).trim()
-        : undefined;
-      fullSummary = typeof (rawSummary as Record<string, unknown>)['full'] === 'string'
-        ? String((rawSummary as Record<string, unknown>)['full']).trim()
-        : undefined;
+      shortSummary =
+        typeof (rawSummary as Record<string, unknown>)['short'] === 'string'
+          ? String((rawSummary as Record<string, unknown>)['short']).trim()
+          : undefined;
+      fullSummary =
+        typeof (rawSummary as Record<string, unknown>)['full'] === 'string'
+          ? String((rawSummary as Record<string, unknown>)['full']).trim()
+          : undefined;
     } else if (typeof rawSummary === 'string') {
       shortSummary = rawSummary.trim();
     }
@@ -134,16 +136,35 @@ export function parseFrontmatter(raw: string): {
     const summary = shortSummary ?? fullSummary;
 
     const locationRaw = fm['location'] as Record<string, unknown> | undefined;
-    const location = locationRaw && typeof locationRaw === 'object'
-      ? {
-          book:       typeof locationRaw['book']       === 'string' ? String(locationRaw['book']).trim()       : undefined,
-          part:       typeof locationRaw['part']       === 'string' ? String(locationRaw['part']).trim()       : undefined,
-          chapter:    typeof locationRaw['chapter']    === 'string' ? String(locationRaw['chapter']).trim()    : undefined,
-          section:    typeof locationRaw['section']    === 'string' ? String(locationRaw['section']).trim()    : undefined,
-          item:       typeof locationRaw['item']       === 'string' ? String(locationRaw['item']).trim()       : undefined,
-          subsection: typeof locationRaw['subsection'] === 'string' ? String(locationRaw['subsection']).trim() : undefined,
-        }
-      : undefined;
+    const location =
+      locationRaw && typeof locationRaw === 'object'
+        ? {
+            book:
+              typeof locationRaw['book'] === 'string'
+                ? String(locationRaw['book']).trim()
+                : undefined,
+            part:
+              typeof locationRaw['part'] === 'string'
+                ? String(locationRaw['part']).trim()
+                : undefined,
+            chapter:
+              typeof locationRaw['chapter'] === 'string'
+                ? String(locationRaw['chapter']).trim()
+                : undefined,
+            section:
+              typeof locationRaw['section'] === 'string'
+                ? String(locationRaw['section']).trim()
+                : undefined,
+            item:
+              typeof locationRaw['item'] === 'string'
+                ? String(locationRaw['item']).trim()
+                : undefined,
+            subsection:
+              typeof locationRaw['subsection'] === 'string'
+                ? String(locationRaw['subsection']).trim()
+                : undefined,
+          }
+        : undefined;
 
     const tagsRaw = fm['tags'] as unknown[] | undefined;
     const tags = Array.isArray(tagsRaw)
@@ -151,17 +172,17 @@ export function parseFrontmatter(raw: string): {
       : undefined;
 
     return {
-      id:         typeof fm['id']     === 'string' ? String(fm['id']).trim()                : undefined,
-      label:      typeof fm['label']  === 'string' ? String(fm['label']).trim()             : undefined,
-      fill:       typeof fm['fill']   === 'string' ? String(fm['fill']).trim()              : undefined,
-      stroke:     typeof fm['stroke'] === 'string' ? String(fm['stroke']).trim()            : undefined,
-      shape:      typeof fm['shape']  === 'string' ? String(fm['shape']).trim()             : undefined,
+      id: typeof fm['id'] === 'string' ? String(fm['id']).trim() : undefined,
+      label: typeof fm['label'] === 'string' ? String(fm['label']).trim() : undefined,
+      fill: typeof fm['fill'] === 'string' ? String(fm['fill']).trim() : undefined,
+      stroke: typeof fm['stroke'] === 'string' ? String(fm['stroke']).trim() : undefined,
+      shape: typeof fm['shape'] === 'string' ? String(fm['shape']).trim() : undefined,
       shortSummary,
       fullSummary,
       summary,
       location,
-      tags:       tags && tags.length > 0 ? tags : undefined,
-      edges_out:  Array.isArray(fm['edges_out']) ? fm['edges_out'] as EdgeTarget[] : undefined,
+      tags: tags && tags.length > 0 ? tags : undefined,
+      edges_out: Array.isArray(fm['edges_out']) ? (fm['edges_out'] as EdgeTarget[]) : undefined,
     };
   } catch {
     return null;

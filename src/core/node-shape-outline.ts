@@ -26,7 +26,12 @@ function ellipsePoints(halfW: number, halfH: number, n = 20): Point[] {
   return pts;
 }
 
-function regularPolygonPoints(sides: number, halfW: number, halfH: number, rotationDeg: number): Point[] {
+function regularPolygonPoints(
+  sides: number,
+  halfW: number,
+  halfH: number,
+  rotationDeg: number,
+): Point[] {
   const pts: Point[] = [];
   const rot = (rotationDeg * Math.PI) / 180;
   for (let i = 0; i < sides; i++) {

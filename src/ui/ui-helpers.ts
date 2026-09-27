@@ -19,8 +19,8 @@ export function initEdgeTooltip(): void {
 export function showEdgeTooltip(text: string, x: number, y: number): void {
   if (!edgeTooltip) return;
   edgeTooltip.textContent = text;
-  edgeTooltip.style.left = (x + 12) + 'px';
-  edgeTooltip.style.top = (y - 12) + 'px';
+  edgeTooltip.style.left = x + 12 + 'px';
+  edgeTooltip.style.top = y - 12 + 'px';
   edgeTooltip.style.opacity = '1';
 }
 
@@ -57,7 +57,12 @@ export function showZoomIndicator(cy: import('cytoscape').Core): void {
     el.style.opacity = '1';
     if (zoomIndicatorTimer) clearTimeout(zoomIndicatorTimer);
     zoomIndicatorTimer = setTimeout(() => {
-      if (el) { el.style.opacity = '0'; setTimeout(() => { if (el) el.style.display = 'none'; }, 400); }
+      if (el) {
+        el.style.opacity = '0';
+        setTimeout(() => {
+          if (el) el.style.display = 'none';
+        }, 400);
+      }
     }, 2500);
     zoomIndicatorDebounce = null;
   }, 50);
@@ -72,5 +77,8 @@ export function showToast(message: string, type: 'info' | 'success' | 'error' = 
   toast.className = `toast toast--${type}`;
   toast.innerHTML = `<span class="toast__dot"></span><span>${message}</span>`;
   container.appendChild(toast);
-  setTimeout(() => { toast.style.animation = 'toast-out 0.3s ease forwards'; setTimeout(() => toast.remove(), 300); }, 3500);
+  setTimeout(() => {
+    toast.style.animation = 'toast-out 0.3s ease forwards';
+    setTimeout(() => toast.remove(), 300);
+  }, 3500);
 }

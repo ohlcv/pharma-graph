@@ -30,12 +30,17 @@ const DELETE_ARM_WINDOW_MS = 2000;
 let deleteArmedAt = 0;
 
 export function initShortcuts(cy: Core, callbacks: ShortcutCallbacks): void {
-  const cancelDeleteArm = () => { deleteArmedAt = 0; };
+  const cancelDeleteArm = () => {
+    deleteArmedAt = 0;
+  };
   document.addEventListener('keydown', (e) => {
     const t = e.target as HTMLElement | null;
     if (
       t &&
-      (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)
+      (t.tagName === 'INPUT' ||
+        t.tagName === 'SELECT' ||
+        t.tagName === 'TEXTAREA' ||
+        t.isContentEditable)
     ) {
       return;
     }
@@ -89,7 +94,10 @@ export function initShortcuts(cy: Core, callbacks: ShortcutCallbacks): void {
         break;
       case 'a':
       case 'A':
-        if (e.ctrlKey || e.metaKey) { e.preventDefault(); cy.nodes().not('.layer-parent').select(); }
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          cy.nodes().not('.layer-parent').select();
+        }
         break;
       case 'p':
       case 'P':

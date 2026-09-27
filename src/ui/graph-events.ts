@@ -100,7 +100,11 @@ export function initGraphEvents(deps: GraphEventDeps): void {
     if (cont) {
       const pos = node.renderedPosition();
       const rect = cont.getBoundingClientRect();
-      deps.spawnNodeRipple(rect.left + pos.x, rect.top + pos.y, node.data('color') || RIPPLE_COLORS.NODE);
+      deps.spawnNodeRipple(
+        rect.left + pos.x,
+        rect.top + pos.y,
+        node.data('color') || RIPPLE_COLORS.NODE,
+      );
     }
     const prev = deps.highlight.highlightNode(node.id());
     deps.setPrevSelectedNode(prev.prevNodeId, prev.prevNodeName);
@@ -122,7 +126,9 @@ export function initGraphEvents(deps: GraphEventDeps): void {
     deps.highlight.highlightEdgeOnly(evt.target.id());
     const edge = evt.target;
     const edgeType = edge.data('edgeType') as string | undefined;
-    const edgeStyle = edgeType ? (EDGE_TYPE_STYLE[edgeType] ?? EDGE_TYPE_STYLE.default) : EDGE_TYPE_STYLE.default;
+    const edgeStyle = edgeType
+      ? (EDGE_TYPE_STYLE[edgeType] ?? EDGE_TYPE_STYLE.default)
+      : EDGE_TYPE_STYLE.default;
     const rippleColor = edgeStyle.color;
     const src = edge.source().renderedPosition();
     const tgt = edge.target().renderedPosition();
@@ -148,7 +154,7 @@ export function initGraphEvents(deps: GraphEventDeps): void {
       // 检查 originalEvent.target 是否是漫游条相关元素
       const originalTarget = evt.originalEvent?.target as HTMLElement | null;
       const isTourInteraction = originalTarget?.closest?.(
-        '[data-tour-action], .tour-mob__range, .tour-dt__range, .tour-mob__cell, .tour-mob__track'
+        '[data-tour-action], .tour-mob__range, .tour-dt__range, .tour-mob__cell, .tour-mob__track',
       );
       if (!isTourInteraction) {
         if (deps.tourController.isRunning() || deps.tourController.isPaused()) {
@@ -236,9 +242,18 @@ export function initGraphEvents(deps: GraphEventDeps): void {
     updateStats(cy);
     syncBottomSheetStats(cy);
   });
-  cy.on('layoutstop', () => { updateStats(cy); syncBottomSheetStats(cy); });
-  cy.on('select', () => { updateStats(cy); syncBottomSheetStats(cy); });
-  cy.on('unselect', () => { updateStats(cy); syncBottomSheetStats(cy); });
+  cy.on('layoutstop', () => {
+    updateStats(cy);
+    syncBottomSheetStats(cy);
+  });
+  cy.on('select', () => {
+    updateStats(cy);
+    syncBottomSheetStats(cy);
+  });
+  cy.on('unselect', () => {
+    updateStats(cy);
+    syncBottomSheetStats(cy);
+  });
 
   // Keep stats + bottom-sheet counters in sync while streaming is still
   // pumping batches through `cy.add()`. Without this hook the counters stay
@@ -248,7 +263,10 @@ export function initGraphEvents(deps: GraphEventDeps): void {
   // initial `cy.add()` inside initGraphFromManager and every batch in
   // appendBatchToGraph; both `updateStats` and `syncBottomSheetStats` are
   // debounced so we won't thrash when a batch adds hundreds of nodes at once.
-  cy.on('add', () => { updateStats(cy); syncBottomSheetStats(cy); });
+  cy.on('add', () => {
+    updateStats(cy);
+    syncBottomSheetStats(cy);
+  });
 
   // 缩放上下限由 cytoscape 自己的 minZoom / maxZoom 保证（见 Renderer 选项）；
   // 这里原来的 5.0 钳制和 maxZoom=4.0 对不上，且永远不会生效。

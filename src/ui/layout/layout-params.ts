@@ -10,15 +10,19 @@
 
 import { Renderer } from '../../core/renderer.js';
 import { LAYOUTS } from '../../core/config.js';
-import { renderParamRow, collectParamOverrides, type RenderParam } from './layout-params-template.js';
+import {
+  renderParamRow,
+  collectParamOverrides,
+  type RenderParam,
+} from './layout-params-template.js';
 import {
   loadStoredParams,
   saveStoredParams,
   clearStoredParams,
-  getMobileAdvancedOpen,
-  setMobileAdvancedOpen,
-  getMobileLayoutSettingOpen,
-  setMobileLayoutSettingOpen,
+  getAdvancedOpen,
+  setAdvancedOpen,
+  getAdvancedLayoutParamsOpen,
+  setAdvancedLayoutParamsOpen,
 } from './layout-store.js';
 import { getCurrentLayout } from './layout-engine.js';
 import { forEachStatic } from '../dom-cache.js';
@@ -85,7 +89,9 @@ export function renderLayoutParams(name: string): void {
     return;
   }
   const stored = loadStoredParams(name);
-  container.innerHTML = params.map((p) => renderParamRow(p as RenderParam, stored?.[p.key], 'desktop')).join('');
+  container.innerHTML = params
+    .map((p) => renderParamRow(p as RenderParam, stored?.[p.key], 'desktop'))
+    .join('');
 }
 
 export function applyLayoutParams(renderer: Renderer): void {
@@ -177,7 +183,9 @@ export function renderBsLayoutParams(name: string): void {
     return;
   }
   const stored = loadStoredParams(name);
-  container.innerHTML = params.map((p) => renderParamRow(p as RenderParam, stored?.[p.key], 'mobile')).join('');
+  container.innerHTML = params
+    .map((p) => renderParamRow(p as RenderParam, stored?.[p.key], 'mobile'))
+    .join('');
   setHidden(applyBtn, false);
   setHidden(resetBtn, false);
 }
@@ -220,7 +228,7 @@ export function toggleBsLayoutSetting(): void {
   if (!block) return;
   const willOpen = block.classList.contains('collapsed'); // 当前折叠 → 即将展开
   applyBsLayoutSettingOpen(willOpen);
-  setMobileLayoutSettingOpen(willOpen);
+  setAdvancedLayoutParamsOpen(willOpen);
   if (willOpen) renderBsLayoutParams(getCurrentLayout());
 }
 
@@ -229,25 +237,25 @@ export function toggleBsAdvanced(): void {
   if (!adv) return;
   const willOpen = adv.classList.contains('collapsed'); // currently collapsed → about to expand
   applyBsAdvancedOpen(willOpen);
-  setMobileAdvancedOpen(willOpen);
+  setAdvancedOpen(willOpen);
 }
 
 export function restoreBsAdvancedPrefs(): void {
-  if (getMobileAdvancedOpen()) applyBsAdvancedOpen(true);
+  if (getAdvancedOpen()) applyBsAdvancedOpen(true);
   restoreBsLayoutSettingPrefs();
 }
 
 export function resetBsAdvancedPrefs(): void {
-  setMobileAdvancedOpen(false);
+  setAdvancedOpen(false);
   resetBsLayoutSettingPrefs();
   applyBsAdvancedOpen(false);
 }
 
 export function restoreBsLayoutSettingPrefs(): void {
-  if (getMobileLayoutSettingOpen()) applyBsLayoutSettingOpen(true);
+  if (getAdvancedLayoutParamsOpen()) applyBsLayoutSettingOpen(true);
 }
 
 export function resetBsLayoutSettingPrefs(): void {
-  setMobileLayoutSettingOpen(false);
+  setAdvancedLayoutParamsOpen(false);
   applyBsLayoutSettingOpen(false);
 }

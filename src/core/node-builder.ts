@@ -14,12 +14,14 @@ import type { ParsedFrontmatter, ParseWarning } from '../parser/frontmatter.js';
  * Soft warnings are dropped — call {@link loadAllFrontmatterWithWarnings}
  * if you need to surface them.
  */
-export async function loadAllFrontmatter(filePaths: string[]): Promise<Map<string, ParsedFrontmatter>> {
+export async function loadAllFrontmatter(
+  filePaths: string[],
+): Promise<Map<string, ParsedFrontmatter>> {
   const results = await Promise.all(
     filePaths.map(async (fp) => {
       const raw = await fs.readFile(fp, 'utf-8');
       return { fp, fm: parseFrontmatter(raw, fp) };
-    })
+    }),
   );
   return new Map(results.map(({ fp, fm }) => [fp, fm]));
 }

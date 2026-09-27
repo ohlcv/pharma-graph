@@ -10,10 +10,7 @@
 
 import cytoscape from 'cytoscape';
 import { Renderer } from '../core/renderer.js';
-import {
-  toggleDebugOverlay,
-  debugOverlayActive,
-} from './app-debug.js';
+import { toggleDebugOverlay, debugOverlayActive } from './app-debug.js';
 
 declare global {
   interface Window {
@@ -26,7 +23,14 @@ export interface DebugBridge {
   node: (id: string) => Record<string, unknown> | string;
   selected: () => Array<{ id: string; label: string; dimmed: boolean }>;
   /** 图谱当前渲染出来的外接矩形（渲染坐标 px）。 */
-  bounds: () => { left: number; top: number; right: number; bottom: number; width: number; height: number };
+  bounds: () => {
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+    width: number;
+    height: number;
+  };
   /** 预览漫游顺序。控制台调用：_dbg.previewSequence() / _dbg.previewSequence('has-dfs') */
   previewSequence: (strategyId?: string) => void;
 }
@@ -55,11 +59,14 @@ export function installDebugBridge(renderer: Renderer): void {
       };
     },
     selected: () => {
-      return cy.$(':selected').nodes().map((n: cytoscape.NodeSingular) => ({
-        id: n.id(),
-        label: n.data('label'),
-        dimmed: n.hasClass('dimmed'),
-      }));
+      return cy
+        .$(':selected')
+        .nodes()
+        .map((n: cytoscape.NodeSingular) => ({
+          id: n.id(),
+          label: n.data('label'),
+          dimmed: n.hasClass('dimmed'),
+        }));
     },
     // 顶栏 / 工具栏是浮层，画布铺满视口后节点会伸到它们下面。要看「适应」
     // 有没有把图放进安全区（top 应 ≥ 浮层高度 + padding），读这个最直接。

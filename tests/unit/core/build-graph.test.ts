@@ -102,13 +102,7 @@ describe('buildGraph', () => {
     // buildGraph doesn't return a degree map directly — it folds the degree
     // into each node's `weight` field for the Cytoscape layout to consume.
     const map = new Map<string, ParsedFrontmatter>([
-      [
-        'a.md',
-        fm('a', [
-          { target: 'b' },
-          { target: 'c' },
-        ]),
-      ],
+      ['a.md', fm('a', [{ target: 'b' }, { target: 'c' }])],
       ['b.md', fm('b', [{ target: 'c' }])],
       ['c.md', fm('c')],
     ]);
@@ -118,18 +112,14 @@ describe('buildGraph', () => {
   });
 
   it('detects dangling edges against knownNodeIds', () => {
-    const map = new Map<string, ParsedFrontmatter>([
-      ['a.md', fm('a', [{ target: 'ghost' }])],
-    ]);
+    const map = new Map<string, ParsedFrontmatter>([['a.md', fm('a', [{ target: 'ghost' }])]]);
     const report = vi.fn();
     const r = buildGraph(map, {
       knownNodeIds: new Set(['a']),
       onDanglingEdges: report,
     });
     expect(r.edges).toHaveLength(0);
-    expect(r.danglingEdges).toEqual([
-      { source: 'a', target: 'ghost', file: 'a.md' },
-    ]);
+    expect(r.danglingEdges).toEqual([{ source: 'a', target: 'ghost', file: 'a.md' }]);
     expect(report).toHaveBeenCalledWith([
       { source: 'a', target: 'ghost', file: 'a.md' },
     ] satisfies DanglingEdge[]);
@@ -137,9 +127,7 @@ describe('buildGraph', () => {
 
   it('does not flag dangling edges when knownNodeIds is not provided', () => {
     // Without knownNodeIds, edges pass through and danglingEdges stays empty.
-    const map = new Map<string, ParsedFrontmatter>([
-      ['a.md', fm('a', [{ target: 'ghost' }])],
-    ]);
+    const map = new Map<string, ParsedFrontmatter>([['a.md', fm('a', [{ target: 'ghost' }])]]);
     const r = buildGraph(map);
     expect(r.edges).toHaveLength(1);
     expect(r.danglingEdges).toEqual([]);

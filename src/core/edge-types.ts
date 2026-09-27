@@ -9,9 +9,9 @@
  */
 export const EDGE_TYPES = [
   // 类-类 / 个体-类 / 局部-整体
-  'subclass_of',  // 是一种（类-类）：子类→父类
-  'part_of',      // 是一部分（局部-整体）：局部→整体
-  'instance_of',  // 是实例（个体-类）：实例→类别
+  'subclass_of', // 是一种（类-类）：子类→父类
+  'part_of', // 是一部分（局部-整体）：局部→整体
+  'instance_of', // 是实例（个体-类）：实例→类别
   // 对称关系
   'disjoint_with', // 互斥（对称）：A↔B
   'equivalent_to', // 等价（对称）：A↔B

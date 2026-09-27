@@ -15,12 +15,14 @@ walk('./public/content');
 
 describe('frontmatter location audit', () => {
   it('check all files have complete location in frontmatter', () => {
-    const parsed = files.map(fp => {
-      const raw = fs.readFileSync(fp, 'utf-8');
-      const fm = parseFrontmatter(raw, fp);
-      const rel = path.relative('./public/content', fp);
-      return { rel, fm };
-    }).filter(x => x.fm.id);
+    const parsed = files
+      .map((fp) => {
+        const raw = fs.readFileSync(fp, 'utf-8');
+        const fm = parseFrontmatter(raw, fp);
+        const rel = path.relative('./public/content', fp);
+        return { rel, fm };
+      })
+      .filter((x) => x.fm.id);
 
     // location 的 schema 里 item / section 都是可选（见 NodeLocation），
     // 唯一硬约束是 book（书的入口文件必须能归到书目）。

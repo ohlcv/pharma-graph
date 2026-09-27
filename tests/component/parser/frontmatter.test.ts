@@ -15,19 +15,21 @@ const REAL_FILE = join(
 );
 
 describe('real-file regression', () => {
-  it.skipIf(!existsSync(REAL_FILE))('reads fullSummary from a migrated A-layout file (top-level full)', () => {
-    // 趋同进化 is one of the migrated nodes whose full lives at the top level.
-    // Verifies the new fallback path actually surfaces the content.
-    const raw = readFileSync(REAL_FILE, 'utf-8');
-    const fm = parseFrontmatter(raw, REAL_FILE);
-    expect(fm.id).toBe('concept-convergent-evolution-p1-01-02');
-    expect(fm.shortSummary).toBeTruthy();
-    // Either layout should now surface a non-trivial fullSummary.
-    expect(fm.fullSummary).toBeTruthy();
-    expect(fm.fullSummary!.length).toBeGreaterThan(1000);
-  });
+  it.skipIf(!existsSync(REAL_FILE))(
+    'reads fullSummary from a migrated A-layout file (top-level full)',
+    () => {
+      // 趋同进化 is one of the migrated nodes whose full lives at the top level.
+      // Verifies the new fallback path actually surfaces the content.
+      const raw = readFileSync(REAL_FILE, 'utf-8');
+      const fm = parseFrontmatter(raw, REAL_FILE);
+      expect(fm.id).toBe('concept-convergent-evolution-p1-01-02');
+      expect(fm.shortSummary).toBeTruthy();
+      // Either layout should now surface a non-trivial fullSummary.
+      expect(fm.fullSummary).toBeTruthy();
+      expect(fm.fullSummary!.length).toBeGreaterThan(1000);
+    },
+  );
 });
-
 
 describe('parseFrontmatter', () => {
   it('parses top-level keys with required fields', () => {

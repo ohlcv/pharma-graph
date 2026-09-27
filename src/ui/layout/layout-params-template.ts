@@ -58,7 +58,11 @@ export function fmt(val: number, step: number): string {
  * Returns the empty string if a range param's stored value parses to NaN —
  * the caller is then responsible for skipping the row.
  */
-export function renderParamRow(p: RenderParam, storedValue: string | undefined, variant: Variant): string {
+export function renderParamRow(
+  p: RenderParam,
+  storedValue: string | undefined,
+  variant: Variant,
+): string {
   const isMobile = variant === 'mobile';
   const rowClass = isMobile ? 'bs-param-row' : 'param-row';
   const sliderClass = isMobile ? 'bs-param-slider' : 'param-slider';

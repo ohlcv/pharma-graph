@@ -40,24 +40,29 @@ import { LAYOUTS, DEFAULT_LAYOUT } from '../core/config.js';
 import { brandCarousel } from './carousel.js';
 import { uiState } from './state.js';
 import { logInfo } from './logger.js';
-import {
-  loadGraph,
-  type LoadProgress as PrebuiltProgress,
-} from '../core/prebuilt-loader.js';
+import { loadGraph, type LoadProgress as PrebuiltProgress } from '../core/prebuilt-loader.js';
 import { detectDeviceCapability } from '../core/device-capability.js';
 import { installDispatcher, dispatchAction } from './action-dispatcher.js';
 import { updateStats, syncBottomSheetStats } from './graph-stats.js';
 import { syncLayoutDisplay, setCurrentLayout } from './layout/layout-engine.js';
 import { restoreBsAdvancedPrefs, renderLayoutParams } from './layout/layout-params.js';
 import { fitGraph, randomize } from './layout/toolbar-actions.js';
-import { initBigscreen, registerFitFn, registerTourController, registerCyAccessor, isBigscreen } from './bigscreen.js';
-import { initGraphEvents } from './graph-events.js';
-import { initSheetDrag, initPanelDrag, initPanelResize, syncTourBarPosition, initSectionHeights } from './drag-manager.js';
 import {
-  spawnNodeRipple,
-  showZoomIndicator,
-  showToast,
-} from './ui-helpers.js';
+  initBigscreen,
+  registerFitFn,
+  registerTourController,
+  registerCyAccessor,
+  isBigscreen,
+} from './bigscreen.js';
+import { initGraphEvents } from './graph-events.js';
+import {
+  initSheetDrag,
+  initPanelDrag,
+  initPanelResize,
+  syncTourBarPosition,
+  initSectionHeights,
+} from './drag-manager.js';
+import { spawnNodeRipple, showZoomIndicator, showToast } from './ui-helpers.js';
 import { initShortcuts } from './keyboard-shortcuts.js';
 import {
   initDebugOverlay,
@@ -71,6 +76,7 @@ import { initMusicPlayer } from './music-player.js';
 import { installDebugBridge } from './debug-bridge.js';
 import { initStarfield } from './starfield.js';
 import { createCelestialEmblemOverlay } from '../core/celestial-emblem-overlay.js';
+import { initSpeechSettings } from './speech-settings.js';
 
 let tourController: TourController;
 
@@ -299,6 +305,7 @@ function initGraphFromManager(graphManager: GraphManager): void {
   initKeyboardShortcuts();
   initBigscreen();
   installDebugBridge(uiState.renderer);
+  initSpeechSettings();
   initSearchUI(uiState.renderer.getCy(), uiState.highlight!, uiState.search!, uiState.detailPanel!);
   // Background stars follow the camera (pan/zoom) — needs cy, nothing else.
   initStarfield(uiState.renderer.getCy());
@@ -480,7 +487,11 @@ function waitForGraphToSettle(cy: cytoscape.Core, onSettled: () => void): void {
     cy.nodes().forEach((node) => {
       const position = node.position();
       const old = previous.get(node.id());
-      if (!old || Math.abs(position.x - old.x) > epsilon || Math.abs(position.y - old.y) > epsilon) {
+      if (
+        !old ||
+        Math.abs(position.x - old.x) > epsilon ||
+        Math.abs(position.y - old.y) > epsilon
+      ) {
         moved = true;
       }
       current.set(node.id(), position);
@@ -669,7 +680,9 @@ function initResizeHandler(): void {
     if (uiState.resizeTimer) clearTimeout(uiState.resizeTimer);
     uiState.resizeTimer = setTimeout(() => {
       const fullscreenTransition = performance.now() < suppressFitUntil;
-      if (!isBigscreen() && !fullscreenTransition) { fitGraph(uiState.renderer!); }
+      if (!isBigscreen() && !fullscreenTransition) {
+        fitGraph(uiState.renderer!);
+      }
       syncTourBarPosition();
     }, 150);
   });

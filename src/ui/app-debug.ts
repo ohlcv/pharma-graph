@@ -211,41 +211,39 @@ export function initDebugOverlay(renderer: Renderer): void {
   document.body.appendChild(panel);
 
   // ── Close button — hides panel without flipping `debugOverlayActive` ──
-  panel
-    .querySelector<HTMLButtonElement>('#dbg-close-btn')
-    ?.addEventListener('click', (e) => {
-      // Stop the event from reaching the drag handler (which is a
-      // mousedown listener on the header). mousedown vs click differ
-      // here, but a click on the X mustn't accidentally start a drag
-      // if the user pressed-down on it.
-      e.stopPropagation();
-      closeForensicPanel();
-    });
+  panel.querySelector<HTMLButtonElement>('#dbg-close-btn')?.addEventListener('click', (e) => {
+    // Stop the event from reaching the drag handler (which is a
+    // mousedown listener on the header). mousedown vs click differ
+    // here, but a click on the X mustn't accidentally start a drag
+    // if the user pressed-down on it.
+    e.stopPropagation();
+    closeForensicPanel();
+  });
 
   // ── Copy button — copies all forensic data to clipboard ──────────────
-  panel
-    .querySelector<HTMLButtonElement>('#dbg-copy-btn')
-    ?.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const data = collectForensicData(renderer);
-      try {
-        await navigator.clipboard.writeText(data);
-        const btn = e.currentTarget as HTMLButtonElement;
-        const orig = btn.textContent;
-        btn.textContent = '✓';
-        setTimeout(() => { btn.textContent = orig; }, 1200);
-      } catch {
-        // Fallback: select the text in a temp textarea
-        const ta = document.createElement('textarea');
-        ta.value = data;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-      }
-    });
+  panel.querySelector<HTMLButtonElement>('#dbg-copy-btn')?.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const data = collectForensicData(renderer);
+    try {
+      await navigator.clipboard.writeText(data);
+      const btn = e.currentTarget as HTMLButtonElement;
+      const orig = btn.textContent;
+      btn.textContent = '✓';
+      setTimeout(() => {
+        btn.textContent = orig;
+      }, 1200);
+    } catch {
+      // Fallback: select the text in a temp textarea
+      const ta = document.createElement('textarea');
+      ta.value = data;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+  });
 
   // ── Drag handler — header is the drag handle ────────────────────────
   // We listen on the header (which is wider than a 16px grip and
@@ -255,9 +253,11 @@ export function initDebugOverlay(renderer: Renderer): void {
   if (headerEl) attachDragHandlers(panel, headerEl);
 
   // ── Node panel diagnostic buttons ─────────────────────────────────
-  panel.querySelector<HTMLButtonElement>('#dbg-btn-refresh-diag')
+  panel
+    .querySelector<HTMLButtonElement>('#dbg-btn-refresh-diag')
     ?.addEventListener('click', () => updateNodePanelDiagnostics());
-  panel.querySelector<HTMLButtonElement>('#dbg-btn-reset-panel-bounds')
+  panel
+    .querySelector<HTMLButtonElement>('#dbg-btn-reset-panel-bounds')
     ?.addEventListener('click', () => {
       clearPanelBounds();
       updateNodePanelDiagnostics();
@@ -269,7 +269,8 @@ export function initDebugOverlay(renderer: Renderer): void {
         np.style.right = '';
       }
     });
-  panel.querySelector<HTMLButtonElement>('#dbg-btn-reposition-panel')
+  panel
+    .querySelector<HTMLButtonElement>('#dbg-btn-reposition-panel')
     ?.addEventListener('click', () => {
       clearPanelBounds();
       uiState.detailPanel?.repositionCurrent();
@@ -372,7 +373,10 @@ function buildRulesTable(cy: cytoscape.Core): string {
   // by the .dimmed rule (border → rgba(255,255,255,0.06), opacity → 0.1),
   // so reading their effective styles gives misleading "everything is white"
   // results that don't reflect the fill mapping.
-  const visible = cy.nodes().not('.layer-parent').filter((n: NodeSingular) => !n.hasClass('dimmed'));
+  const visible = cy
+    .nodes()
+    .not('.layer-parent')
+    .filter((n: NodeSingular) => !n.hasClass('dimmed'));
   visible.forEach((n: NodeSingular) => {
     const fill = n.data('fill') ?? '?';
     const shape = n.style('shape') as string;
@@ -439,10 +443,18 @@ function nodeProps(node: NodeSingular): string {
 // inside the 取证面板 so users on production (vercel) can self-serve.
 // ═══════════════════════════════════════════════════════════════════════════
 
-function ok(v: string): string { return `<span style="color:#4ade80">✓ ${v}</span>`; }
-function warn(v: string): string { return `<span style="color:#fbbf24">⚠ ${v}</span>`; }
-function bad(v: string): string { return `<span style="color:#f87171">✗ ${v}</span>`; }
-function info(v: string): string { return `<span style="color:#94a3b8">${v}</span>`; }
+function ok(v: string): string {
+  return `<span style="color:#4ade80">✓ ${v}</span>`;
+}
+function warn(v: string): string {
+  return `<span style="color:#fbbf24">⚠ ${v}</span>`;
+}
+function bad(v: string): string {
+  return `<span style="color:#f87171">✗ ${v}</span>`;
+}
+function info(v: string): string {
+  return `<span style="color:#94a3b8">${v}</span>`;
+}
 const L = (k: string, v: string) => `<div><span style="color:#64748b">${k}</span> ${v}</div>`;
 
 /** Walk upward from #node-panel looking for any ancestor whose CSS would
@@ -450,8 +462,9 @@ const L = (k: string, v: string) => `<div><span style="color:#64748b">${k}</span
  *  contain:paint). If any is found, `position:fixed` is effectively
  *  `position:absolute` relative to that ancestor → panel is clipped /
  *  misscaled. Returns list of `[{elem, reason, value}]`. */
-function findAncestorContainingBlocks(start: Element | null):
-    Array<{ tag: string; id: string; reason: string; value: string }> {
+function findAncestorContainingBlocks(
+  start: Element | null,
+): Array<{ tag: string; id: string; reason: string; value: string }> {
   const out: Array<{ tag: string; id: string; reason: string; value: string }> = [];
   let el: Element | null = start;
   while (el && el.tagName !== 'HTML') {
@@ -459,11 +472,11 @@ function findAncestorContainingBlocks(start: Element | null):
     if (!el) break;
     const cs = getComputedStyle(el);
     const checks: Array<[string, (v: string) => boolean]> = [
-      ['transform',      (v) => v !== 'none' && v !== 'matrix(1, 0, 0, 1, 0, 0)'],
-      ['filter',         (v) => v !== 'none'],
-      ['will-change',    (v) => /transform|perspective|filter/.test(v) && v !== 'auto'],
-      ['perspective',    (v) => v !== 'none'],
-      ['contain',        (v) => /paint|layout|strict|content/.test(v) && v !== 'none'],
+      ['transform', (v) => v !== 'none' && v !== 'matrix(1, 0, 0, 1, 0, 0)'],
+      ['filter', (v) => v !== 'none'],
+      ['will-change', (v) => /transform|perspective|filter/.test(v) && v !== 'auto'],
+      ['perspective', (v) => v !== 'none'],
+      ['contain', (v) => /paint|layout|strict|content/.test(v) && v !== 'none'],
     ];
     for (const [name, badFn] of checks) {
       const val = (cs as any)[name];
@@ -484,7 +497,10 @@ export function updateNodePanelDiagnostics(): void {
   const out = document.getElementById('dbg-panel-diag') as HTMLElement | null;
   if (!out) return;
   const p = document.getElementById('node-panel');
-  if (!p) { out.innerHTML = bad('#node-panel 不存在于 DOM'); return; }
+  if (!p) {
+    out.innerHTML = bad('#node-panel 不存在于 DOM');
+    return;
+  }
   const h = document.getElementById('node-panel-header');
   const cs = getComputedStyle(p);
   const hcs = h ? getComputedStyle(h) : null;
@@ -492,14 +508,19 @@ export function updateNodePanelDiagnostics(): void {
   const hr = h ? h.getBoundingClientRect() : null;
   const vpW = window.innerWidth;
   const vpH = window.innerHeight;
-  const MIN_TOP = 56 + 44 + 8;  // topbar(56) + toolbar(44) + pad(8) = 108px
+  const MIN_TOP = 56 + 44 + 8; // topbar(56) + toolbar(44) + pad(8) = 108px
 
   const rows: string[] = [];
 
   // — 1) DOM tree position —
   const parentId = p.parentElement?.id || p.parentElement?.tagName || '?';
   const correctParent = parentId === 'app';
-  rows.push(L('DOM 父级', correctParent ? ok(`#${parentId} ✓ (在 #main 外)`) : bad(`#${parentId} → 不应在 #main 内`)));
+  rows.push(
+    L(
+      'DOM 父级',
+      correctParent ? ok(`#${parentId} ✓ (在 #main 外)`) : bad(`#${parentId} → 不应在 #main 内`),
+    ),
+  );
 
   // — 2) Containing block — position:fixed must be relative to viewport.
   const traps = findAncestorContainingBlocks(p);
@@ -514,41 +535,79 @@ export function updateNodePanelDiagnostics(): void {
 
   // — 3) Positioning —
   const topOK = r.top >= MIN_TOP - 0.5;
-  const overlapTB = r.top < 56;        // overlaps topbar (y<56 means above bottom of topbar)
-  const overlapTool = r.top < (56 + 44) && r.top + r.height > 56;  // overlaps toolbar band
+  const overlapTB = r.top < 56; // overlaps topbar (y<56 means above bottom of topbar)
+  const overlapTool = r.top < 56 + 44 && r.top + r.height > 56; // overlaps toolbar band
   const leftOK = r.left >= 0 && r.left + r.width <= vpW + 0.5;
   const topInfo = `${r.top.toFixed(0)}px (需要≥${MIN_TOP}px, topbar底=56 toolbar底=100)`;
-  rows.push(L('rect.top',    topOK ? ok(topInfo) : (overlapTB ? bad(topInfo + ' ⚠ 与topbar重叠!') : warn(topInfo + ' 与toolbar重叠'))));
-  rows.push(L('rect.left',   leftOK ? ok(`${r.left.toFixed(0)}px`) : warn(`${r.left.toFixed(0)}px (超出viewport左)`)));
-  rows.push(L('rect size',   info(`${r.width.toFixed(0)} × ${r.height.toFixed(0)}`)));
-  rows.push(L('viewport',    info(`${vpW} × ${vpH}`)));
+  rows.push(
+    L(
+      'rect.top',
+      topOK
+        ? ok(topInfo)
+        : overlapTB
+          ? bad(topInfo + ' ⚠ 与topbar重叠!')
+          : warn(topInfo + ' 与toolbar重叠'),
+    ),
+  );
+  rows.push(
+    L(
+      'rect.left',
+      leftOK ? ok(`${r.left.toFixed(0)}px`) : warn(`${r.left.toFixed(0)}px (超出viewport左)`),
+    ),
+  );
+  rows.push(L('rect size', info(`${r.width.toFixed(0)} × ${r.height.toFixed(0)}`)));
+  rows.push(L('viewport', info(`${vpW} × ${vpH}`)));
   rows.push(L('computed position/z-index', info(`${cs.position} / z=${cs.zIndex}`)));
   rows.push(L('left/top explicit', info(`left=${cs.left} top=${cs.top} right=${cs.right}`)));
 
   // — 4) Classes / visibility —
   const cls = Array.from(p.classList).join('.');
   rows.push(L('classList', info(cls || '(空)')));
-  rows.push(L('visibility',
-    cs.visibility === 'visible' ? ok('visible') : bad(cs.visibility)));
-  rows.push(L('pointer-events',
-    cs.pointerEvents === 'none' ? bad('none (整面板无法接收指针!)') : ok(cs.pointerEvents)));
+  rows.push(L('visibility', cs.visibility === 'visible' ? ok('visible') : bad(cs.visibility)));
+  rows.push(
+    L(
+      'pointer-events',
+      cs.pointerEvents === 'none' ? bad('none (整面板无法接收指针!)') : ok(cs.pointerEvents),
+    ),
+  );
 
   // — 5) Header pointer capture test (the user drags from here) —
   if (hcs && hr) {
-    rows.push(L('header 可见性',
-      hcs.visibility === 'visible' ? ok('visible') : bad(hcs.visibility)));
-    rows.push(L('header pointer-events',
-      hcs.pointerEvents === 'none' ? bad('none → 无法拖!') : ok(hcs.pointerEvents)));
-    rows.push(L('header cursor',
-      /grab|grabbing|move/.test(hcs.cursor) ? ok(hcs.cursor) : warn(`${hcs.cursor} (未设置拖拽提示)`)));
-    rows.push(L('header 顶部y',
-      hr.top >= MIN_TOP - 0.5 ? ok(`${hr.top.toFixed(0)}px`) :
-        bad(`${hr.top.toFixed(0)}px < ${MIN_TOP} → 头部在工具栏下!`)));
-    rows.push(L('header 区域',
-      info(`${hr.width.toFixed(0)} × ${hr.height.toFixed(0)}  (拖动手柄)`)));
+    rows.push(
+      L('header 可见性', hcs.visibility === 'visible' ? ok('visible') : bad(hcs.visibility)),
+    );
+    rows.push(
+      L(
+        'header pointer-events',
+        hcs.pointerEvents === 'none' ? bad('none → 无法拖!') : ok(hcs.pointerEvents),
+      ),
+    );
+    rows.push(
+      L(
+        'header cursor',
+        /grab|grabbing|move/.test(hcs.cursor)
+          ? ok(hcs.cursor)
+          : warn(`${hcs.cursor} (未设置拖拽提示)`),
+      ),
+    );
+    rows.push(
+      L(
+        'header 顶部y',
+        hr.top >= MIN_TOP - 0.5
+          ? ok(`${hr.top.toFixed(0)}px`)
+          : bad(`${hr.top.toFixed(0)}px < ${MIN_TOP} → 头部在工具栏下!`),
+      ),
+    );
+    rows.push(
+      L('header 区域', info(`${hr.width.toFixed(0)} × ${hr.height.toFixed(0)}  (拖动手柄)`)),
+    );
     // Check if header's bounding rect overlaps topbar (0..56) / toolbar (56..100)
-    if (hr.top < 56) rows.push('  ' + bad('header 伸进 topbar! topbar z-index=10 → pointerdown 会被toolbar上面元素拦截'));
-    else if (hr.top < 100) rows.push('  ' + warn('header 伸进 toolbar (z-index=25) 区域 — 可能被toolbar按钮拦截'));
+    if (hr.top < 56)
+      rows.push(
+        '  ' + bad('header 伸进 topbar! topbar z-index=10 → pointerdown 会被toolbar上面元素拦截'),
+      );
+    else if (hr.top < 100)
+      rows.push('  ' + warn('header 伸进 toolbar (z-index=25) 区域 — 可能被toolbar按钮拦截'));
   }
 
   // — 6) localStorage saved bounds —
@@ -558,9 +617,14 @@ export function updateNodePanelDiagnostics(): void {
       rows.push(L('saved bounds', ok('(无) 每次打开都会重新定位')));
     } else {
       const v = JSON.parse(raw);
-      rows.push(L('saved bounds', info(`v5: left=${v.left} top=${v.top} w=${v.width} h=${v.height}`)));
+      rows.push(
+        L('saved bounds', info(`v5: left=${v.left} top=${v.top} w=${v.width} h=${v.height}`)),
+      );
       if (typeof v.top === 'number' && v.top < MIN_TOP) {
-        rows.push('  ' + bad(`saved top=${v.top} < ${MIN_TOP} → 打开时会放在工具栏区域! 点"重置面板位置"清除`));
+        rows.push(
+          '  ' +
+            bad(`saved top=${v.top} < ${MIN_TOP} → 打开时会放在工具栏区域! 点"重置面板位置"清除`),
+        );
       }
     }
   } catch (e: any) {
@@ -573,10 +637,14 @@ export function updateNodePanelDiagnostics(): void {
   const tbs = tb ? getComputedStyle(tb) : null;
   const tls = tl ? getComputedStyle(tl) : null;
   const pz = parseInt(cs.zIndex || '0', 10) || 0;
-  const tbz = tbs ? (parseInt(tbs.zIndex || '0', 10) || 0) : 0;
-  const tlz = tls ? (parseInt(tls.zIndex || '0', 10) || 0) : 0;
-  rows.push(L('z-index 对比',
-    `panel(z=${pz}) vs topbar(z=${tbz})${pz > tbz ? ' ✓' : ' ✗'}  vs toolbar(z=${tlz})${pz > tlz ? ' ✓' : ' ✗'}`));
+  const tbz = tbs ? parseInt(tbs.zIndex || '0', 10) || 0 : 0;
+  const tlz = tls ? parseInt(tls.zIndex || '0', 10) || 0 : 0;
+  rows.push(
+    L(
+      'z-index 对比',
+      `panel(z=${pz}) vs topbar(z=${tbz})${pz > tbz ? ' ✓' : ' ✗'}  vs toolbar(z=${tlz})${pz > tlz ? ' ✓' : ' ✗'}`,
+    ),
+  );
   if (pz <= tlz) rows.push('  ' + bad('panel z-index ≤ toolbar → toolbar 会盖住header → 拖不动!'));
 
   out.innerHTML = rows.join('');
@@ -590,7 +658,10 @@ export function updateForensicPanel(renderer: Renderer): void {
 
   // ── Stats ──────────────────────────────────────────────────────────
   const el = (id: string) => document.getElementById(id) as HTMLElement | null;
-  const setEl = (id: string, val: string) => { const e = el(id); if (e) e.textContent = val; };
+  const setEl = (id: string, val: string) => {
+    const e = el(id);
+    if (e) e.textContent = val;
+  };
 
   setEl('dbg-sel-count', String(cy.$(':selected').length));
   setEl('dbg-dim-count', String(cy.nodes('.dimmed').not('.layer-parent').length));
@@ -627,7 +698,10 @@ export function updateForensicPanel(renderer: Renderer): void {
   const visibleEdgesEl = el('dbg-visible-edges');
   if (visibleEdgesEl) {
     const expected = allEdges.length - badEdges.length;
-    visibleEdgesEl.classList.toggle('dbg-stat__val--red', visibleEdges.length === 0 && expected > 0);
+    visibleEdgesEl.classList.toggle(
+      'dbg-stat__val--red',
+      visibleEdges.length === 0 && expected > 0,
+    );
     visibleEdgesEl.classList.toggle('dbg-stat__val--green', visibleEdges.length > 0);
   }
 
@@ -644,17 +718,21 @@ export function updateForensicPanel(renderer: Renderer): void {
   const currentNodeId = snodeEls.length > 0 ? snodeEls[0].id() : null;
   const currentNode = currentNodeId ? cy.getElementById(currentNodeId) : null;
 
-  setEl('dbg-node-name', currentNode
-    ? (currentNode.data('label') || currentNode.id()).slice(0, 20)
-    : '— (无 .selected-node)');
+  setEl(
+    'dbg-node-name',
+    currentNode
+      ? (currentNode.data('label') || currentNode.id()).slice(0, 20)
+      : '— (无 .selected-node)',
+  );
 
   const metaEl = el('dbg-node-meta');
-  if (metaEl) metaEl.innerHTML = currentNode
-    ? `id: <code>${currentNode.id()}</code>`
-    : '';
+  if (metaEl) metaEl.innerHTML = currentNode ? `id: <code>${currentNode.id()}</code>` : '';
 
   const propsEl = el('dbg-node-props');
-  if (propsEl) propsEl.innerHTML = currentNode ? nodeProps(currentNode) : '<span style="color:#64748b">点击图谱中的节点以启动取证</span>';
+  if (propsEl)
+    propsEl.innerHTML = currentNode
+      ? nodeProps(currentNode)
+      : '<span style="color:#64748b">点击图谱中的节点以启动取证</span>';
 
   // ── Prev node ─────────────────────────────────────────────────────
   // Issue #7: prevNodeName() returned null unconditionally (its
@@ -664,14 +742,10 @@ export function updateForensicPanel(renderer: Renderer): void {
   // by setPrevSelectedNode() and is a faithful snapshot of the previous
   // node's label, no extra cy lookup required.
   const prevNode = _prevSelectedNodeId ? cy.getElementById(_prevSelectedNodeId) : null;
-  setEl('dbg-prev-name', _prevSelectedNodeName
-    ? _prevSelectedNodeName.slice(0, 20)
-    : '—');
+  setEl('dbg-prev-name', _prevSelectedNodeName ? _prevSelectedNodeName.slice(0, 20) : '—');
 
   const prevPropsEl = el('dbg-prev-props');
-  if (prevPropsEl) prevPropsEl.innerHTML = prevNode
-    ? nodeProps(prevNode)
-    : '';
+  if (prevPropsEl) prevPropsEl.innerHTML = prevNode ? nodeProps(prevNode) : '';
 
   // ── Conflict ───────────────────────────────────────────────────────
   const conflictNodes = cy.nodes('.dimmed').filter(':selected');
@@ -689,9 +763,10 @@ export function updateForensicPanel(renderer: Renderer): void {
     const allNodes = cy.nodes().not('.layer-parent');
     const noFill = allNodes.filter((n: NodeSingular) => !n.data('fill')).length;
     const total = allNodes.length;
-    const fillWarn = noFill > 0
-      ? `<span style="color:#f87171">⚠ fill 缺失: ${noFill}/${total}</span>`
-      : `<span style="color:#4ade80">✓ fill 全覆盖</span>`;
+    const fillWarn =
+      noFill > 0
+        ? `<span style="color:#f87171">⚠ fill 缺失: ${noFill}/${total}</span>`
+        : `<span style="color:#4ade80">✓ fill 全覆盖</span>`;
     coverageEl.innerHTML = `<div style="font-size:9px;line-height:1.8">${fillWarn}</div>`;
   }
 
@@ -707,12 +782,12 @@ function collectForensicData(renderer: Renderer): string {
   const cy = renderer.getCy();
   const lines: string[] = [];
   const now = new Date().toLocaleString('zh-CN');
-  
+
   lines.push('═══════════════════════════════════════');
   lines.push('  🔬 节点取证报告');
   lines.push(`  时间: ${now}`);
   lines.push('═══════════════════════════════════════');
-  
+
   // ── Graph stats ──────────────────────────────────────────────────
   const allNodes = cy.nodes().not('.layer-parent');
   const allEdges = cy.edges();
@@ -720,7 +795,7 @@ function collectForensicData(renderer: Renderer): string {
   const dimCount = cy.nodes('.dimmed').not('.layer-parent').length;
   const snodeCount = cy.nodes('.selected-node').length;
   const hlCount = cy.nodes('.highlighted').length;
-  
+
   lines.push('\n【图谱状态】');
   lines.push(`  节点总数: ${allNodes.length}`);
   lines.push(`  边总数: ${allEdges.length}`);
@@ -728,12 +803,12 @@ function collectForensicData(renderer: Renderer): string {
   lines.push(`  .dimmed: ${dimCount}`);
   lines.push(`  .selected-node: ${snodeCount}`);
   lines.push(`  .highlighted: ${hlCount}`);
-  
+
   // ── Current node ────────────────────────────────────────────────
   const snodeEls = cy.nodes('.selected-node');
   const currentNodeId = snodeEls.length > 0 ? snodeEls[0].id() : null;
   const currentNode = currentNodeId ? cy.getElementById(currentNodeId) : null;
-  
+
   if (currentNode) {
     lines.push('\n【当前节点】');
     lines.push(`  ID: ${currentNode.id()}`);
@@ -746,7 +821,7 @@ function collectForensicData(renderer: Renderer): string {
     lines.push(`  fill: ${currentNode.data('fill') || '(无)'}`);
     lines.push(`  depth: ${currentNode.data('depth')}`);
     lines.push(`  subtreeRoot: ${currentNode.data('subtreeRoot') || '(无)'}`);
-    
+
     // Neighbors and edges
     const neighbors = currentNode.neighborhood('node').not('.layer-parent');
     const connectedEdges = currentNode.connectedEdges();
@@ -762,7 +837,7 @@ function collectForensicData(renderer: Renderer): string {
   } else {
     lines.push('\n【当前节点】无 (.selected-node)');
   }
-  
+
   // ── All highlighted nodes ─────────────────────────────────────────
   const allHighlighted = cy.nodes('.highlighted');
   lines.push('\n【所有 .highlighted 节点】');
@@ -773,7 +848,7 @@ function collectForensicData(renderer: Renderer): string {
   } else {
     lines.push('  (无)');
   }
-  
+
   // ── All selected-node ────────────────────────────────────────────
   const allSelectedNode = cy.nodes('.selected-node');
   lines.push('\n【所有 .selected-node 节点】');
@@ -784,11 +859,9 @@ function collectForensicData(renderer: Renderer): string {
   } else {
     lines.push('  (无)');
   }
-  
+
   // ── Specific node check (for debugging mysterious highlights) ──────
-  const suspiciousNodes = [
-    'umbrella-firstgen-y2-01-02',
-  ];
+  const suspiciousNodes = ['umbrella-firstgen-y2-01-02'];
   // Also find nodes whose label contains "脑蛋白水解物"
   const brainProteinNodes = cy.nodes().filter((n: NodeSingular) => {
     const label = n.data('label') || '';
@@ -815,7 +888,7 @@ function collectForensicData(renderer: Renderer): string {
       lines.push(`  border-color样式: ${checkNode.style('border-color')}`);
     }
   });
-  
+
   // ── All non-dimmed nodes (catch-all) ─────────────────────────────
   // This is the GROUND TRUTH for what should be visually "on" in the graph.
   // Any node NOT dimmed will be rendered with its normal styles, regardless
@@ -824,13 +897,17 @@ function collectForensicData(renderer: Renderer): string {
   lines.push('\n【所有非 .dimmed 节点（视觉真相）】');
   if (allNonDimmed.length > 0) {
     allNonDimmed.forEach((n: NodeSingular) => {
-      const classes = n.classes().filter((c: string) => c !== 'dimmed').join(',') || '∅';
+      const classes =
+        n
+          .classes()
+          .filter((c: string) => c !== 'dimmed')
+          .join(',') || '∅';
       lines.push(`  - ${n.id()}: ${n.data('label') || '(无)'} [${classes}]`);
     });
   } else {
     lines.push('  (无)');
   }
-  
+
   // ── Pipeline integrity ───────────────────────────────────────────
   const orphanNodes = allNodes.filter((n: NodeSingular) => n.degree(false) === 0);
   const badEdges = allEdges.filter((e: cytoscape.EdgeSingular) => {
@@ -838,11 +915,11 @@ function collectForensicData(renderer: Renderer): string {
     const t = e.target();
     return s.empty() || t.empty() || s.hasClass('layer-parent') || t.hasClass('layer-parent');
   });
-  
+
   lines.push('\n【数据完整性】');
   lines.push(`  孤立节点: ${orphanNodes.length}`);
   lines.push(`  异常边: ${badEdges.length}`);
-  
+
   if (orphanNodes.length > 0) {
     lines.push('  孤立节点 IDs:');
     orphanNodes.slice(0, 20).forEach((n: NodeSingular) => {
@@ -850,7 +927,7 @@ function collectForensicData(renderer: Renderer): string {
     });
     if (orphanNodes.length > 20) lines.push(`    ... 还有 ${orphanNodes.length - 20} 个`);
   }
-  
+
   lines.push('\n═══════════════════════════════════════');
   return lines.join('\n');
 }

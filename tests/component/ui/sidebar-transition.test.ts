@@ -178,10 +178,7 @@ describe('sidebar toggle — invariants to prevent black-flash regression', () =
       path.join(process.cwd(), 'src/ui/styles/components.css'),
       'utf8',
     );
-    const layout = await fs.readFile(
-      path.join(process.cwd(), 'src/ui/styles/layout.css'),
-      'utf8',
-    );
+    const layout = await fs.readFile(path.join(process.cwd(), 'src/ui/styles/layout.css'), 'utf8');
     const stripComments = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '');
 
     // No `width: 0` on the hidden rule.

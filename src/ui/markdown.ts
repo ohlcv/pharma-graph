@@ -15,7 +15,18 @@ marked.setOptions({
 // type / checked / disabled 只为 GFM 任务列表（<input type=checkbox disabled>）放行。
 // ALLOWED_ATTR 会整个替换 DOMPurify 的默认白名单，少了 type 的 input 会变成普通文本框，
 // 所以 renderMarkdown() 末尾还会把非 checkbox 的 input 剔掉。
-const SAFE_ATTR = ['target', 'rel', 'src', 'href', 'alt', 'title', 'class', 'type', 'checked', 'disabled'];
+const SAFE_ATTR = [
+  'target',
+  'rel',
+  'src',
+  'href',
+  'alt',
+  'title',
+  'class',
+  'type',
+  'checked',
+  'disabled',
+];
 const SAFE_TAGS = [
   'a',
   'p',
@@ -78,7 +89,8 @@ function rewriteImageSrc(src: string, sourceUrl: string): string {
   stack.pop(); // drop filename
   for (const seg of src.split('/')) {
     if (seg === '' || seg === '.') continue;
-    if (seg === '..') stack.pop(); // 上溯一级（原来是直接丢掉 '..'，../a.png 会落在本目录）
+    if (seg === '..')
+      stack.pop(); // 上溯一级（原来是直接丢掉 '..'，../a.png 会落在本目录）
     else stack.push(seg);
   }
   return '/content/' + stack.join('/');

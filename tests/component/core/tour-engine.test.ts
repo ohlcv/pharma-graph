@@ -24,7 +24,14 @@ if (typeof globalThis.requestAnimationFrame !== 'function') {
 
 import { describe, it, expect, vi } from 'vitest';
 import cytoscape from 'cytoscape';
-import { TourEngine, asStrategy, registerStrategy, unregisterStrategy, TourCompleteInfo, getStrategy } from '@/core/tour';
+import {
+  TourEngine,
+  asStrategy,
+  registerStrategy,
+  unregisterStrategy,
+  TourCompleteInfo,
+  getStrategy,
+} from '@/core/tour';
 
 /** Single-node graph — sufficient for onComplete reason-routing tests that
  *  never advance the tour. */
@@ -56,7 +63,9 @@ describe('TourEngine onComplete reason routing (issue #16)', () => {
     const cy = makeCy();
     const engine = new TourEngine(cy);
     let captured: TourCompleteInfo | null = null;
-    installOnComplete(engine, (info) => { captured = info; });
+    installOnComplete(engine, (info) => {
+      captured = info;
+    });
     priv(engine).onComplete?.({ reason: 'depth-reached', maxAttempts: 3 });
     expect(captured?.reason).toBe('depth-reached');
     expect(captured?.maxAttempts).toBe(3);
@@ -66,7 +75,9 @@ describe('TourEngine onComplete reason routing (issue #16)', () => {
     const cy = makeCy();
     const engine = new TourEngine(cy);
     let captured: TourCompleteInfo | null = null;
-    installOnComplete(engine, (info) => { captured = info; });
+    installOnComplete(engine, (info) => {
+      captured = info;
+    });
     priv(engine).onComplete?.({ reason: 'no-more-restarts', maxAttempts: 3 });
     expect(captured?.reason).toBe('no-more-restarts');
     expect(captured?.maxAttempts).toBe(3);
@@ -76,7 +87,9 @@ describe('TourEngine onComplete reason routing (issue #16)', () => {
     const cy = makeCy();
     const engine = new TourEngine(cy);
     let captured: TourCompleteInfo | null = null;
-    installOnComplete(engine, (info) => { captured = info; });
+    installOnComplete(engine, (info) => {
+      captured = info;
+    });
     priv(engine).onComplete?.({ reason: 'no-root', maxAttempts: 3 });
     expect(captured?.reason).toBe('no-root');
   });
@@ -264,7 +277,11 @@ describe('TourEngine shouldRestart hook (issue #7)', () => {
     registerStrategy({
       id: 'test-no-restart',
       label: 'Test: no restart',
-      buildSequence: (cy) => cy.nodes().not('.layer-parent').map((n) => n.id()),
+      buildSequence: (cy) =>
+        cy
+          .nodes()
+          .not('.layer-parent')
+          .map((n) => n.id()),
       hooks: {
         shouldRestart: () => false,
       },
@@ -281,12 +298,14 @@ describe('TourEngine shouldRestart hook (issue #7)', () => {
 
     engine.start('a', {
       interval: 1_000_000, // 几乎不会触发，但 visitNext 同步跑
-      maxDepth: -1,         // infinite mode（否则 maxDepth > 0 会按 depth-reached 收束）
+      maxDepth: -1, // infinite mode（否则 maxDepth > 0 会按 depth-reached 收束）
       strategy: asStrategy('test-no-restart'),
     });
     // start 会用 options.onComplete 覆盖 engine.onComplete，所以**之后**再装
     // 真正的捕获回调，否则我们的 captured 永远不会被赋值。
-    installOnComplete(engine, (info) => { captured = info; });
+    installOnComplete(engine, (info) => {
+      captured = info;
+    });
 
     // 手动同步驱动 visitNext 把 seq 走完——而不是依赖 setTimeout。
     // seq = [a,b,c]，start 已经访问过 a（seqIndex=1），
@@ -449,7 +468,9 @@ describe('TourEngine setMaxDepth (depth-level switch)', () => {
       maxDepth: 5,
       strategy: asStrategy('has-dfs'),
       onStep: () => {},
-      onProgress: () => { progressCalls++; },
+      onProgress: () => {
+        progressCalls++;
+      },
       onComplete: () => {},
     });
     (engine as unknown as { visitNext: () => void }).visitNext();
@@ -499,7 +520,9 @@ describe('TourEngine onStepAfterCenter firing (detail panel updates)', () => {
       maxDepth: 0, // instant stop — just attach listeners
       strategy: asStrategy('has-dfs'),
       onStep: () => {},
-      onStepAfterCenter: (info) => { afterCenterCalls.push(info.nodeId); },
+      onStepAfterCenter: (info) => {
+        afterCenterCalls.push(info.nodeId);
+      },
       onComplete: () => {},
     });
     // start() 已经为 seq[0]='a' 触发了一次 onStepAfterCenter
@@ -524,15 +547,26 @@ describe('TourEngine onStepAfterCenter firing (detail panel updates)', () => {
       maxDepth: 0,
       strategy: asStrategy('has-dfs'),
       onStep: () => {},
-      onStepAfterCenter: (info) => { afterCenterCalls.push(info.nodeId); },
+      onStepAfterCenter: (info) => {
+        afterCenterCalls.push(info.nodeId);
+      },
       onComplete: () => {},
     });
     expect(afterCenterCalls).toEqual(['a']);
     // highlightAndFocus 的 silent 参数：start 内部用 silent=false，所以会触发；
     // silent=true 时（prev() 用的 silent=false，但 jumpToNode 没用 silent 参数）应该不触发。
-    (engine as unknown as { highlightAndFocus: (id: string, path: string[], d: number, t: number, l: number, silent?: boolean) => void }).highlightAndFocus(
-      'b', ['b'], 0, 2, 1, /* silent */ true,
-    );
+    (
+      engine as unknown as {
+        highlightAndFocus: (
+          id: string,
+          path: string[],
+          d: number,
+          t: number,
+          l: number,
+          silent?: boolean,
+        ) => void;
+      }
+    ).highlightAndFocus('b', ['b'], 0, 2, 1, /* silent */ true);
     // silent=true 时不应追加
     expect(afterCenterCalls).toEqual(['a']);
     engine.stop();
@@ -624,14 +658,19 @@ describe('has-dfs buildSequence cycle defense', () => {
     cy.add([
       // 自环：A 是 structure，A.part_of 自己 —— 构造有环的 part_of 边
       { group: 'nodes', data: { id: 'A', fill: 'cls-structure' } },
-      { group: 'nodes', data: { id: 'B', fill: 'cls-structure', edges_out: [{ type: 'part_of', target: 'A' }] } },
+      {
+        group: 'nodes',
+        data: { id: 'B', fill: 'cls-structure', edges_out: [{ type: 'part_of', target: 'A' }] },
+      },
     ]);
     // 现在故意给 A 加一个 part_of 自环（罕见但真实会出现的脏数据）
     cy.getElementById('A').data('edges_out', [{ type: 'part_of', target: 'A' }]);
 
     const warn = spyWarn();
     let seq: string[];
-    expect(() => { seq = seqOf(cy); }).not.toThrow();
+    expect(() => {
+      seq = seqOf(cy);
+    }).not.toThrow();
     expect(seq!).toContain('A');
     expect(seq!).toContain('B');
     expect(new Set(seq!).size).toBe(seq!.length); // 无重复
@@ -650,7 +689,9 @@ describe('has-dfs buildSequence cycle defense', () => {
 
     const warn = spyWarn();
     let seq: string[];
-    expect(() => { seq = seqOf(cy); }).not.toThrow();
+    expect(() => {
+      seq = seqOf(cy);
+    }).not.toThrow();
     expect(seq!).toContain('A');
     expect(seq!).toContain('B');
     expect(new Set(seq!).size).toBe(seq!.length);
@@ -677,7 +718,9 @@ describe('has-dfs buildSequence cycle defense', () => {
 
     const warn = spyWarn();
     let seq: string[];
-    expect(() => { seq = seqOf(cy); }).not.toThrow();
+    expect(() => {
+      seq = seqOf(cy);
+    }).not.toThrow();
     expect(seq!).toContain('A');
     expect(seq!).toContain('B');
     expect(seq!).toContain('C');

@@ -81,7 +81,10 @@ export function initMusicPlayer(): void {
       if (!audio.src) {
         audio.src = '/audio/' + queue[trackIdx];
       }
-      audio.play().then(() => setPlaying(true)).catch(() => {});
+      audio
+        .play()
+        .then(() => setPlaying(true))
+        .catch(() => {});
     }
   }
 

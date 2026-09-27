@@ -21,7 +21,10 @@ import { HighlightEngine } from '@/ui/highlight-engine';
 import { DetailPanel } from '@/ui/detail-panel';
 
 /** Minimal fake — only the methods the canvas-tap path touches. */
-function makeFakeTourController(): Pick<TourController, 'isRunning' | 'isPaused' | 'stop' | 'refreshStartHintFromHighlight'> & {
+function makeFakeTourController(): Pick<
+  TourController,
+  'isRunning' | 'isPaused' | 'stop' | 'refreshStartHintFromHighlight'
+> & {
   isRunning: ReturnType<typeof vi.fn>;
   isPaused: ReturnType<typeof vi.fn>;
   stop: ReturnType<typeof vi.fn>;
@@ -187,7 +190,9 @@ describe('initGraphEvents — canvas tap + tour (issue #11 fix)', () => {
     // the `target === cy` guard works (cytoscape may emit node taps to BOTH
     // the element listener and the cy-level listener — only the cy-level
     // guard is what stops a node tap from triggering `stop()`).
-    cy.on('tap', (e) => { if (e.target === cy) canvasTapCalls++; });
+    cy.on('tap', (e) => {
+      if (e.target === cy) canvasTapCalls++;
+    });
 
     const node = cy.add({ group: 'nodes', data: { id: 'n1', label: 'N1' } });
     // Node taps go through the element-level event, not cy.emit. We dispatch

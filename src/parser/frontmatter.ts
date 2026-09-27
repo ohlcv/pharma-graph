@@ -32,20 +32,14 @@ const VALID_SHAPE: ReadonlySet<string> = new Set([
 ]);
 
 /** stroke 白名单 —— 与 graph.ts 的 StrokeType 联合保持一致 */
-const VALID_STROKE: ReadonlySet<string> = new Set([
-  'auto',
-  'glow',
-  'fallback',
-  'flow',
-  'double',
-]);
+const VALID_STROKE: ReadonlySet<string> = new Set(['auto', 'glow', 'fallback', 'flow', 'double']);
 
 // --- frontmatter 字段类型 ---
 
 export interface NodeMeta {
   id: string;
   label: string;
-  
+
   // ── 新字段（基于 OWL2）─────────────────────────────────────────────
   /** 领域顶层类 IRI（如 cls-drug, cls-classification, cls-adverse 等）*/
   fill?: string;
@@ -75,7 +69,7 @@ export interface EdgeDef {
 export interface ParsedFrontmatter extends NodeMeta {
   edges_out?: EdgeDef[];
   tags?: string[];
-  body?: string;   // 正文内容（在 frontmatter 分隔线之后）
+  body?: string; // 正文内容（在 frontmatter 分隔线之后）
 }
 
 /**
@@ -111,7 +105,7 @@ function parseFrontmatterRaw(raw: string): { data: Record<string, unknown>; cont
   const content = match[2];
   let data: Record<string, unknown>;
   try {
-    data = yamlParse(yamlBlock) as Record<string, unknown> ?? {};
+    data = (yamlParse(yamlBlock) as Record<string, unknown>) ?? {};
   } catch (err) {
     // Surface YAML errors loudly — silently returning {} produces ghost
     // nodes with no id/edges that look fine in the graph but corrupt
@@ -198,7 +192,7 @@ export function parseFrontmatterWithWarnings(
   }
 
   const label = getField(fm, 'label') ?? basename(filePath);
-  
+
   const fill = getField(fm, 'fill') ?? '';
   const strokeRaw = getField(fm, 'stroke');
   const shape = getField(fm, 'shape');
@@ -291,9 +285,10 @@ export function parseFrontmatterWithWarnings(
       return;
     }
     const rawType = obj['type'];
-    const typeStr = rawType === undefined || rawType === null
-      ? DEFAULT_EDGE_TYPE
-      : String(rawType).trim() || DEFAULT_EDGE_TYPE;
+    const typeStr =
+      rawType === undefined || rawType === null
+        ? DEFAULT_EDGE_TYPE
+        : String(rawType).trim() || DEFAULT_EDGE_TYPE;
     if (!isValidEdgeType(typeStr)) {
       warnings.push({
         file: filePath,
@@ -380,19 +375,16 @@ function describe(v: unknown): string {
 // ── Serialisation ─────────────────────────────────────────────────────────────
 
 /** 序列化 ParsedFrontmatter + 正文，回写到 .md 文件的格式。 */
-export function stringifyFrontmatter(
-  fm: ParsedFrontmatter,
-  body: string,
-): string {
+export function stringifyFrontmatter(fm: ParsedFrontmatter, body: string): string {
   const top: Record<string, unknown> = {};
 
-  if (fm.id)              top['id']     = fm.id;
-  if (fm.label)           top['label']  = fm.label;
-  
+  if (fm.id) top['id'] = fm.id;
+  if (fm.label) top['label'] = fm.label;
+
   // 新字段（基于 OWL2）
-  if (fm.fill)            top['fill']   = fm.fill;
-  if (fm.stroke)         top['stroke'] = fm.stroke;
-  if (fm.shape)          top['shape']  = fm.shape;
+  if (fm.fill) top['fill'] = fm.fill;
+  if (fm.stroke) top['stroke'] = fm.stroke;
+  if (fm.shape) top['shape'] = fm.shape;
   // 有 full 时必须写成 { short, full }；原来只写 short ?? full 一个字符串，
   // 两者都有时 full 会在回写时丢掉。
   if (fm.fullSummary) {
@@ -404,15 +396,15 @@ export function stringifyFrontmatter(
     top['summary'] = fm.shortSummary;
   }
   if (fm.edges_out?.length) top['edges_out'] = fm.edges_out;
-  if (fm.tags?.length)      top['tags']      = fm.tags;
+  if (fm.tags?.length) top['tags'] = fm.tags;
 
   if (fm.location) {
     const loc: Record<string, unknown> = {};
-    if (fm.location.book)       loc['book']       = fm.location.book;
-    if (fm.location.part)        loc['part']        = fm.location.part;
-    if (fm.location.chapter)     loc['chapter']     = fm.location.chapter;
-    if (fm.location.section)    loc['section']    = fm.location.section;
-    if (fm.location.item)       loc['item']       = fm.location.item;
+    if (fm.location.book) loc['book'] = fm.location.book;
+    if (fm.location.part) loc['part'] = fm.location.part;
+    if (fm.location.chapter) loc['chapter'] = fm.location.chapter;
+    if (fm.location.section) loc['section'] = fm.location.section;
+    if (fm.location.item) loc['item'] = fm.location.item;
     if (fm.location.subsection) loc['subsection'] = fm.location.subsection;
     if (Object.keys(loc).length > 0) top['location'] = loc;
   }

@@ -12,26 +12,19 @@ import { parseBodyQuestions } from '@/ui/detail-panel';
 
 describe('parseBodyQuestions', () => {
   it('returns each H2 as a label/answer pair', () => {
-    const body = [
-      '## 第一个问题',
-      '答案是 A。',
-      '',
-      '## 第二个问题',
-      '答案是 B。',
-    ].join('\n');
+    const body = ['## 第一个问题', '答案是 A。', '', '## 第二个问题', '答案是 B。'].join('\n');
     const qs = parseBodyQuestions(body);
-    expect(qs.map(q => q.label)).toEqual(['第一个问题', '第二个问题']);
-    expect(qs.map(q => q.answer)).toEqual(['答案是 A。', '答案是 B。']);
+    expect(qs.map((q) => q.label)).toEqual(['第一个问题', '第二个问题']);
+    expect(qs.map((q) => q.answer)).toEqual(['答案是 A。', '答案是 B。']);
   });
 
   it('keeps a section whose title coincidentally matches the old hard-coded wording', () => {
     // The pre-fix SKIP set would have silently dropped this. With the
     // sentinel design, the title is just data — no string equality
     // filter runs — so the section is preserved verbatim.
-    const body = [
-      '## 它在整套框架里属于哪一层、放在哪一块？',
-      '这是一段真实回答，不该被吞。',
-    ].join('\n');
+    const body = ['## 它在整套框架里属于哪一层、放在哪一块？', '这是一段真实回答，不该被吞。'].join(
+      '\n',
+    );
     const qs = parseBodyQuestions(body);
     expect(qs).toHaveLength(1);
     expect(qs[0].label).toBe('它在整套框架里属于哪一层、放在哪一块？');
@@ -51,7 +44,7 @@ describe('parseBodyQuestions', () => {
       '也应保留。',
     ].join('\n');
     const qs = parseBodyQuestions(body);
-    expect(qs.map(q => q.label)).toEqual(['保留的问题', '再来一个保留']);
+    expect(qs.map((q) => q.label)).toEqual(['保留的问题', '再来一个保留']);
   });
 
   it('treats the sentinel as a no-op when it appears inside an answer, not before an H2', () => {
@@ -80,7 +73,7 @@ describe('parseBodyQuestions', () => {
       '保留。',
     ].join('\n');
     const qs = parseBodyQuestions(body);
-    expect(qs.map(q => q.label)).toEqual(['正常问题']);
+    expect(qs.map((q) => q.label)).toEqual(['正常问题']);
   });
 
   it('returns an empty array when there are no H2 sections', () => {

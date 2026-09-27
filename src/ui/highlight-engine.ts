@@ -20,9 +20,13 @@ export class HighlightEngine {
 
   /** Clear all highlighting classes and selections. */
   private resetClasses(): void {
-    this.cy.elements().removeClass(
-      [CLASSES.DIMMED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED, CLASSES.HIGHLIGHTED_EDGE].join(' '),
-    );
+    this.cy
+      .elements()
+      .removeClass(
+        [CLASSES.DIMMED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED, CLASSES.HIGHLIGHTED_EDGE].join(
+          ' ',
+        ),
+      );
     this.cy.elements().unselect();
   }
 
@@ -44,7 +48,8 @@ export class HighlightEngine {
 
   /** Dim all nodes that are not highlighted. */
   private dimUnhighlightedNodes(): void {
-    this.cy.nodes()
+    this.cy
+      .nodes()
       .not(`.${CLASSES.LAYER_PARENT}`)
       .not(`.${CLASSES.SELECTED_NODE}`)
       .not(`.${CLASSES.HIGHLIGHTED}`)
@@ -159,7 +164,11 @@ export class HighlightEngine {
 
       matchingEdges.addClass(CLASSES.HIGHLIGHTED_EDGE);
       matchingEdges.connectedNodes().not(`.${CLASSES.LAYER_PARENT}`).addClass(CLASSES.HIGHLIGHTED);
-      this.cy.nodes().not(`.${CLASSES.HIGHLIGHTED}`).not(`.${CLASSES.LAYER_PARENT}`).addClass(CLASSES.DIMMED);
+      this.cy
+        .nodes()
+        .not(`.${CLASSES.HIGHLIGHTED}`)
+        .not(`.${CLASSES.LAYER_PARENT}`)
+        .addClass(CLASSES.DIMMED);
       this.cy.edges().not(`.${CLASSES.HIGHLIGHTED_EDGE}`).addClass(CLASSES.DIMMED);
     });
   }
@@ -219,6 +228,9 @@ export class HighlightEngine {
   }
 
   getAllDimmed(): string[] {
-    return this.cy.nodes(`.${CLASSES.DIMMED}`).not(`.${CLASSES.LAYER_PARENT}`).map((n: cytoscape.NodeSingular) => n.id());
+    return this.cy
+      .nodes(`.${CLASSES.DIMMED}`)
+      .not(`.${CLASSES.LAYER_PARENT}`)
+      .map((n: cytoscape.NodeSingular) => n.id());
   }
 }

@@ -34,8 +34,4 @@ export {
   installLayoutMenuDismissHandlers,
 } from './layout/layout-switcher.js';
 
-export {
-  fitGraph,
-  randomize,
-  animatePulse,
-} from './layout/toolbar-actions.js';
+export { fitGraph, randomize, animatePulse } from './layout/toolbar-actions.js';

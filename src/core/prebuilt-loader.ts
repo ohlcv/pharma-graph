@@ -71,9 +71,7 @@ const reportLegacy = (cb: ProgressCallback | undefined) =>
  *
  * Returns the graph + collected md files (empty in the prebuilt path).
  */
-export async function loadGraph(
-  onProgress?: ProgressCallback,
-): Promise<LoadResult> {
+export async function loadGraph(onProgress?: ProgressCallback): Promise<LoadResult> {
   const report = onProgress ?? (() => {});
 
   // ── Fast path: prebuilt graph-data.json ─────────────────────────────────
@@ -85,7 +83,12 @@ export async function loadGraph(
       const raw = (await res.json()) as PrebuiltGraphData;
       if (raw?.nodes && Array.isArray(raw.nodes)) {
         const graph = buildGraphFromPrebuilt(raw);
-        report({ phase: 'done', loaded: raw.nodes.length, total: raw.nodes.length, message: '准备就绪' });
+        report({
+          phase: 'done',
+          loaded: raw.nodes.length,
+          total: raw.nodes.length,
+          message: '准备就绪',
+        });
         return { graph, files: {}, usedPrebuilt: true };
       }
     }

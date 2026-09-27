@@ -288,7 +288,17 @@ describe('initDebugOverlay — close button & drag handle', () => {
     // path leaves top/left at the *initial* mousedown-derived
     // values (no delta applied from the under-threshold mousemove).
     panel.getBoundingClientRect = () =>
-      ({ top: 100, left: 200, right: 600, bottom: 400, width: 400, height: 300, x: 200, y: 100, toJSON: () => '' }) as DOMRect;
+      ({
+        top: 100,
+        left: 200,
+        right: 600,
+        bottom: 400,
+        width: 400,
+        height: 300,
+        x: 200,
+        y: 100,
+        toJSON: () => '',
+      }) as DOMRect;
 
     fire(header, 'mousedown', { clientX: 200, clientY: 100 });
     // Capture top/left immediately after mousedown — the handler

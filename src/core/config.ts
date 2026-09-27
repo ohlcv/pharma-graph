@@ -22,11 +22,11 @@ import type { StrokeType, ShapeType } from './graph.js';
 //   - 复杂场景：不填 shape，让 fill 的扩展形状生效（如 cls-mnemonic 的 vee、cls-summary 的 round-rectangle）
 //
 export const SHAPE_BY_OWL2: Record<Exclude<ShapeType, 'auto'>, cytoscape.Css.NodeShape> = {
-  class:              'round-rectangle',  // 类：圆角矩形（适合分类/概念集合）
-  named_individual:   'ellipse',          // 具名个体：椭圆（适合具体药物/疾病）
-  object_property:    'hexagon',          // 对象属性：六边形（适合关系实体化）
-  data_property:      'rectangle',        // 数据属性：矩形（适合数值属性）
-  annotation_property:'tag',              // 注释属性：标签形（适合定义/口诀/总结）
+  class: 'round-rectangle', // 类：圆角矩形（适合分类/概念集合）
+  named_individual: 'ellipse', // 具名个体：椭圆（适合具体药物/疾病）
+  object_property: 'hexagon', // 对象属性：六边形（适合关系实体化）
+  data_property: 'rectangle', // 数据属性：矩形（适合数值属性）
+  annotation_property: 'tag', // 注释属性：标签形（适合定义/口诀/总结）
 };
 
 // ── Stroke → 边框样式配置（新增）─────────────────────────────────────────────
@@ -36,20 +36,42 @@ export const SHAPE_BY_OWL2: Record<Exclude<ShapeType, 'auto'>, cytoscape.Css.Nod
 //   stroke = auto → subtreeRoot 色（自动计算）
 //   无 subtreeRoot → depth 灰阶 fallback
 
-export const STROKE_CONFIG: Record<StrokeType, {
-  color: string;
-  lineStyle: 'solid' | 'dashed' | 'double';
-  effect?: 'glow' | 'flow';
-  description: string;
-}> = {
-  auto:     { color: 'inherit', lineStyle: 'solid', description: 'subtreeRoot 色（无则走 fill fallback）' },
-  fallback: { color: 'inherit', lineStyle: 'solid', description: 'fill 兜底边框色（FILL_BORDER_HINTS[fill]）' },
-  glow:     { color: '#818cf8', lineStyle: 'solid', effect: 'glow',
-    description: '固定光晕紫（有子树时被子树色覆盖）+ 呼吸脉冲光晕' },
-  flow:     { color: 'inherit', lineStyle: 'solid', effect: 'flow',
-    description: '边框色走 auto 同一套取色逻辑（子树色/fill 兜底）+ 绕节点旋转的流动光弧' },
-  double:   { color: 'inherit', lineStyle: 'double',
-    description: '同 auto 取色（子树色/fill 兜底）+ 双线边框' },
+export const STROKE_CONFIG: Record<
+  StrokeType,
+  {
+    color: string;
+    lineStyle: 'solid' | 'dashed' | 'double';
+    effect?: 'glow' | 'flow';
+    description: string;
+  }
+> = {
+  auto: {
+    color: 'inherit',
+    lineStyle: 'solid',
+    description: 'subtreeRoot 色（无则走 fill fallback）',
+  },
+  fallback: {
+    color: 'inherit',
+    lineStyle: 'solid',
+    description: 'fill 兜底边框色（FILL_BORDER_HINTS[fill]）',
+  },
+  glow: {
+    color: '#818cf8',
+    lineStyle: 'solid',
+    effect: 'glow',
+    description: '固定光晕紫（有子树时被子树色覆盖）+ 呼吸脉冲光晕',
+  },
+  flow: {
+    color: 'inherit',
+    lineStyle: 'solid',
+    effect: 'flow',
+    description: '边框色走 auto 同一套取色逻辑（子树色/fill 兜底）+ 绕节点旋转的流动光弧',
+  },
+  double: {
+    color: 'inherit',
+    lineStyle: 'double',
+    description: '同 auto 取色（子树色/fill 兜底）+ 双线边框',
+  },
 };
 
 /**
@@ -78,23 +100,26 @@ export const STROKE_MERGE_MODE: 'coexist' | 'override' = 'coexist';
 //   - stroke=auto → STROKE_CONFIG.auto.color（子树色或 depth 灰阶）
 // 边框色最终由 STROKE_CONFIG / getSubtreeBorderColor 决定。
 //
-export const FILL_CONFIG: Record<string, {
-  shape: string;
-  background: string;
-  backgroundDark: string;
-  /** 默认 stroke 行为，节点不填 stroke 时启用
-   *  - auto: 子树统一色（subtreeRoot），无子树时降级到 fill 兜底边框色
-   *  - fallback: 直接用 fill 兜底边框色（按 fill 类型着色，不跟随子树）
-   *  - glow: subtreeRoot 色 + 呼吸光晕效果 */
-  defaultStroke: StrokeType;
-  label: string;
-  description: string;
-}> = {
+export const FILL_CONFIG: Record<
+  string,
+  {
+    shape: string;
+    background: string;
+    backgroundDark: string;
+    /** 默认 stroke 行为，节点不填 stroke 时启用
+     *  - auto: 子树统一色（subtreeRoot），无子树时降级到 fill 兜底边框色
+     *  - fallback: 直接用 fill 兜底边框色（按 fill 类型着色，不跟随子树）
+     *  - glow: subtreeRoot 色 + 呼吸光晕效果 */
+    defaultStroke: StrokeType;
+    label: string;
+    description: string;
+  }
+> = {
   // ── 结构入口 ────────────────────────────────────────────────────────────
   // round-pentagon：五边形（柔），区别于章的矩形
   'cls-structure': {
     shape: 'round-pentagon',
-    background: '#fae8e3',         // 柔奶杏粉
+    background: '#fae8e3', // 柔奶杏粉
     backgroundDark: '#f5d0c5',
     defaultStroke: 'glow',
     label: '组织结构',
@@ -104,7 +129,7 @@ export const FILL_CONFIG: Record<string, {
   // octagon：八边形，明显的"分类"层级感
   'cls-classification': {
     shape: 'octagon',
-    background: '#ffe4b5',         // 柔莫兰迪黄
+    background: '#ffe4b5', // 柔莫兰迪黄
     backgroundDark: '#ffcc80',
     defaultStroke: 'glow',
     label: '药物分类',
@@ -114,7 +139,7 @@ export const FILL_CONFIG: Record<string, {
   // ellipse：椭圆，最通用的具体物形状
   'cls-drug': {
     shape: 'ellipse',
-    background: '#dbeafe',         // 柔天空蓝
+    background: '#dbeafe', // 柔天空蓝
     backgroundDark: '#bfdbfe',
     defaultStroke: 'glow',
     label: '药物',
@@ -124,7 +149,7 @@ export const FILL_CONFIG: Record<string, {
   // diamond：菱形，"病症"的尖锐感
   'cls-disease': {
     shape: 'diamond',
-    background: '#fce7f3',         // 柔樱花粉
+    background: '#fce7f3', // 柔樱花粉
     backgroundDark: '#fbcfe8',
     defaultStroke: 'glow',
     label: '疾病',
@@ -134,7 +159,7 @@ export const FILL_CONFIG: Record<string, {
   // round-triangle：圆角三角形，三角形表"指向/锚定"——靶点/受体是药理作用的锚点
   'cls-biomolecule': {
     shape: 'round-triangle',
-    background: '#d1fae5',         // 柔薄荷绿
+    background: '#d1fae5', // 柔薄荷绿
     backgroundDark: '#a7f3d0',
     defaultStroke: 'glow',
     label: '生物实体',
@@ -144,7 +169,7 @@ export const FILL_CONFIG: Record<string, {
   // star：星形，突出"亮点/重点特征"
   'cls-feature': {
     shape: 'star',
-    background: '#cffafe',         // 柔湖青
+    background: '#cffafe', // 柔湖青
     backgroundDark: '#a5f3fc',
     defaultStroke: 'glow',
     label: '作用特点',
@@ -154,7 +179,7 @@ export const FILL_CONFIG: Record<string, {
   // round-hexagon：圆角六边形，警示标志意象，警示感
   'cls-adverse': {
     shape: 'round-hexagon',
-    background: '#ffe4e6',         // 柔玫瑰粉
+    background: '#ffe4e6', // 柔玫瑰粉
     backgroundDark: '#fecdd3',
     defaultStroke: 'glow',
     label: '不良反应',
@@ -164,7 +189,7 @@ export const FILL_CONFIG: Record<string, {
   // round-rectangle：圆角矩形，中性稳定，承载抽象定义
   'cls-concept': {
     shape: 'round-rectangle',
-    background: '#e0e7ff',         // 柔雾紫蓝
+    background: '#e0e7ff', // 柔雾紫蓝
     backgroundDark: '#c7d2fe',
     defaultStroke: 'glow',
     label: '概念',
@@ -174,7 +199,7 @@ export const FILL_CONFIG: Record<string, {
   // bottom-round-rectangle：下圆矩形，像"汇总底栏"
   'cls-summary': {
     shape: 'bottom-round-rectangle',
-    background: '#fef9c3',         // 柔麦穗黄
+    background: '#fef9c3', // 柔麦穗黄
     backgroundDark: '#fef08a',
     defaultStroke: 'glow',
     label: '总结',
@@ -184,7 +209,7 @@ export const FILL_CONFIG: Record<string, {
   // tag：标签形，像"附加的口诀便签"
   'cls-mnemonic': {
     shape: 'tag',
-    background: '#fed7aa',         // 柔蜜桃橙
+    background: '#fed7aa', // 柔蜜桃橙
     backgroundDark: '#fdba74',
     defaultStroke: 'glow',
     label: '口诀',
@@ -211,7 +236,7 @@ export function getBorderColor(
   stroke: string | undefined,
   subtreeRoot: string | undefined,
   depth: number | undefined,
-  fill?: string,  // ← 新增：节点 fill，决定 fallback 兜底色
+  fill?: string, // ← 新增：节点 fill，决定 fallback 兜底色
 ): string {
   // 1. stroke 显式声明（glow）
   if (stroke && stroke !== 'auto' && stroke !== 'fallback') {
@@ -348,12 +373,12 @@ function oklchToHex(L: number, C: number, hDeg: number): string {
   // 2. OKLab → linear sRGB（规范矩阵 M₂）
   const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
   const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
-  const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
+  const s_ = L - 0.0894841775 * a - 1.291485548 * b;
 
   // l_, m_, s_ 是 cube-root 空间，需要 ^3 回到 linear-light sRGB
-  let r =  4.0767416621 * l_ ** 3 - 3.3077115913 * m_ ** 3 + 0.2309699292 * s_ ** 3;
+  let r = 4.0767416621 * l_ ** 3 - 3.3077115913 * m_ ** 3 + 0.2309699292 * s_ ** 3;
   let g = -1.2684380046 * l_ ** 3 + 2.6097574011 * m_ ** 3 - 0.3413193965 * s_ ** 3;
-  let bb = -0.0041960863 * l_ ** 3 - 0.7034186147 * m_ ** 3 + 1.7076147010 * s_ ** 3;
+  let bb = -0.0041960863 * l_ ** 3 - 0.7034186147 * m_ ** 3 + 1.707614701 * s_ ** 3;
 
   // 3. linear sRGB → sRGB（gamma 校正 + 钳位）
   const toSrgb = (x: number) => {
@@ -366,7 +391,9 @@ function oklchToHex(L: number, C: number, hDeg: number): string {
 
   // 4. → hex 字符串
   const toHex = (v: number) =>
-    Math.round(v * 255).toString(16).padStart(2, '0');
+    Math.round(v * 255)
+      .toString(16)
+      .padStart(2, '0');
   return `#${toHex(r)}${toHex(g)}${toHex(bb)}`;
 }
 
@@ -406,9 +433,9 @@ export function getLevelLabel(depthVal: number): string {
 export const EDGE_TYPE_STYLE: Record<string, { color: string; lineStyle: string; arrow: string }> =
   {
     // 类-类 / 个体-类 / 局部-整体 — 都用三角箭头表示方向
-    subclass_of: { color: '#3b82f6', lineStyle: 'solid', arrow: 'triangle' },   // 蓝色实线箭头 — 类-类层级
-    part_of: { color: '#22c55e', lineStyle: 'solid', arrow: 'triangle' },       // 绿色实线箭头 — 局部-整体
-    instance_of: { color: '#f97316', lineStyle: 'solid', arrow: 'triangle' },   // 橙色实线箭头 — 个体-类
+    subclass_of: { color: '#3b82f6', lineStyle: 'solid', arrow: 'triangle' }, // 蓝色实线箭头 — 类-类层级
+    part_of: { color: '#22c55e', lineStyle: 'solid', arrow: 'triangle' }, // 绿色实线箭头 — 局部-整体
+    instance_of: { color: '#f97316', lineStyle: 'solid', arrow: 'triangle' }, // 橙色实线箭头 — 个体-类
     // 对称关系 — 点线 + 双向箭头
     disjoint_with: { color: '#a855f7', lineStyle: 'dashed', arrow: 'triangle' }, // 紫色虚线 — 互斥（cytoscape 不支持 dash-dot，用 dashed+紫色区分）
     equivalent_to: { color: '#a78bfa', lineStyle: 'dotted', arrow: 'triangle' }, // 灰紫点线 — 等价
@@ -787,16 +814,16 @@ export const LAYOUTS: Record<string, LayoutConfig> = {
 // 修改此表会直接影响 stroke=auto 节点的边框色。如需自定义，优先改 STROKE_CONFIG，
 // 此表作为"按 fill 类型给的中性边框"。
 export const FILL_BORDER_HINTS: Record<string, string> = {
-  'cls-structure':       '#c89b8a',  // 浅棕（柔奶杏粉背景的中等明度版）
-  'cls-classification':  '#c9a06a',  // 莫兰迪棕黄
-  'cls-drug':            '#7aa8d9',  // 浅蓝
-  'cls-disease':         '#e89bb8',  // 浅粉
-  'cls-biomolecule':     '#6dbfa0',  // 浅绿
-  'cls-feature':         '#7db8c4',  // 浅青
-  'cls-adverse':         '#d4868f',  // 浅玫
-  'cls-concept':         '#818cf8',  // 浅紫
-  'cls-summary':         '#c9b96a',  // 浅黄
-  'cls-mnemonic':        '#d4884e',  // 浅橙
+  'cls-structure': '#c89b8a', // 浅棕（柔奶杏粉背景的中等明度版）
+  'cls-classification': '#c9a06a', // 莫兰迪棕黄
+  'cls-drug': '#7aa8d9', // 浅蓝
+  'cls-disease': '#e89bb8', // 浅粉
+  'cls-biomolecule': '#6dbfa0', // 浅绿
+  'cls-feature': '#7db8c4', // 浅青
+  'cls-adverse': '#d4868f', // 浅玫
+  'cls-concept': '#818cf8', // 浅紫
+  'cls-summary': '#c9b96a', // 浅黄
+  'cls-mnemonic': '#d4884e', // 浅橙
 };
 
 // FILL_BORDER_HINTS 没列到的 fill 时使用此兜底色（节点连合法 fill 都没有的情况）
@@ -815,6 +842,6 @@ export const DEFAULT_LAYOUT = 'euler';
 // 新增体系：在 frontmatter 创建体系根节点后，加一行 id 即可。
 //   示例：'sum-third-universe'、'concept-domain-X'
 export const UNIVERSE_ROOTS: ReadonlySet<string> = new Set<string>([
-  'concept-exam-system',       // 体系一：执业药师考试（4 本教材）
-  'sum-neurodiversity-p1',     // 体系二：神经多样性与生存策略
+  'concept-exam-system', // 体系一：执业药师考试（4 本教材）
+  'sum-neurodiversity-p1', // 体系二：神经多样性与生存策略
 ]);

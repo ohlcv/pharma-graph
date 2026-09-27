@@ -60,9 +60,33 @@ interface StarLayerConfig {
 }
 
 const LAYERS: readonly StarLayerConfig[] = [
-  { parallax: 0.10, tile: 896,  stars: 21, sizeRange: [0.6, 1.2], alphaRange: [0.35, 0.55], color: '#cbd5e1', seedOffset: 1 },  // 远：冷灰白
-  { parallax: 0.22, tile: 768,  stars: 20, sizeRange: [0.9, 1.8], alphaRange: [0.45, 0.70], color: '#e2e8f0', seedOffset: 2 },  // 中：稍亮
-  { parallax: 0.45, tile: 1024, stars: 20, sizeRange: [1.4, 2.6], alphaRange: [0.55, 0.85], color: '#f8fafc', seedOffset: 3 },  // 近：近白
+  {
+    parallax: 0.1,
+    tile: 896,
+    stars: 21,
+    sizeRange: [0.6, 1.2],
+    alphaRange: [0.35, 0.55],
+    color: '#cbd5e1',
+    seedOffset: 1,
+  }, // 远：冷灰白
+  {
+    parallax: 0.22,
+    tile: 768,
+    stars: 20,
+    sizeRange: [0.9, 1.8],
+    alphaRange: [0.45, 0.7],
+    color: '#e2e8f0',
+    seedOffset: 2,
+  }, // 中：稍亮
+  {
+    parallax: 0.45,
+    tile: 1024,
+    stars: 20,
+    sizeRange: [1.4, 2.6],
+    alphaRange: [0.55, 0.85],
+    color: '#f8fafc',
+    seedOffset: 3,
+  }, // 近：近白
 ] as const;
 
 // ── 单层 tile ─────────────────────────────────────────────────────────────

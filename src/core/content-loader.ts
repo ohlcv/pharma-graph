@@ -46,18 +46,25 @@ export async function loadContent(): Promise<LoadedContent> {
       // and Vite dev server doesn't decode %2B → SPA fallback. Full-width
       // `＋` is encoded by encodeURI to %EF%BC%8B, which both servers decode
       // correctly (same as all other CJK characters in filenames).
-      fetch('/content/' + rel.split('/').map(
-          (s) => encodeURI(s).replace(/#/g, '%23').replace(/\?/g, '%3F'),
-        ).join('/')).then((r) => {
-          if (!r.ok) throw new Error(`[content-loader] ${rel}: ${r.status}`);
-          const ct = r.headers.get('content-type') ?? '';
-          if (ct.includes('text/html')) throw new Error(`[content-loader] ${rel}: received HTML (SPA fallback), expected markdown`);
-          return r.text().then((text) => {
-            if (text.startsWith('<!DOCTYPE') || text.startsWith('<html'))
-              throw new Error(`[content-loader] ${rel}: received HTML, expected markdown`);
-            return [rel, text] as const;
-          });
-        }),
+      fetch(
+        '/content/' +
+          rel
+            .split('/')
+            .map((s) => encodeURI(s).replace(/#/g, '%23').replace(/\?/g, '%3F'))
+            .join('/'),
+      ).then((r) => {
+        if (!r.ok) throw new Error(`[content-loader] ${rel}: ${r.status}`);
+        const ct = r.headers.get('content-type') ?? '';
+        if (ct.includes('text/html'))
+          throw new Error(
+            `[content-loader] ${rel}: received HTML (SPA fallback), expected markdown`,
+          );
+        return r.text().then((text) => {
+          if (text.startsWith('<!DOCTYPE') || text.startsWith('<html'))
+            throw new Error(`[content-loader] ${rel}: received HTML, expected markdown`);
+          return [rel, text] as const;
+        });
+      }),
     ),
   );
 

@@ -36,62 +36,346 @@ import { parseFrontmatter } from '../parser/frontmatter.js';
 // ── 数据：原样迁自 data.js ───────────────────────────────────────────────
 
 const TRI: Record<string, readonly [number, number, number]> = {
-  乾: [1, 1, 1], 兑: [1, 1, 0], 离: [1, 0, 1], 震: [1, 0, 0],
-  巽: [0, 1, 1], 坎: [0, 1, 0], 艮: [0, 0, 1], 坤: [0, 0, 0],
+  乾: [1, 1, 1],
+  兑: [1, 1, 0],
+  离: [1, 0, 1],
+  震: [1, 0, 0],
+  巽: [0, 1, 1],
+  坎: [0, 1, 0],
+  艮: [0, 0, 1],
+  坤: [0, 0, 0],
 };
 // 先天八卦：自乾顺时针。
 const BAGUA_ORDER = ['乾', '巽', '坎', '艮', '坤', '震', '离', '兑'] as const;
 
 const GAN = '甲乙丙丁戊己庚辛壬癸'.split('');
 const ZHI = '子丑寅卯辰巳午未申酉戌亥'.split('');
-const LV = ['黄钟', '大吕', '太簇', '夹钟', '姑洗', '仲吕', '蕤宾', '林钟', '夷则', '南吕', '无射', '应钟'];
-const CS = ['长生', '沐浴', '冠带', '临官', '帝旺', '衰', '病', '死', '墓', '绝', '胎', '养'];
-const JIEQI = ['立春', '雨水', '惊蛰', '春分', '清明', '谷雨', '立夏', '小满', '芒种', '夏至', '小暑', '大暑', '立秋', '处暑', '白露', '秋分', '寒露', '霜降', '立冬', '小雪', '大雪', '冬至', '小寒', '大寒'];
-const XIU = ['角', '亢', '氐', '房', '心', '尾', '箕', '斗', '牛', '女', '虚', '危', '室', '壁', '奎', '娄', '胃', '昴', '毕', '觜', '参', '井', '鬼', '柳', '星', '张', '翼', '轸'];
-const GUA: ReadonlyArray<readonly [string, string, string]> = [
-  ['乾', '乾', '乾'], ['坤', '坤', '坤'], ['屯', '坎', '震'], ['蒙', '艮', '坎'], ['需', '坎', '乾'], ['讼', '乾', '坎'], ['师', '坤', '坎'], ['比', '坎', '坤'],
-  ['小畜', '巽', '乾'], ['履', '乾', '兑'], ['泰', '坤', '乾'], ['否', '乾', '坤'], ['同人', '乾', '离'], ['大有', '离', '乾'], ['谦', '坤', '艮'], ['豫', '震', '坤'],
-  ['随', '兑', '震'], ['蛊', '艮', '巽'], ['临', '坤', '兑'], ['观', '巽', '坤'], ['噬嗑', '离', '震'], ['贲', '艮', '离'], ['剥', '艮', '坤'], ['复', '坤', '震'],
-  ['无妄', '乾', '震'], ['大畜', '艮', '乾'], ['颐', '艮', '震'], ['大过', '兑', '巽'], ['坎', '坎', '坎'], ['离', '离', '离'], ['咸', '兑', '艮'], ['恒', '震', '巽'],
-  ['遁', '乾', '艮'], ['大壮', '震', '乾'], ['晋', '离', '坤'], ['明夷', '坤', '离'], ['家人', '巽', '离'], ['睽', '离', '兑'], ['蹇', '坎', '艮'], ['解', '震', '坎'],
-  ['损', '艮', '兑'], ['益', '巽', '震'], ['夬', '兑', '乾'], ['姤', '乾', '巽'], ['萃', '兑', '坤'], ['升', '坤', '巽'], ['困', '兑', '坎'], ['井', '坎', '巽'],
-  ['革', '兑', '离'], ['鼎', '离', '巽'], ['震', '震', '震'], ['艮', '艮', '艮'], ['渐', '巽', '艮'], ['归妹', '震', '兑'], ['丰', '震', '离'], ['旅', '离', '艮'],
-  ['巽', '巽', '巽'], ['兑', '兑', '兑'], ['涣', '巽', '坎'], ['节', '坎', '兑'], ['中孚', '巽', '兑'], ['小过', '震', '艮'], ['既济', '坎', '离'], ['未济', '离', '坎'],
+const LV = [
+  '黄钟',
+  '大吕',
+  '太簇',
+  '夹钟',
+  '姑洗',
+  '仲吕',
+  '蕤宾',
+  '林钟',
+  '夷则',
+  '南吕',
+  '无射',
+  '应钟',
 ];
-const HOU = ['东风解冻', '蛰虫始振', '鱼陟负冰', '獭祭鱼', '候雁北', '草木萌动', '桃始华', '仓庚鸣', '鹰化为鸠', '玄鸟至', '雷乃发声', '始电', '桐始华', '田鼠化鴽', '虹始见', '萍始生', '鸣鸠拂羽', '戴胜降桑', '蝼蝈鸣', '蚯蚓出', '王瓜生', '苦菜秀', '靡草死', '麦秋至', '螳螂生', '鵙始鸣', '反舌无声', '鹿角解', '蜩始鸣', '半夏生', '温风至', '蟋蟀居壁', '鹰始挚', '腐草为萤', '土润溽暑', '大雨时行', '凉风至', '白露降', '寒蝉鸣', '鹰乃祭鸟', '天地始肃', '禾乃登', '鸿雁来', '玄鸟归', '群鸟养羞', '雷始收声', '蛰虫坯户', '水始涸', '鸿雁来宾', '雀入大水为蛤', '菊有黄华', '豺乃祭兽', '草木黄落', '蛰虫咸俯', '水始冰', '地始冻', '雉入大水为蜃', '虹藏不见', '天气上升', '闭塞成冬', '鹖鴠不鸣', '虎始交', '荔挺出', '蚯蚓结', '麋角解', '水泉动', '雁北乡', '鹊始巢', '雉雊', '鸡乳', '征鸟厉疾', '水泽腹坚'];
+const CS = ['长生', '沐浴', '冠带', '临官', '帝旺', '衰', '病', '死', '墓', '绝', '胎', '养'];
+const JIEQI = [
+  '立春',
+  '雨水',
+  '惊蛰',
+  '春分',
+  '清明',
+  '谷雨',
+  '立夏',
+  '小满',
+  '芒种',
+  '夏至',
+  '小暑',
+  '大暑',
+  '立秋',
+  '处暑',
+  '白露',
+  '秋分',
+  '寒露',
+  '霜降',
+  '立冬',
+  '小雪',
+  '大雪',
+  '冬至',
+  '小寒',
+  '大寒',
+];
+const XIU = [
+  '角',
+  '亢',
+  '氐',
+  '房',
+  '心',
+  '尾',
+  '箕',
+  '斗',
+  '牛',
+  '女',
+  '虚',
+  '危',
+  '室',
+  '壁',
+  '奎',
+  '娄',
+  '胃',
+  '昴',
+  '毕',
+  '觜',
+  '参',
+  '井',
+  '鬼',
+  '柳',
+  '星',
+  '张',
+  '翼',
+  '轸',
+];
+const GUA: ReadonlyArray<readonly [string, string, string]> = [
+  ['乾', '乾', '乾'],
+  ['坤', '坤', '坤'],
+  ['屯', '坎', '震'],
+  ['蒙', '艮', '坎'],
+  ['需', '坎', '乾'],
+  ['讼', '乾', '坎'],
+  ['师', '坤', '坎'],
+  ['比', '坎', '坤'],
+  ['小畜', '巽', '乾'],
+  ['履', '乾', '兑'],
+  ['泰', '坤', '乾'],
+  ['否', '乾', '坤'],
+  ['同人', '乾', '离'],
+  ['大有', '离', '乾'],
+  ['谦', '坤', '艮'],
+  ['豫', '震', '坤'],
+  ['随', '兑', '震'],
+  ['蛊', '艮', '巽'],
+  ['临', '坤', '兑'],
+  ['观', '巽', '坤'],
+  ['噬嗑', '离', '震'],
+  ['贲', '艮', '离'],
+  ['剥', '艮', '坤'],
+  ['复', '坤', '震'],
+  ['无妄', '乾', '震'],
+  ['大畜', '艮', '乾'],
+  ['颐', '艮', '震'],
+  ['大过', '兑', '巽'],
+  ['坎', '坎', '坎'],
+  ['离', '离', '离'],
+  ['咸', '兑', '艮'],
+  ['恒', '震', '巽'],
+  ['遁', '乾', '艮'],
+  ['大壮', '震', '乾'],
+  ['晋', '离', '坤'],
+  ['明夷', '坤', '离'],
+  ['家人', '巽', '离'],
+  ['睽', '离', '兑'],
+  ['蹇', '坎', '艮'],
+  ['解', '震', '坎'],
+  ['损', '艮', '兑'],
+  ['益', '巽', '震'],
+  ['夬', '兑', '乾'],
+  ['姤', '乾', '巽'],
+  ['萃', '兑', '坤'],
+  ['升', '坤', '巽'],
+  ['困', '兑', '坎'],
+  ['井', '坎', '巽'],
+  ['革', '兑', '离'],
+  ['鼎', '离', '巽'],
+  ['震', '震', '震'],
+  ['艮', '艮', '艮'],
+  ['渐', '巽', '艮'],
+  ['归妹', '震', '兑'],
+  ['丰', '震', '离'],
+  ['旅', '离', '艮'],
+  ['巽', '巽', '巽'],
+  ['兑', '兑', '兑'],
+  ['涣', '巽', '坎'],
+  ['节', '坎', '兑'],
+  ['中孚', '巽', '兑'],
+  ['小过', '震', '艮'],
+  ['既济', '坎', '离'],
+  ['未济', '离', '坎'],
+];
+const HOU = [
+  '东风解冻',
+  '蛰虫始振',
+  '鱼陟负冰',
+  '獭祭鱼',
+  '候雁北',
+  '草木萌动',
+  '桃始华',
+  '仓庚鸣',
+  '鹰化为鸠',
+  '玄鸟至',
+  '雷乃发声',
+  '始电',
+  '桐始华',
+  '田鼠化鴽',
+  '虹始见',
+  '萍始生',
+  '鸣鸠拂羽',
+  '戴胜降桑',
+  '蝼蝈鸣',
+  '蚯蚓出',
+  '王瓜生',
+  '苦菜秀',
+  '靡草死',
+  '麦秋至',
+  '螳螂生',
+  '鵙始鸣',
+  '反舌无声',
+  '鹿角解',
+  '蜩始鸣',
+  '半夏生',
+  '温风至',
+  '蟋蟀居壁',
+  '鹰始挚',
+  '腐草为萤',
+  '土润溽暑',
+  '大雨时行',
+  '凉风至',
+  '白露降',
+  '寒蝉鸣',
+  '鹰乃祭鸟',
+  '天地始肃',
+  '禾乃登',
+  '鸿雁来',
+  '玄鸟归',
+  '群鸟养羞',
+  '雷始收声',
+  '蛰虫坯户',
+  '水始涸',
+  '鸿雁来宾',
+  '雀入大水为蛤',
+  '菊有黄华',
+  '豺乃祭兽',
+  '草木黄落',
+  '蛰虫咸俯',
+  '水始冰',
+  '地始冻',
+  '雉入大水为蜃',
+  '虹藏不见',
+  '天气上升',
+  '闭塞成冬',
+  '鹖鴠不鸣',
+  '虎始交',
+  '荔挺出',
+  '蚯蚓结',
+  '麋角解',
+  '水泉动',
+  '雁北乡',
+  '鹊始巢',
+  '雉雊',
+  '鸡乳',
+  '征鸟厉疾',
+  '水泽腹坚',
+];
 const JIAZI = Array.from({ length: 60 }, (_, i) => GAN[i % 10] + ZHI[i % 12]);
 const T = (arr: readonly string[]): RingItem[] => arr.map((label) => ({ label }));
 
-interface RingItem { label: string; bits?: readonly number[] }
+interface RingItem {
+  label: string;
+  bits?: readonly number[];
+}
 interface RingDef {
   key: string;
-  r: number;                       // 归一化半径（0~1，相对最外圈）
+  r: number; // 归一化半径（0~1，相对最外圈）
   items: RingItem[];
   kind: 'tri' | 'hex' | 'text';
-  sizeFrac: number;                // 文字/爻线宽度 相对该环实际半径的比例
-  speed: number;                   // 转速（圈/秒），正负交替制造对转感
-  glow?: boolean;                  // 只给内圈"主角"用，外圈密集环不加光晕，省性能也更清爽
-  phase: number;                   // 呼吸/脉动相位，环与环错开不同步
-  tickCount?: number;              // 只有最外圈有：额外的精细刻度线数量
+  sizeFrac: number; // 文字/爻线宽度 相对该环实际半径的比例
+  speed: number; // 转速（圈/秒），正负交替制造对转感
+  glow?: boolean; // 只给内圈"主角"用，外圈密集环不加光晕，省性能也更清爽
+  phase: number; // 呼吸/脉动相位，环与环错开不同步
+  tickCount?: number; // 只有最外圈有：额外的精细刻度线数量
 }
 
 const RINGS_DEF: RingDef[] = [
-  { key: '八卦', r: 0.128, kind: 'tri', sizeFrac: 0.34, speed: 0.050, glow: true, phase: 0.0,
-    items: BAGUA_ORDER.map((n) => ({ label: n, bits: TRI[n] })) },
-  { key: '十天干', r: 0.202, kind: 'text', sizeFrac: 0.20, speed: -0.040, glow: true, phase: 0.6, items: T(GAN) },
-  { key: '十二地支', r: 0.268, kind: 'text', sizeFrac: 0.15, speed: 0.034, phase: 1.2, items: T(ZHI) },
-  { key: '十二律', r: 0.334, kind: 'text', sizeFrac: 0.10, speed: -0.028, phase: 1.8, items: T(LV) },
-  { key: '十二长生', r: 0.400, kind: 'text', sizeFrac: 0.10, speed: 0.024, phase: 2.4, items: T(CS) },
-  { key: '二十四节气', r: 0.474, kind: 'text', sizeFrac: 0.075, speed: -0.020, phase: 3.0, items: T(JIEQI) },
-  { key: '二十八宿', r: 0.544, kind: 'text', sizeFrac: 0.065, speed: 0.017, phase: 3.6, items: T(XIU) },
-  { key: '六十甲子', r: 0.629, kind: 'text', sizeFrac: 0.042, speed: -0.013, phase: 4.2, items: T(JIAZI) },
-  { key: '六十四卦', r: 0.722, kind: 'hex', sizeFrac: 0.075, speed: 0.010, phase: 4.8,
-    items: GUA.map(([n, up, lo]) => ({ label: n, bits: [...TRI[lo], ...TRI[up]] })) },
-  { key: '六十四卦名', r: 0.804, kind: 'text', sizeFrac: 0.038, speed: 0.010, phase: 5.4,
-    items: GUA.map(([n]) => ({ label: n })) },
-  { key: '七十二候', r: 0.899, kind: 'text', sizeFrac: 0.020, speed: -0.008, phase: 6.0, items: T(HOU) },
-  { key: '三百六十度', r: 1.000, kind: 'text', sizeFrac: 0.016, speed: 0.005, phase: 6.6, tickCount: 120,
-    items: T(Array.from({ length: 12 }, (_, i) => String(i * 30))) },
+  {
+    key: '八卦',
+    r: 0.128,
+    kind: 'tri',
+    sizeFrac: 0.34,
+    speed: 0.05,
+    glow: true,
+    phase: 0.0,
+    items: BAGUA_ORDER.map((n) => ({ label: n, bits: TRI[n] })),
+  },
+  {
+    key: '十天干',
+    r: 0.202,
+    kind: 'text',
+    sizeFrac: 0.2,
+    speed: -0.04,
+    glow: true,
+    phase: 0.6,
+    items: T(GAN),
+  },
+  {
+    key: '十二地支',
+    r: 0.268,
+    kind: 'text',
+    sizeFrac: 0.15,
+    speed: 0.034,
+    phase: 1.2,
+    items: T(ZHI),
+  },
+  { key: '十二律', r: 0.334, kind: 'text', sizeFrac: 0.1, speed: -0.028, phase: 1.8, items: T(LV) },
+  { key: '十二长生', r: 0.4, kind: 'text', sizeFrac: 0.1, speed: 0.024, phase: 2.4, items: T(CS) },
+  {
+    key: '二十四节气',
+    r: 0.474,
+    kind: 'text',
+    sizeFrac: 0.075,
+    speed: -0.02,
+    phase: 3.0,
+    items: T(JIEQI),
+  },
+  {
+    key: '二十八宿',
+    r: 0.544,
+    kind: 'text',
+    sizeFrac: 0.065,
+    speed: 0.017,
+    phase: 3.6,
+    items: T(XIU),
+  },
+  {
+    key: '六十甲子',
+    r: 0.629,
+    kind: 'text',
+    sizeFrac: 0.042,
+    speed: -0.013,
+    phase: 4.2,
+    items: T(JIAZI),
+  },
+  {
+    key: '六十四卦',
+    r: 0.722,
+    kind: 'hex',
+    sizeFrac: 0.075,
+    speed: 0.01,
+    phase: 4.8,
+    items: GUA.map(([n, up, lo]) => ({ label: n, bits: [...TRI[lo], ...TRI[up]] })),
+  },
+  {
+    key: '六十四卦名',
+    r: 0.804,
+    kind: 'text',
+    sizeFrac: 0.038,
+    speed: 0.01,
+    phase: 5.4,
+    items: GUA.map(([n]) => ({ label: n })),
+  },
+  {
+    key: '七十二候',
+    r: 0.899,
+    kind: 'text',
+    sizeFrac: 0.02,
+    speed: -0.008,
+    phase: 6.0,
+    items: T(HOU),
+  },
+  {
+    key: '三百六十度',
+    r: 1.0,
+    kind: 'text',
+    sizeFrac: 0.016,
+    speed: 0.005,
+    phase: 6.6,
+    tickCount: 120,
+    items: T(Array.from({ length: 12 }, (_, i) => String(i * 30))),
+  },
 ];
 
 /** 图上这个节点固定用这个 id，找它/避免重复添加都靠它。 */
@@ -106,7 +390,10 @@ function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
 }
 
-function graphSpread(cy: cytoscape.Core): { bb: { x1: number; y1: number; x2: number; y2: number }; spread: number } {
+function graphSpread(cy: cytoscape.Core): {
+  bb: { x1: number; y1: number; x2: number; y2: number };
+  spread: number;
+} {
   let bb = { x1: -500, y1: -500, x2: 500, y2: 500 };
   try {
     const real = cy.nodes().not('.layer-parent').boundingBox();
@@ -254,9 +541,11 @@ function stripNodeChrome(node: cytoscape.NodeSingular, size: number): void {
  *  失败（网络、404、frontmatter 缺 id 等）一律静默降级。 */
 async function fetchEmblemContent(node: cytoscape.NodeSingular): Promise<void> {
   try {
-    const url = '/content/' + CONTENT_REL_PATH.split('/').map(
-      (s) => encodeURI(s).replace(/#/g, '%23').replace(/\?/g, '%3F'),
-    ).join('/');
+    const url =
+      '/content/' +
+      CONTENT_REL_PATH.split('/')
+        .map((s) => encodeURI(s).replace(/#/g, '%23').replace(/\?/g, '%3F'))
+        .join('/');
     const res = await fetch(url);
     if (!res.ok) return;
     const text = await res.text();
@@ -322,7 +611,11 @@ export class CelestialEmblemOverlay {
     this.canvas = document.createElement('canvas');
     this.canvas.setAttribute('data-celestial-emblem', '');
     Object.assign(this.canvas.style, {
-      position: 'absolute', left: '0', top: '0', width: '100%', height: '100%',
+      position: 'absolute',
+      left: '0',
+      top: '0',
+      width: '100%',
+      height: '100%',
       pointerEvents: 'none',
     } as Partial<CSSStyleDeclaration>);
     container.insertBefore(this.canvas, container.firstChild);
@@ -361,11 +654,14 @@ export class CelestialEmblemOverlay {
   private syncSize(): void {
     const container = this.canvas.parentElement;
     if (!container) return;
-    const w = container.clientWidth, h = container.clientHeight;
+    const w = container.clientWidth,
+      h = container.clientHeight;
     if (w === 0 || h === 0) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     if (w === this.cssWidth && h === this.cssHeight && dpr === this.dpr) return;
-    this.cssWidth = w; this.cssHeight = h; this.dpr = dpr;
+    this.cssWidth = w;
+    this.cssHeight = h;
+    this.dpr = dpr;
     this.canvas.width = Math.round(w * dpr);
     this.canvas.height = Math.round(h * dpr);
   }
@@ -373,11 +669,17 @@ export class CelestialEmblemOverlay {
   private start(): void {
     if (this.rafId !== null) return;
     this.startedAt = performance.now();
-    if (this.reducedMotion) { this.draw(0); return; }
+    if (this.reducedMotion) {
+      this.draw(0);
+      return;
+    }
     this.rafId = requestAnimationFrame(this.tick);
   }
   private pause(): void {
-    if (this.rafId !== null) { cancelAnimationFrame(this.rafId); this.rafId = null; }
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
   }
   private resume(): void {
     if (this.rafId === null && !this.reducedMotion) this.rafId = requestAnimationFrame(this.tick);
@@ -405,10 +707,17 @@ export class CelestialEmblemOverlay {
     // 缩小到一定程度后整体不再继续收缩：作为"一颗很亮的星"留在线索里，
     // 而不是彻底消失。最外圈半径 floor 在 ~7 CSS px。
     const R = Math.max(this.modelRadius * zoom, 7);
-    const rx = p.x, ry = p.y;
+    const rx = p.x,
+      ry = p.y;
 
     const reach = R * 1.15 + 20;
-    if (rx + reach < 0 || rx - reach > this.cssWidth || ry + reach < 0 || ry - reach > this.cssHeight) return;
+    if (
+      rx + reach < 0 ||
+      rx - reach > this.cssWidth ||
+      ry + reach < 0 ||
+      ry - reach > this.cssHeight
+    )
+      return;
 
     const breathe = this.reducedMotion ? 1 : 1 + 0.02 * Math.sin(t * 0.4);
 
@@ -423,7 +732,7 @@ export class CelestialEmblemOverlay {
     }
 
     // 太极坐镇中心，自转。半径独立于外圈基准，固定占整体的一小块。
-    const taijiR = R * 0.10;
+    const taijiR = R * 0.1;
     ctx.save();
     ctx.rotate(t * this.taijiSpeed * Math.PI * 2);
     ctx.shadowColor = this.glow;
@@ -451,10 +760,14 @@ export class CelestialEmblemOverlay {
 
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 - Math.PI / 2 + angleOffset;
-      const x = Math.cos(a) * ringPxR, y = Math.sin(a) * ringPxR;
+      const x = Math.cos(a) * ringPxR,
+        y = Math.sin(a) * ringPxR;
       ctx.save();
       ctx.translate(x, y);
-      if (ring.glow) { ctx.shadowColor = this.glow; ctx.shadowBlur = ringPxR * 0.05; }
+      if (ring.glow) {
+        ctx.shadowColor = this.glow;
+        ctx.shadowBlur = ringPxR * 0.05;
+      }
       if (ring.kind === 'text') {
         ctx.globalAlpha = pulse;
         ctx.fillStyle = this.ink;
@@ -485,7 +798,12 @@ export class CelestialEmblemOverlay {
   }
 
   /** N 道爻线堆叠：3 道给八卦，6 道给六十四卦，同一份逻辑。index 0 = 最下面那一道。 */
-  private drawBars(ctx: CanvasRenderingContext2D, bits: readonly number[], w: number, alpha: number): void {
+  private drawBars(
+    ctx: CanvasRenderingContext2D,
+    bits: readonly number[],
+    w: number,
+    alpha: number,
+  ): void {
     const n = bits.length;
     const gap = (w * 0.62) / n;
     const barH = gap * 0.46;
@@ -514,28 +832,45 @@ export class CelestialEmblemOverlay {
    * 对调 light/dark 颜色更不容易在大瓣/小点的配对关系上出错。
    */
   private drawTaiji(ctx: CanvasRenderingContext2D, r: number): void {
-    const light = this.ink, dark = 'rgba(5,5,5,0.92)';
+    const light = this.ink,
+      dark = 'rgba(5,5,5,0.92)';
     ctx.save();
     ctx.scale(-1, 1);
-    ctx.beginPath(); ctx.arc(0, 0, r, -Math.PI / 2, Math.PI / 2);
-    ctx.fillStyle = light; ctx.fill();
-    ctx.beginPath(); ctx.arc(0, 0, r, Math.PI / 2, -Math.PI / 2);
-    ctx.fillStyle = dark; ctx.fill();
-    ctx.beginPath(); ctx.arc(0, -r / 2, r / 2, 0, Math.PI * 2);
-    ctx.fillStyle = light; ctx.fill();
-    ctx.beginPath(); ctx.arc(0, r / 2, r / 2, 0, Math.PI * 2);
-    ctx.fillStyle = dark; ctx.fill();
-    ctx.beginPath(); ctx.arc(0, -r / 2, r * 0.15, 0, Math.PI * 2);
-    ctx.fillStyle = dark; ctx.fill();
-    ctx.beginPath(); ctx.arc(0, r / 2, r * 0.15, 0, Math.PI * 2);
-    ctx.fillStyle = light; ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, 0, r, -Math.PI / 2, Math.PI / 2);
+    ctx.fillStyle = light;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, 0, r, Math.PI / 2, -Math.PI / 2);
+    ctx.fillStyle = dark;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, -r / 2, r / 2, 0, Math.PI * 2);
+    ctx.fillStyle = light;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, r / 2, r / 2, 0, Math.PI * 2);
+    ctx.fillStyle = dark;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, -r / 2, r * 0.15, 0, Math.PI * 2);
+    ctx.fillStyle = dark;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, r / 2, r * 0.15, 0, Math.PI * 2);
+    ctx.fillStyle = light;
+    ctx.fill();
     ctx.lineWidth = Math.max(0.6, r * 0.02);
     ctx.strokeStyle = light;
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.stroke();
     ctx.restore();
   }
 }
 
-export function createCelestialEmblemOverlay(options: CelestialEmblemOverlayOptions): CelestialEmblemOverlay {
+export function createCelestialEmblemOverlay(
+  options: CelestialEmblemOverlayOptions,
+): CelestialEmblemOverlay {
   return new CelestialEmblemOverlay(options);
 }

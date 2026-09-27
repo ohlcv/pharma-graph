@@ -114,8 +114,12 @@ export const CLASSES = {
 // own (graph-events.ts normally passes the node's fill / the edge type's color).
 // Getters, not constants: they follow the active theme (accent / accent2).
 export const RIPPLE_COLORS = {
-  get NODE(): string { return readThemeColors().accent; },
-  get EDGE(): string { return readThemeColors().accent2; },
+  get NODE(): string {
+    return readThemeColors().accent;
+  },
+  get EDGE(): string {
+    return readThemeColors().accent2;
+  },
 };
 
 // ── Stylesheet (built per Renderer, and again on theme change / new subtree) ────
@@ -131,7 +135,10 @@ export const RIPPLE_COLORS = {
 // fill 兜底逻辑在 buildElements()：节点 stroke 字段未填时按 fill 查 FILL_CONFIG[fill].defaultStroke。
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) => any[] = (maxDepth, subtreeColorMap) => {
+const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) => any[] = (
+  maxDepth,
+  subtreeColorMap,
+) => {
   // 交互状态色跟主题走（canvas 样式表写不了 var()，所以在这里读出来）：
   //   accent  → 悬停、glow 兜底；accent2 → 选中 / 高亮 / 脉冲 / 高亮边 / 路径预览。
   // 节点填充、子树边框、边类型色是语义色，保持固定。
@@ -169,16 +176,17 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
   // ── Shape (OWL2 实体类型) 规则：显式填写 shape 时覆盖 fill 的默认形状 ──────
   // 每个 OWL2 类型对应一个固定形状（SHAPE_BY_OWL2）。
   // 不填 shape 时使用 fill 的默认形状（可为 FILL_CONFIG 中的扩展形状）。
-  const shapeOwlRules = (Object.entries(SHAPE_BY_OWL2) as [string, cytoscape.Css.NodeShape][])
-    .map(([owlType, shape]) => ({
+  const shapeOwlRules = (Object.entries(SHAPE_BY_OWL2) as [string, cytoscape.Css.NodeShape][]).map(
+    ([owlType, shape]) => ({
       selector: `node[shape = "${owlType}"]`,
       style: { shape },
-    }));
+    }),
+  );
 
   // ── Stroke 规则 — 边框色 + 效果 ────────────────────────────────────────────
   // stroke 显式声明时覆盖 fill/subtreeRoot 的默认边框色。
   // stroke = auto（默认）：边框色由 subtreeRoot 或 depth 自动决定。
-  
+
   // stroke = glow：呼吸光晕
   //
   // 分工：
@@ -292,8 +300,15 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         'line-gradient-stop-colors': `${s.color} ${darken(s.color, 80)}`,
         'target-arrow-color': s.color,
         'line-style': s.lineStyle as cytoscape.Css.LineStyle,
-        'target-arrow-shape': (s.arrow === 'none' ? 'none' : 'triangle') as cytoscape.Css.ArrowShape,
-        ...(isBidirectional ? { 'source-arrow-shape': 'triangle' as cytoscape.Css.ArrowShape, 'source-arrow-color': s.color } : {}),
+        'target-arrow-shape': (s.arrow === 'none'
+          ? 'none'
+          : 'triangle') as cytoscape.Css.ArrowShape,
+        ...(isBidirectional
+          ? {
+              'source-arrow-shape': 'triangle' as cytoscape.Css.ArrowShape,
+              'source-arrow-color': s.color,
+            }
+          : {}),
       },
     };
   });
@@ -454,7 +469,8 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
       },
     },
     {
-      selector: '.selected-node:not(.celestial-emblem-node), .highlighted:not(.celestial-emblem-node)',
+      selector:
+        '.selected-node:not(.celestial-emblem-node), .highlighted:not(.celestial-emblem-node)',
       style: {
         opacity: 1,
         'border-width': 4,
@@ -814,11 +830,7 @@ export class Renderer {
         const existing = this.cy.getElementById(n.id);
         if (existing.empty()) continue;
         const cur = existing.data();
-        if (
-          cur.depth !== n.depth ||
-          cur.subtreeRoot !== n.subtreeRoot ||
-          cur.weight !== n.weight
-        ) {
+        if (cur.depth !== n.depth || cur.subtreeRoot !== n.subtreeRoot || cur.weight !== n.weight) {
           existing.data({
             depth: n.depth,
             subtreeRoot: n.subtreeRoot,
@@ -1111,8 +1123,12 @@ export class Renderer {
             weight: n.weight ?? 60,
             edges_out: n.edges_out ?? [],
             // 颜色（基于 FILL_CONFIG）
-            color: FILL_CONFIG[n.fill ?? '']?.background ?? FILL_CONFIG['']?.background ?? '#f9fafb',
-            colorDark: FILL_CONFIG[n.fill ?? '']?.backgroundDark ?? FILL_CONFIG['']?.backgroundDark ?? '#94a3b8',
+            color:
+              FILL_CONFIG[n.fill ?? '']?.background ?? FILL_CONFIG['']?.background ?? '#f9fafb',
+            colorDark:
+              FILL_CONFIG[n.fill ?? '']?.backgroundDark ??
+              FILL_CONFIG['']?.backgroundDark ??
+              '#94a3b8',
           },
           // Pass through preset position so the 'preset' layout / layoutless
           // init can scatter streaming-arrived nodes without overlapping.

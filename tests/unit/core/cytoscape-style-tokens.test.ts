@@ -14,10 +14,10 @@ import { EDGE_TYPE_STYLE, FILL_CONFIG } from '@/core/config';
 
 const RGBA_RE = new RegExp(
   '^' +
-  'rgb[a]?\\((-?\\d+(?:\\.\\d+)?[%]?)\\s*,\\s*' +
-  '(-?\\d+(?:\\.\\d+)?[%]?)\\s*,\\s*' +
-  '(-?\\d+(?:\\.\\d+)?[%]?)' +
-  '(?:\\s*,\\s*(-?\\d+(?:\\.\\d+)?))?\\)$'
+    'rgb[a]?\\((-?\\d+(?:\\.\\d+)?[%]?)\\s*,\\s*' +
+    '(-?\\d+(?:\\.\\d+)?[%]?)\\s*,\\s*' +
+    '(-?\\d+(?:\\.\\d+)?[%]?)' +
+    '(?:\\s*,\\s*(-?\\d+(?:\\.\\d+)?))?\\)$',
 );
 
 const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
@@ -35,7 +35,7 @@ describe('cytoscape stylesheet color tokens (split on whitespace)', () => {
       const r = Math.max(0, parseInt(hex.slice(1, 3), 16) - 80);
       const g = Math.max(0, parseInt(hex.slice(3, 5), 16) - 80);
       const b = Math.max(0, parseInt(hex.slice(5, 7), 16) - 80);
-      const dark = '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+      const dark = '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
       const stopColors = `${hex} ${dark}`;
 
       const tokens = stopColors.split(/\s+/);
@@ -48,7 +48,10 @@ describe('cytoscape stylesheet color tokens (split on whitespace)', () => {
   it('FILL_CONFIG — every fill produces a parseable hex background', () => {
     // 节点填充色由 fill 决定，background 必须是合法 hex 才能 cytoscape 渲染。
     for (const [fill, cfg] of Object.entries(FILL_CONFIG)) {
-      expect(HEX_RE.test(cfg.background), `FILL_CONFIG[${fill}].background "${cfg.background}" must be hex`).toBe(true);
+      expect(
+        HEX_RE.test(cfg.background),
+        `FILL_CONFIG[${fill}].background "${cfg.background}" must be hex`,
+      ).toBe(true);
     }
   });
 

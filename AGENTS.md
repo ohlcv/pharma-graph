@@ -46,11 +46,11 @@ Markdown ──[scripts/build-graph-data.ts]──> graph-data.json ──> 浏�
 
 ### 1.3 tsconfig / vite / vitest 三个工具各管一段
 
-| 工具 | 作用域 | 关键配置 |
-|---|---|---|
-| `tsconfig.json` | 类型检查 + 路径别名 `@/*` → `./src/*` | strict: true, target: ES2022, moduleResolution: bundler |
-| `vite.config.ts` | dev server + 生产构建 | `contentManifestPlugin` 在 `buildStart` 与 `.md` 文件 `handleHotUpdate` 时重新构建图数据 |
-| `vitest.config.ts` | 单元/集成测试 | environment: node（默认）；DOM 测试在文件内 `vi.stubGlobal` / `// @vitest-environment jsdom` |
+| 工具               | 作用域                                | 关键配置                                                                                     |
+| ------------------ | ------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `tsconfig.json`    | 类型检查 + 路径别名 `@/*` → `./src/*` | strict: true, target: ES2022, moduleResolution: bundler                                      |
+| `vite.config.ts`   | dev server + 生产构建                 | `contentManifestPlugin` 在 `buildStart` 与 `.md` 文件 `handleHotUpdate` 时重新构建图数据     |
+| `vitest.config.ts` | 单元/集成测试                         | environment: node（默认）；DOM 测试在文件内 `vi.stubGlobal` / `// @vitest-environment jsdom` |
 
 - 源码中**禁止**使用 `process.env.X` 之类直读，用 `import.meta.env`（Vite 注入）。`.env.example` 已列出可注入变量。
 - 模块解析走 `bundler`，所以 `import` 可以省略 `.ts` / `.js` 扩展名，但**保持现状别批量加扩展名**。
@@ -61,28 +61,28 @@ Markdown ──[scripts/build-graph-data.ts]──> graph-data.json ──> 浏�
 
 ### 2.1 分层
 
-| 路径 | 职责 | 可以做 | 不可以做 |
-|---|---|---|---|
-| `src/parser/` | Markdown / frontmatter 解析 | parse、validate、序列化 | 触碰 Cytoscape / DOM |
-| `src/core/` | 图数据 / 渲染 / 漫游引擎（纯逻辑 + Canvas） | 算法、状态机、Cytoscape 实例 | 引用 `src/ui/*` |
-| `src/ui/` | 浏览器侧 UI（DOM、CSS、用户交互） | 引用 `src/core/*` | 内部反向依赖 `src/ui/*`（用事件 / `state.ts` 解耦） |
-| `src/data/` | 领域词汇表（药学专用） | 静态数据 | 引入运行时依赖 |
-| `src/types/` | 全局类型补充 | `.d.ts` | 实现代码 |
-| `tests/` | 测试（不在 `src/` 树内） | 见 §2.4 | 业务逻辑 |
+| 路径          | 职责                                        | 可以做                       | 不可以做                                            |
+| ------------- | ------------------------------------------- | ---------------------------- | --------------------------------------------------- |
+| `src/parser/` | Markdown / frontmatter 解析                 | parse、validate、序列化      | 触碰 Cytoscape / DOM                                |
+| `src/core/`   | 图数据 / 渲染 / 漫游引擎（纯逻辑 + Canvas） | 算法、状态机、Cytoscape 实例 | 引用 `src/ui/*`                                     |
+| `src/ui/`     | 浏览器侧 UI（DOM、CSS、用户交互）           | 引用 `src/core/*`            | 内部反向依赖 `src/ui/*`（用事件 / `state.ts` 解耦） |
+| `src/data/`   | 领域词汇表（药学专用）                      | 静态数据                     | 引入运行时依赖                                      |
+| `src/types/`  | 全局类型补充                                | `.d.ts`                      | 实现代码                                            |
+| `tests/`      | 测试（不在 `src/` 树内）                    | 见 §2.4                      | 业务逻辑                                            |
 
 `src/core/` 不依赖 `src/ui/`；`src/ui/` 是消费者。**单向**。
 
 ### 2.2 `scripts/` / `build/` / `tools/` 的边界
 
-| 路径 | 角色 | 是否被 `vite.config.ts` import |
-|---|---|---|
-| `scripts/build-graph-data.ts` | 构建入口（仅组装 + 调用） | 否，**通过 `vite build` 自动触发** |
-| `scripts/build-content-manifest.ts` | 同上 | 否，自动触发 |
-| `scripts/check-graph-fresh.ts` | 治理：检查图数据是否新鲜 | 否，CI / 手动 |
-| `scripts/validate*.ts` | 治理：schema / 深度校验（CI 门禁） | 否 |
-| `scripts/audit-frontmatter.ts` | 治理：打分审计（**永远 exit 0**，只输出报告） | 否 |
-| **`build/build-content.ts`** | **共享构建库**（被 `vite.config.ts` 和多个 scripts 入口 import） | **是** |
-| `tools/*` | **一次性**迁移 / 修复脚本，**不参与构建链** | 否 |
+| 路径                                | 角色                                                             | 是否被 `vite.config.ts` import     |
+| ----------------------------------- | ---------------------------------------------------------------- | ---------------------------------- |
+| `scripts/build-graph-data.ts`       | 构建入口（仅组装 + 调用）                                        | 否，**通过 `vite build` 自动触发** |
+| `scripts/build-content-manifest.ts` | 同上                                                             | 否，自动触发                       |
+| `scripts/check-graph-fresh.ts`      | 治理：检查图数据是否新鲜                                         | 否，CI / 手动                      |
+| `scripts/validate*.ts`              | 治理：schema / 深度校验（CI 门禁）                               | 否                                 |
+| `scripts/audit-frontmatter.ts`      | 治理：打分审计（**永远 exit 0**，只输出报告）                    | 否                                 |
+| **`build/build-content.ts`**        | **共享构建库**（被 `vite.config.ts` 和多个 scripts 入口 import） | **是**                             |
+| `tools/*`                           | **一次性**迁移 / 修复脚本，**不参与构建链**                      | 否                                 |
 
 - 修一个构建问题？如果你能直接改 `build/build-content.ts`，那就该在那里改，不要把它推到 `scripts/`。`scripts/` 入口是薄壳。
 
@@ -102,11 +102,11 @@ Markdown ──[scripts/build-graph-data.ts]──> graph-data.json ──> 浏�
 
 **三层目录**（按"对外部世界依赖"分，不是按大小）：
 
-| 目录 | 含义 | 识别标签 | 例子 |
-|---|---|---|---|
-| `tests/unit/` | **纯函数 / 数据变换**。只测输入→输出。**不 mock DOM、不 mock 时间、不读真实磁盘** | 默认 `vitest` 配置 `environment: node`；无 `// @vitest-environment jsdom` | `parser/frontmatter.test.ts`、`core/build-graph.test.ts`、`core/tour-engine.test.ts`、`ui/search.test.ts` |
-| `tests/component/` | **DOM 行为测试**。`document` / `localStorage` / `cytoscape` mock；jsdom；可能读磁盘 fixture | 文件顶部 `/** @vitest-environment jsdom */` | `ui/bigscreen.test.ts`、`ui/tour-controller.test.ts`、`parser/location-audit.test.ts`（扫盘 → "准集成"，归这里） |
-| `tests/e2e/` | **真实浏览器驱动**（Playwright/Cypress）。目前**空目录**，留占位 | 需要外部 driver 才能跑 | （未来）`ui/graph-interaction.spec.ts` |
+| 目录               | 含义                                                                                        | 识别标签                                                                  | 例子                                                                                                             |
+| ------------------ | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `tests/unit/`      | **纯函数 / 数据变换**。只测输入→输出。**不 mock DOM、不 mock 时间、不读真实磁盘**           | 默认 `vitest` 配置 `environment: node`；无 `// @vitest-environment jsdom` | `parser/frontmatter.test.ts`、`core/build-graph.test.ts`、`core/tour-engine.test.ts`、`ui/search.test.ts`        |
+| `tests/component/` | **DOM 行为测试**。`document` / `localStorage` / `cytoscape` mock；jsdom；可能读磁盘 fixture | 文件顶部 `/** @vitest-environment jsdom */`                               | `ui/bigscreen.test.ts`、`ui/tour-controller.test.ts`、`parser/location-audit.test.ts`（扫盘 → "准集成"，归这里） |
+| `tests/e2e/`       | **真实浏览器驱动**（Playwright/Cypress）。目前**空目录**，留占位                            | 需要外部 driver 才能跑                                                    | （未来）`ui/graph-interaction.spec.ts`                                                                           |
 
 **判定准则（四个问题，新人能背）**：
 
@@ -242,15 +242,15 @@ npm run check:graph       # 图数据新鲜度检查
 
 ## 6. 文档索引（按优先级）
 
-| 想做的事 | 看哪里 |
-|---|---|
-| 弄清项目是什么、目录结构 | [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) |
-| 弄清数据模型、关系类型、目录设计 | [`docs/DEVELOP.md`](./docs/DEVELOP.md) |
-| 了解节点字段怎么写 | [`docs/frontmatter.md`](./docs/frontmatter.md) + `.cursor/rules/frontmatter-conventions.mdc` |
-| 写决策记录 | [`docs/ADR/`](./docs/ADR/)，命名 ADR- 续号（已废弃 ARD- 双前缀） |
-| 看已知 bug / 调试经验 | [`docs/DEBUG/debug-index.md`](./docs/DEBUG/debug-index.md) |
-| 看完整规则集 | [`docs/RULES.md`](./docs/RULES.md) |
-| 看代码维基（行级说明） | [`docs/CODE-WIKI.md`](./docs/CODE-WIKI.md) |
+| 想做的事                         | 看哪里                                                                                       |
+| -------------------------------- | -------------------------------------------------------------------------------------------- |
+| 弄清项目是什么、目录结构         | [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)                                             |
+| 弄清数据模型、关系类型、目录设计 | [`docs/DEVELOP.md`](./docs/DEVELOP.md)                                                       |
+| 了解节点字段怎么写               | [`docs/frontmatter.md`](./docs/frontmatter.md) + `.cursor/rules/frontmatter-conventions.mdc` |
+| 写决策记录                       | [`docs/ADR/`](./docs/ADR/)，命名 ADR- 续号（已废弃 ARD- 双前缀）                             |
+| 看已知 bug / 调试经验            | [`docs/DEBUG/debug-index.md`](./docs/DEBUG/debug-index.md)                                   |
+| 看完整规则集                     | [`docs/RULES.md`](./docs/RULES.md)                                                           |
+| 看代码维基（行级说明）           | [`docs/CODE-WIKI.md`](./docs/CODE-WIKI.md)                                                   |
 
 ---
 

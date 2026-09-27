@@ -176,7 +176,9 @@ describe('UiToggle.resyncFromDom — DOM was rewritten out-of-band', () => {
 
     // Should not throw, should not fire onChange (which would re-resize cy)
     let fired = 0;
-    t.listen(() => { fired++; });
+    t.listen(() => {
+      fired++;
+    });
     t.resyncFromDom();
     expect(fired).toBe(0);
     expect(t.value).toBe(true);

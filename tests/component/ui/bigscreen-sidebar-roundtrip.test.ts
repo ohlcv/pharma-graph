@@ -41,7 +41,8 @@ class NoopResizeObserver {
   unobserve(): void {}
   disconnect(): void {}
 }
-(globalThis as unknown as { ResizeObserver: typeof NoopResizeObserver }).ResizeObserver = NoopResizeObserver;
+(globalThis as unknown as { ResizeObserver: typeof NoopResizeObserver }).ResizeObserver =
+  NoopResizeObserver;
 
 describe('bigscreen sidebar round-trip', () => {
   let sidebar: HTMLElement;
@@ -93,8 +94,12 @@ describe('bigscreen sidebar round-trip', () => {
     cy = {
       resize: vi.fn(),
       container: () => cyContainer,
-      zoom: function () { return this.zoom_set; },
-      pan: function () { return this.pan_set ?? { x: 0, y: 0 }; },
+      zoom: function () {
+        return this.zoom_set;
+      },
+      pan: function () {
+        return this.pan_set ?? { x: 0, y: 0 };
+      },
       extent: () => ({ x1: 0, y1: 0, x2: 100, y2: 100 }),
       stop: vi.fn(),
       zoom_set: 1,

@@ -80,8 +80,12 @@ describe('speechController regression: WeChat X5 / Android stub', () => {
     let active = true;
     vi.mock('@/ui/speech', () => ({
       speechController: {
-        get isSupported() { return supported; },
-        get isActive() { return active; },
+        get isSupported() {
+          return supported;
+        },
+        get isActive() {
+          return active;
+        },
         toggle: vi.fn(),
         stop: vi.fn(),
         speak(_text: string) {

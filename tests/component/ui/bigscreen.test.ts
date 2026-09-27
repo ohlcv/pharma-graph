@@ -3,7 +3,14 @@
  */
 // src/ui/__tests__/bigscreen.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { isBigscreen, exitBigscreen, enterBigscreen, toggleBigscreen, initBigscreen, registerFitFn } from '@/ui/bigscreen';
+import {
+  isBigscreen,
+  exitBigscreen,
+  enterBigscreen,
+  toggleBigscreen,
+  initBigscreen,
+  registerFitFn,
+} from '@/ui/bigscreen';
 
 const CLS = 'bigscreen';
 
@@ -13,7 +20,12 @@ function mockFullscreenApi(): void {
     writable: true,
     configurable: true,
   });
-  (document.documentElement as HTMLElement & { requestFullscreen?: () => Promise<void>; exitFullscreen?: () => Promise<void> }).requestFullscreen = vi.fn().mockResolvedValue(undefined);
+  (
+    document.documentElement as HTMLElement & {
+      requestFullscreen?: () => Promise<void>;
+      exitFullscreen?: () => Promise<void>;
+    }
+  ).requestFullscreen = vi.fn().mockResolvedValue(undefined);
   document.exitFullscreen = vi.fn().mockResolvedValue(undefined);
 }
 
@@ -64,7 +76,10 @@ describe('bigscreen', () => {
 
   it('calls requestFullscreen', async () => {
     await enterBigscreen();
-    expect((document.documentElement as HTMLElement & { requestFullscreen?: () => Promise<void> }).requestFullscreen).toHaveBeenCalled();
+    expect(
+      (document.documentElement as HTMLElement & { requestFullscreen?: () => Promise<void> })
+        .requestFullscreen,
+    ).toHaveBeenCalled();
   });
 
   it('shows the hint toast', async () => {
@@ -76,7 +91,9 @@ describe('bigscreen', () => {
   it('idempotent: second enter is no-op', async () => {
     await enterBigscreen();
     const req = vi.fn();
-    (document.documentElement as HTMLElement & { requestFullscreen?: () => Promise<void> }).requestFullscreen = req;
+    (
+      document.documentElement as HTMLElement & { requestFullscreen?: () => Promise<void> }
+    ).requestFullscreen = req;
     await enterBigscreen();
     expect(req).not.toHaveBeenCalled();
   });
@@ -91,7 +108,11 @@ describe('bigscreen', () => {
 
   it('calls exitFullscreen when in fullscreen', async () => {
     addBigscreenClass();
-    Object.defineProperty(document, 'fullscreenElement', { value: document.documentElement, writable: true, configurable: true });
+    Object.defineProperty(document, 'fullscreenElement', {
+      value: document.documentElement,
+      writable: true,
+      configurable: true,
+    });
     await exitBigscreen();
     expect(document.exitFullscreen).toHaveBeenCalled();
   });
@@ -125,7 +146,7 @@ describe('bigscreen', () => {
     const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
     window.dispatchEvent(event);
     // The handler is async, give it a tick.
-    await new Promise(r => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
     expect(isBigscreen()).toBe(false);
   });
 
@@ -134,7 +155,7 @@ describe('bigscreen', () => {
     const before = isBigscreen();
     const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
     window.dispatchEvent(event);
-    await new Promise(r => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
     expect(isBigscreen()).toBe(before);
   });
 
@@ -143,9 +164,13 @@ describe('bigscreen', () => {
   it('fullscreenchange removes class if browser forces exit', async () => {
     addBigscreenClass();
     initBigscreen();
-    Object.defineProperty(document, 'fullscreenElement', { value: null, writable: true, configurable: true });
+    Object.defineProperty(document, 'fullscreenElement', {
+      value: null,
+      writable: true,
+      configurable: true,
+    });
     document.dispatchEvent(new Event('fullscreenchange'));
-    await new Promise(r => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
     expect(document.documentElement.classList.contains(CLS)).toBe(false);
   });
 

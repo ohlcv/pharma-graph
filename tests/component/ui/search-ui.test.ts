@@ -58,7 +58,9 @@ function setupInputs(): {
   vi.spyOn(cy, 'stop').mockImplementation(() => undefined as never);
   const search = new Search(cy, makeHighlight(cy));
   const show = vi.fn();
-  const detailPanel = { show } as unknown as { show: (id: string, userInitiated?: boolean) => void };
+  const detailPanel = { show } as unknown as {
+    show: (id: string, userInitiated?: boolean) => void;
+  };
   initSearchUI(cy, makeHighlight(cy), search, detailPanel as never);
   return { cy, search, show, detailPanel };
 }

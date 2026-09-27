@@ -54,7 +54,7 @@ export interface NodeData {
    *  留空时使用 fill 的默认形状（可访问 FILL_CONFIG 中的扩展形状如 vee/tag/barrel 等）*/
   shape?: ShapeType;
 
-  depth?: number;   // 思维导图深度级别（从中心节点往下第 N 层，0=中心节点）
+  depth?: number; // 思维导图深度级别（从中心节点往下第 N 层，0=中心节点）
   /** 节点所属的分类子树根 ID。若为空则该节点不属于任何 subtree（使用 depth 色）。 */
   subtreeRoot?: string;
   /** 简短摘要 */
@@ -64,15 +64,15 @@ export interface NodeData {
   summary?: string; // 摘要（shortSummary 优先，否则 fullSummary）
   location?: NodeLocation;
   tags?: string[];
-  body?: string;      // 正文内容（md 文件中 frontmatter 后的部分）
+  body?: string; // 正文内容（md 文件中 frontmatter 后的部分）
   /** Manifest-style path to the source file (e.g. `药学专业知识二/第一章 .../COMT抑制剂.md`).
-    *  Used by the detail panel to resolve relative image references against
-    *  `/content/<dir>/`. Empty string when the source is unknown (CLI tools). */
+   *  Used by the detail panel to resolve relative image references against
+   *  `/content/<dir>/`. Empty string when the source is unknown (CLI tools). */
   sourcePath?: string;
   /** Raw outgoing edges as declared in the source frontmatter, e.g.
-    *  `[{ id, type, target, reason }]`. Preserved so traversal code (tour
-    *  builder, debug panels) can reason about parent/child semantics
-    *  without having to reverse-walk cytoscape's edge store. */
+   *  `[{ id, type, target, reason }]`. Preserved so traversal code (tour
+   *  builder, debug panels) can reason about parent/child semantics
+   *  without having to reverse-walk cytoscape's edge store. */
   edges_out?: Array<{ id?: string; type: string; target: string; reason?: string }>;
   /** Optional preset position for the cytoscape element. When set, the
    *  'preset' layout (or layoutless init) honors it directly. Used by the
@@ -85,7 +85,7 @@ export interface EdgeData {
   id: string;
   source: string; // 源节点 id
   target: string; // 目标节点 id
-  type: string;   // 关系类型：subclass_of / part_of / instance_of / disjoint_with / equivalent_to
+  type: string; // 关系类型：subclass_of / part_of / instance_of / disjoint_with / equivalent_to
   reason?: string; // 建边原因说明
 }
 

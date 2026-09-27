@@ -1,9 +1,6 @@
 import { defineConfig, type Plugin } from 'vite';
 import legacy from '@vitejs/plugin-legacy';
-import {
-  buildGraphData,
-  buildManifest,
-} from './build/build-content.ts';
+import { buildGraphData, buildManifest } from './build/build-content.ts';
 
 function contentManifestPlugin(): Plugin {
   return {
@@ -55,11 +52,6 @@ export default defineConfig({
     }),
   ],
   optimizeDeps: {
-    include: [
-      'cytoscape',
-      'cytoscape-cose-bilkent',
-      'cytoscape-dagre',
-      'cytoscape-euler',
-    ],
+    include: ['cytoscape', 'cytoscape-cose-bilkent', 'cytoscape-dagre', 'cytoscape-euler'],
   },
 });

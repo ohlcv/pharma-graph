@@ -1,14 +1,14 @@
 # ADR-0003: Tour 漫游引入体系边界（universe isolation）
 
-| 字段 | 值 |
-|---|---|
-| **状态** | Accepted · Implemented |
-| **日期** | 2026-09-18 |
-| **决策者** | 项目所有者 |
+| 字段         | 值                                                                                                          |
+| ------------ | ----------------------------------------------------------------------------------------------------------- |
+| **状态**     | Accepted · Implemented                                                                                      |
+| **日期**     | 2026-09-18                                                                                                  |
+| **决策者**   | 项目所有者                                                                                                  |
 | **影响范围** | `src/ui/tour-controller.ts`、`src/core/tour.ts`、`src/core/config.ts`、`public/content/执业药师考试体系.md` |
-| **修复文档** | `docs/DEBUG/debug-tour-depth1-universe-isolation.md` |
+| **修复文档** | `docs/DEBUG/debug-tour-depth1-universe-isolation.md`                                                        |
 
-***
+---
 
 ## 一、背景（Context）
 
@@ -18,12 +18,12 @@ Tour 漫游引擎原本只有一个隐含假设：**整张图是一棵树**，`b
 
 双体系下，这个假设崩塌：
 
-| 场景 | 旧行为 | 用户预期 |
-|---|---|---|
-| 选 book-y2 → 漫游 | 走遍整图（混播两部电视剧）| 只走体系一（执业药师）|
-| 选 sum-neurodiversity → 漫游 | 走遍整图 | 只走体系二（生存策略）|
-| 不选节点 → 默认起点 | 走 book-y2 → ... → 混播体系二 | 走 book-y2 → ... → 在体系一根停下 |
-| 漫游到体系一末尾 | 跳到体系二的第一个节点 | **停**在体系一根（不跨体系）|
+| 场景                         | 旧行为                        | 用户预期                          |
+| ---------------------------- | ----------------------------- | --------------------------------- |
+| 选 book-y2 → 漫游            | 走遍整图（混播两部电视剧）    | 只走体系一（执业药师）            |
+| 选 sum-neurodiversity → 漫游 | 走遍整图                      | 只走体系二（生存策略）            |
+| 不选节点 → 默认起点          | 走 book-y2 → ... → 混播体系二 | 走 book-y2 → ... → 在体系一根停下 |
+| 漫游到体系一末尾             | 跳到体系二的第一个节点        | **停**在体系一根（不跨体系）      |
 
 需要一套**体系边界**机制，让漫游只走"一部电视剧"。
 
@@ -34,8 +34,8 @@ Tour 漫游引擎原本只有一个隐含假设：**整张图是一棵树**，`b
 ```typescript
 // src/core/config.ts
 export const UNIVERSE_ROOTS: ReadonlySet<string> = new Set<string>([
-  'concept-exam-system',       // 体系一：执业药师考试
-  'sum-neurodiversity-p1',     // 体系二：神经多样性生存策略
+  'concept-exam-system', // 体系一：执业药师考试
+  'sum-neurodiversity-p1', // 体系二：神经多样性生存策略
 ]);
 ```
 
@@ -56,6 +56,7 @@ export const UNIVERSE_ROOTS: ReadonlySet<string> = new Set<string>([
 ```
 
 `TourEngine.applyRootScope()` 用这个 Set 过滤 seq：
+
 - 集合为空 → 不隔离（保留 legacy 行为，用于测试场景）
 - 集合非空 → seq 只保留 universe 内节点
 
@@ -63,14 +64,15 @@ export const UNIVERSE_ROOTS: ReadonlySet<string> = new Set<string>([
 
 cytoscape 边方向：**source = child, target = parent**（参见 `ADR-0001`）。
 
-| API | 在我们的图里 = ? |
-|---|---|
-| `.descendants()` | ❌ 只对 compound parent，普通节点返回空 |
-| `.children()` | ❌ 同上 |
-| `.outgoers('node')` | ❌ 是 parent（target = parent）|
-| `.incomers('node')` | ✅ 是 children（source = child）|
+| API                 | 在我们的图里 = ?                        |
+| ------------------- | --------------------------------------- |
+| `.descendants()`    | ❌ 只对 compound parent，普通节点返回空 |
+| `.children()`       | ❌ 同上                                 |
+| `.outgoers('node')` | ❌ 是 parent（target = parent）         |
+| `.incomers('node')` | ✅ 是 children（source = child）        |
 
 正确实现：
+
 ```typescript
 private getStrictDescendants(nodeId: string): Set<string> {
   const set = new Set<string>([nodeId]);
@@ -90,11 +92,13 @@ private getStrictDescendants(nodeId: string): Set<string> {
 体系根本质上是"结构入口"——它把分散的 4 本教材组织成"一个体系"，从用户视角它就是顶层结构节点。
 
 `isNodeInLevel`（档位判定）只看 `cls-structure`，档位 1（结构档）漫游必须能访问到体系根，否则：
+
 - 漫游走完 4 本教材的结构后**停在 book-y4 最后一个节**（突兀）
 - 进度条**不包含**体系根
 - 用户看不到"我走完了体系一"的视觉锚点
 
 修改：
+
 ```diff
   edges_out: []
 - fill: cls-concept

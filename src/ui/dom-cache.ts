@@ -39,10 +39,7 @@ export function staticEls(...selectors: Selector[]): HTMLElement[] {
  * Variant for arrays of selectors paired with a per-select callback. The
  * callback receives each element once even if multiple selectors match.
  */
-export function forEachStatic(
-  cb: (el: HTMLElement) => void,
-  ...selectors: Selector[]
-): void {
+export function forEachStatic(cb: (el: HTMLElement) => void, ...selectors: Selector[]): void {
   staticEls(...selectors).forEach(cb);
 }
 

@@ -62,7 +62,11 @@ function makeController(): TourController {
   const cy = cytoscape({ headless: true, styleEnabled: false });
   cy.add({ group: 'nodes', data: { id: 'a', label: 'A' } });
   const renderer = { getCy: () => cy } as unknown as Renderer;
-  const detailPanel = { close: () => {}, closeSilently: () => {}, show: () => {} } as unknown as DetailPanel;
+  const detailPanel = {
+    close: () => {},
+    closeSilently: () => {},
+    show: () => {},
+  } as unknown as DetailPanel;
   return new TourController(cy, renderer, detailPanel);
 }
 
@@ -75,7 +79,10 @@ function makeController(): TourController {
  * at compile time rather than as silently-skipped tests.
  */
 type PrivateControllerFields = {
-  engine: Pick<TourEngine, 'start' | 'isRunning' | 'isPaused' | 'stop' | 'pause' | 'resume' | 'prev' | 'next'> | null;
+  engine: Pick<
+    TourEngine,
+    'start' | 'isRunning' | 'isPaused' | 'stop' | 'pause' | 'resume' | 'prev' | 'next'
+  > | null;
   running: boolean;
   paused: boolean;
   onComplete: (reason: 'depth-reached' | 'no-more-restarts' | 'no-root') => void;
@@ -94,10 +101,7 @@ function captureOnComplete(controller: TourController) {
   // have given to the engine.
   let captured: ((info: TourCompleteInfo) => void) | null = null;
   const fakeEngine = {
-    start: (
-      _rootId: string,
-      opts: TourOptions,
-    ) => {
+    start: (_rootId: string, opts: TourOptions) => {
       captured = opts.onComplete ?? null;
       return true;
     },

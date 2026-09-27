@@ -73,6 +73,7 @@
 ```
 
 **关键设计**：
+
 - **数据优先**：图谱展示的所有信息必须先在 frontmatter 中定义，视觉是数据的下游。
 - **单向边定义**：关系只在发起方节点写 `edges_out`，不需要两边都写。
 - **单一真相源（SSoT）**：颜色/形状/线型等视觉配置集中在 `core/config.ts`；edge-type 词汇表集中在 `core/edge-types.ts`；frontmatter 白名单集中在 `parser/schema.ts`。
@@ -186,6 +187,7 @@ graph-events/highlight-engine/detail-panel/search 等模块接管交互
 ```
 
 **关键点**：
+
 - Markdown 不进 JS bundle，运行时 fetch（节省 ~600KB bundle 体积，代价是冷启动多一次往返）。
 - 浏览器与 CLI 共享同一个 `buildGraph` 纯函数，行为一致。
 - Parser warnings 同时输出到浏览器 console 与 CLI 报告（issue #14）。
@@ -199,11 +201,13 @@ graph-events/highlight-engine/detail-panel/search 等模块接管交互
 负责把 Markdown 文件转换为结构化元数据，是浏览器与 CLI 共用的底层模块。
 
 #### [content-manager.ts](../src/parser/content-manager.ts)
+
 - **职责**：扫描项目 `public/content/` 目录，递归收集所有 `.md` 文件（过滤 `dist/`），返回排序后的绝对路径列表。
 - **关键导出**：`scanContentDir(dir)` — Node CLI 入口。
 - **依赖**：`node:fs/promises`、`path`。
 
 #### [frontmatter.ts](../src/parser/frontmatter.ts)
+
 - **职责**：纯 JS frontmatter 解析器，浏览器兼容。从 Markdown 文件顶部的 `---` YAML 块提取节点元数据，校验必填字段（`id` 等），转换 `edges_out` / `tags` / `location` / `body`，并向 caller 报告结构化 warning（issue #14）。
 - **关键类型**：
   - `NodeMeta` — 节点元数据（id/label/essence/field/tier/summary/location）
@@ -217,6 +221,7 @@ graph-events/highlight-engine/detail-panel/search 等模块接管交互
 - **依赖**：`yaml`（YAML 解析）、`core/edge-types.ts`（`DEFAULT_EDGE_TYPE`）。
 
 #### [schema.ts](../src/parser/schema.ts)
+
 - **职责**：frontmatter **值列表白名单**的唯一真相源（issue #20）。集中定义 `VALID_ESSENCE`、`VALID_FIELD`、`VALID_TIER`，并 re-export `VALID_EDGE_TYPES`（来自 `core/edge-types.ts`）。提供 `isValidEssence/isValidField/isValidTier/isValidEdgeType` 谓词。
 - **设计要点**：
   - parser 自身接受任意字符串，白名单是 warning 级校验，不是 parse error。
@@ -227,6 +232,7 @@ graph-events/highlight-engine/detail-panel/search 等模块接管交互
 负责从解析结果构建图谱数据，封装 Cytoscape 实例与视觉配置。与浏览器无强耦合（CLI 也可用）。
 
 #### [graph.ts](../src/core/graph.ts)
+
 - **职责**：图谱数据类型定义，对应 Cytoscape.js 的 data 字段。
 - **关键类型**：
   - `NodeLocation` — 教材位置（book/part/chapter/section/subsection/item）
@@ -235,6 +241,7 @@ graph-events/highlight-engine/detail-panel/search 等模块接管交互
   - `GraphData` — `{ nodes: NodeData[], edges: EdgeData[] }`
 
 #### [build-graph.ts](../src/core/build-graph.ts)
+
 - **职责**：纯函数 `buildGraph(frontmatters, options)` — 从 `Map<filePath, ParsedFrontmatter>` 构建 `GraphData`。负责节点 ID 收集、`edges_out` 转边、悬空边检测、边去重、度计算（节点 weight）、`sourcePath` 规范化。
 - **关键导出**：
   - `buildGraph(frontmatters, options)` — 纯函数，无 I/O
@@ -243,18 +250,22 @@ graph-events/highlight-engine/detail-panel/search 等模块接管交互
 - **设计要点**：浏览器（Vite glob → strings）与 Node CLI（fs.readFile）共用此函数，确保行为一致。
 
 #### [graph-manager.ts](../src/core/graph-manager.ts)
+
 - **职责**：浏览器端入口。接收 `{ filePath: rawText }` map，对每个文件调用 `parseFrontmatterWithWarnings`，收集 warnings，再调 `buildGraph` 生成图谱数据。缓存构建结果。
 - **关键导出**：`GraphManager` 类（`build()`、`getData()`、`warnings: ParseWarning[]`）。
 
 #### [content-loader.ts](../src/core/content-loader.ts)
+
 - **职责**：替代旧 `import.meta.glob` 方案。`fetch('/content-manifest.json')` 拿到文件列表，并行 `fetch` 每个 `.md`，key 仍按旧 glob 路径 shape（`../../content/<rel>`）以便 `GraphManager` 不变。
 - **关键导出**：`loadContent()` → `{ files: Record<string,string>, count }`。
 - **设计要点**：对每个路径段单独 `encodeURIComponent`，避免 nginx 把 `+` 解码成空格破坏文件名。
 
 #### [node-builder.ts](../src/core/node-builder.ts) / [edge-builder.ts](../src/core/edge-builder.ts)
+
 - **职责**：Node CLI 构建入口。读取文件路径、解析 frontmatter、从路径推导 `NodeLocation`、调 `buildGraph` 生成节点/边数据，并对 `knownNodeIds` 外的悬空边输出 stderr 报告。供 `scripts/` 调用。
 
 #### [config.ts](../src/core/config.ts)
+
 - **职责**：视觉配置的单一真相源（SSoT）。定义：
   - `NODE_TYPE_SHAPE` — essence → 形状（concept=octagon、medication=ellipse、illness=diamond…）
   - `NODE_TYPE_COLOR` / `NODE_TYPE_COLOR_DARK` — essence → 颜色
@@ -266,10 +277,12 @@ graph-events/highlight-engine/detail-panel/search 等模块接管交互
 - **设计原则**：视觉维度与知识语义一一对应——essence→形状（"这是什么"）、field→边框色（"哪门学科"）、tier→填充色（"在哪一层"）。
 
 #### [edge-types.ts](../src/core/edge-types.ts)
+
 - **职责**：边类型词汇表的 SSoT（issue #9）。导出 `EDGE_TYPES` readonly tuple（has/isa/activates/inhibits/mechanism/metabolizes/treats/causes/interacts/contraindicates/prerequisite/relates/sibling/specializes）、`EdgeType` 类型、`DEFAULT_EDGE_TYPE`（`'relates'`）、`isEdgeType()` 类型守卫。
 - **设计要点**：新增边类型只需改这一个文件，validator/legend/renderer 全部派生自此。
 
 #### [renderer.ts](../src/core/renderer.ts)
+
 - **职责**：Cytoscape 实例管理 + 样式表生成。注册 `cose-bilkent`/`dagre`/`euler` 扩展；从 `config.ts` 编译节点形状/边框色/填充色/边样式为 Cytoscape stylesheet；定义 `Renderer` 类封装实例化、layout、canvas renderer、zoom/selection 配置。
 - **关键导出**：
   - `CLASSES` — CSS class 常量（`SELECTED_NODE`、`DIMMED`、`HIGHLIGHTED`、`PULSE`、`TOUR_PATH_PREVIEW`…）
@@ -278,6 +291,7 @@ graph-events/highlight-engine/detail-panel/search 等模块接管交互
 - **样式层级**：① 节点基础 → ② field 边框色 → ③ essence 形状 → ④ tier 填充 → ⑤ 边与交互状态。
 
 #### [tour.ts](../src/core/tour.ts)
+
 - **职责**：自动导览引擎，Strategy 模式，2 种内置策略。
 - **关键类型/导出**：
   - `TourStrategy` = `'has-dfs' | 'topo-prereq'`
@@ -294,34 +308,41 @@ graph-events/highlight-engine/detail-panel/search 等模块接管交互
 负责浏览器端的视觉呈现与交互。按职责分组：
 
 #### 入口与组装
+
 - **[main.ts](../src/ui/main.ts)** — 应用入口。`boot()` 异步函数：加载内容 → `GraphManager.build()` → 创建 `Renderer`/`HighlightEngine`/`DetailPanel`/`Search` → 构造 `TourController`（必须在 `initGraphEvents` 之前，issue #11 修复的竞态）→ `initGraphEvents` → 注册 action handlers / shortcuts / search UI / music player / bigscreen / debug bridge → 显示 onboarding tip。
 - **[state.ts](../src/ui/state.ts)** — 集中临时状态。`uiState` 单例持有 renderer/highlight/detailPanel/search/tour/sectionState/activeTab 等引用。`isPanelPinned`/`tourBarCollapsed` 改为通过 `UiToggle` 代理读取（issue #6，消除双源写入）。提供 `registerPinToggle`/`registerTourBarToggle`。
 
 #### 事件与动作分发
+
 - **[action-dispatcher.ts](../src/ui/action-dispatcher.ts)** — 替代 inline `onclick` 的委托分发器。HTML 用 `data-action="..."` + `data-arg`/`data-args` 声明动作，TS 用 `registerAction(name, handler)` 注册。一个 document 级 click listener，未注册动作静默 no-op。`dispatchAction(name, args)` 供编程式触发（快捷键/测试）。
 - **[action-handlers.ts](../src/ui/action-handlers.ts)** — 所有 `data-action` 注册入口。toolbar/bottom sheet/layout picker/sidebar collapse/legend filter/bigscreen 等动作到业务函数的映射表。
 - **[graph-events.ts](../src/ui/graph-events.ts)** — Cytoscape 事件绑定。node/edge/canvas tap、dblclick：节点点击开 detailPanel、边点击高亮、空白点击关 panel/停 tour、双击退出 bigscreen。`GraphEventDeps` 列出依赖。
 
 #### 面板与视图
+
 - **[detail-panel.ts](../src/ui/detail-panel.ts)** — 节点详情面板。构造时查找 DOM、初始化 pin toggle（`UiToggle`）、绑定 tab/pin/节点点击/section collapse 事件。
 - **[bigscreen.ts](../src/ui/bigscreen.ts)** — 影院/大屏模式。隐藏 UI 并全屏，ESC/双击画布退出。提供 `registerFitFn`/`registerTourController`/`registerCyAccessor`/`isBigscreen`。
 - **[focus-node.ts](../src/ui/focus-node.ts)** — 相机聚焦动画。`focusOnNode(cy, nodeId, opts)` 支持只移动相机不重置 highlight 的 "preview" 模式（搜索自动居中用）。
 
 #### 搜索
+
 - **[search.ts](../src/ui/search.ts)** — `Search` 类。`search()` 调 `HighlightEngine.highlightSearch()`，重置导航光标，更新屏幕阅读器提示。`navigateNext/Prev/commit/clear` 维护结果列表与焦点。
 - **[search-ui.ts](../src/ui/search-ui.ts)** — `initSearchUI()` 将 desktop/mobile 两个搜索输入接入 `Search + HighlightEngine + DetailPanel` 管线，同步两输入框。`input` 触发搜索、`ArrowUp/Down` 导航、`Enter` commit、`Escape` 清除。
 
 #### 高亮与图例
+
 - **[highlight-engine.ts](../src/ui/highlight-engine.ts)** — `HighlightEngine`。清除旧状态、选中目标节点、高亮邻居节点和边、dim 无关元素。`highlightSearch(query)` 按 label 匹配并返回匹配节点 ID 列表。
 - **[legend-manager.ts](../src/ui/legend-manager.ts)** — 图例主动态管理。四个 legend axis（essence/field/tier/edge）共享 active filter 状态。`clearShapeFilter()` 清除所有 filter。`populateEssenceLegend/FieldLegend/TierLegend` 入口。
 - **[legend-factory.ts](../src/ui/legend-factory.ts)** — `LegendAxisDescriptor` 类型 + `buildLegend()` 幂等构建 legend DOM，绑定 delegated click/keyboard handler，按 key 更新计数。
 
 #### 漫游与布局
+
 - **[tour-controller.ts](../src/ui/tour-controller.ts)** — 漫游 UI 控制器。挂载桌面/移动两套控件，管理 engine 生命周期与 running/paused 标志，写回 `uiState.tour.strategy/pathHistory`。
 - **[layout-manager.ts](../src/ui/layout-manager.ts)** — 布局切换/参数管理。`fitGraph`/`randomize`/`runLayout`/`syncLayoutDisplay`/`setCurrentLayout`。
 - **[layout-menu.ts](../src/ui/layout-menu.ts)** — 布局下拉菜单开关。
 
 #### 辅助与工具
+
 - **[markdown.ts](../src/ui/markdown.ts)** — Markdown 渲染，marked + DOMPurify sanitize。
 - **[music-player.ts](../src/ui/music-player.ts)** — 背景音乐播放控制。
 - **[carousel.ts](../src/ui/carousel.ts)** — 顶栏品牌轮播（"信息熵"等文案）。
@@ -339,22 +360,25 @@ graph-events/highlight-engine/detail-panel/search 等模块接管交互
 ### 5.4 data 数据层
 
 #### [vocabulary.ts](../src/data/vocabulary.ts)
+
 - **职责**：定义词汇/分类数据结构：`Term`、`DisciplineNode`、`DisciplineLayer`，用于结构化学科分类。
 
 ### 5.5 scripts 工具脚本
 
-| 命令 | 脚本 | 用途 | 退出码 |
-|---|---|---|---|
-| `npm run validate` | [validate.ts](../scripts/validate.ts) | 严格 schema/类型校验 + 跨文件 id 引用检查；**CI 必跑** | 0=通过，非0=有 ❌ |
-| `npm run audit` | [audit-frontmatter.ts](../scripts/audit-frontmatter.ts) | 0/1/2/3 评分 + ADR-0001 关系方向 + 双向配对；输出 `docs/frontmatter-audit.md` | 永远 0（人工修正用） |
-| `npm run view` | [serve.ts](../scripts/serve.ts) | 启动静态开发服务器（无 HMR）+ `/api/graph` 端点 | — |
-| `npm run measure-overlap` | [measure-overlap.ts](../scripts/measure-overlap.ts) | 布局重叠度量（N=10 mean/worst overlap） | — |
+| 命令                      | 脚本                                                    | 用途                                                                          | 退出码               |
+| ------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------- | -------------------- |
+| `npm run validate`        | [validate.ts](../scripts/validate.ts)                   | 严格 schema/类型校验 + 跨文件 id 引用检查；**CI 必跑**                        | 0=通过，非0=有 ❌    |
+| `npm run audit`           | [audit-frontmatter.ts](../scripts/audit-frontmatter.ts) | 0/1/2/3 评分 + ADR-0001 关系方向 + 双向配对；输出 `docs/frontmatter-audit.md` | 永远 0（人工修正用） |
+| `npm run view`            | [serve.ts](../scripts/serve.ts)                         | 启动静态开发服务器（无 HMR）+ `/api/graph` 端点                               | —                    |
+| `npm run measure-overlap` | [measure-overlap.ts](../scripts/measure-overlap.ts)     | 布局重叠度量（N=10 mean/worst overlap）                                       | —                    |
 
 **`validate` vs `audit` 差异**（来自 [DEVELOP.md](./DEVELOP.md)）：
+
 - `validate` 是**门禁**：缺失必填、值非法、跨文件引用 id 不存在会让进程退出非零。CI 硬约束。
 - `audit` 是**度量**：给每篇 markdown 打分并按目录分组输出报告。永远 exit 0，因为字段缺失是增量写作常态。
 
 **归档脚本**（`archive/scripts/`，不在 npm scripts 里）：
+
 - `migrate-frontmatter.ts` — 统一 frontmatter schema 迁移（已完成）
 - `migrate-isa.ts` — 按 ADR-0001 把 has 边迁为 isa（已落地）
 - `extract-all-frontmatter.ts` — 全库 frontmatter 聚合为 markdown
@@ -366,35 +390,35 @@ graph-events/highlight-engine/detail-panel/search 等模块接管交互
 
 ## 6. 关键类与函数索引
 
-| 模块 | 符号 | 类型 | 说明 |
-|---|---|---|---|
-| `parser/frontmatter.ts` | `parseFrontmatterWithWarnings` | 函数 | 带 warning 收集的解析入口 |
-| `parser/frontmatter.ts` | `ParsedFrontmatter` | 接口 | 解析结果（含 edges_out/tags/body） |
-| `parser/schema.ts` | `VALID_ESSENCE/FIELD/TIER` | 常量 | 字段白名单 |
-| `parser/content-manager.ts` | `scanContentDir` | 函数 | 扫描 content 目录返回路径列表 |
-| `core/graph.ts` | `GraphData/NodeData/EdgeData` | 接口 | 图谱数据契约 |
-| `core/build-graph.ts` | `buildGraph` | 函数 | 纯函数：ParsedFrontmatter Map → GraphData |
-| `core/graph-manager.ts` | `GraphManager` | 类 | 浏览器入口（解析+构建+缓存） |
-| `core/content-loader.ts` | `loadContent` | 函数 | fetch manifest + 并行加载 .md |
-| `core/config.ts` | `NODE_TYPE_SHAPE/COLOR` | 常量 | essence → 形状/颜色 |
-| `core/config.ts` | `FIELD_COLOR` | 常量 | 学科 → 边框色 |
-| `core/config.ts` | `EDGE_TYPE_STYLE` | 常量 | 边类型 → 线型/箭头/颜色 |
-| `core/config.ts` | `LAYOUTS/DEFAULT_LAYOUT` | 常量 | 布局配置 + 默认布局（Euler） |
-| `core/edge-types.ts` | `EDGE_TYPES` | 常量 | 边类型词汇表 SSoT |
-| `core/renderer.ts` | `Renderer` | 类 | Cytoscape 实例封装 |
-| `core/renderer.ts` | `CLASSES` | 常量 | CSS class 常量集 |
-| `core/tour.ts` | `TourEngine` | 类 | 漫游引擎本体 |
-| `core/tour.ts` | `HasDfsStrategy` / `TopoPrereqStrategy` | 类 | 两种导览策略 |
-| `ui/main.ts` | `boot` | 函数 | 应用入口（异步组装+接线） |
-| `ui/state.ts` | `uiState` | 对象 | 集中临时状态单例 |
-| `ui/action-dispatcher.ts` | `registerAction` / `dispatchAction` / `installDispatcher` | 函数 | data-action 委托分发 |
-| `ui/detail-panel.ts` | `DetailPanel` | 类 | 节点详情面板 |
-| `ui/search.ts` | `Search` | 类 | 搜索引擎 |
-| `ui/highlight-engine.ts` | `HighlightEngine` | 类 | 节点高亮/dim 引擎 |
-| `ui/tour-controller.ts` | `TourController` | 类 | 漫游 UI 控制器 |
-| `ui/layout-manager.ts` | `fitGraph` / `runLayout` / `setCurrentLayout` | 函数 | 布局操作 |
-| `ui/focus-node.ts` | `focusOnNode` | 函数 | 相机聚焦动画 |
-| `ui/ui-toggle.ts` | `UiToggle` | 类 | 双态切换抽象 |
+| 模块                        | 符号                                                      | 类型 | 说明                                      |
+| --------------------------- | --------------------------------------------------------- | ---- | ----------------------------------------- |
+| `parser/frontmatter.ts`     | `parseFrontmatterWithWarnings`                            | 函数 | 带 warning 收集的解析入口                 |
+| `parser/frontmatter.ts`     | `ParsedFrontmatter`                                       | 接口 | 解析结果（含 edges_out/tags/body）        |
+| `parser/schema.ts`          | `VALID_ESSENCE/FIELD/TIER`                                | 常量 | 字段白名单                                |
+| `parser/content-manager.ts` | `scanContentDir`                                          | 函数 | 扫描 content 目录返回路径列表             |
+| `core/graph.ts`             | `GraphData/NodeData/EdgeData`                             | 接口 | 图谱数据契约                              |
+| `core/build-graph.ts`       | `buildGraph`                                              | 函数 | 纯函数：ParsedFrontmatter Map → GraphData |
+| `core/graph-manager.ts`     | `GraphManager`                                            | 类   | 浏览器入口（解析+构建+缓存）              |
+| `core/content-loader.ts`    | `loadContent`                                             | 函数 | fetch manifest + 并行加载 .md             |
+| `core/config.ts`            | `NODE_TYPE_SHAPE/COLOR`                                   | 常量 | essence → 形状/颜色                       |
+| `core/config.ts`            | `FIELD_COLOR`                                             | 常量 | 学科 → 边框色                             |
+| `core/config.ts`            | `EDGE_TYPE_STYLE`                                         | 常量 | 边类型 → 线型/箭头/颜色                   |
+| `core/config.ts`            | `LAYOUTS/DEFAULT_LAYOUT`                                  | 常量 | 布局配置 + 默认布局（Euler）              |
+| `core/edge-types.ts`        | `EDGE_TYPES`                                              | 常量 | 边类型词汇表 SSoT                         |
+| `core/renderer.ts`          | `Renderer`                                                | 类   | Cytoscape 实例封装                        |
+| `core/renderer.ts`          | `CLASSES`                                                 | 常量 | CSS class 常量集                          |
+| `core/tour.ts`              | `TourEngine`                                              | 类   | 漫游引擎本体                              |
+| `core/tour.ts`              | `HasDfsStrategy` / `TopoPrereqStrategy`                   | 类   | 两种导览策略                              |
+| `ui/main.ts`                | `boot`                                                    | 函数 | 应用入口（异步组装+接线）                 |
+| `ui/state.ts`               | `uiState`                                                 | 对象 | 集中临时状态单例                          |
+| `ui/action-dispatcher.ts`   | `registerAction` / `dispatchAction` / `installDispatcher` | 函数 | data-action 委托分发                      |
+| `ui/detail-panel.ts`        | `DetailPanel`                                             | 类   | 节点详情面板                              |
+| `ui/search.ts`              | `Search`                                                  | 类   | 搜索引擎                                  |
+| `ui/highlight-engine.ts`    | `HighlightEngine`                                         | 类   | 节点高亮/dim 引擎                         |
+| `ui/tour-controller.ts`     | `TourController`                                          | 类   | 漫游 UI 控制器                            |
+| `ui/layout-manager.ts`      | `fitGraph` / `runLayout` / `setCurrentLayout`             | 函数 | 布局操作                                  |
+| `ui/focus-node.ts`          | `focusOnNode`                                             | 函数 | 相机聚焦动画                              |
+| `ui/ui-toggle.ts`           | `UiToggle`                                                | 类   | 双态切换抽象                              |
 
 ---
 
@@ -402,27 +426,27 @@ graph-events/highlight-engine/detail-panel/search 等模块接管交互
 
 ### 7.1 生产依赖（package.json `dependencies`）
 
-| 依赖 | 版本 | 用途 |
-|---|---|---|
-| `cytoscape` | ^3.34.0 | 图论可视化核心引擎 |
-| `dompurify` | ^3.4.13 | Markdown HTML 输出 sanitize |
-| `glob` | ^11.0.0 | 文件路径匹配（CLI 脚本） |
-| `marked` | ^18.0.9 | Markdown → HTML 渲染（detail-panel） |
-| `yaml` | ^2.9.0 | frontmatter YAML 解析 |
+| 依赖        | 版本    | 用途                                 |
+| ----------- | ------- | ------------------------------------ |
+| `cytoscape` | ^3.34.0 | 图论可视化核心引擎                   |
+| `dompurify` | ^3.4.13 | Markdown HTML 输出 sanitize          |
+| `glob`      | ^11.0.0 | 文件路径匹配（CLI 脚本）             |
+| `marked`    | ^18.0.9 | Markdown → HTML 渲染（detail-panel） |
+| `yaml`      | ^2.9.0  | frontmatter YAML 解析                |
 
 ### 7.2 开发依赖（关键）
 
-| 依赖 | 用途 |
-|---|---|
-| `vite` ^8.0.16 | 构建+开发服务器 |
-| `vitest` ^2.1.9 + `@vitest/coverage-v8` | 测试框架 + 覆盖率 |
-| `tsx` ^4.22.4 | 直接运行 TS 脚本（scripts/） |
-| `typescript` ^5.5.0 | 类型系统 |
-| `eslint` ^9.39.5 + `prettier` ^3.9.6 | 代码风格 |
-| `jsdom` ^25.0.1 | DOM 测试环境 |
-| `cytoscape-cose-bilkent` / `cytoscape-dagre` / `cytoscape-euler` | 布局扩展 |
-| `cytoscape-popper` | tooltip 扩展 |
-| `@types/node` ^22 | Node 类型 |
+| 依赖                                                             | 用途                         |
+| ---------------------------------------------------------------- | ---------------------------- |
+| `vite` ^8.0.16                                                   | 构建+开发服务器              |
+| `vitest` ^2.1.9 + `@vitest/coverage-v8`                          | 测试框架 + 覆盖率            |
+| `tsx` ^4.22.4                                                    | 直接运行 TS 脚本（scripts/） |
+| `typescript` ^5.5.0                                              | 类型系统                     |
+| `eslint` ^9.39.5 + `prettier` ^3.9.6                             | 代码风格                     |
+| `jsdom` ^25.0.1                                                  | DOM 测试环境                 |
+| `cytoscape-cose-bilkent` / `cytoscape-dagre` / `cytoscape-euler` | 布局扩展                     |
+| `cytoscape-popper`                                               | tooltip 扩展                 |
+| `@types/node` ^22                                                | Node 类型                    |
 
 ### 7.3 模块内依赖图（关键路径）
 
@@ -506,6 +530,7 @@ npm run measure-overlap    # 布局重叠度量
 ```
 
 **工作流建议**（来自 [DEVELOP.md](./DEVELOP.md)）：
+
 - 改了 markdown → 先 `npm run validate`（防 schema 回归）
 - 集中批量修一批 → 中途用 `npm run audit` 看进度
 - 修完提交前 → 再 `npm run validate`（兜底）
@@ -547,6 +572,7 @@ npm run format:check # prettier --check .
 ### 9.4 测试覆盖范围
 
 测试文件与源文件同目录（`*.test.ts`），覆盖：
+
 - `core/`：`build-graph`、`edge-types`、`tour`/`tour-engine`、`config-layouts`、`cytoscape-style-tokens`
 - `parser/`：`frontmatter`
 - `ui/`：`action-dispatcher`、`app-debug`、`bigscreen`/`bigscreen-sidebar-roundtrip`、`detail-panel-questions`、`focus-node`、`graph-events`/`graph-events-helpers`、`layout-manager`、`layout-menu`、`logger`、`search`/`search-ui`、`state`、`tour-controller`、`ui-toggle`
@@ -557,11 +583,11 @@ npm run format:check # prettier --check .
 
 ### 10.1 规则手册（来自 [README.md §0](./README.md)）
 
-| 规则 | 适用范围 | 文档 |
-|---|---|---|
-| 节点拆分 | 把手绘思维导图转写为新增节点 | [SPLIT-RULES.md](./SPLIT-RULES.md) |
-| 节点合并/重构 | 清理零入度节点、补骨架边、修 schema | [REFACTOR-RULES.md](./REFACTOR-RULES.md) |
-| 层级关系方向 | isa/prerequisite/mechanism 等边的方向约定 | [ADR-0001](./ARD/ADR-0001-层级关系统一使用isa方向.md) |
+| 规则          | 适用范围                                  | 文档                                                  |
+| ------------- | ----------------------------------------- | ----------------------------------------------------- |
+| 节点拆分      | 把手绘思维导图转写为新增节点              | [SPLIT-RULES.md](./SPLIT-RULES.md)                    |
+| 节点合并/重构 | 清理零入度节点、补骨架边、修 schema       | [REFACTOR-RULES.md](./REFACTOR-RULES.md)              |
+| 层级关系方向  | isa/prerequisite/mechanism 等边的方向约定 | [ADR-0001](./ARD/ADR-0001-层级关系统一使用isa方向.md) |
 
 ### 10.2 关系类型（13 种 + 结构语义扩展）
 
@@ -575,16 +601,17 @@ npm run format:check # prettier --check .
 
 ### 10.3 视觉维度与语义一一对应
 
-| 维度 | 回答的问题 | 配置位置 |
-|---|---|---|
-| Essence（本质）→ 形状 | "这是什么"（药/病/概念/机制） | `config.ts` `NODE_TYPE_SHAPE` |
-| Field（学科）→ 边框色 | "属于哪门学科" | `config.ts` `FIELD_COLOR` |
-| Tier（层次）→ 填充色 | "在哪一层"（基础→高层） | `config.ts` `NODE_TIER_STYLE` |
-| Edge type → 线型/箭头/颜色 | 关系语义 | `config.ts` `EDGE_TYPE_STYLE` |
+| 维度                       | 回答的问题                    | 配置位置                      |
+| -------------------------- | ----------------------------- | ----------------------------- |
+| Essence（本质）→ 形状      | "这是什么"（药/病/概念/机制） | `config.ts` `NODE_TYPE_SHAPE` |
+| Field（学科）→ 边框色      | "属于哪门学科"                | `config.ts` `FIELD_COLOR`     |
+| Tier（层次）→ 填充色       | "在哪一层"（基础→高层）       | `config.ts` `NODE_TIER_STYLE` |
+| Edge type → 线型/箭头/颜色 | 关系语义                      | `config.ts` `EDGE_TYPE_STYLE` |
 
 ### 10.4 单一真相源（SSoT）原则
 
 代码中多处强调 SSoT，避免手抄多份列表失同步：
+
 - **边类型词汇表**：`core/edge-types.ts`（issue #9，原分散在 validate.ts/config.ts 三处）
 - **frontmatter 白名单**：`parser/schema.ts`（issue #20，原 validate.ts 与 audit-frontmatter.ts 各持一份且已 drift）
 - **视觉配置**：`core/config.ts`
@@ -624,10 +651,9 @@ data:
     full: 详细解释
   edges_out:
     - target: <nodeId>
-      type: isa           # 关系类型，见 edge-types.ts
+      type: isa # 关系类型，见 edge-types.ts
       reason: 为什么指向
 ---
-
 # 卡马西平
 正文（Markdown）...
 ```

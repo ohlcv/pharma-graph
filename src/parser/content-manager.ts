@@ -1,8 +1,8 @@
 // src/parser/content-manager.ts
-import { glob } from "glob";
-import path from "path";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
+import { glob } from 'glob';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -12,10 +12,10 @@ const __dirname = dirname(__filename);
  * @param dir 目标目录，默认相对于项目根的 content/
  */
 export async function scanContentDir(dir?: string): Promise<string[]> {
-  const rootDir = dir ?? path.resolve(__dirname, "../../public/content");
-  const files = await glob("**/*.md", { cwd: rootDir, absolute: false });
+  const rootDir = dir ?? path.resolve(__dirname, '../../public/content');
+  const files = await glob('**/*.md', { cwd: rootDir, absolute: false });
   return files
-    .filter((f) => !f.startsWith("dist/"))
+    .filter((f) => !f.startsWith('dist/'))
     .map((f) => path.join(rootDir, f))
     .sort();
 }

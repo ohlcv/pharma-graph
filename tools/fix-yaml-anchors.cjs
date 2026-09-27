@@ -59,7 +59,10 @@ function fixFile(fullPath) {
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].trim() === '---') {
       dashCount++;
-      if (dashCount === 2) { fmCloseLine = i; break; }
+      if (dashCount === 2) {
+        fmCloseLine = i;
+        break;
+      }
     }
   }
   if (fmCloseLine === -1) return 'NO_FM';
@@ -77,7 +80,10 @@ function fixFile(fullPath) {
       for (let j = i; j < fmCloseLine; j++) {
         const lt = lines[j];
         if (lt.trim().startsWith('edges_out:')) {
-          if (depth === 0) { depth = 1; itemStart = -1; }
+          if (depth === 0) {
+            depth = 1;
+            itemStart = -1;
+          }
         }
         const m = lt.trim().match(/^-\s*&(\w+)$/);
         if (m && depth === 1) {
@@ -113,10 +119,19 @@ function fixFile(fullPath) {
       topEdgesStart = i;
       for (let j = i + 1; j < lines.length; j++) {
         const lt = lines[j];
-        if (lt.trim() === '---') { topEdgesEnd = j - 1; break; }
+        if (lt.trim() === '---') {
+          topEdgesEnd = j - 1;
+          break;
+        }
         // 遇到非缩进行
-        if (lt.length > 0 && !lt.startsWith(' ') && !lt.startsWith('\t') && !lt.trim().startsWith('-')) {
-          topEdgesEnd = j - 1; break;
+        if (
+          lt.length > 0 &&
+          !lt.startsWith(' ') &&
+          !lt.startsWith('\t') &&
+          !lt.trim().startsWith('-')
+        ) {
+          topEdgesEnd = j - 1;
+          break;
         }
         if (j === lines.length - 1) topEdgesEnd = j;
       }
@@ -168,7 +183,8 @@ function fixFile(fullPath) {
   return 'OK';
 }
 
-let ok = 0, err = 0;
+let ok = 0,
+  err = 0;
 for (const relPath of files) {
   const fullPath = path.join(root, relPath);
   if (!fs.existsSync(fullPath)) {
@@ -179,12 +195,22 @@ for (const relPath of files) {
       continue;
     }
     const result = fixFile(altPath);
-    if (result === 'OK') { console.log('Fixed: ' + relPath); ok++; }
-    else { console.log('Error ' + result + ': ' + relPath); err++; }
+    if (result === 'OK') {
+      console.log('Fixed: ' + relPath);
+      ok++;
+    } else {
+      console.log('Error ' + result + ': ' + relPath);
+      err++;
+    }
   } else {
     const result = fixFile(fullPath);
-    if (result === 'OK') { console.log('Fixed: ' + relPath); ok++; }
-    else { console.log('Error ' + result + ': ' + relPath); err++; }
+    if (result === 'OK') {
+      console.log('Fixed: ' + relPath);
+      ok++;
+    } else {
+      console.log('Error ' + result + ': ' + relPath);
+      err++;
+    }
   }
 }
 console.log('\nDone: ' + ok + ' fixed, ' + err + ' errors');

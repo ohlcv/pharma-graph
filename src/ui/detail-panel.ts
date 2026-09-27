@@ -300,13 +300,9 @@ function rgba(hex: string, alpha: number): string {
 
 function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
   const fillVal = (d.fill as string) || '';
-  const color = fillVal
-    ? (FILL_CONFIG[fillVal]?.background ?? '#94a3b8')
-    : '#94a3b8';
+  const color = fillVal ? (FILL_CONFIG[fillVal]?.background ?? '#94a3b8') : '#94a3b8';
   const nodeName = (d.label as string) || (d.id as string);
-  const fillText = fillVal
-    ? (FILL_CONFIG[fillVal]?.label ?? fillVal)
-    : '—';
+  const fillText = fillVal ? (FILL_CONFIG[fillVal]?.label ?? fillVal) : '—';
   const depthVal = typeof d.depth === 'number' ? d.depth : 0;
   const depthLabel = getLevelLabel(depthVal);
   // A1：徽章色不再按 depth 取，而是按"是否属于某个子树"——
@@ -328,7 +324,7 @@ function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
   // 标签渲染到徽章区域，过滤掉与 label 重复的标签
   const rawTags = d.tags as string[] | undefined;
   const filteredTags = rawTags?.filter(
-    (t) => t !== nodeName && !(fillVal === 'cls-mnemonic' && t === '口诀')
+    (t) => t !== nodeName && !(fillVal === 'cls-mnemonic' && t === '口诀'),
   );
   const tagsHtml = filteredTags?.length
     ? filteredTags.map((t) => `<span class="np-tag np-tag--inline">${escHtml(t)}</span>`).join('')

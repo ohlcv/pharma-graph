@@ -38,14 +38,18 @@ const OUTPUT_FILE = path.resolve('docs/frontmatter-audit.md');
 // from the same module so the two scripts can no longer drift on what
 // counts as a canonical value. Locally re-bind the readonly tuples under
 // their old names so the scoring branches read naturally.
-import {
-  VALID_FILL,
-} from "../src/parser/schema.js";
+import { VALID_FILL } from '../src/parser/schema.js';
 
 const LOC_KEYS = ['book', 'part', 'chapter', 'section', 'point', 'item', 'subsection'] as const;
-type LocKey = typeof LOC_KEYS[number];
+type LocKey = (typeof LOC_KEYS)[number];
 const LOC_RANK: Record<LocKey, number> = {
-  book: 0, part: 1, chapter: 2, section: 3, point: 4, item: 5, subsection: 6,
+  book: 0,
+  part: 1,
+  chapter: 2,
+  section: 3,
+  point: 4,
+  item: 5,
+  subsection: 6,
 };
 
 function isKebabCase(s: string): boolean {
@@ -53,12 +57,16 @@ function isKebabCase(s: string): boolean {
 }
 
 // ── Frontmatter 解析 ────────────────────────────────────────────────
-interface EdgeDef { target: string; type: string; reason?: string; }
+interface EdgeDef {
+  target: string;
+  type: string;
+  reason?: string;
+}
 interface ParsedFM {
   id?: string;
   label?: string;
-  fill?: string;           // replaces essence (kept for backward compat)
-  essence?: string;         // deprecated; use fill
+  fill?: string; // replaces essence (kept for backward compat)
+  essence?: string; // deprecated; use fill
   type?: string;
   layer?: string;
   summary?: string | { short?: string; full?: string };
@@ -85,40 +93,46 @@ function extractFrontmatter(content: string): ParsedFM {
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       root = parsed as Record<string, unknown>;
     }
-  } catch { /* fallback empty */ }
+  } catch {
+    /* fallback empty */
+  }
 
   const fm = pickSource(root);
   const edgesRaw = (root['edges_out'] as unknown[]) ?? (fm['edges_out'] as unknown[]) ?? [];
   const edges: EdgeDef[] = Array.isArray(edgesRaw)
     ? edgesRaw
-        .filter((e): e is Record<string, unknown> =>
-          typeof e === 'object' && e !== null && !Array.isArray(e))
-        .map(e => ({
+        .filter(
+          (e): e is Record<string, unknown> =>
+            typeof e === 'object' && e !== null && !Array.isArray(e),
+        )
+        .map((e) => ({
           target: String(e['target'] ?? ''),
           type: String(e['type'] ?? 'relates'),
           reason: typeof e['reason'] === 'string' ? e['reason'] : undefined,
         }))
-        .filter(e => Boolean(e.target))
+        .filter((e) => Boolean(e.target))
     : [];
 
   const summary = fm['summary'];
   const summaryStr =
-    typeof summary === 'string' ? summary :
-    typeof summary === 'object' && summary !== null ?
-      ((summary as { full?: string }).full ?? (summary as { short?: string }).short ?? '') :
-      '';
+    typeof summary === 'string'
+      ? summary
+      : typeof summary === 'object' && summary !== null
+        ? ((summary as { full?: string }).full ?? (summary as { short?: string }).short ?? '')
+        : '';
 
   return {
-    id: typeof fm['id'] === 'string' ? fm['id'] as string : undefined,
-    label: typeof fm['label'] === 'string' ? fm['label'] as string : undefined,
-    fill: typeof fm['fill'] === 'string' ? fm['fill'] as string : undefined,
-    essence: typeof fm['essence'] === 'string' ? fm['essence'] as string : undefined,
-    type: typeof fm['type'] === 'string' ? fm['type'] as string : undefined,
-    layer: typeof fm['layer'] === 'string' ? fm['layer'] as string : undefined,
+    id: typeof fm['id'] === 'string' ? (fm['id'] as string) : undefined,
+    label: typeof fm['label'] === 'string' ? (fm['label'] as string) : undefined,
+    fill: typeof fm['fill'] === 'string' ? (fm['fill'] as string) : undefined,
+    essence: typeof fm['essence'] === 'string' ? (fm['essence'] as string) : undefined,
+    type: typeof fm['type'] === 'string' ? (fm['type'] as string) : undefined,
+    layer: typeof fm['layer'] === 'string' ? (fm['layer'] as string) : undefined,
     summary: summaryStr,
-    location: fm['location'] && typeof fm['location'] === 'object' && !Array.isArray(fm['location'])
-      ? (fm['location'] as Record<string, string>)
-      : undefined,
+    location:
+      fm['location'] && typeof fm['location'] === 'object' && !Array.isArray(fm['location'])
+        ? (fm['location'] as Record<string, string>)
+        : undefined,
     tags: Array.isArray(fm['tags'])
       ? (fm['tags'] as unknown[]).filter((t): t is string => typeof t === 'string')
       : [],
@@ -129,8 +143,13 @@ function extractFrontmatter(content: string): ParsedFM {
 
 // ── 评分（基础字段分） ─────────────────────────────────────────────
 interface Score {
-  id: number; label: number; fill: number;
-  summary: number; edges_out: number; location: number; tags: number;
+  id: number;
+  label: number;
+  fill: number;
+  summary: number;
+  edges_out: number;
+  location: number;
+  tags: number;
 }
 
 function scoreField(fm: ParsedFM, field: keyof Score): number {
@@ -147,15 +166,19 @@ function scoreField(fm: ParsedFM, field: keyof Score): number {
   }
   if (field === 'summary') {
     if (!fm.summary) return 2;
-    const s = typeof fm.summary === 'string' ? fm.summary.trim() :
-      ((fm.summary as { full?: string }).full ?? (fm.summary as { short?: string }).short ?? '');
-    return (s && s !== '{}') ? 3 : 2;
+    const s =
+      typeof fm.summary === 'string'
+        ? fm.summary.trim()
+        : ((fm.summary as { full?: string }).full ??
+          (fm.summary as { short?: string }).short ??
+          '');
+    return s && s !== '{}' ? 3 : 2;
   }
   if (field === 'edges_out') {
-    return (fm.edges_out && fm.edges_out.length > 0) ? 3 : 2;
+    return fm.edges_out && fm.edges_out.length > 0 ? 3 : 2;
   }
   if (field === 'location') {
-    return (fm.location && Object.keys(fm.location).length > 0) ? 3 : 2;
+    return fm.location && Object.keys(fm.location).length > 0 ? 3 : 2;
   }
   if (field === 'tags') return 3;
   return 2;
@@ -197,7 +220,10 @@ function lastLocationKey(loc: Record<string, string> | undefined): LocKey | null
 }
 
 /** target 是不是在 prefix 的下级 location（更深一级或更多） */
-function isLocationUnder(targetLoc: Record<string, string> | undefined, prefixLoc: Record<string, string> | undefined): boolean {
+function isLocationUnder(
+  targetLoc: Record<string, string> | undefined,
+  prefixLoc: Record<string, string> | undefined,
+): boolean {
   if (!targetLoc || !prefixLoc) return false;
   const prefLast = lastLocationKey(prefixLoc);
   const tgtLast = lastLocationKey(targetLoc);
@@ -236,7 +262,10 @@ interface FileResult {
 }
 
 // ── ADR-0001 关系方向检测 ───────────────────────────────────────────
-function detectDirIssues(r: FileResult, all: FileResult[]): { dirIssues: DirIssue[]; bidirPairs: BidirPair[] } {
+function detectDirIssues(
+  r: FileResult,
+  all: FileResult[],
+): { dirIssues: DirIssue[]; bidirPairs: BidirPair[] } {
   const dirIssues: DirIssue[] = [];
   const bidirPairs: BidirPair[] = [];
   const idIndex = new Map<string, FileResult>();
@@ -279,8 +308,9 @@ function detectDirIssues(r: FileResult, all: FileResult[]): { dirIssues: DirIssu
     // 双向配对检查：只在字典序较小的节点 push 一次
     if (idIndex.has(tgt)) {
       const tgtFr = idIndex.get(tgt)!;
-      if (myId < tgt) {  // ensure single-direction discovery
-        const back = (tgtFr.fm.edges_out ?? []).find(e => e.target === myId);
+      if (myId < tgt) {
+        // ensure single-direction discovery
+        const back = (tgtFr.fm.edges_out ?? []).find((e) => e.target === myId);
         if (back) {
           const bt = (back.type ?? '').toLowerCase();
           if (type === bt && (type === 'has' || type === 'isa' || type === 'relates')) {
@@ -417,7 +447,7 @@ async function main() {
     const id = r.fm.id;
     const loc = r.fm.location ?? {};
     if (!id) continue;
-    const isBookRoot = r.fm.fill === 'cls-structure' || (lastLocationKey(loc) === 'book');
+    const isBookRoot = r.fm.fill === 'cls-structure' || lastLocationKey(loc) === 'book';
     if (isBookRoot) continue;
     const hasIsa = r.hasIsaOut || isaInByNode.get(id) === true;
     if (!hasIsa) {
@@ -434,15 +464,17 @@ async function main() {
     groups.get(top)!.push(r);
   }
 
-  const totalPct = scoreTotal(results.map(r => r.score));
-  const errCount = results.filter(r => Object.values(r.score).some(s => s === 1)).length;
-  const warnCount = results.filter(r =>
-    !Object.values(r.score).some(s => s === 1) &&
-    r.baseIssues.some(i => i.startsWith('⚠️'))
+  const totalPct = scoreTotal(results.map((r) => r.score));
+  const errCount = results.filter((r) => Object.values(r.score).some((s) => s === 1)).length;
+  const warnCount = results.filter(
+    (r) =>
+      !Object.values(r.score).some((s) => s === 1) && r.baseIssues.some((i) => i.startsWith('⚠️')),
   ).length;
   const dirIssueCount = results.reduce((acc, r) => acc + r.dirIssues.length, 0);
   const bidirCount = allBidirPairs.length;
-  const noIsaCount = results.filter(r => r.baseIssues.some(i => i.includes('无 isa 边'))).length;
+  const noIsaCount = results.filter((r) =>
+    r.baseIssues.some((i) => i.includes('无 isa 边')),
+  ).length;
 
   let md = `# Frontmatter 审核报告\n\n`;
   md += `> 生成时间：${new Date().toLocaleString('zh-CN')}\n`;
@@ -476,13 +508,12 @@ async function main() {
     for (const r of files) {
       rowNo++;
       const keys: (keyof Score)[] = ['id', 'label', 'fill', 'summary', 'edges_out'];
-      const correct = keys.filter(k => r.score[k] === 3).length;
+      const correct = keys.filter((k) => r.score[k] === 3).length;
       const pct = Math.round((correct / keys.length) * 100);
-      const idDisplay = r.score.id === 3
-        ? `✅ \`${r.fm.id ?? '—'}\`` : `❌ \`${r.fm.id ?? '—'}\``;
+      const idDisplay = r.score.id === 3 ? `✅ \`${r.fm.id ?? '—'}\`` : `❌ \`${r.fm.id ?? '—'}\``;
       const fillVal = (r.fm.fill ?? r.fm.essence ?? '—').toString();
-      const fillDisplay = r.score.fill === 3 ? `✅ ${fillVal}` :
-        r.score.fill === 2 ? `⚠️ —` : `❌ ${fillVal}`;
+      const fillDisplay =
+        r.score.fill === 3 ? `✅ ${fillVal}` : r.score.fill === 2 ? `⚠️ —` : `❌ ${fillVal}`;
       const sumDisplay = r.score.summary === 3 ? `✅` : `⚠️`;
       const edgeDisplay = r.score.edges_out === 3 ? `✅` : `⚠️`;
       const dirMark = r.dirIssues.length === 0 ? `-无` : `🔁×${r.dirIssues.length}`;
@@ -525,7 +556,7 @@ async function main() {
   md += `#### （a）has 边指向 location 子级（共 ${dirIssueCount} 处）\n\n`;
   if (dirIssueCount > 0) {
     const byGroup = new Map<string, DirIssue[]>();
-    for (const it of results.flatMap(r => r.dirIssues)) {
+    for (const it of results.flatMap((r) => r.dirIssues)) {
       const grp = it.relPath.split(path.sep)[0];
       if (!byGroup.has(grp)) byGroup.set(grp, []);
       byGroup.get(grp)!.push(it);
@@ -553,7 +584,7 @@ async function main() {
     md += `🎉 未发现双向配对。\n\n`;
   }
 
-  const noIsaList = results.filter(r => r.baseIssues.some(i => i.includes('无 isa 边')));
+  const noIsaList = results.filter((r) => r.baseIssues.some((i) => i.includes('无 isa 边')));
   md += `#### （c）非 book 节点缺 isa 边（共 ${noIsaList.length} 处，建议）\n\n`;
   if (noIsaList.length === 0) {
     md += `🎉 全部非 book 节点都已具备 isa 边。\n\n`;
@@ -591,8 +622,15 @@ async function main() {
 
   fs.writeFileSync(OUTPUT_FILE, md, 'utf-8');
   console.log(`✅ 审核报告已写入：${OUTPUT_FILE}`);
-  console.log(`📊 总文件：${results.length} | ❌严重错误：${errCount} | ⚠️警告：${warnCount} | 完成度：${totalPct}%`);
-  console.log(`🔁 ADR 方向：has↔子级 ${dirIssueCount} 处 | 双向配对 ${bidirCount} 处 | 缺 isa ${noIsaCount} 处`);
+  console.log(
+    `📊 总文件：${results.length} | ❌严重错误：${errCount} | ⚠️警告：${warnCount} | 完成度：${totalPct}%`,
+  );
+  console.log(
+    `🔁 ADR 方向：has↔子级 ${dirIssueCount} 处 | 双向配对 ${bidirCount} 处 | 缺 isa ${noIsaCount} 处`,
+  );
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

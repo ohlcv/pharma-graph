@@ -1,19 +1,16 @@
 // scripts/validate.ts
 // 校验 content/ 下所有 Markdown 文件的 frontmatter 格式和跨文件引用
 import fs from 'fs/promises';
-import { scanContentDir } from "../src/parser/content-manager.js";
-import { parseFrontmatterWithWarnings } from "../src/parser/frontmatter.js";
-import {
-  isValidFill,
-  isValidEdgeType,
-} from "../src/parser/schema.js";
-import path from "path";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
+import { scanContentDir } from '../src/parser/content-manager.js';
+import { parseFrontmatterWithWarnings } from '../src/parser/frontmatter.js';
+import { isValidFill, isValidEdgeType } from '../src/parser/schema.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const ROOT = path.resolve(__dirname, "..");
+const ROOT = path.resolve(__dirname, '..');
 
 // VALID_* whitelists live in src/parser/schema.ts. Both validate and
 // audit-frontmatter import the same readonly tuples, so the two scripts
@@ -23,17 +20,17 @@ interface ValidationError {
   file: string;
   field?: string;
   message: string;
-  severity: "error" | "warning";
+  severity: 'error' | 'warning';
 }
 
 export async function validate(): Promise<void> {
-  console.log("🔍 Running frontmatter validation...\n");
+  console.log('🔍 Running frontmatter validation...\n');
 
-  const contentDir = path.join(ROOT, "public/content");
+  const contentDir = path.join(ROOT, 'public/content');
   const files = await scanContentDir(contentDir);
 
   if (files.length === 0) {
-    console.warn("⚠️  No .md files found in public/content/");
+    console.warn('⚠️  No .md files found in public/content/');
     return;
   }
 
@@ -51,7 +48,7 @@ export async function validate(): Promise<void> {
     try {
       result = parseFrontmatterWithWarnings(raw, fp);
     } catch (err: any) {
-      errors.push({ file: relPath, message: err.message, severity: "error" });
+      errors.push({ file: relPath, message: err.message, severity: 'error' });
       continue;
     }
     const { fm, warnings } = result;
@@ -111,13 +108,13 @@ export async function validate(): Promise<void> {
 
       for (let i = 0; i < fm.edges_out.length; i++) {
         const edge = fm.edges_out[i];
-        const target = String(edge.target ?? "").trim();
+        const target = String(edge.target ?? '').trim();
         if (target && !allIds.has(target)) {
           errors.push({
             file: relPath,
             field: `edges_out[${i}].target`,
             message: `edges_out[${i}].target 指向的节点 id "${target}" 不存在`,
-            severity: "error",
+            severity: 'error',
           });
         }
       }
@@ -128,12 +125,12 @@ export async function validate(): Promise<void> {
 
   // Report results
   if (errors.length === 0) {
-    console.log("✅ All files passed validation.");
+    console.log('✅ All files passed validation.');
     return;
   }
 
-  const errorCount = errors.filter((e) => e.severity === "error").length;
-  const warnCount = errors.filter((e) => e.severity === "warning").length;
+  const errorCount = errors.filter((e) => e.severity === 'error').length;
+  const warnCount = errors.filter((e) => e.severity === 'warning').length;
 
   if (errorCount > 0) {
     console.error(`❌ ${errorCount} error(s), ${warnCount} warning(s)\n`);
@@ -142,8 +139,8 @@ export async function validate(): Promise<void> {
   }
 
   for (const err of errors) {
-    const icon = err.severity === "error" ? "❌" : "⚠️ ";
-    const location = err.field ? `[${err.field}]` : "";
+    const icon = err.severity === 'error' ? '❌' : '⚠️ ';
+    const location = err.field ? `[${err.field}]` : '';
     console.error(`${icon} ${err.file} ${location}`);
     console.error(`   ${err.message}\n`);
   }
@@ -155,12 +152,12 @@ export async function validate(): Promise<void> {
 
 function toRelativePath(filePath: string): string {
   const parts = filePath.split(/[/\\]/);
-  const idx = parts.findIndex((p) => p === "content");
-  return idx === -1 ? filePath : parts.slice(idx).join("/");
+  const idx = parts.findIndex((p) => p === 'content');
+  return idx === -1 ? filePath : parts.slice(idx).join('/');
 }
 
 // Run if executed directly
 validate().catch((err) => {
-  console.error("❌ Validation crashed:", err.message);
+  console.error('❌ Validation crashed:', err.message);
   process.exit(1);
 });
