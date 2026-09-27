@@ -110,7 +110,7 @@ export const SPEECH_RATE_DEFAULT = 1.25;
 export const SPEECH_POST_DELAY_MIN = 0;
 export const SPEECH_POST_DELAY_MAX = 2000;
 export const SPEECH_POST_DELAY_STEP = 100;
-export const SPEECH_POST_DELAY_DEFAULT = 0;
+export const SPEECH_POST_DELAY_DEFAULT = 1000;
 
 function loadRate(): number {
   try {

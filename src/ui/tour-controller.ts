@@ -436,7 +436,7 @@ export class TourController {
   }
 
   private currentInterval(): number {
-    return this.findSlider('interval')?.range.valueAsNumber ?? 3000;
+    return this.findSlider('interval')?.range.valueAsNumber ?? 1000;
   }
 
   private findSlider(which: 'interval' | 'maxdepth'): SliderBind | undefined {
