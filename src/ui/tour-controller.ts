@@ -28,6 +28,7 @@ import { uiState, registerTourBarToggle } from './state.js';
 import { UiToggle } from './ui-toggle.js';
 import { showToast } from './ui-helpers.js';
 import { speechController } from './speech.js';
+import { registerSpeechSettingsChange } from './speech-settings.js';
 import { UNIVERSE_ROOTS } from '../core/config.js';
 import { HIERARCHY_EDGE_TYPES } from '../core/edge-types.js';
 
@@ -37,8 +38,8 @@ const PATH_HISTORY_MAX = 500;
 /** Slider drag UI — kept tabular so CSS-only fill can mirror the value live. */
 interface SliderBind {
   range: HTMLInputElement;
-  fill?: HTMLElement | null;       // optional: vertical track fill (#tour-interval-fill / depth-fill)
-  value?: HTMLElement | null;      // optional: external value label
+  fill?: HTMLElement | null; // optional: vertical track fill (#tour-interval-fill / depth-fill)
+  value?: HTMLElement | null; // optional: external value label
   /** Horizontal mirror input (desktop). paintFill syncs gradient background here. */
   mirror?: HTMLInputElement | null;
   format: (v: number) => string;
@@ -81,13 +82,18 @@ export class TourController {
     this.bindStrategyToggle();
     this.bindMobileCollapse();
     this.bindSelectionHint();
+    this.bindSpeechSettingsBridge();
     this.setIdleUI();
     // 初始化 fill（DOM 默认 value 不会触发 input 事件，需手动同步 fill）
     for (const s of this.sliders) this.paintFill(s);
   }
 
-  isRunning(): boolean { return this.running; }
-  isPaused():  boolean { return this.paused; }
+  isRunning(): boolean {
+    return this.running;
+  }
+  isPaused(): boolean {
+    return this.paused;
+  }
 
   /** 追踪期望的档位（1-5，5=全部），用于在 start() 时覆盖 DOM 滑块值 */
   private _pendingMaxDepth: number = 5;
@@ -109,23 +115,32 @@ export class TourController {
       // 过滤 BFS 后代——保证选 y2 节点后只跑体系一的节点，
       // 选 sum-neurodiversity 后只跑体系二的节点。
       universeNodeIds,
-      onStep:           (info) => this.onStep(info),
+      // ── 朗读协同 ──────────────────────────────────────────────────
+      // 把"等当前 utterance 结束再跳下一步"的开关 + post-delay + 适配器
+      // 一次性注入 engine。适配器把 SpeechController.onEnd 包装成
+      // { promise, cancel },并兜一个内部超时防止 WebView 不发 end。
+      // interval 也传进来:TTS 关闭时 adapter 要 fallback 到 "等 interval -
+      // 600ms",否则 scheduleNext 会立刻 visitNext(issue: TTS 关 → 1s 跳 20 个)。
+      waitForSpeech: speechController.currentWaitForSpeech,
+      postSpeechDelayMs: speechController.currentPostSpeechDelayMs,
+      waitForSpeechEnd: () => this.makeSpeechWait(this.currentInterval()),
+      onStep: (info) => this.onStep(info),
       // 节点一进入视野（不等动画完成）就刷详情面板——之前用 onStepAfterCenter
       // （在 cy.animate complete 回调里）会让 interval < 600ms 的快速档下，
       // 中间某些节点的动画被 cy.stop() 取消，complete 回调不触发，面板
       // 内容就停留在更早的节点上（用户报告"详情面板没跟着切换"）。
       // 修复见 tour.ts:highlightAndFocus 末尾把 onStepAfterCenter 提前到
       // !silent 分支同步触发。
-      onStepAfterCenter:(info) => {
+      onStepAfterCenter: (info) => {
         if (!uiState.panelClosedByUser) {
           this.detailPanel.show(info.nodeId);
         }
       },
       // 档位切换 / total 重算：只刷数字/进度条，不动 pathHistory/语音/detail panel
-      onProgress:       (info) => this.onProgress(info),
-      onPause:          () => this.onEnginePause(),
-      onResume:         () => this.onEngineResume(),
-      onComplete:       (reason) => this.onComplete(reason),
+      onProgress: (info) => this.onProgress(info),
+      onPause: () => this.onEnginePause(),
+      onResume: () => this.onEngineResume(),
+      onComplete: (reason) => this.onComplete(reason),
       onRootOutOfLevel: (info) => this.onRootOutOfLevel(info),
     });
     // Engine returns false when there's nothing to visit at this depth —
@@ -175,7 +190,7 @@ export class TourController {
    */
   toggle(): void {
     if (this.running || this.paused) this.stop();
-    else                             this.start();
+    else this.start();
   }
 
   stop(): void {
@@ -232,12 +247,85 @@ export class TourController {
       if (seen.has(curId)) continue;
       seen.add(curId);
       if (UNIVERSE_ROOTS.has(curId)) return curId;
-      this.cy.getElementById(curId).outgoers('edge').forEach((edge: cytoscape.EdgeSingular) => {
-        if (!HIERARCHY_EDGE_TYPES.has(edge.data('edgeType') as string)) return;
-        queue.push(edge.target().id());
-      });
+      this.cy
+        .getElementById(curId)
+        .outgoers('edge')
+        .forEach((edge: cytoscape.EdgeSingular) => {
+          if (!HIERARCHY_EDGE_TYPES.has(edge.data('edgeType') as string)) return;
+          queue.push(edge.target().id());
+        });
     }
     return null;
+  }
+
+  /**
+   * Build a fresh speech-wait handle for the engine. Called by the engine
+   * on every step when `waitForSpeech` is true.
+   *
+   * Behaviour:
+   * - If TTS is ON and a real utterance is queued, resolve when the
+   *   utterance's `end` / `error` event fires (whichever comes first).
+   * - If TTS is OFF (or no utterance yet), resolve after `interval - 600ms`
+   *   so we preserve the legacy fixed-timer pacing. Without this fallback,
+   *   scheduleNext would visit the next node immediately and the tour
+   *   would race through the graph (1s → 20 nodes) with no reading.
+   * - A safety timer (10s) fires as a last resort in case the browser
+   *   never sends any end event (the same class of bug the speech
+   *   controller's silent-check guards).
+   *
+   * `cancel()` short-circuits the promise + clears BOTH timers so a
+   * pause / stop / manual next can't trigger a stale `visitNext`.
+   *
+   * @param intervalMs The user-facing tour interval (slider value, ms).
+   *                   Used only for the TTS-off fallback pacing.
+   */
+  private makeSpeechWait(intervalMs: number): {
+    promise: Promise<void>;
+    cancel: () => void;
+  } {
+    let cancelled = false;
+    let safetyTimer: ReturnType<typeof setTimeout> | null = null;
+    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+    let resolveOnce: () => void = () => {};
+    const promise = new Promise<void>((resolve) => {
+      resolveOnce = () => {
+        if (cancelled) return;
+        cancelled = true; // single-shot: any path that fires first wins
+        if (safetyTimer !== null) {
+          clearTimeout(safetyTimer);
+          safetyTimer = null;
+        }
+        if (fallbackTimer !== null) {
+          clearTimeout(fallbackTimer);
+          fallbackTimer = null;
+        }
+        resolve();
+      };
+
+      if (speechController.isActive && speechController.isSpeaking) {
+        const unsubscribe = speechController.onEnd(resolveOnce);
+        // Adapter-level safety: if no `end`/`error` arrives within this
+        // window, fire anyway so the engine never locks.
+        safetyTimer = setTimeout(() => {
+          unsubscribe();
+          resolveOnce();
+        }, 10000);
+        return;
+      }
+
+      // TTS is off (or no utterance yet). Preserve the legacy fixed-timer
+      // pacing so a tour that started without TTS still waits `interval`
+      // ms between steps — otherwise every step takes ~0ms and the graph
+      // blurs by.
+      const fallbackMs = Math.max(0, intervalMs - 600);
+      fallbackTimer = setTimeout(resolveOnce, fallbackMs);
+    });
+    return {
+      promise,
+      cancel: () => {
+        resolveOnce();
+      },
+    };
   }
 
   /**
@@ -279,7 +367,11 @@ export class TourController {
    *        universeRootId = 该节点所属体系根（决定"这是哪部电视剧"）
    *        universeNodeIds = 该体系根的严格后代集合（跨体系隔离边界）
    */
-  private pickRoot(): { rootId: string; universeRootId: string | null; universeNodeIds: Set<string> } {
+  private pickRoot(): {
+    rootId: string;
+    universeRootId: string | null;
+    universeNodeIds: Set<string>;
+  } {
     // 注意：选中节点用 .selected-node class（不是 .node-selected，也不是 cytoscape 的 :selected）
     const sel = this.cy.nodes('.selected-node').not('.layer-parent');
     let candidateId: string;
@@ -321,17 +413,25 @@ export class TourController {
       const sorted = books.sort((a, b) => getBookPriority(a.id()) - getBookPriority(b.id()));
       return sorted[0].id();
     }
-    const structures = this.cy.nodes('[fill = "cls-structure"]').not('.layer-parent')
+    const structures = this.cy
+      .nodes('[fill = "cls-structure"]')
+      .not('.layer-parent')
       .filter((n) => !/^(sec|ch|subsec|part)-/.test(n.id()));
     if (structures.length > 0) {
       return structures[0].id();
     }
     let best: cytoscape.NodeSingular | null = null;
     let maxDeg = 0;
-    this.cy.nodes().not('.layer-parent').forEach((n) => {
-      const d = n.degree();
-      if (d > maxDeg) { maxDeg = d; best = n; }
-    });
+    this.cy
+      .nodes()
+      .not('.layer-parent')
+      .forEach((n) => {
+        const d = n.degree();
+        if (d > maxDeg) {
+          maxDeg = d;
+          best = n;
+        }
+      });
     return (best as cytoscape.NodeSingular | null)?.id() ?? '';
   }
 
@@ -373,7 +473,9 @@ export class TourController {
 
   /** Mobile compact-button shortcut: cycle between the two strategies. */
   toggleStrategy(): void {
-    const next: TourStrategy = (uiState.tour.strategy === 'has-dfs' ? 'topo-prereq' : 'has-dfs') as TourStrategy;
+    const next: TourStrategy = (
+      uiState.tour.strategy === 'has-dfs' ? 'topo-prereq' : 'has-dfs'
+    ) as TourStrategy;
     this.setStrategy(next);
   }
 
@@ -381,26 +483,45 @@ export class TourController {
 
   private bindActions(): void {
     // Action delegation — every control carries data-tour-action.
-    document.addEventListener('click', this._boundClick = (e) => {
-      const target = (e.target as HTMLElement).closest<HTMLElement>('[data-tour-action]');
-      if (!target) return;
-      const action = target.dataset['tourAction'];
-      switch (action) {
-        case 'start':       this.start();       break;
-        case 'toggle':      this.toggle();      break;
-        case 'toggle-pause': this.togglePause(); break;
-        case 'stop':        this.stop();        break;
-        case 'prev':        this.prev();        break;
-        case 'next':        this.next();        break;
-        case 'toggle-strategy': this.toggleStrategy(); break;
-        case 'toggle-speech':   speechController.toggle(); break;
-      }
-    });
+    document.addEventListener(
+      'click',
+      (this._boundClick = (e) => {
+        const target = (e.target as HTMLElement).closest<HTMLElement>('[data-tour-action]');
+        if (!target) return;
+        const action = target.dataset['tourAction'];
+        switch (action) {
+          case 'start':
+            this.start();
+            break;
+          case 'toggle':
+            this.toggle();
+            break;
+          case 'toggle-pause':
+            this.togglePause();
+            break;
+          case 'stop':
+            this.stop();
+            break;
+          case 'prev':
+            this.prev();
+            break;
+          case 'next':
+            this.next();
+            break;
+          case 'toggle-strategy':
+            this.toggleStrategy();
+            break;
+          case 'toggle-speech':
+            speechController.toggle();
+            break;
+        }
+      }),
+    );
 
     // Keyboard shortcuts for the active tour. Bound on document so the
     // shortcut works regardless of where focus lives, with the standard
     // "skip if the user is typing" guard.
-    document.addEventListener('keydown', this._boundKeydown = (e) => this.onTourKey(e));
+    document.addEventListener('keydown', (this._boundKeydown = (e) => this.onTourKey(e)));
   }
 
   /** Tear down the controller: remove document listeners and stop the tour.
@@ -464,19 +585,22 @@ export class TourController {
   private bindSliders(): void {
     // Desktop sliders mirror the mobile slider's value via bindSlider()
     const desktopInterval = document.getElementById('tour-interval-dt') as HTMLInputElement | null;
-    const desktopDepth    = document.getElementById('tour-maxdepth-dt')  as HTMLInputElement | null;
+    const desktopDepth = document.getElementById('tour-maxdepth-dt') as HTMLInputElement | null;
 
     // Bind mobile interval slider + its desktop mirror
     const mobileInterval = document.getElementById('tour-interval') as HTMLInputElement | null;
     if (mobileInterval) {
-      this.sliders.push(this.bindSlider(
-        mobileInterval, desktopInterval,
-        document.getElementById(mobileInterval.id + '-fill'),
-        document.getElementById(mobileInterval.id + '-val'),
-        document.getElementById('tour-interval-val-dt'),
-        (v) => Math.round(v / 1000) + 's',
-        (v) => this.engine?.setInterval(v),
-      ));
+      this.sliders.push(
+        this.bindSlider(
+          mobileInterval,
+          desktopInterval,
+          document.getElementById(mobileInterval.id + '-fill'),
+          document.getElementById(mobileInterval.id + '-val'),
+          document.getElementById('tour-interval-val-dt'),
+          (v) => Math.round(v / 1000) + 's',
+          (v) => this.engine?.setInterval(v),
+        ),
+      );
       // 阻止 touchmove 冒泡，防止父容器（tour-mob__inner）把它当作滚动处理
       mobileInterval.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: true });
     }
@@ -484,24 +608,27 @@ export class TourController {
     // Bind mobile depth slider + its desktop mirror
     const mobileDepth = document.getElementById('tour-maxdepth') as HTMLInputElement | null;
     if (mobileDepth) {
-      this.sliders.push(this.bindSlider(
-        mobileDepth, desktopDepth,
-        document.getElementById(mobileDepth.id + '-fill'),
-        document.getElementById('tour-depth-val'),
-        document.getElementById('tour-depth-val-dt'),
-        (v) => v >= 5 ? '\u221e' : TOUR_DEPTH_CONFIG.getLabel(v),
-        (v) => {
-          // 同时更新追踪状态和 DOM 滑块值，确保下次 start() 时使用正确的值
-          this._pendingMaxDepth = v;
-          // 同步更新 DOM 滑块
-          const depthSlider = this.findSlider('maxdepth');
-          if (depthSlider) {
-            depthSlider.range.value = String(v);
-            this.paintFill(depthSlider);
-          }
-          this.engine?.setMaxDepth(v);
-        },
-      ));
+      this.sliders.push(
+        this.bindSlider(
+          mobileDepth,
+          desktopDepth,
+          document.getElementById(mobileDepth.id + '-fill'),
+          document.getElementById('tour-depth-val'),
+          document.getElementById('tour-depth-val-dt'),
+          (v) => (v >= 5 ? '\u221e' : TOUR_DEPTH_CONFIG.getLabel(v)),
+          (v) => {
+            // 同时更新追踪状态和 DOM 滑块值，确保下次 start() 时使用正确的值
+            this._pendingMaxDepth = v;
+            // 同步更新 DOM 滑块
+            const depthSlider = this.findSlider('maxdepth');
+            if (depthSlider) {
+              depthSlider.range.value = String(v);
+              this.paintFill(depthSlider);
+            }
+            this.engine?.setMaxDepth(v);
+          },
+        ),
+      );
       mobileDepth.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: true });
     }
 
@@ -517,8 +644,8 @@ export class TourController {
    *  - Idle 时 listener 不响应（CSS pointer-events: none 已禁掉事件，这里再做兜底）
    *  - 策略切换时由调用方负责把两个 input value 重置为 0 */
   private bindProgress(): void {
-    const mob   = document.getElementById('tour-progress')    as HTMLInputElement | null;
-    const dt    = document.getElementById('tour-progress-dt') as HTMLInputElement | null;
+    const mob = document.getElementById('tour-progress') as HTMLInputElement | null;
+    const dt = document.getElementById('tour-progress-dt') as HTMLInputElement | null;
     if (!mob || !dt) return;
 
     const onChange = (src: HTMLInputElement, other: HTMLInputElement) => {
@@ -549,20 +676,20 @@ export class TourController {
       if (fillMob) fillMob.style.transform = `translateX(-50%) scaleY(${pct})`;
     };
 
-    mob.addEventListener('input',  () => onInput(mob, dt));
+    mob.addEventListener('input', () => onInput(mob, dt));
     mob.addEventListener('change', () => onChange(mob, dt));
-    dt.addEventListener('input',   () => onInput(dt, mob));
-    dt.addEventListener('change',  () => onChange(dt, mob));
+    dt.addEventListener('input', () => onInput(dt, mob));
+    dt.addEventListener('change', () => onChange(dt, mob));
   }
 
   /** 策略切换后重置进度条为 0%（fill 缩到 0，value 清零，镜像同步）。
    *  由策略切换的处理逻辑调用。 */
   private resetProgress(): void {
-    const mob = document.getElementById('tour-progress')    as HTMLInputElement | null;
-    const dt  = document.getElementById('tour-progress-dt') as HTMLInputElement | null;
-    const fillMob  = document.getElementById('tour-progress-fill');
+    const mob = document.getElementById('tour-progress') as HTMLInputElement | null;
+    const dt = document.getElementById('tour-progress-dt') as HTMLInputElement | null;
+    const fillMob = document.getElementById('tour-progress-fill');
     if (mob) mob.value = '0';
-    if (dt)  dt.value  = '0';
+    if (dt) dt.value = '0';
     // 移动端 fill 是 vertical-lr：必须保留 translateX(-50%) 居中
     if (fillMob) fillMob.style.transform = 'translateX(-50%) scaleY(0)';
   }
@@ -644,8 +771,9 @@ export class TourController {
   }
 
   private paintFill(s: SliderBind): void {
-    const min = Number(s.range.min), max = Number(s.range.max);
-    const pct = ((s.range.valueAsNumber - min) / (max - min));
+    const min = Number(s.range.min),
+      max = Number(s.range.max);
+    const pct = (s.range.valueAsNumber - min) / (max - min);
     if (s.fill) {
       // Vertical track (mobile) — 原生 <input type="range"> 的 thumb 圆心
       // 实际行程是 [thumbR, containerH - thumbR]（不是 [0, containerH]），
@@ -653,7 +781,7 @@ export class TourController {
       // 修正：把 pct 映射到 thumb 圆心的实际行程上，让 fill 顶端 = thumb 圆心。
       const container = s.fill.parentElement as HTMLElement | null;
       const trackLen = container?.clientHeight || 80;
-      const thumbSize = 18;        // 必须与 ::-webkit-slider-thumb 的 width/height 一致
+      const thumbSize = 18; // 必须与 ::-webkit-slider-thumb 的 width/height 一致
       const thumbR = thumbSize / 2;
       const travel = Math.max(0, trackLen - thumbSize);
       const centerFromBottom = thumbR + pct * travel;
@@ -700,7 +828,9 @@ export class TourController {
     el.classList.remove('strategy-switched');
     void el.offsetWidth; // force reflow to restart the animation
     el.classList.add('strategy-switched');
-    el.addEventListener('animationend', () => el.classList.remove('strategy-switched'), { once: true });
+    el.addEventListener('animationend', () => el.classList.remove('strategy-switched'), {
+      once: true,
+    });
   }
 
   private bindMobileCollapse(): void {
@@ -728,7 +858,8 @@ export class TourController {
       // aria-expanded.
       ariaPressed: false,
       ariaExpanded: true,
-      applyTo: (bar && chev ? [bar, chev as unknown as HTMLElement] : (bar ?? chev ?? handle)) as HTMLElement | HTMLElement[],
+      applyTo: (bar && chev ? [bar, chev as unknown as HTMLElement] : (bar ?? chev ?? handle)) as
+        HTMLElement | HTMLElement[],
     });
     registerTourBarToggle(this.barToggle);
     handle.addEventListener('click', (e) => {
@@ -771,8 +902,12 @@ export class TourController {
     this.updateStartHint();
 
     // 监听 cytoscape 的 select/unselect 事件（highlightNode 会调用 node.select()）
-    this.cy.on('select', 'node', () => { this.scheduleStartHint(); });
-    this.cy.on('unselect', 'node', () => { this.scheduleStartHint(); });
+    this.cy.on('select', 'node', () => {
+      this.scheduleStartHint();
+    });
+    this.cy.on('unselect', 'node', () => {
+      this.scheduleStartHint();
+    });
 
     // 原来这里还有一个 cy.on('class', 'node', ...)。Cytoscape 的 `class`
     // 事件不区分是哪个 class 变了，所以 dimmed / highlighted / hovered /
@@ -780,6 +915,33 @@ export class TourController {
     // 而真正会改变 hint 状态的只有 .selected-node，它由 highlightNode()
     // 设置，之后 graph-events 会显式调用 refreshStartHintFromHighlight()。
     // 所以这个监听器是纯冗余，删除。
+  }
+
+  /**
+   * Wire the speech-settings panel's change events to the running engine.
+   * The panel calls `fireChange()` on every user interaction; we route
+   * each kind into the matching engine setter. The setter immediately
+   * reschedules the next step, so mid-tour changes take effect on the
+   * current step rather than waiting for the next one.
+   */
+  private bindSpeechSettingsBridge(): void {
+    registerSpeechSettingsChange((kind, value) => {
+      const engine = this.engine;
+      if (!engine) return;
+      if (kind === 'rate') {
+        // Rate is a speech-controller concern; controller has already
+        // pushed it through to its `speak()` calls, nothing engine-side.
+        return;
+      }
+      if (kind === 'waitForSpeech') {
+        engine.setWaitForSpeech(Boolean(value));
+        return;
+      }
+      if (kind === 'postSpeechDelayMs') {
+        engine.setPostSpeechDelayMs(Number(value));
+        return;
+      }
+    });
   }
 
   /**
@@ -823,20 +985,26 @@ export class TourController {
     const ph = uiState.tour.pathHistory;
     const prev = info.path.slice(0, -1);
     if (prev.length > 0) ph.push(prev[prev.length - 1], info.nodeId);
-    else                 ph.push(info.nodeId);
+    else ph.push(info.nodeId);
     if (ph.length > PATH_HISTORY_MAX) ph.splice(0, ph.length - PATH_HISTORY_MAX);
 
     // 节点 badge = 已访问节点 / 档位总节点（X/Y 格式）
     const nodeBadge = `${info.currentStep}/${info.totalToExplore}`;
-    this.setText('tour-cycle-num',         String(info.cycleCount + 1));
+    this.setText('tour-cycle-num', String(info.cycleCount + 1));
     // Desktop bars
-    this.setText('tour-cycle-num-dt',       String(info.cycleCount + 1));
-    this.setText('tour-dt-node-name',       this.labelOf(info.nodeId) || info.nodeId);
-    // 朗读当前节点名（用户开启后每步自动读）
-    speechController.speak(this.labelOf(info.nodeId) || info.nodeId);
+    this.setText('tour-cycle-num-dt', String(info.cycleCount + 1));
+    this.setText('tour-dt-node-name', this.labelOf(info.nodeId) || info.nodeId);
+    // 朗读当前节点名（用户开启后每步自动读）。粒度由用户在高级设置里决定。
+    const node = this.cy.getElementById(info.nodeId);
+    if (!node.empty()) {
+      const data = node.data() as Parameters<typeof speechController.speakNode>[0];
+      speechController.speakNode(data);
+    } else {
+      speechController.speak(info.nodeId);
+    }
     // 进度：current step / total steps in the sequence
     const total = this.engine?.totalSteps() ?? info.totalToExplore;
-    const step  = this.engine?.currentStepIndex() ?? info.currentStep;
+    const step = this.engine?.currentStepIndex() ?? info.currentStep;
     this.renderTimeline(step, total, info.totalVisited);
   }
 
@@ -844,10 +1012,10 @@ export class TourController {
    *  只同步数字/进度条/range value，避免触发 600ms 飞行动画或重复朗读。 */
   private onProgress(info: TourStepInfo): void {
     const total = this.engine?.totalSteps() ?? info.totalToExplore;
-    const step  = this.engine?.currentStepIndex() ?? info.currentStep;
+    const step = this.engine?.currentStepIndex() ?? info.currentStep;
     this.renderTimeline(step, total, info.totalVisited);
     // 节点 badge / 节点名 / 轮次也跟 onStep 同步——切档后这些数字变了，必须刷。
-    this.setText('tour-cycle-num',   String(info.cycleCount + 1));
+    this.setText('tour-cycle-num', String(info.cycleCount + 1));
     this.setText('tour-cycle-num-dt', String(info.cycleCount + 1));
     // 节点名保持不变（仍是 pulsingNode）；这里不重设，避免触发无意义 DOM 写。
   }
@@ -869,8 +1037,8 @@ export class TourController {
     this.setText('tour-count-badge-num', String(current));
     this.setText('tour-count-badge-den', String(total));
     // 桌面端/手机端"步" badge = 跨轮累计的漫游节点总数（不再每轮归零）
-    this.setText('tour-step-badge-dt',      String(cumulative));
-    this.setText('tour-step-badge-mob',     String(cumulative));
+    this.setText('tour-step-badge-dt', String(cumulative));
+    this.setText('tour-step-badge-mob', String(cumulative));
 
     // 手机端 fill：vertical-lr 模式 translateX(-50%) scaleY(0~1)
     const fillMob = document.getElementById('tour-progress-fill');
@@ -883,7 +1051,7 @@ export class TourController {
     if (dt) this.paintHorizontalFill(dt, pct);
     // 进度条 range value：0-100，由 change 监听反推 seqIdx
     const rangeVal = Math.round(pct * 100);
-    this.setProgressRange('tour-progress',    rangeVal);
+    this.setProgressRange('tour-progress', rangeVal);
     this.setProgressRange('tour-progress-dt', rangeVal);
   }
 
@@ -915,14 +1083,15 @@ export class TourController {
    * toast so the user understands why their tour suddenly covers everything
    * instead of stopping instantly.
    */
-  private onRootOutOfLevel(info: { rootId: string; requestedLevel: number; upgradedLevel: number }): void {
+  private onRootOutOfLevel(info: {
+    rootId: string;
+    requestedLevel: number;
+    upgradedLevel: number;
+  }): void {
     const depthLabels = ['', '结构', '概览', '复习', '口诀', '全面'];
     const requested = depthLabels[info.requestedLevel] ?? `L${info.requestedLevel}`;
     const upgraded = depthLabels[info.upgradedLevel] ?? `L${info.upgradedLevel}`;
-    showToast(
-      `所选节点不在【${requested}】档位内，已自动切换到【${upgraded}】漫游`,
-      'info',
-    );
+    showToast(`所选节点不在【${requested}】档位内，已自动切换到【${upgraded}】漫游`, 'info');
     this.announceStatus(`深度档位已自动从 ${requested} 升到 ${upgraded}`);
     // Sync the slider DOM so the user sees the new value. The engine already
     // updated internally; this keeps the UI consistent.
@@ -935,7 +1104,15 @@ export class TourController {
   }
 
   private onComplete(
-    info: { reason: 'depth-reached' | 'no-more-restarts' | 'no-root'; maxAttempts: number; attempts?: number } | 'depth-reached' | 'no-more-restarts' | 'no-root',
+    info:
+      | {
+          reason: 'depth-reached' | 'no-more-restarts' | 'no-root';
+          maxAttempts: number;
+          attempts?: number;
+        }
+      | 'depth-reached'
+      | 'no-more-restarts'
+      | 'no-root',
   ): void {
     this.running = false;
     this.paused = false;
@@ -956,13 +1133,13 @@ export class TourController {
     const badge = exhausted ? '⏹' : '\u2713';
     const nameLabel = exhausted ? '已停止' : '完成';
 
-    this.setText('tour-count-badge-num',   '—');
-    this.setText('tour-count-badge-den',   '—');
-    this.setText('tour-dt-node-name',      nameLabel);
+    this.setText('tour-count-badge-num', '—');
+    this.setText('tour-count-badge-den', '—');
+    this.setText('tour-dt-node-name', nameLabel);
     // 桌面端进度横向分数 idle 时也置 "—"，跟其他 stat 保持一致。
     this.setText('tour-progress-label-dt', '—');
-    this.setText('tour-step-badge-dt',     '—');
-    this.setText('tour-step-badge-mob',    '—');
+    this.setText('tour-step-badge-dt', '—');
+    this.setText('tour-step-badge-mob', '—');
 
     // If the tour exhausted itself, surface a title so the bar reads
     // "已停止 · 已试 N 轮" instead of just "已停止". Use the engine's
@@ -970,17 +1147,13 @@ export class TourController {
     // A 方案：maxAttempts 为 Infinity 时显示 "∞"，不再硬编码 3。
     if (exhausted) {
       const label = `已停止 · 已试 ${maxAttemptsLabel} 轮`;
-      this.setText('tour-dt-node-name',   label);
+      this.setText('tour-dt-node-name', label);
     }
 
     // Issue #29: announce terminal tour state to screen readers. This
     // is the only tour event that should reach AT — per-step updates
     // would be too noisy.
-    this.announceStatus(
-      exhausted
-        ? `漫游已停止 · 已试 ${maxAttemptsLabel} 轮`
-        : '漫游已完成',
-    );
+    this.announceStatus(exhausted ? `漫游已停止 · 已试 ${maxAttemptsLabel} 轮` : '漫游已完成');
 
     this.setIdleUI();
   }
@@ -1052,6 +1225,6 @@ export class TourController {
 
   private labelOf(nodeId: string): string {
     const node = this.cy.getElementById(nodeId);
-    return node.empty() ? nodeId : (node.data('label') || nodeId);
+    return node.empty() ? nodeId : node.data('label') || nodeId;
   }
 }

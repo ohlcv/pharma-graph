@@ -33,7 +33,13 @@ export const TOUR_DEPTH_CONFIG = {
       level: 4,
       label: '口诀',
       description: '加入记忆内容',
-      includes: ['cls-structure', 'cls-classification', 'cls-drug-key', 'cls-summary', 'cls-mnemonic'],
+      includes: [
+        'cls-structure',
+        'cls-classification',
+        'cls-drug-key',
+        'cls-summary',
+        'cls-mnemonic',
+      ],
     },
     {
       level: 5,
@@ -75,7 +81,9 @@ export function isNodeInLevel(node: cytoscape.NodeSingular, level: number): bool
 
   // 档位 4 = structure + classification + 重点药 + summary + mnemonic
   if (level >= 4) {
-    return ['cls-structure', 'cls-classification', 'cls-summary', 'cls-mnemonic'].includes(fill) || isKey;
+    return (
+      ['cls-structure', 'cls-classification', 'cls-summary', 'cls-mnemonic'].includes(fill) || isKey
+    );
   }
 
   // 档位 3 = structure + classification + 重点药（跳过普通药）
@@ -123,6 +131,34 @@ export interface TourOptions {
   onStep?: (info: TourStepInfo) => void;
   /** Called after the pan animation completes */
   onStepAfterCenter?: (info: TourStepInfo) => void;
+  /**
+   * Wait for the current utterance to end before scheduling the next
+   * step, plus `postSpeechDelayMs` of settle time. When `waitForSpeech`
+   * is true the engine treats `interval` as a MINIMUM step gap (per the
+   * design decision: short texts still wait the configured interval,
+   * long texts wait as long as they need to, but never longer than
+   * SPEECH_WAIT_TIMEOUT_MS as an absolute safety cap).
+   *
+   * When false, the legacy behavior holds: a fixed-duration setTimeout
+   * equal to `interval - 600ms` decides the next step.
+   */
+  waitForSpeech?: boolean;
+  /** Extra settle time (ms) inserted after the speech end signal fires. */
+  postSpeechDelayMs?: number;
+  /**
+   * Wait-for-speech adapter. Called on every step when `waitForSpeech`
+   * is true. The returned `promise` resolves when the current speech
+   * utterance ends naturally, errors out, or the adapter's internal
+   * safety timer fires — whichever first. The returned `cancel` MUST
+   * short-circuit the adapter immediately (so a pause / stop / manual
+   * advance can't be followed by a stale `visitNext`).
+   *
+   * Injected by the UI layer (tour-controller), so the core engine
+   * stays free of any dependency on the speech module. A missing
+   * adapter falls back to legacy fixed-timer scheduling. Tests can pass
+   * a deterministic stub.
+   */
+  waitForSpeechEnd?: () => { promise: Promise<void>; cancel: () => void };
   /** Called when progress metadata changes WITHOUT a real step (e.g. depth
    *  slider change). Receives the same TourStepInfo but the controller must
    *  treat it as "数字/进度条刷新" only — do NOT push to history, speak,
@@ -238,7 +274,11 @@ export interface StrategyHooks {
    * 返回 false 表示该策略一次性跑完即可（如 topo-prereq 拓扑序，
    * 第二次遍历和第一次完全一样，循环没意义）。
    */
-  shouldRestart?: (ctx: { attemptCount: number; maxAttempts: number; cy: cytoscape.Core }) => boolean;
+  shouldRestart?: (ctx: {
+    attemptCount: number;
+    maxAttempts: number;
+    cy: cytoscape.Core;
+  }) => boolean;
 }
 
 const _strategies: TourStrategyDef[] = [];
@@ -295,14 +335,16 @@ export const asStrategy = (id: string): TourStrategy => id as TourStrategy;
  * @param seen  已访问 / 已加入主序列的 id 集合（按引用读，不写）
  */
 function buildLocationFallbackSeq(cy: cytoscape.Core, seen: ReadonlySet<string>): string[] {
-  return cy.nodes().not('.layer-parent')
+  return cy
+    .nodes()
+    .not('.layer-parent')
     .toArray()
     .sort((a, b) => {
       // 无 book 的孤儿节点（完全无 location）排序到末尾，不应排在有定位的节点之前。
       // 空字符串 < '\x00' < 'y2'（字符集序），所以必须显式判断 book 而非依赖 key 比较。
       const aBook = getLocationBook(a as cytoscape.NodeSingular);
       const bBook = getLocationBook(b as cytoscape.NodeSingular);
-      if (!aBook && bBook) return  1; // a 无定位，b 有 → a 排后面
+      if (!aBook && bBook) return 1; // a 无定位，b 有 → a 排后面
       if (!bBook && aBook) return -1; // b 无定位，a 有 → b 排后面
       if (!aBook && !bBook) {
         // 两个都是孤儿，按 label 排序保持稳定
@@ -341,10 +383,10 @@ function insertOrphansNearAncestors(
   seen: ReadonlySet<string>,
 ): void {
   const getLocationPrefix = (node: cytoscape.NodeSingular): string => {
-    const book       = getLocationBook(node);
-    const chapter    = getLocationChapter(node);
-    const part       = getLocationPart(node);
-    const section    = getLocationSection(node);
+    const book = getLocationBook(node);
+    const chapter = getLocationChapter(node);
+    const part = getLocationPart(node);
+    const section = getLocationSection(node);
     const subsection = getLocationSubsection(node);
 
     let chapterNum: string;
@@ -355,11 +397,13 @@ function insertOrphansNearAncestors(
     } else {
       chapterNum = '000';
     }
-    const sectionNum    = section    ? extractSectionNumber(section).toString().padStart(3, '0')    : '';
-    const subsectionNum = subsection ? extractSectionNumber(subsection).toString().padStart(3, '0') : '';
+    const sectionNum = section ? extractSectionNumber(section).toString().padStart(3, '0') : '';
+    const subsectionNum = subsection
+      ? extractSectionNumber(subsection).toString().padStart(3, '0')
+      : '';
 
     let key = book + '\x00' + chapterNum;
-    if (sectionNum)    key += '\x00' + sectionNum;
+    if (sectionNum) key += '\x00' + sectionNum;
     if (subsectionNum) key += '\x00' + subsectionNum;
     return key;
   };
@@ -385,7 +429,7 @@ function insertOrphansNearAncestors(
     let ancestorPos = -1;
     for (let i = 0; i < seq.length; i++) {
       const seqNode = cy.getElementById(seq[i]);
-      const seqKey  = getLocationKey(seqNode);
+      const seqKey = getLocationKey(seqNode);
       if (seqKey.startsWith(uPrefix + '\x00') || seqKey === uPrefix) {
         ancestorPos = i;
         break;
@@ -460,6 +504,21 @@ const INFINITE_DEPTH = -1;
 /** 安全循环上限，防止无限循环 */
 const LOOP_SAFETY_LIMIT = 20000;
 
+/**
+ * Absolute upper bound (ms) for how long the engine will wait for speech
+ * to end before giving up and advancing anyway. Defends against WebViews
+ * whose `onend` never fires (the same class of bug the silent-check timer
+ * already guards against) and against any case where the speech adapter
+ * itself hangs. The value is generous enough to cover a 200-character
+ * utterance at the slowest supported rate (~30s) and still leaves room
+ * for the post-speech pause below it.
+ */
+const SPEECH_WAIT_TIMEOUT_MS = 30000;
+
+/** Total animation time (pan + pulse) the scheduler subtracts from the
+ *  user-facing interval so "next step" fires as the animation finishes. */
+const ANIMATION_BUDGET_MS = 600;
+
 /** previewSequence 控制台输出截断：保留前 N 行 */
 const PREVIEW_HEAD_LINES = 20;
 /** previewSequence 控制台输出截断：保留后 N 行 */
@@ -501,7 +560,9 @@ function strategyAllowsRestart(
   attemptCount: number,
   cy: cytoscape.Core,
 ): boolean {
-  return strategy.hooks?.shouldRestart?.({ attemptCount, maxAttempts: MAX_RESTART_ATTEMPTS, cy }) ?? true;
+  return (
+    strategy.hooks?.shouldRestart?.({ attemptCount, maxAttempts: MAX_RESTART_ATTEMPTS, cy }) ?? true
+  );
 }
 
 function shuffleInPlace<T>(arr: T[]): void {
@@ -514,23 +575,31 @@ function shuffleInPlace<T>(arr: T[]): void {
 function getLocationField(node: cytoscape.NodeSingular, field: string): string {
   const loc = node.data('location');
   if (typeof loc === 'object' && loc !== null) {
-    return (loc as Record<string, unknown>)[field] as string ?? '';
+    return ((loc as Record<string, unknown>)[field] as string) ?? '';
   }
   return '';
 }
 
 // 便捷包装器，保持 API 兼容性
-const getLocationBook      = (n: cytoscape.NodeSingular) => getLocationField(n, 'book');
-const getLocationChapter   = (n: cytoscape.NodeSingular) => getLocationField(n, 'chapter');
-const getLocationPart      = (n: cytoscape.NodeSingular) => getLocationField(n, 'part');
-const getLocationSection   = (n: cytoscape.NodeSingular) => getLocationField(n, 'section');
-const getLocationSubsection= (n: cytoscape.NodeSingular) => getLocationField(n, 'subsection');
-const getLocationItem      = (n: cytoscape.NodeSingular) => getLocationField(n, 'item');
+const getLocationBook = (n: cytoscape.NodeSingular) => getLocationField(n, 'book');
+const getLocationChapter = (n: cytoscape.NodeSingular) => getLocationField(n, 'chapter');
+const getLocationPart = (n: cytoscape.NodeSingular) => getLocationField(n, 'part');
+const getLocationSection = (n: cytoscape.NodeSingular) => getLocationField(n, 'section');
+const getLocationSubsection = (n: cytoscape.NodeSingular) => getLocationField(n, 'subsection');
+const getLocationItem = (n: cytoscape.NodeSingular) => getLocationField(n, 'item');
 
 // 汉字数字转阿拉伯数字
 const CN_DIGIT_MAP: Record<string, number> = {
-  '零': 0, '一': 1, '二': 2, '三': 3, '四': 4,
-  '五': 5, '六': 6, '七': 7, '八': 8, '九': 9,
+  零: 0,
+  一: 1,
+  二: 2,
+  三: 3,
+  四: 4,
+  五: 5,
+  六: 6,
+  七: 7,
+  八: 8,
+  九: 9,
 };
 
 // 从"第X节"/"第X章"/"第X篇"格式中提取数字，支持阿拉伯数字和汉字（含十、百）
@@ -573,13 +642,13 @@ export function extractSectionNumber(section: string): number {
 // Full location sort key: book > part/chapter > section > subsection > item
 // book级总入口（无chapter也无part）用 chapterNum='000'，排在该 book 的最前面。
 export function getLocationKey(node: cytoscape.NodeSingular): string {
-  const book       = getLocationBook(node);
-  const chapter    = getLocationChapter(node);
-  const part       = getLocationPart(node);
-  const section    = getLocationSection(node);
+  const book = getLocationBook(node);
+  const chapter = getLocationChapter(node);
+  const part = getLocationPart(node);
+  const section = getLocationSection(node);
   const subsection = getLocationSubsection(node);
-  const item       = getLocationItem(node);
-  const label      = node.data('label') ?? node.id();
+  const item = getLocationItem(node);
+  const label = node.data('label') ?? node.id();
 
   // chapter 优先，无 chapter 则用 part，两者都无则为书级入口排最前
   let chapterNum: string;
@@ -592,14 +661,26 @@ export function getLocationKey(node: cytoscape.NodeSingular): string {
   }
 
   // 层级缺失时用 '000'，保证入口节点（section/subsection 均空）排在子节点前面
-  const sectionNum    = section    ? extractSectionNumber(section).toString().padStart(3, '0')    : '000';
-  const subsectionNum = subsection ? extractSectionNumber(subsection).toString().padStart(3, '0') : '000';
+  const sectionNum = section ? extractSectionNumber(section).toString().padStart(3, '0') : '000';
+  const subsectionNum = subsection
+    ? extractSectionNumber(subsection).toString().padStart(3, '0')
+    : '000';
 
   // item 不含序号格式，直接用原文做 tiebreaker；label 兜底
-  return book + '\x00' + chapterNum + '\x00' + sectionNum + '\x00' + subsectionNum + '\x00' + item + '\x00' + label;
+  return (
+    book +
+    '\x00' +
+    chapterNum +
+    '\x00' +
+    sectionNum +
+    '\x00' +
+    subsectionNum +
+    '\x00' +
+    item +
+    '\x00' +
+    label
+  );
 }
-
-
 
 // ── E1: 教材顺序（按 location 全局排序）────────────────────────────────────────
 //
@@ -613,7 +694,16 @@ registerStrategy({
   buildSequence(cy) {
     // 书籍优先级：y2(药二)→y3(药综)→y1(药一)→y4(法规)
     // key 兼容正则捕获的 'y2'/'2' 两种格式
-    const BOOK_ORDER: Record<string, number> = { 'y2': 0, '2': 0, 'y3': 1, '3': 1, 'y1': 2, '1': 2, 'y4': 3, '4': 3 };
+    const BOOK_ORDER: Record<string, number> = {
+      y2: 0,
+      '2': 0,
+      y3: 1,
+      '3': 1,
+      y1: 2,
+      '1': 2,
+      y4: 3,
+      '4': 3,
+    };
     // bookOrder: 兼容 book-y4（末尾无 dash）和 sec-gcs-y2-08-02（末尾有 dash）
     const getBookOrder = (node: cytoscape.NodeSingular): number => {
       const id = node.id();
@@ -661,7 +751,8 @@ registerStrategy({
     }
     for (const [, arr] of children) {
       arr.sort((a, b) => {
-        const la = getLocationKey(a), lb = getLocationKey(b);
+        const la = getLocationKey(a),
+          lb = getLocationKey(b);
         return la < lb ? -1 : la > lb ? 1 : 0;
       });
     }
@@ -719,7 +810,8 @@ registerStrategy({
         }
         // 其他所有类型（非 FILL_VISIT_ORDER 中列出的新 fill 值）
         for (const k of (children.get(parentId) ?? []).filter(
-          (k) => !FILL_VISIT_ORDER.includes((k.data('fill') ?? '') as typeof FILL_VISIT_ORDER[number]),
+          (k) =>
+            !FILL_VISIT_ORDER.includes((k.data('fill') ?? '') as (typeof FILL_VISIT_ORDER)[number]),
         )) {
           if (!visited.has(k.id())) {
             visited.add(k.id());
@@ -738,9 +830,11 @@ registerStrategy({
     //    —— 之前有一个 collectTree 死循环调用（line 660-664）已被删除：它不写 result、
     //    不查 visited，纯浪费栈空间；一旦 children 有环就直接 RangeError: stack overflow。
     const sortedStructures = allStructures.sort((a, b) => {
-      const ba = getBookOrder(a), bb = getBookOrder(b);
+      const ba = getBookOrder(a),
+        bb = getBookOrder(b);
       if (ba !== bb) return ba - bb;
-      const la = getLocationKey(a), lb = getLocationKey(b);
+      const la = getLocationKey(a),
+        lb = getLocationKey(b);
       return la < lb ? -1 : la > lb ? 1 : 0;
     });
 
@@ -819,7 +913,9 @@ registerStrategy({
     nodes.toArray().forEach((n) => inDegree.set(n.id(), (prereqIn.get(n.id()) ?? []).length));
 
     const noPrereq: string[] = [];
-    inDegree.forEach((deg, id) => { if (deg === 0) noPrereq.push(id); });
+    inDegree.forEach((deg, id) => {
+      if (deg === 0) noPrereq.push(id);
+    });
 
     // FILL_VISIT_ORDER 已在模块顶部统一定义；这里直接读索引避免重复声明
     const getFillOrder = (id: string): number =>
@@ -827,7 +923,8 @@ registerStrategy({
 
     // 比较函数：先按 fill，再按 location
     const nodeCompare = (a: string, b: string): number => {
-      const ta = getFillOrder(a), tb = getFillOrder(b);
+      const ta = getFillOrder(a),
+        tb = getFillOrder(b);
       if (ta !== tb) return ta - tb;
       const la = getLocationKey(cy.getElementById(a));
       const lb = getLocationKey(cy.getElementById(b));
@@ -848,7 +945,9 @@ registerStrategy({
           let inserted = false;
           for (let i = 0; i < noPrereq.length; i++) {
             if (nodeCompare(dep, noPrereq[i]) < 0) {
-              noPrereq.splice(i, 0, dep); inserted = true; break;
+              noPrereq.splice(i, 0, dep);
+              inserted = true;
+              break;
             }
           }
           if (!inserted) noPrereq.push(dep);
@@ -881,6 +980,17 @@ export class TourEngine {
   /** 内容档位：1-5，决定漫游时过滤哪些 fill 类型。独立于 maxDepth（步数限制）。 */
   private _depthLevel = 5;
   private timer: ReturnType<typeof setTimeout> | undefined = undefined;
+  /** Tracks an active speech-end Promise so we can cancel its timer when
+   *  the engine is paused / stopped / manually advanced (otherwise a
+   *  late `onend` could fire `visitNext()` on an already-stopped tour). */
+  private speechWaitCancel: (() => void) | null = null;
+  /** When true, scheduleNext awaits `waitForSpeechEnd()` instead of
+   *  relying on a fixed setTimeout. See TourOptions.waitForSpeech. */
+  private waitForSpeech = false;
+  /** Extra settle ms after `waitForSpeechEnd()` resolves. */
+  private postSpeechDelayMs = 0;
+  /** Adapter that returns a promise + cancel for the current utterance. */
+  private waitForSpeechEnd: (() => { promise: Promise<void>; cancel: () => void }) | null = null;
   private paused = false;
   private stopped = false;
   private onStep?: TourOptions['onStep'];
@@ -969,6 +1079,9 @@ export class TourEngine {
     const level = options.maxDepth ?? INFINITE_DEPTH;
     this._depthLevel = level <= 0 ? 5 : level;
     this.maxDepth = -1; // 始终无限
+    this.waitForSpeech = options.waitForSpeech ?? false;
+    this.postSpeechDelayMs = options.postSpeechDelayMs ?? 0;
+    this.waitForSpeechEnd = options.waitForSpeechEnd ?? null;
     // Guard against an empty graph or a bad rootId (e.g. the pickRoot
     // fallback returning '' when no candidate node exists). Without
     // this, every subsequent cy.getElementById(rootId) would silently
@@ -1087,7 +1200,10 @@ export class TourEngine {
   /** Advance to next node in sequence (for manual prev/next) */
   next(): void {
     if (this.stopped) return;
-    if (this.timer) { clearTimeout(this.timer); this.timer = undefined; }
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = undefined;
+    }
     // Mark as paused so the animate-complete callback does NOT auto-schedule
     // the next step. Emit onPause unconditionally so the controller's
     // play/pause icon stays in sync across consecutive prev/next calls; the
@@ -1105,7 +1221,10 @@ export class TourEngine {
    *  recent visits even mid-cycle. */
   prev(): void {
     if (this.stopped) return;
-    if (this.timer) { clearTimeout(this.timer); this.timer = undefined; }
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = undefined;
+    }
     if (this._visited.length <= 1) return; // can't go before start node
     // Pop the current node, then visit the previous one (the new top).
     const target = this._visited[this._visited.length - 2];
@@ -1119,7 +1238,14 @@ export class TourEngine {
     this.seqIndex = Math.max(0, this.seqIndex - 1);
     this.currentStep = Math.max(0, this.currentStep - 1);
     this.paused = true;
-    this.highlightAndFocus(target, [target], 0, this.totalSteps(), this.seqIndex, /* silent */ false);
+    this.highlightAndFocus(
+      target,
+      [target],
+      0,
+      this.totalSteps(),
+      this.seqIndex,
+      /* silent */ false,
+    );
     this.onPause?.();
   }
 
@@ -1144,7 +1270,10 @@ export class TourEngine {
     if (!id) return;
     const node = this.cy.getElementById(id);
     if (node.empty() || node.hasClass('layer-parent')) return;
-    if (this.timer) { clearTimeout(this.timer); this.timer = undefined; }
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = undefined;
+    }
     this.seqIndex = rawIdx + 1;
     this.currentStep = visibleIdx + 1;
     this._visited = this.seq.slice(0, rawIdx + 1);
@@ -1159,7 +1288,14 @@ export class TourEngine {
     // 如果引擎处于 paused 状态（用户手动暂停），jumpToNode 只负责跳到节点 + 停在
     // 那里，不触发 auto-play——这样暂停→拖进度条不会导致自动播放。
     const wasRunning = !this.paused && !this.stopped;
-    this.highlightAndFocus(id, [id], nodeDepth, this.totalSteps(), this.seqIndex, /* silent */ false);
+    this.highlightAndFocus(
+      id,
+      [id],
+      nodeDepth,
+      this.totalSteps(),
+      this.seqIndex,
+      /* silent */ false,
+    );
     if (wasRunning) {
       this.paused = false;
       this.scheduleNext();
@@ -1186,7 +1322,11 @@ export class TourEngine {
   pause(): void {
     if (this.paused || this.stopped) return;
     this.paused = true;
-    if (this.timer) { clearTimeout(this.timer); this.timer = undefined; }
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = undefined;
+    }
+    this.clearSpeechWait();
     this.stopTourPulse();
     this.onPause?.();
   }
@@ -1202,7 +1342,11 @@ export class TourEngine {
   }
 
   stop(): void {
-    if (this.timer) { clearTimeout(this.timer); this.timer = undefined; }
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = undefined;
+    }
+    this.clearSpeechWait();
     if (this.pulsingNode) this.stopTourPulse();
     this.clearAllNodeInlineStyles();
     // Detach graph-mutation listeners (issue #15) so a stale engine
@@ -1227,8 +1371,12 @@ export class TourEngine {
     // Defensive: if a previous tour never detached for some reason, clear
     // before re-attaching so we don't leak handlers.
     this.detachGraphMutators();
-    this._onNodeAdded = () => { this.resyncTotalExplored(); };
-    this._onNodeRemoved = () => { this.resyncTotalExplored(); };
+    this._onNodeAdded = () => {
+      this.resyncTotalExplored();
+    };
+    this._onNodeRemoved = () => {
+      this.resyncTotalExplored();
+    };
     this.cy.on('add', this._onNodeAdded);
     this.cy.on('remove', this._onNodeRemoved);
   }
@@ -1294,9 +1442,7 @@ export class TourEngine {
    * 避免一次 dump 641 行刷屏控制台。
    */
   previewSequence(strategyId?: TourStrategy): void {
-    const targets = strategyId
-      ? [getStrategy(strategyId)]
-      : ALL_STRATEGIES;
+    const targets = strategyId ? [getStrategy(strategyId)] : ALL_STRATEGIES;
 
     targets.forEach((s) => {
       const seq = s.buildSequence(this.cy);
@@ -1307,12 +1453,14 @@ export class TourEngine {
 
       const formatLine = (id: string, i: number): string => {
         const n = this.cy.getElementById(id);
-        const label = n.empty() ? `(missing: ${id})` : (n.data('label') || id);
-        const loc = n.empty() ? '' : (() => {
-          const l = n.data('location') as Record<string, string> | null;
-          if (!l) return '';
-          return [l['book'], l['chapter'], l['section']].filter(Boolean).join(' › ');
-        })();
+        const label = n.empty() ? `(missing: ${id})` : n.data('label') || id;
+        const loc = n.empty()
+          ? ''
+          : (() => {
+              const l = n.data('location') as Record<string, string> | null;
+              if (!l) return '';
+              return [l['book'], l['chapter'], l['section']].filter(Boolean).join(' › ');
+            })();
         return `  ${String(i + 1).padStart(3)}. ${label}${loc ? `  [${loc}]` : ''}`;
       };
 
@@ -1324,9 +1472,9 @@ export class TourEngine {
       } else {
         seq.slice(0, head).forEach((id, i) => console.log(formatLine(id, i)));
         console.log(`  ... (${seq.length - head - tail} nodes omitted) ...`);
-        seq.slice(seq.length - tail).forEach((id, i) =>
-          console.log(formatLine(id, seq.length - tail + i)),
-        );
+        seq
+          .slice(seq.length - tail)
+          .forEach((id, i) => console.log(formatLine(id, seq.length - tail + i)));
       }
     });
   }
@@ -1338,6 +1486,35 @@ export class TourEngine {
     // 体感是"画面卡住"——特别是从 5s 拖到 1s 时，旧的 4.4s timer 还在挂起。
     // 副作用：在 paused 状态下也重排是无害的，paused 的 scheduleNext 不执行 visitNext。
     if (!this.stopped && !this.paused) this.scheduleNext();
+  }
+
+  /**
+   * Toggle "wait for the current utterance to end before scheduling the
+   * next step". Off = legacy fixed-timer behavior. Re-runs scheduleNext
+   * immediately so the change applies to the *current* in-flight step,
+   * not just the next one.
+   */
+  setWaitForSpeech(wait: boolean): void {
+    if (this.waitForSpeech === wait) return;
+    this.waitForSpeech = wait;
+    if (!this.stopped && !this.paused) this.scheduleNext();
+  }
+
+  /** Update the post-speech settle delay. See SPEECH_POST_DELAY_DEFAULT. */
+  setPostSpeechDelayMs(ms: number): void {
+    if (this.postSpeechDelayMs === ms) return;
+    this.postSpeechDelayMs = Math.max(0, ms);
+    if (!this.stopped && !this.paused) this.scheduleNext();
+  }
+
+  /**
+   * Inject the speech-end adapter. Called once by the UI layer on boot
+   * (after the speech controller is constructed) so the core engine can
+   * resolve a Promise when the current utterance ends — see
+   * TourOptions.waitForSpeechEnd for the contract.
+   */
+  setWaitForSpeechEnd(adapter: (() => Promise<void>) | null): void {
+    this.waitForSpeechEnd = adapter;
   }
 
   setMaxDepth(depth: number): void {
@@ -1409,13 +1586,115 @@ export class TourEngine {
     return TOUR_DEPTH_CONFIG.getLabel(this._depthLevel);
   }
 
+  /**
+   * Cancel any in-flight speech-end Promise (its safety timer + the
+   * "first event wins" race). Called before every reschedule so a stale
+   * speech wait never fires `visitNext()` on a tour that's already
+   * paused, stopped, or manually advanced.
+   */
+  private clearSpeechWait(): void {
+    if (this.speechWaitCancel) {
+      try {
+        this.speechWaitCancel();
+      } catch {
+        /* defensive: adapter must not throw */
+      }
+      this.speechWaitCancel = null;
+    }
+  }
+
   private scheduleNext(): void {
     if (this.stopped) return;
     clearTimeout(this.timer);
+    this.timer = undefined;
+    this.clearSpeechWait();
     const t = this;
-    // 总间隔 = 滑块值（包含动画 600ms），所以 setTimeout 延迟 = 滑块值 - 动画时间
-    // 如果滑块值小于动画时间，则间隔设为 0（动画完成后立即开始下一步）
-    const delay = Math.max(0, this.interval - 600);
+
+    if (this.waitForSpeech && this.waitForSpeechEnd) {
+      // Path A: speech-aware pacing. The contract:
+      //   - The user-facing `interval` is a MINIMUM step gap (so short
+      //     texts still give the eye a moment to track to the next
+      //     node). We enforce this floor REGARDLESS of how fast the
+      //     speech adapter resolves — otherwise a "TTS off" tour would
+      //     blur the graph (regression: 1s → 20 nodes visited).
+      //   - Long utterances may EXTEND the gap: if speech takes longer
+      //     than `interval`, we keep waiting until end + postDelay.
+      //   - SPEECH_WAIT_TIMEOUT_MS caps the wait absolutely so a wedged
+      //     TTS engine can never lock the tour.
+      //
+      // Implementation: race `minGap` (the floor) against the adapter's
+      // promise + the absolute safety timeout. Whichever fires first
+      // wins; if `minGap` wins, the adapter's eventual resolve becomes
+      // a no-op (the `settled` flag gates `finish`).
+      const minGap = Math.max(500, this.interval - ANIMATION_BUDGET_MS);
+
+      let settled = false;
+      const finish = (): void => {
+        if (settled) return;
+        settled = true;
+        this.speechWaitCancel = null;
+        if (t.stopped || t.paused) return;
+        t.timer = setTimeout(() => {
+          t.timer = undefined;
+          if (!t.stopped && !t.paused) t.visitNext();
+        }, t.postSpeechDelayMs);
+      };
+
+      // The floor is the AUTHORITATIVE pacing. minGap elapsed before any
+      // finish() call is allowed, no matter what the adapter says. The
+      // adapter can ONLY shorten the wait IF the floor has already passed
+      // by the time its promise resolves — and even then, we still honor
+      // the floor by scheduling finish() to run "right now" via setTimeout(0).
+      //
+      // Concretely:
+      //   - floor fires  → finish() (short text or TTS off, interval is minGap)
+      //   - speech ends  → if floor elapsed, finish() via 0-tick; otherwise
+      //                    wait for the floor timer (long text, adapter is
+      //                    already covered by the floor timer's finish).
+      const start = Date.now();
+      const elapsedMs = (): number => Date.now() - start;
+      const onFloorElapsed = (): void => {
+        finish();
+      };
+      const onSpeechEnded = (): void => {
+        if (settled) return;
+        const remaining = minGap - elapsedMs();
+        if (remaining <= 0) {
+          // Floor already passed — speech end wins the race.
+          finish();
+        } else {
+          // Speech ended early; pad out to the floor. We have to
+          // schedule, not synchronously finish, otherwise we'd break
+          // the "interval is minGap" contract.
+          setTimeout(finish, remaining);
+        }
+      };
+
+      let floorTimer: ReturnType<typeof setTimeout> | null = null;
+      let safetyTimer: ReturnType<typeof setTimeout> | null = null;
+      const adapter = this.waitForSpeechEnd();
+      this.speechWaitCancel = () => {
+        if (settled) return;
+        settled = true;
+        adapter.cancel();
+        if (floorTimer !== null) {
+          clearTimeout(floorTimer);
+          floorTimer = null;
+        }
+        if (safetyTimer !== null) {
+          clearTimeout(safetyTimer);
+          safetyTimer = null;
+        }
+      };
+      floorTimer = setTimeout(onFloorElapsed, minGap);
+      safetyTimer = setTimeout(() => finish(), SPEECH_WAIT_TIMEOUT_MS);
+      adapter.promise.then(onSpeechEnded);
+      return;
+    }
+
+    // Path B: legacy fixed-timer behavior (waitForSpeech off OR no
+    // adapter injected). Preserves the original contract.
+    const delay = Math.max(0, this.interval - ANIMATION_BUDGET_MS);
     this.timer = setTimeout(() => {
       if (!t.stopped && !t.paused) {
         t.visitNext();
@@ -1487,7 +1766,10 @@ export class TourEngine {
     let loopSafety = 0;
     while (true) {
       loopSafety++;
-      if (loopSafety > LOOP_SAFETY_LIMIT) { this.stopped = true; return; }
+      if (loopSafety > LOOP_SAFETY_LIMIT) {
+        this.stopped = true;
+        return;
+      }
       while (this.seqIndex < this.seq.length) {
         const id = this.seq[this.seqIndex];
         const node = this.cy.getElementById(id);
