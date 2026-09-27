@@ -12,9 +12,11 @@
 //   single-space utterance in the toggle() handler (deferred via microtask if
 //   voices are still loading so iOS does not silently drop the unlock
 //   utterance).
-// - Rate: 1.25 (slightly faster than default for Chinese pacing). Could be
-//   exposed as a setting in future.
+// - Rate: user-controllable via the 朗读设置 panel (0.5x–2.0x, default
+//   1.0x). Was hardcoded to 1.25 historically.
 // - State is NOT persisted — TTS is off by default on every page load.
+// - Granularity (4 modes) IS persisted under one key — the user picks how
+//   much of a node to read; survives reloads.
 //
 // Two layers of degradation, because one probe isn't enough:
 //
@@ -58,6 +60,141 @@
 import { showToast } from './ui-helpers.js';
 
 type Voice = SpeechSynthesisVoice | null;
+
+/**
+ * Read-aloud granularity for a node. Determines what fields of the node
+ * get joined into the utterance. User picks one in the advanced-settings
+ * panel; default is 'label-edges' (a step up from the legacy label-only
+ * behaviour, but still concise enough not to overwhelm during a tour).
+ */
+export type SpeechGranularity =
+  /** Only the node label. */
+  | 'label'
+  /** Label + outgoing edges (targets joined by commas). */
+  | 'label-edges'
+  /** Label + outgoing edges + tags. */
+  | 'label-edges-tags'
+  /** Label + the full summary text. */
+  | 'label-full-summary';
+
+export const SpeechGranularityOptions: ReadonlyArray<SpeechGranularity> = [
+  'label',
+  'label-edges',
+  'label-edges-tags',
+  'label-full-summary',
+] as const;
+
+/** Human label shown on the granularity segmented control. */
+export const SpeechGranularityLabels: Record<SpeechGranularity, string> = {
+  label: '仅标题',
+  'label-edges': '标题和关联',
+  'label-edges-tags': '标题和关联和标签',
+  'label-full-summary': '标题和摘要',
+};
+
+/** Single localStorage key holding the chosen granularity. */
+export const SPEECH_GRANULARITY_KEY = 'pg:speech:granularity';
+
+/** Single localStorage key holding the chosen read-aloud rate (0.5–2.0). */
+export const SPEECH_RATE_KEY = 'pg:speech:rate';
+
+/** Single localStorage key holding the "wait for speech to finish before advancing" toggle. */
+export const SPEECH_WAIT_KEY = 'pg:speech:waitForSpeech';
+
+/** Single localStorage key holding the post-speech pause (ms; 0–2000). */
+export const SPEECH_POST_DELAY_KEY = 'pg:speech:postDelay';
+
+export const SPEECH_RATE_MIN = 0.5;
+export const SPEECH_RATE_MAX = 2.0;
+export const SPEECH_RATE_DEFAULT = 1.25;
+export const SPEECH_POST_DELAY_MIN = 0;
+export const SPEECH_POST_DELAY_MAX = 2000;
+export const SPEECH_POST_DELAY_STEP = 100;
+export const SPEECH_POST_DELAY_DEFAULT = 0;
+
+function loadRate(): number {
+  try {
+    const raw = localStorage.getItem(SPEECH_RATE_KEY);
+    if (!raw) return SPEECH_RATE_DEFAULT;
+    const n = Number(raw);
+    if (Number.isFinite(n) && n >= SPEECH_RATE_MIN && n <= SPEECH_RATE_MAX) {
+      return n;
+    }
+  } catch {
+    /* ignore */
+  }
+  return SPEECH_RATE_DEFAULT;
+}
+
+function saveRate(r: number): void {
+  try {
+    localStorage.setItem(SPEECH_RATE_KEY, String(r));
+  } catch {
+    /* ignore */
+  }
+}
+
+function loadWaitForSpeech(): boolean {
+  try {
+    const raw = localStorage.getItem(SPEECH_WAIT_KEY);
+    if (raw === null) return true;
+    return raw === '1';
+  } catch {
+    /* ignore */
+  }
+  return true;
+}
+
+function saveWaitForSpeech(wait: boolean): void {
+  try {
+    localStorage.setItem(SPEECH_WAIT_KEY, wait ? '1' : '0');
+  } catch {
+    /* ignore */
+  }
+}
+
+function loadPostDelay(): number {
+  try {
+    const raw = localStorage.getItem(SPEECH_POST_DELAY_KEY);
+    if (!raw) return SPEECH_POST_DELAY_DEFAULT;
+    const n = Number(raw);
+    if (Number.isFinite(n) && n >= SPEECH_POST_DELAY_MIN && n <= SPEECH_POST_DELAY_MAX) {
+      return Math.round(n / SPEECH_POST_DELAY_STEP) * SPEECH_POST_DELAY_STEP;
+    }
+  } catch {
+    /* ignore */
+  }
+  return SPEECH_POST_DELAY_DEFAULT;
+}
+
+function savePostDelay(ms: number): void {
+  try {
+    localStorage.setItem(SPEECH_POST_DELAY_KEY, String(ms));
+  } catch {
+    /* ignore */
+  }
+}
+
+function loadGranularity(): SpeechGranularity {
+  try {
+    const raw = localStorage.getItem(SPEECH_GRANULARITY_KEY);
+    if (!raw) return 'label-edges-tags';
+    if ((SpeechGranularityOptions as readonly string[]).includes(raw)) {
+      return raw as SpeechGranularity;
+    }
+  } catch {
+    /* ignore */
+  }
+  return 'label-edges-tags';
+}
+
+function saveGranularity(g: SpeechGranularity): void {
+  try {
+    localStorage.setItem(SPEECH_GRANULARITY_KEY, g);
+  } catch {
+    /* ignore */
+  }
+}
 
 /** Resolve `speechSynthesis` from whatever host object we're running under.
  *  In real browsers this is on `window`; in Node/jsdom test envs we may
@@ -120,6 +257,24 @@ class SpeechController {
   private silentCheckTimer: ReturnType<typeof setTimeout> | null = null;
   /** Cached speechSynthesis reference; null when unsupported. */
   private readonly synth: SpeechSynthesis | null;
+  /** Current read-aloud granularity (persisted under SPEECH_GRANULARITY_KEY). */
+  private granularity: SpeechGranularity = loadGranularity();
+  /** Current utterance rate (persisted under SPEECH_RATE_KEY). */
+  private rate: number = loadRate();
+  /**
+   * Whether the tour engine should wait for the current utterance to end
+   * before advancing. Persisted under SPEECH_WAIT_KEY. Default true: the
+   * reason for the toggle to exist is so users can opt OUT, not opt in.
+   */
+  private waitForSpeech: boolean = loadWaitForSpeech();
+  /**
+   * Extra pause (ms) inserted after an utterance ends before the next step
+   * can fire. Persisted under SPEECH_POST_DELAY_KEY.
+   */
+  private postSpeechDelayMs: number = loadPostDelay();
+  /** Listeners notified on every utterance `end` / `error` event (real only;
+   *  iOS-unlock probe and silent-check timer don't fire these). */
+  private endListeners: Set<() => void> = new Set();
 
   constructor() {
     this.synth = getSpeechSynthesis();
@@ -167,6 +322,89 @@ class SpeechController {
    */
   get isSilentStub(): boolean {
     return this.engineState === 'silent';
+  }
+
+  /** Currently selected read-aloud granularity. */
+  get currentGranularity(): SpeechGranularity {
+    return this.granularity;
+  }
+
+  /**
+   * Persist a new granularity. Subsequent `speakNode()` calls use it.
+   * Safe to call at any time; the next speak picks it up.
+   */
+  setGranularity(g: SpeechGranularity): void {
+    this.granularity = g;
+    saveGranularity(g);
+  }
+
+  /** Current utterance rate (multiplier on the engine default). */
+  get currentRate(): number {
+    return this.rate;
+  }
+
+  /**
+   * Persist a new rate. Clamped to [SPEECH_RATE_MIN, SPEECH_RATE_MAX].
+   * Subsequent `speak()` calls pick it up.
+   */
+  setRate(r: number): void {
+    if (!Number.isFinite(r)) return;
+    const clamped = Math.max(SPEECH_RATE_MIN, Math.min(SPEECH_RATE_MAX, r));
+    this.rate = clamped;
+    saveRate(clamped);
+  }
+
+  /** Whether the tour engine waits for the current utterance to end before advancing. */
+  get currentWaitForSpeech(): boolean {
+    return this.waitForSpeech;
+  }
+
+  /** Persist the "wait for speech" toggle. Safe at any time. */
+  setWaitForSpeech(wait: boolean): void {
+    this.waitForSpeech = wait;
+    saveWaitForSpeech(wait);
+  }
+
+  /** Post-speech pause (ms) inserted after each utterance end. */
+  get currentPostSpeechDelayMs(): number {
+    return this.postSpeechDelayMs;
+  }
+
+  /** Persist a new post-speech delay. Snapped to the nearest 100ms step,
+   *  clamped to [SPEECH_POST_DELAY_MIN, SPEECH_POST_DELAY_MAX]. */
+  setPostSpeechDelayMs(ms: number): void {
+    if (!Number.isFinite(ms)) return;
+    const snapped = Math.round(ms / SPEECH_POST_DELAY_STEP) * SPEECH_POST_DELAY_STEP;
+    const clamped = Math.max(SPEECH_POST_DELAY_MIN, Math.min(SPEECH_POST_DELAY_MAX, snapped));
+    this.postSpeechDelayMs = clamped;
+    savePostDelay(clamped);
+  }
+
+  /** True iff there is currently a real (non-probe) utterance queued or
+   *  playing on the engine. Safe to call from any consumer that needs to
+   *  coordinate around speech completion (e.g. the tour engine). */
+  get isSpeaking(): boolean {
+    return this.currentUtterance !== null;
+  }
+
+  /**
+   * Subscribe to utterance end events. The listener fires once per
+   * utterance's natural `end` / `error` event (NOT the iOS-unlock probe,
+   * NOT synthetic stops). Returns an unsubscribe function.
+   *
+   * Use case: the tour engine waits for speech to finish before scheduling
+   * the next step. Each subscription covers exactly one end; consumers
+   * re-subscribe per step (see tour-controller).
+   */
+  onEnd(listener: () => void): () => void {
+    this.endListeners.add(listener);
+    return () => {
+      this.endListeners.delete(listener);
+    };
+  }
+
+  private fireEnd(): void {
+    for (const l of this.endListeners) l();
   }
 
   /**
@@ -265,7 +503,7 @@ class SpeechController {
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'zh-CN';
-    utterance.rate = 1.25;
+    utterance.rate = this.rate;
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
 
@@ -282,14 +520,18 @@ class SpeechController {
     };
     utterance.addEventListener('start', markAlive);
     utterance.addEventListener('boundary', markAlive);
-    utterance.addEventListener('end', () => {
+    const onSettle = (): void => {
       markAlive();
-      this.currentUtterance = null;
-    });
-    utterance.addEventListener('error', () => {
-      markAlive();
-      this.currentUtterance = null;
-    });
+      // Only clear currentUtterance / fire listeners if THIS utterance is
+      // still the active one. A subsequent speak() has superseded it, and
+      // its own listeners will fire when *it* ends.
+      if (this.currentUtterance === utterance) {
+        this.currentUtterance = null;
+        this.fireEnd();
+      }
+    };
+    utterance.addEventListener('end', onSettle);
+    utterance.addEventListener('error', onSettle);
 
     this.currentUtterance = utterance;
     try {
@@ -308,6 +550,21 @@ class SpeechController {
     if (this.engineState === 'unknown' && this.silentCheckTimer === null) {
       this.scheduleSilentCheck();
     }
+  }
+
+  /**
+   * Speak a node according to the current granularity setting. Composes the
+   * utterance text from the node's fields and delegates to speak(). Returns
+   * immediately if TTS is inactive, just like speak().
+   *
+   * The `node` shape is intentionally loose — the call site (tour-controller)
+   * passes a cytoscape node data dump (label / shortSummary / fullSummary /
+   * tags / edges_out). Missing fields are skipped gracefully.
+   */
+  speakNode(node: SpeakableNode | null | undefined): void {
+    if (!node) return;
+    const text = composeSpeechText(node, this.granularity);
+    if (text) this.speak(text);
   }
 
   /**
@@ -372,23 +629,25 @@ class SpeechController {
   }
 
   private updateButtonState(): void {
-    document.querySelectorAll<HTMLButtonElement>('[data-tour-action="toggle-speech"]').forEach((btn) => {
-      btn.classList.toggle('active', this.active);
-      btn.setAttribute('aria-pressed', String(this.active));
-      // We never set `btn.disabled = true`. On WebViews whose speechSynthesis
-      // is broken (X5/TBS, U4/Quark, etc.), users can still toggle the active
-      // state — the visual highlight works regardless of audio emission.
-      // The title hints at browser compatibility without disabling interaction.
-      btn.disabled = false;
-      btn.removeAttribute('aria-disabled');
-      btn.title = !this.supported
-        ? '当前浏览器可能不支持朗读（推荐用 Chrome/Safari 打开）'
-        : this.engineState === 'silent'
-          ? '此浏览器朗读引擎无声音输出，已自动关闭（推荐用 Chrome/Safari 打开）'
-          : this.active
-            ? '关闭朗读'
-            : '开启朗读';
-    });
+    document
+      .querySelectorAll<HTMLButtonElement>('[data-tour-action="toggle-speech"]')
+      .forEach((btn) => {
+        btn.classList.toggle('active', this.active);
+        btn.setAttribute('aria-pressed', String(this.active));
+        // We never set `btn.disabled = true`. On WebViews whose speechSynthesis
+        // is broken (X5/TBS, U4/Quark, etc.), users can still toggle the active
+        // state — the visual highlight works regardless of audio emission.
+        // The title hints at browser compatibility without disabling interaction.
+        btn.disabled = false;
+        btn.removeAttribute('aria-disabled');
+        btn.title = !this.supported
+          ? '当前浏览器可能不支持朗读（推荐用 Chrome/Safari 打开）'
+          : this.engineState === 'silent'
+            ? '此浏览器朗读引擎无声音输出，已自动关闭（推荐用 Chrome/Safari 打开）'
+            : this.active
+              ? '关闭朗读'
+              : '开启朗读';
+      });
   }
 }
 
@@ -415,6 +674,68 @@ function probeSpeechApi(api: SpeechSynthesis): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Minimal contract that speakNode() needs from a node. The tour-controller
+ * call site passes a cytoscape data dump; tests pass synthetic literals.
+ * Fields are all optional — missing ones are silently skipped at compose time.
+ */
+export interface SpeakableNode {
+  label?: string;
+  /**
+   * Outgoing edges. For TTS we read `reason` (the human-readable Chinese
+   * rationale from the source frontmatter, e.g. "镇静催眠药的一种分类"),
+   * NOT `target` — the target id is meaningless when spoken aloud. Nodes
+   * without a reason fall back to target label resolution upstream.
+   */
+  edges_out?: Array<{ type?: string; target: string; reason?: string }>;
+  tags?: string[];
+  shortSummary?: string;
+  fullSummary?: string;
+}
+
+/**
+ * Build the text to be spoken for a node at the given granularity. Pure
+ * function — exported so unit tests can exercise every (granularity, fields)
+ * combination without going through the SpeechController.
+ *
+ * Concatenation rules:
+ *   - 'label'             → node.label
+ *   - 'label-edges'       → label + ', ' + edge reasons joined with '、'
+ *   - 'label-edges-tags'  → label-edges + ', ' + tags joined with '、'
+ *   - 'label-full-summary' → label + ', ' + fullSummary
+ *
+ * "关联" 朗读的是 edges_out[*].reason (来自 frontmatter 的中文语义说明,
+ * 例如 "镇静催眠药的一种分类"),而不是 target id — id 是机器用的,
+ * 念出来毫无意义;没有 reason 的边会被静默跳过。
+ *
+ * Empty trailing parts are dropped so we don't read "卡马西平, " followed by
+ * silence. Whitespace-only fields are skipped too.
+ */
+export function composeSpeechText(node: SpeakableNode, granularity: SpeechGranularity): string {
+  const parts: string[] = [];
+  const label = (node.label ?? '').trim();
+  if (label) parts.push(label);
+
+  if (granularity === 'label-edges' || granularity === 'label-edges-tags') {
+    const edges = (node.edges_out ?? [])
+      .map((e) => (e.reason ?? '').trim())
+      .filter((s) => s.length > 0);
+    if (edges.length > 0) parts.push(edges.join('、'));
+  }
+
+  if (granularity === 'label-edges-tags') {
+    const tags = (node.tags ?? []).map((t) => t.trim()).filter((s) => s.length > 0);
+    if (tags.length > 0) parts.push(tags.join('、'));
+  }
+
+  if (granularity === 'label-full-summary') {
+    const summary = (node.fullSummary ?? '').trim();
+    if (summary) parts.push(summary);
+  }
+
+  return parts.join('，');
 }
 
 /** Module-level singleton — created on first import. */
