@@ -1612,23 +1612,26 @@ export class TourEngine {
 
     if (this.waitForSpeech && this.waitForSpeechEnd) {
       // Path A: speech-aware pacing. The contract:
-      //   - The user-facing `interval` is a MINIMUM step gap (so short
-      //     texts still give the eye a moment to track to the next
-      //     node). We enforce this floor REGARDLESS of how fast the
-      //     speech adapter resolves — otherwise a "TTS off" tour would
-      //     blur the graph (regression: 1s → 20 nodes visited).
-      //   - Long utterances may EXTEND the gap: if speech takes longer
-      //     than `interval`, we keep waiting until end + postDelay.
+      //   - `minGap = max(500, interval - animationBudget)` is the
+      //     STEP-TO-STEP gap, NOT a hard ceiling on a single step.
+      //   - If speech is over by the time we've waited `minGap` since
+      //     the step started, finish (short text case).
+      //   - If speech is still going at `minGap` (long text), the
+      //     adapter effectively "renews" the floor — we keep waiting
+      //     another `minGap` instead of abandoning the utterance. This
+      //     is the key insight: the floor must NOT truncate a long
+      //     utterance just because `interval` happens to be smaller than
+      //     the read-aloud duration.
       //   - SPEECH_WAIT_TIMEOUT_MS caps the wait absolutely so a wedged
       //     TTS engine can never lock the tour.
       //
-      // Implementation: race `minGap` (the floor) against the adapter's
-      // promise + the absolute safety timeout. Whichever fires first
-      // wins; if `minGap` wins, the adapter's eventual resolve becomes
-      // a no-op (the `settled` flag gates `finish`).
+      // Implementation: every `minGap`, ask "is the speaker done?". If
+      // yes, finish; if not, schedule another check in `minGap`. Stop
+      // the loop once speech resolves OR the safety timer fires.
       const minGap = Math.max(500, this.interval - ANIMATION_BUDGET_MS);
 
       let settled = false;
+      let speechEnded = false;
       const finish = (): void => {
         if (settled) return;
         settled = true;
@@ -1639,56 +1642,44 @@ export class TourEngine {
           if (!t.stopped && !t.paused) t.visitNext();
         }, t.postSpeechDelayMs);
       };
-
-      // The floor is the AUTHORITATIVE pacing. minGap elapsed before any
-      // finish() call is allowed, no matter what the adapter says. The
-      // adapter can ONLY shorten the wait IF the floor has already passed
-      // by the time its promise resolves — and even then, we still honor
-      // the floor by scheduling finish() to run "right now" via setTimeout(0).
-      //
-      // Concretely:
-      //   - floor fires  → finish() (short text or TTS off, interval is minGap)
-      //   - speech ends  → if floor elapsed, finish() via 0-tick; otherwise
-      //                    wait for the floor timer (long text, adapter is
-      //                    already covered by the floor timer's finish).
-      const start = Date.now();
-      const elapsedMs = (): number => Date.now() - start;
-      const onFloorElapsed = (): void => {
-        finish();
-      };
-      const onSpeechEnded = (): void => {
+      const checkFloor = (): void => {
         if (settled) return;
-        const remaining = minGap - elapsedMs();
-        if (remaining <= 0) {
-          // Floor already passed — speech end wins the race.
+        if (speechEnded) {
           finish();
-        } else {
-          // Speech ended early; pad out to the floor. We have to
-          // schedule, not synchronously finish, otherwise we'd break
-          // the "interval is minGap" contract.
-          setTimeout(finish, remaining);
+          return;
         }
+        // Speech still going — extend the wait by another minGap so the
+        // utterance can complete naturally. This is the "renewal" branch:
+        // a long utterance no longer gets truncated by the floor.
+        this.speechWaitCancel = () => clearTimeout(renewalTimer);
+        renewalTimer = setTimeout(checkFloor, minGap);
       };
 
-      let floorTimer: ReturnType<typeof setTimeout> | null = null;
+      let renewalTimer: ReturnType<typeof setTimeout> | null = null;
       let safetyTimer: ReturnType<typeof setTimeout> | null = null;
       const adapter = this.waitForSpeechEnd();
       this.speechWaitCancel = () => {
         if (settled) return;
         settled = true;
         adapter.cancel();
-        if (floorTimer !== null) {
-          clearTimeout(floorTimer);
-          floorTimer = null;
+        if (renewalTimer !== null) {
+          clearTimeout(renewalTimer);
+          renewalTimer = null;
         }
         if (safetyTimer !== null) {
           clearTimeout(safetyTimer);
           safetyTimer = null;
         }
       };
-      floorTimer = setTimeout(onFloorElapsed, minGap);
-      safetyTimer = setTimeout(() => finish(), SPEECH_WAIT_TIMEOUT_MS);
-      adapter.promise.then(onSpeechEnded);
+      // First check after minGap: if speech has finished by then (short
+      // text or TTS off), finish immediately; otherwise the renewal
+      // branch starts polling every minGap until speech resolves.
+      renewalTimer = setTimeout(checkFloor, minGap);
+      safetyTimer = setTimeout(finish, SPEECH_WAIT_TIMEOUT_MS);
+      adapter.promise.then(() => {
+        if (settled) return;
+        speechEnded = true;
+      });
       return;
     }
 

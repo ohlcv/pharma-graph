@@ -207,20 +207,22 @@ describe('TourEngine: waitForSpeech / postSpeechDelayMs / adapter plumbing', () 
 
 describe('TourEngine: speech-aware pacing respects the user interval (regression)', () => {
   /**
-   * Regression: when waitForSpeech=true and the adapter's promise resolves
-   * immediately (TTS is OFF, or no utterance queued), scheduleNext used
-   * to skip straight to visitNext — turning a 1s interval into a blur
-   * (1s → 20 nodes visited). The contract the engine now enforces is:
+   * Three independent contracts Path A must satisfy:
    *
-   *   - Path A (waitForSpeech + adapter): always wait AT LEAST a
-   *     `minGap` (≥500ms) between steps, regardless of how fast the
-   *     adapter resolves. minGap = max(500, interval - 600).
-   *   - The user-facing interval slider therefore remains the
-   *     authoritative pace, even with TTS off.
+   *   1. **No blur on TTS-off**: if the adapter resolves immediately
+   *      (TTS off), each step still waits `minGap = max(500, interval
+   *      - 600)`. Otherwise the graph blurs past the eye (regression:
+   *      1s → 20 nodes visited).
    *
-   * We verify this by counting onStep fires over a fixed window with a
-   * fast adapter (immediate resolve) and asserting the per-step gap
-   * stays above the floor.
+   *   2. **Short text honoured**: if the speech ends well before
+   *      `minGap`, finish fires at the floor anyway (interval slider
+   *      is the user-chosen pace).
+   *
+   *   3. **Long text NOT truncated**: if the speech is still going at
+   *      `minGap`, the engine must RENEW the floor — wait another
+   *      `minGap` — and keep polling until the utterance ends. The
+   *      interval slider is the FLOOR between steps, not a
+   *      hard ceiling on a single step.
    */
   function makeCy3() {
     const cy = cytoscape({ headless: true, styleEnabled: false });
@@ -242,8 +244,6 @@ describe('TourEngine: speech-aware pacing respects the user interval (regression
       maxDepth: 5,
       strategy: asStrategy('has-dfs'),
       waitForSpeech: true,
-      // Pathological adapter: resolves immediately, simulating "TTS off"
-      // before the controller's fallback was wired up.
       waitForSpeechEnd: () => ({
         promise: Promise.resolve(),
         cancel: () => {},
@@ -254,19 +254,64 @@ describe('TourEngine: speech-aware pacing respects the user interval (regression
       onComplete: () => {},
     });
 
-    // Give the engine ~3.2s to step through 4 nodes (a,b,c,d). With the
-    // floor of minGap = max(500, 1500-600) = 900ms between steps, a
-    // honest implementation produces ≥ 3 gaps. The buggy version
-    // produced all 4 steps within ~50ms.
     await new Promise((r) => setTimeout(r, 3200));
     engine.stop();
 
     expect(stamps.length).toBeGreaterThanOrEqual(2);
     for (let i = 1; i < stamps.length; i++) {
       const gap = stamps[i] - stamps[i - 1];
-      // Generous lower bound (300ms) — far above the buggy ~0ms but
-      // tolerant of CI scheduler jitter. minGap is 900ms in this config.
+      // minGap = max(500, 1500-600) = 900ms. Generous 300ms floor to
+      // tolerate CI scheduler jitter while still catching the
+      // buggy ~0ms behaviour.
       expect(gap).toBeGreaterThanOrEqual(300);
     }
+  });
+
+  it('long utterance is NOT truncated by the floor — engine waits until speech ends', async () => {
+    // Scenario: interval=1s (floor minGap = max(500, 1000-600) = 500ms),
+    // but the utterance takes ~1.4s to read. With the old "race and
+    // truncating" design, the floor would have fired finish at 500ms
+    // and the rest of the utterance was abandoned mid-read. Now the
+    // engine must keep waiting until the adapter resolves.
+    const cy = makeCy3();
+    const engine = new TourEngine(cy);
+    let resolveSpeech: () => void = () => {};
+    const speechPromise = new Promise<void>((resolve) => {
+      resolveSpeech = resolve;
+    });
+    let stepCount = 0;
+    let lastStepAt = 0;
+    engine.start('a', {
+      interval: 1000,
+      maxDepth: 5,
+      strategy: asStrategy('has-dfs'),
+      waitForSpeech: true,
+      waitForSpeechEnd: () => ({
+        promise: speechPromise,
+        cancel: () => {},
+      }),
+      onStep: () => {
+        stepCount++;
+        lastStepAt = Date.now();
+      },
+      onComplete: () => {},
+    });
+
+    // While utterance is pending, engine must NOT advance. Wait 1.5s
+    // (three times the 500ms floor) — if the floor was truncating,
+    // stepCount would have climbed past 1 by now.
+    await new Promise((r) => setTimeout(r, 1500));
+    expect(stepCount).toBe(1); // only the initial step has fired
+
+    // Now release the utterance — engine should advance shortly.
+    const beforeRelease = Date.now();
+    resolveSpeech();
+    await new Promise((r) => setTimeout(r, 600));
+    expect(stepCount).toBeGreaterThanOrEqual(2);
+    // The second step must fire AFTER release (not earlier), proving
+    // the floor didn't truncate.
+    expect(lastStepAt).toBeGreaterThanOrEqual(beforeRelease);
+
+    engine.stop();
   });
 });
