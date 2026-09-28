@@ -81,6 +81,8 @@ description: '将纸质思维导图照片（或扫描件）转录为符合药学
 | 跨节大总结/表格                        | `double` | 跨节汇总对比                               |
 | 节内总结                               | 不填     | 仅本节内总结                               |
 
+> **完整判定 + 渲染链路以 [RULES.md §5.1](./RULES.md#51-stroke-组合值) 为准**。本节是面向转录工作流的简化判定清单；如出现分歧，以 RULES.md 为准。
+
 ### 1.5 平铺结构（无 data 包装）
 
 所有字段直接平铺，不使用 `data:` 包装。
@@ -807,16 +809,6 @@ summary:
 
 ### 8.2 旧 essence → 新规范迁移映射
 
-| 旧 essence                    | 新 fill            | 新 stroke           |
-| ----------------------------- | ------------------ | ------------------- |
-| module                        | cls-structure      | 不填                |
-| umbrella-class / strict-class | cls-classification | 有临床评价 → double |
-| medication                    | cls-drug           | double              |
-| drug                          | cls-drug           | 不填                |
-| notion（作用特点/评价）       | cls-feature        | 不填                |
-| notion（不良反应/禁忌）       | cls-adverse        | 不填                |
-| concept                       | cls-concept        | 不填                |
-| summary                       | cls-summary        | 跨节 → double       |
-| mnemonic                      | cls-mnemonic       | 不填                |
+旧 `essence` 字段迁移到新 `fill`+`stroke` 字段的**权威映射表已迁移到 [RULES.md §七](./RULES.md#七旧-essence--新规范迁移映射)**，本节不再维护。
 
 迁移时同时移除 `data:` 包装、`essence` 字段、`depth` 字段，改为平铺结构。

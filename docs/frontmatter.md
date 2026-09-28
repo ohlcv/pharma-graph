@@ -130,7 +130,8 @@ shape: object_property # → 六边形（强制显式指定）
 ### 3.3 fill — 领域顶层 Class IRI
 
 - 类型：`string`，值为领域顶层类的 id
-- 缺省：**省略**（节点归入通用类，不写也合法）
+- 通用图谱：缺省时**省略**（节点归入通用类，不写也合法）
+- **领域图谱（如药学）：`fill` 必填**，否则失去 fill 提供的语义色与默认配置（见 [RULES.md §二](./RULES.md)）
 - 作用：
   1. 决定节点**背景色**
   2. 在 RULES 中定义该类的**默认 shape（几何形状）**
@@ -174,7 +175,7 @@ stroke 是自定义 AnnotationProperty `style` 的简写，值为组合枚举，
 
 | 字段    | 类型   | 说明                                                  |
 | ------- | ------ | ----------------------------------------------------- |
-| `short` | string | 一句话定义，关键词用 `**加粗**`                       |
+| `short` | string | 一句话定义，关键词用 `**加粗**`（口诀节点例外：可多行换行对齐，详见 [SKILL.md §6.4](./SKILL.md)） |
 | `full`  | string | 详细解释，用 `\|` block scalar 保留换行，【标签】分段 |
 
 **full 标签**（按需使用）：`【药理作用】` `【适应症】` `【不良反应】` `【禁忌】` `【相互作用】` `【药代动力学】` `【临床应用注意】` `【作用机制】` `【代表药】` `【口诀】`
@@ -256,150 +257,13 @@ fill: cls-drug # 默认 stroke=glow（呼吸光晕）
 
 ---
 
-## 五、完整示例（药学举例，本规范通用）
-
-### 示例 1：普通药（不填 stroke，由 fill 的 defaultStroke 决定）
-
-```yaml
----
-id: drug-trizolam-y2-01-01
-label: 三唑仑
-fill: cls-drug
-
-location:
-  book: 药学专业知识二
-  chapter: 第一章 精神与中枢神经系统用药
-  section: 第一节 镇静催眠药
-  item: 苯二氮䓬类
-
-tags: [三唑仑, 苯二氮䓬类, 短效]
-
-summary:
-  short: '**苯二氮䓬类短效**镇静催眠药。'
-  full:
-
-edges_out:
-  - target: cls-benzodiazepine-y2-01-01
-    type: instance_of
-    reason: 属于苯二氮䓬类
----
-```
-
-渲染（由 cls-drug 默认配置）：圆形 + 浅蓝背景 + 呼吸光晕边框（默认 glow）。
-
-### 示例 2：重点药（stroke 覆盖 fill 默认）
-
-```yaml
----
-id: med-diazepam-y2-01-01
-label: 地西泮
-fill: cls-drug
-stroke: double
-
-location:
-  book: 药学专业知识二
-  chapter: 第一章 精神与中枢神经系统用药
-  section: 第一节 镇静催眠药
-  item: 苯二氮䓬类
-
-tags: [地西泮, 苯二氮䓬类, 抗焦虑, 镇静催眠]
-
-summary:
-  short: '**苯二氮䓬类长效代表药**；适应证包括**抗焦虑、镇静催眠、抗癫痫抗惊厥**；**妊娠妇女和新生儿禁用**。'
-  full: |
-    【药理作用】抗焦虑、镇静催眠、抗癫痫、抗惊厥、肌肉松弛。
-    【适应症】①抗焦虑、镇静催眠、抗癫痫和抗惊厥；②治疗惊恐发作；③手术麻醉前给药。
-    【禁忌】妊娠妇女、新生儿禁用。
-
-edges_out:
-  - target: cls-benzodiazepine-y2-01-01
-    type: instance_of
-    reason: 属于苯二氮䓬类
----
-```
-
-渲染：圆形 + 浅蓝背景 + **双线边框**（stroke: double，重点药特效）。
-
-### 示例 3：不良反应
-
-```yaml
----
-id: adr-barbiturate-y2-01-01
-label: 巴比妥类典型不良反应
-fill: cls-adverse
-# 不填 stroke → 默认 glow（呼吸光晕）
-
-location:
-  book: 药学专业知识二
-  chapter: 第一章 精神与中枢神经系统用药
-  section: 第一节 镇静催眠药
-  item: 巴比妥类
-
-tags: [巴比妥类, 不良反应, 宿醉现象, 依赖性]
-
-summary:
-  short: '**过敏**（剥脱性皮疹）；常见**宿醉现象**；长期应用产生**依赖性和戒断综合征**。'
-  full: |
-    【典型不良反应】(1)过敏：剥脱性皮疹、史蒂文斯-约翰逊综合征；(2)常见"宿醉"现象：嗜睡、步履蹒跚、肌无力；(3)长期应用可发生药物依赖性、戒断综合征。
-
-edges_out:
-  - target: cls-barbiturate-y2-01-01
-    type: part_of
-    reason: 巴比妥类的临床用药评价
----
-```
-
-渲染：六边形 + 浅橙背景 + **呼吸光晕边框**（默认 glow）。
-
-### 示例 4：跨节大总结（double 效果）
-
-```yaml
----
-id: meta-cyp1a2-summary-y2-01
-label: 总结-CYP1A2
-fill: cls-summary
-stroke: double
-
-location:
-  book: 药学专业知识二
-  chapter: 第一章 精神与中枢神经系统用药
-
-tags: [CYP1A2, 肝药酶, 总结, 药物相互作用]
-
-summary:
-  short: 'CYP1A2 **底物、抑制剂、诱导剂**汇总表。'
-  full: |
-    【底物】茶碱、咖啡因、氯氮平、奥氮平...
-    【抑制剂】氟伏沙明、环丙沙星...
-    【诱导剂】吸烟、奥美拉唑...
-
-edges_out:
-  - target: ch-cns-y2-01
-    type: part_of
-    reason: 跨节总结
----
-```
-
-渲染：圆角矩形 + 浅金背景 + **双线边框**（stroke: double）。
+完整示例与字段填写样例见 [SKILL.md §五"字段制作规范"](./SKILL.md)(含 YAML 模板、full 格式、加粗规则、tags 抽取)。frontmatter.md 仅保留字段定义,不维护示例。
 
 ---
 
-## 六、文件名与 id 命名
+## 五、文件名与 id 命名
 
 - **文件名** = `label`（中文），如 `地西泮.md`、`苯二氮䓬类.md`
 - **id** = 英文/拉丁文，格式 `{前缀}-{英文名}-{书简写}{章}-{节}`
 
-| 节点类型                                          | 前缀                          | 示例                                |
-| ------------------------------------------------- | ----------------------------- | ----------------------------------- |
-| 结构入口（class, cls-structure）                  | `sec` / `ch` / `book`         | `sec-sedative-y2-01-01`             |
-| 分类（class, cls-classification）                 | `cls`                         | `cls-benzodiazepine-y2-01-01`       |
-| 药物（named_individual, cls-drug）                | `med`（重点）/ `drug`（普通） | `med-diazepam-y2-01-01`             |
-| 疾病（named_individual, cls-disease）             | `disease`                     | `disease-insomnia-y2-01-01`         |
-| 生物实体（named_individual, cls-biomolecule）     | `bio`                         | `bio-gabaa-y2-01-01`                |
-| 作用特点/评价（annotation_property, cls-feature） | `feat`                        | `feat-barbiturate-feature-y2-01-01` |
-| 不良反应（annotation_property, cls-adverse）      | `adr`                         | `adr-barbiturate-y2-01-01`          |
-| 概念（annotation_property, cls-concept）          | `concept`                     | `concept-bioavailability-y1-04`     |
-| 总结（annotation_property, cls-summary）          | `sum`                         | `sum-barbiturate-y2-01`             |
-| 口诀（annotation_property, cls-mnemonic）         | `mem`                         | `mem-barbiturate-y2-01-01`          |
-
-> 前缀仅为约定，不参与图形编码；核心是 id 唯一且英文。权威表见 [SKILL.md §1.2](./SKILL.md)（frontmatter.md 不重复维护，避免双份漂移）。
+完整的前缀表与药学 id 命名细则（权威）见 [SKILL.md §1.2](./SKILL.md)。本节不重复维护，以避免双份漂移。

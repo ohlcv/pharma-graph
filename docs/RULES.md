@@ -9,7 +9,8 @@
 >
 > **不包含**：转录工作流、字段制作规范、照片提取原则、YAML 格式、质量检查清单——这些在 [SKILL.md](./SKILL.md) 中。
 >
-> 旧 essence → 新规范迁移映射见 [SKILL.md §8.2](./SKILL.md)（RULES.md 不再单独维护该表，避免双份漂移）。
+> 旧 essence → 新规范迁移映射见 [§七](#七旧-essence--新规范迁移映射)（本文件维护权威源）。
+> **字段填写细则索引**（tags / reason / summary / location / edges_out.type 等）见 [§八](#八字段填写细则索引)。各权威源的指针集中在此，本文件不复制细则正文。
 > 通用字段规范见 [frontmatter.md](./frontmatter.md)（基于 OWL2，不绑定学科）。
 
 ---
@@ -31,6 +32,8 @@
 ---
 
 ## 二、药学顶层类（fill 取值范围）
+
+**药学图谱所有节点 `fill` 必填**（通用图谱可选，见 [frontmatter.md §3.3](./frontmatter.md)）。
 
 以下 10 个顶层类本身也是 `shape: class` 的节点，作为 `fill` 的引用目标。
 
@@ -162,6 +165,8 @@
 
 ### 5.1 stroke 组合值
 
+**权威说明**：本节是 stroke 取值与渲染链路的**唯一权威源**。SKILL.md §1.4 给出了简化判定清单，但其文字以本节为准；若两处文字出现分歧，以本节为准。
+
 | stroke 值  | 边框色                                        | 线型        | 特效                 | 适用场景                                                  |
 | ---------- | --------------------------------------------- | ----------- | -------------------- | --------------------------------------------------------- |
 | `auto`     | subtreeRoot 色 或 `FILL_BORDER_HINTS[fill]`   | solid 实线  | 无                   | 跟子树走                                                  |
@@ -227,3 +232,61 @@
 | 口诀                   | `cls-mnemonic`       | 不填            | —               |
 
 > "重点"判定标准：教材中有详细药理卡片/临床用药评价单独讲解的药物或分类。
+
+---
+
+## 七、旧 essence → 新规范迁移映射
+
+> **本节是旧 `essence` 字段迁移到新 `fill`+`stroke` 字段的权威映射表**。迁移工作流（含 `data:` 包装的去除、`essence`/`depth` 字段的移除）见 [SKILL.md §8](./SKILL.md)。
+
+| 旧 essence                    | 新 fill            | 新 stroke           |
+| ----------------------------- | ------------------ | ------------------- |
+| `module`                      | `cls-structure`    | 不填                |
+| `umbrella-class` / `strict-class` | `cls-classification` | 有临床评价 → `double` |
+| `medication`                  | `cls-drug`         | `double`            |
+| `drug`                        | `cls-drug`         | 不填                |
+| `notion`（作用特点/评价）     | `cls-feature`      | 不填                |
+| `notion`（不良反应/禁忌）     | `cls-adverse`      | 不填                |
+| `concept`                     | `cls-concept`      | 不填                |
+| `summary`                     | `cls-summary`      | 跨节 → `double`     |
+| `mnemonic`                    | `cls-mnemonic`     | 不填                |
+
+迁移时同时移除 `data:` 包装、`essence` 字段、`depth` 字段，改为平铺结构。
+
+---
+
+## 八、字段填写细则索引
+
+> 本节**不是**字段填写规范的副本，而是把分散在三份文档里的填写细则集中到一个跳转索引。规范正文只在权威源维护，本节只负责"在哪里查"。
+
+### 8.1 tags — 抽取与前缀规则
+
+| 项 | 内容 |
+|---|---|
+| **权威源** | [SKILL.md §5.4](./SKILL.md#54-tags-抽取规则) |
+| **字段定义** | [frontmatter.md §3.6](./frontmatter.md#36-tags--检索关键词) |
+| **节点类型专属** | 见 §5.4 表格（重点药 vs 普通药 vs 分类 vs 口诀 vs 总结） |
+| **四种前缀 tag** | `药理作用：`（重点药必填）/ `适应症：` / `禁忌：` / `ADR：`（最多 3 个） |
+| **口诀节点标签顺序** | `口诀` → `节名/分类名` → `具体分类` → `代表药` |
+
+### 8.2 reason — edges_out 措辞规范
+
+| 项 | 内容 |
+|---|---|
+| **权威源** | [SKILL.md §5.5](./SKILL.md#55-edges_out-填写规则) |
+| **字段定义** | [frontmatter.md §二"边（OWL2 公理）"](./frontmatter.md#二标准结构字段平铺无-data-包装) |
+| **三条铁律** | 必填 / 必须包含具体对象（药名或分类名）/ 必须能独立成句 |
+| **边方向铁律** | 见 §5.5 表格（子类→父类用 `subclass_of`；药物→分类用 `instance_of`；口诀/总结用 `part_of`） |
+
+### 8.3 其它字段填写
+
+| 字段 | 权威源 |
+|---|---|
+| `summary.short` / `summary.full` | [SKILL.md §5.2–§6.4](./SKILL.md)（字段格式、full 多标签、加粗规则） |
+| `location` | [SKILL.md §5.6](./SKILL.md#56-location-字段) |
+| `shape` / `stroke` 组合值 | [RULES.md §三 / §四](./RULES.md)（OWL2 实体类型映射 / fill 默认外观） |
+| `edges_out.type`（5 种 OWL2 公理） | [frontmatter.md §3.8](./frontmatter.md#38-edges_out--owl2-公理5-种) |
+| id 命名 / 前缀表 | [SKILL.md §1.2](./SKILL.md)（frontmatter §六 不再重复维护） |
+
+> **冲突处理**：若本索引指向的权威源之间出现分歧，按 [AGENTS.md §0](../AGENTS.md) 的优先级链处理（AGENTS < ARCHITECTURE < DEVELOP < **RULES**，RULES 最高）。
+
