@@ -81,6 +81,33 @@ import { initSpeechSettings } from './speech-settings.js';
 
 let tourController: TourController;
 
+/**
+ * 装饰节点（太极八卦 / 四维空间）的运行时停用开关（URL 控制）。
+ *
+ * 背景：两者共用同一套机制（真实 cytoscape 节点 + 独立 canvas 逐帧重绘）。
+ * 原假设「四维空间节点大幅拉长初始加载并降低力布局帧数」已被四组对照
+ * 实验否证（1182 节点 / 22s 布局期 rAF 采样，preview 构建）：
+ *
+ *   decor=off     太极关/超立方体关  中位 116.4ms / FPS 8.6 / 长帧 79.9%
+ *   decor=celestial  只留太极      中位 104.7ms / FPS 9.6 / 长帧 81.3%
+ *   decor=tess      只留超立方体  中位 110.2ms / FPS 9.1 / 长帧 81.8%
+ *   缺省（全开）                    中位 120.2ms / FPS 8.3 / 长帧 80.4%
+ *
+ * 四组差异都在测量噪声内，**装饰节点对布局帧率没有可观测的影响**——真正的
+ * 瓶颈是 1182 节点的 euler 力布局本身（详见
+ * docs/DEBUG/debug-tesseract-perf-hypothesis-rejected.md）。开关保留是为后续
+ * 对照实验方便，并非作为修复手段。
+ *
+ * URL 参数（无需重新构建）：
+ *   ?decor=off        两个都关
+ *   ?decor=celestial  只留太极八卦
+ *   ?decor=tess       只留超立方体
+ *   缺省              两个都开
+ */
+const DECOR_OVERRIDE = new URLSearchParams(location.search).get('decor');
+const DISABLE_TESSERACT = DECOR_OVERRIDE === 'off' || DECOR_OVERRIDE === 'celestial';
+const DISABLE_CELESTIAL = DECOR_OVERRIDE === 'off' || DECOR_OVERRIDE === 'tess';
+
 // ── Loading Indicator (corner pill) ───────────────────────────────────────────
 
 function updateLoadingIndicator(progress: PrebuiltProgress): void {
@@ -352,10 +379,11 @@ function initGraphFromManager(graphManager: GraphManager): void {
   // finishStreamingLayout() triggers the first Euler run — so it has a
   // position from the very first physics tick. See celestial-emblem-overlay.ts
   // header for the full rationale.
-  createCelestialEmblemOverlay({ container, cy });
+  if (!DISABLE_CELESTIAL) createCelestialEmblemOverlay({ container, cy });
   // 四维空间（tesseract）：与太极八卦同机制的第二个装饰节点，独立 overlay +
   // 独立 canvas，生命周期互不牵连。接入时机的两条约束同上。
-  createTesseractOverlay({ container, cy });
+  // 见 DECOR_OVERRIDE 上方注释：当前因性能问题默认停用，需 ?decor 显式开启。
+  if (!DISABLE_TESSERACT) createTesseractOverlay({ container, cy });
 
   // ── Populate sidebar the moment the graph is ready — not after layout settles.
   // stats (node/edge/selected/highlighted + essence/edge legend) are accurate as
