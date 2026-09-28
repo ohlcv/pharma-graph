@@ -3,12 +3,9 @@
 
 import { HIERARCHY_EDGE_TYPES } from './edge-types.js';
 
-/** 漫游深度层级配置：5档设计，区分重点药和普通药 */
+/** 漫游深度层级配置：5档设计，从章节骨架逐层加内容到全图 */
 export const TOUR_DEPTH_CONFIG = {
-  // 档位 1-5 对应的 fill 类型包含关系
-  // 每档包含所有更低档的内容
-  // 注意：'cls-drug-key' 不是 FILL_CONFIG 里的真实 fill，而是"重点药"的伪类型，
-  // 实际判定见 isKeyDrug()（fill === 'cls-drug' 且 stroke === 'double'）。
+  // 档位 1-5 是严格包含关系：每档 = 上一档 + 本档新增的节点类型。
   // 过滤逻辑以 isNodeInLevel() 为准，这里的 includes 仅作说明/展示用途。
   levels: [
     {
@@ -25,27 +22,32 @@ export const TOUR_DEPTH_CONFIG = {
     },
     {
       level: 3,
-      label: '复习',
-      description: '只看重点药（跳过普通药）',
-      includes: ['cls-structure', 'cls-classification', 'cls-drug-key'], // key = 重点药
+      label: '重点',
+      description: '加上重点药（stroke: double）',
+      includes: ['cls-structure', 'cls-classification', 'cls-drug(double)'],
     },
     {
       level: 4,
-      label: '口诀',
-      description: '加入记忆内容',
-      includes: [
-        'cls-structure',
-        'cls-classification',
-        'cls-drug-key',
-        'cls-summary',
-        'cls-mnemonic',
-      ],
+      label: '全面',
+      description: '加上普通药，覆盖全部药物节点',
+      includes: ['cls-structure', 'cls-classification', 'cls-drug'],
     },
     {
       level: 5,
-      label: '全面',
-      description: '完整学习',
-      includes: ['all'], // 全部类型
+      label: '全部',
+      description: '完整学习：其余全部节点类型',
+      includes: [
+        'cls-structure',
+        'cls-classification',
+        'cls-drug',
+        'cls-disease',
+        'cls-biomolecule',
+        'cls-feature',
+        'cls-adverse',
+        'cls-concept',
+        'cls-summary',
+        'cls-mnemonic',
+      ],
     },
   ] as const,
 
@@ -70,29 +72,32 @@ export function isKeyDrug(node: cytoscape.NodeSingular): boolean {
   return fill === 'cls-drug' && stroke === 'double';
 }
 
-/** 判断节点是否属于给定档位的内容范围 */
+/** 判断节点是否属于给定档位的内容范围。
+ *
+ *  档位是严格包含的累加序列，每档比上一档只多一类节点：
+ *    1 结构  = cls-structure
+ *    2 概览  = + cls-classification
+ *    3 重点  = + cls-drug 且 stroke=double（重点药）
+ *    4 全面  = + 剩余全部 cls-drug（普通药，即不限定 stroke）
+ *    5 全部  = + 其余所有 fill（疾病/靶点/特点/不良反应/概念/总结/口诀）
+ */
 export function isNodeInLevel(node: cytoscape.NodeSingular, level: number): boolean {
   const fill = node.data('fill') as string;
-  const stroke = node.data('stroke') as string | undefined;
-  const isKey = fill === 'cls-drug' && stroke === 'double';
 
   // 档位 5 = 全部
   if (level >= 5) return true;
 
-  // 档位 4 = structure + classification + 重点药 + summary + mnemonic
-  if (level >= 4) {
-    return (
-      ['cls-structure', 'cls-classification', 'cls-summary', 'cls-mnemonic'].includes(fill) || isKey
-    );
+  if (level === 4) {
+    // 4 全面 = structure + classification + 所有药物（重点 + 普通，不看 stroke）
+    return ['cls-structure', 'cls-classification', 'cls-drug'].includes(fill);
   }
 
-  // 档位 3 = structure + classification + 重点药（跳过普通药）
-  if (level >= 3) {
-    return ['cls-structure', 'cls-classification'].includes(fill) || isKey;
+  if (level === 3) {
+    // 3 重点 = structure + classification + 重点药（stroke=double）
+    return ['cls-structure', 'cls-classification'].includes(fill) || isKeyDrug(node);
   }
 
-  // 档位 2 = structure + classification
-  if (level >= 2) {
+  if (level === 2) {
     return ['cls-structure', 'cls-classification'].includes(fill);
   }
 

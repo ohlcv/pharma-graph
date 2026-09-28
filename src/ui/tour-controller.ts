@@ -1088,9 +1088,8 @@ export class TourController {
     requestedLevel: number;
     upgradedLevel: number;
   }): void {
-    const depthLabels = ['', '结构', '概览', '复习', '口诀', '全面'];
-    const requested = depthLabels[info.requestedLevel] ?? `L${info.requestedLevel}`;
-    const upgraded = depthLabels[info.upgradedLevel] ?? `L${info.upgradedLevel}`;
+    const requested = TOUR_DEPTH_CONFIG.getLabel(info.requestedLevel);
+    const upgraded = TOUR_DEPTH_CONFIG.getLabel(info.upgradedLevel);
     showToast(`所选节点不在【${requested}】档位内，已自动切换到【${upgraded}】漫游`, 'info');
     this.announceStatus(`深度档位已自动从 ${requested} 升到 ${upgraded}`);
     // Sync the slider DOM so the user sees the new value. The engine already
