@@ -76,6 +76,7 @@ import { initMusicPlayer } from './music-player.js';
 import { installDebugBridge } from './debug-bridge.js';
 import { initStarfield } from './starfield.js';
 import { createCelestialEmblemOverlay } from '../core/celestial-emblem-overlay.js';
+import { createTesseractOverlay } from '../core/tesseract-overlay.js';
 import { initSpeechSettings } from './speech-settings.js';
 
 let tourController: TourController;
@@ -352,6 +353,9 @@ function initGraphFromManager(graphManager: GraphManager): void {
   // position from the very first physics tick. See celestial-emblem-overlay.ts
   // header for the full rationale.
   createCelestialEmblemOverlay({ container, cy });
+  // 四维空间（tesseract）：与太极八卦同机制的第二个装饰节点，独立 overlay +
+  // 独立 canvas，生命周期互不牵连。接入时机的两条约束同上。
+  createTesseractOverlay({ container, cy });
 
   // ── Populate sidebar the moment the graph is ready — not after layout settles.
   // stats (node/edge/selected/highlighted + essence/edge legend) are accurate as

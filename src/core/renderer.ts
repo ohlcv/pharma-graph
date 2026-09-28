@@ -130,6 +130,23 @@ export const RIPPLE_COLORS = {
   },
 };
 
+// ── 装饰节点（canvas overlay 宿主）的统一选择器 ───────────────────────────
+//
+// 太极八卦与四维空间都是"图上真节点 + 独立 canvas 自绘"的空域装置：cytoscape
+// 本体必须彻底透明（否则会盖住 canvas 画的图案），同时命中盒要跟着视觉半径
+// 走（否则点不到自己眼睛看到的东西）。两者的差异只在 canvas 那一侧。
+//
+// 下面三处必须始终同步覆盖这两个 class：
+//   ① 强透明规则本体；② hover 排除；③ selected / highlighted 排除。
+// 漏掉 ②③ 的后果是：选中装饰节点时 cytoscape 会给它画 1×1 的 accent2 边框，
+// 正好落在图案正中央，像一块盖在画上的小方块。
+
+const DECOR_NODE_CLASSES = ['celestial-emblem-node', 'tesseract-node'];
+/** 装饰节点自身（本体压透明）。 */
+const DECOR_NODE = `.${DECOR_NODE_CLASSES.join(', .')}`;
+/** "不是装饰节点"的伪类拼装，喂给需要排除交互态的规则。 */
+const NOT_DECOR = DECOR_NODE_CLASSES.map((c) => `:not(.${c})`).join('');
+
 // ── Stylesheet (built per Renderer, and again on theme change / new subtree) ────
 
 // 视觉层级（从上到下依次展开）：
@@ -393,14 +410,14 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         shape: 'rectangle' as cytoscape.Css.NodeShape,
       },
     },
-    // 太极八卦：本体已被 .layer-parent 隐藏，但 .selected-node / .highlighted
-    // 会以 border-width:4 + accent2 把它"点亮"成 1×1 矩形 + 强光边框——盖在
-    // canvas 画的图案正中央。再叠一条强 selector 强制压回去：
-    //   border / 阴影 / opacity / 自身尺寸全部透明。
+    // 装饰节点（太极八卦 / 四维空间）：本体已被 .layer-parent 隐藏，但
+    // .selected-node / .highlighted 会以 border-width:4 + accent2 把它"点亮"成
+    // 1×1 矩形 + 强光边框——盖在 canvas 画的图案正中央。再叠一条强 selector
+    // 强制压回去：border / 阴影 / opacity / 自身尺寸全部透明。
     // glow-overlay 仍然按节点位置画强光（这是预期的"选中态"反馈），但节点
-    // 本体不再画出任何东西，不再遮图案。
+    // 本体不再画出任何东西，不再遮图案。events 保持 yes —— 关掉就点不开了。
     {
-      selector: '.celestial-emblem-node',
+      selector: DECOR_NODE,
       style: {
         'background-color': 'rgba(0,0,0,0)',
         'background-opacity': 0,
@@ -464,7 +481,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
     },
     { selector: '.entering', style: { opacity: 0 } },
     {
-      selector: '.hovered:not(.celestial-emblem-node)',
+      selector: `.hovered${NOT_DECOR}`,
       style: {
         opacity: 1,
         'border-width': 3,
@@ -477,8 +494,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
       },
     },
     {
-      selector:
-        '.selected-node:not(.celestial-emblem-node), .highlighted:not(.celestial-emblem-node)',
+      selector: `.selected-node${NOT_DECOR}, .highlighted${NOT_DECOR}`,
       style: {
         opacity: 1,
         'border-width': 4,
