@@ -1699,7 +1699,22 @@ export class TourEngine {
    * from the restart path so every loop cycle still begins from the
    * same selected node.
    *
-   * ── DESIGN ──
+   * ── INTENT (产品动机) ──
+   * 用户手动点选节点开启漫游 = "我要复习这一块"的明确信号。本函数把 seq
+   * 过滤到 rootId 的递归后代,再把 rootId 提到首位。这样:
+   *   - 漫游只在用户选中的子树内走(章节→小节→知识点),不跨子树、不混入
+   *     其他章节 / 体系。
+   *   - 走完一轮后 restart(visitNext → while-loop → strategy.shouldRestart)
+   *     仍以 rootId 为起点,形成"循环复习同一小块"的体验,正合"复习特定章节"
+   *     的用途。**这是 by design,不是 bug**——之前有人疑惑"为啥我选了节点 A
+   *     却把 A 的兄弟节点也跑了一遍",答案就在这里:只要你没选中节点,就不会
+   *     触发 universe 边界;选中节点 = 主动把范围圈在该子树。
+   *
+   * 不选择节点开启漫游 = pickDefaultRoot() 选体系根 / book-y2 等"全书级别"
+   * 起点(参 pickRoot() 的 sel.length === 0 分支),此时 _universeNodeIds 为空,
+   * 本函数走 line 1724 的 legacy 早返回,不缩范围——这同样是预期行为。
+   *
+   * ── DESIGN (算法) ──
    * Edges go child → parent (parts_of / instance_of / subclass_of).
    *   - For rootId X, the teaching tour should visit X first, then every
    *     descendant of X, in some parent-first order.

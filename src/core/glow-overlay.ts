@@ -697,7 +697,12 @@ export class GlowOverlay {
       const halfW = n.renderedOuterWidth() / 2;
       const halfH = n.renderedOuterHeight() / 2;
       const maxHalf = Math.max(halfW, halfH);
-      if (maxHalf < 2) return;
+      // 早返回阈值从 < 2 放宽到 < 0.5,确保缩到全图(minZoom=0.02)时选中节点
+      // 仍有强光标记。原来 < 2 时,极小 zoom 下所有节点的 maxHalf 都掉到 1~2px,
+      // 强光直接被跳过,用户反馈"选中效果消失了"——其实 4px border 在 1px 节点上
+      // 糊成一团,肉眼基本看不出。0.5 仍然是低于 1 像素的安全值,不会因为
+      // shadowBlur 在亚像素节点上产生可见的"色团"噪点。
+      if (maxHalf < 0.5) return;
 
       const pulsing = n.hasClass('tour-pulsing');
       const breath = this.reducedMotion
