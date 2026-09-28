@@ -77,6 +77,7 @@ import { installDebugBridge } from './debug-bridge.js';
 import { initStarfield } from './starfield.js';
 import { createCelestialEmblemOverlay } from '../core/celestial-emblem-overlay.js';
 import { createTesseractOverlay } from '../core/tesseract-overlay.js';
+import { createFractalTreeOverlay } from '../core/fractal-tree-overlay.js';
 import { initSpeechSettings } from './speech-settings.js';
 
 let tourController: TourController;
@@ -99,14 +100,26 @@ let tourController: TourController;
  * 对照实验方便，并非作为修复手段。
  *
  * URL 参数（无需重新构建）：
- *   ?decor=off        两个都关
+ *   ?decor=off        三个都关
  *   ?decor=celestial  只留太极八卦
  *   ?decor=tess       只留超立方体
- *   缺省              两个都开
+ *   ?decor=tree       只留生命之树
+ *   缺省              三个都开
  */
 const DECOR_OVERRIDE = new URLSearchParams(location.search).get('decor');
+const ONLY = DECOR_OVERRIDE && DECOR_OVERRIDE !== 'off' ? DECOR_OVERRIDE : null;
 const DISABLE_TESSERACT = DECOR_OVERRIDE === 'off' || DECOR_OVERRIDE === 'celestial';
 const DISABLE_CELESTIAL = DECOR_OVERRIDE === 'off' || DECOR_OVERRIDE === 'tess';
+const DISABLE_TREE =
+  DECOR_OVERRIDE === 'off' || DECOR_OVERRIDE === 'celestial' || DECOR_OVERRIDE === 'tess';
+/** 供调试面板查询当前开关状态。 */
+export const DECOR_STATE = {
+  override: DECOR_OVERRIDE,
+  only: ONLY,
+  tess: !DISABLE_TESSERACT,
+  celestial: !DISABLE_CELESTIAL,
+  tree: !DISABLE_TREE,
+};
 
 // ── 布局质量降级实验开关 (?quality=) ────────────────────────────────────────
 //
@@ -414,8 +427,11 @@ function initGraphFromManager(graphManager: GraphManager): void {
   if (!DISABLE_CELESTIAL) createCelestialEmblemOverlay({ container, cy });
   // 四维空间（tesseract）：与太极八卦同机制的第二个装饰节点，独立 overlay +
   // 独立 canvas，生命周期互不牵连。接入时机的两条约束同上。
-  // 见 DECOR_OVERRIDE 上方注释：当前因性能问题默认停用，需 ?decor 显式开启。
   if (!DISABLE_TESSERACT) createTesseractOverlay({ container, cy });
+  // 生命之树：第三个装饰节点。L-system 递归树 + 末梢光点，
+  // 结构与前两者平行（独立 canvas / 独立 rAF / 真 cytoscape 节点挂
+  // layer-parent 排除出搜索统计），接入时机的两条约束同样适用。
+  if (!DISABLE_TREE) createFractalTreeOverlay({ container, cy });
 
   // ── Populate sidebar the moment the graph is ready — not after layout settles.
   // stats (node/edge/selected/highlighted + essence/edge legend) are accurate as
