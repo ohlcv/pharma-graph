@@ -745,7 +745,19 @@ export const LAYOUTS: Record<string, LayoutConfig> = {
         description:
           '正系数 = 节点被拉向 origin (0,0); euler 默认 0.001 会把布局收紧到中心。0 = 关闭。',
       },
-      { key: 'refresh', label: '刷新间隔', min: 1, max: 200, step: 1, default: 30 },
+      {
+        key: 'refresh',
+        label: '刷新间隔',
+        min: 1,
+        max: 200,
+        step: 1,
+        // 必须与 cytoscape-euler 的 layout/defaults.js 里 refresh: 10 一致。
+        // 这个 default 只在用户点过「应用」后才写进 localStorage、经
+        // coerceStoredParams 变成 override 生效；全新会话不走 override，
+        // euler 用自己的 10。两者不一致会让面板显示 30 而实际跑 10，
+        // 造成「我调了没反应」的错觉。
+        default: 10,
+      },
       {
         key: 'maxIterations',
         label: '最大迭代',

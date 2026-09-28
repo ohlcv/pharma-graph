@@ -108,6 +108,38 @@ const DECOR_OVERRIDE = new URLSearchParams(location.search).get('decor');
 const DISABLE_TESSERACT = DECOR_OVERRIDE === 'off' || DECOR_OVERRIDE === 'celestial';
 const DISABLE_CELESTIAL = DECOR_OVERRIDE === 'off' || DECOR_OVERRIDE === 'tess';
 
+// ── 布局质量降级实验开关 (?quality=) ────────────────────────────────────────
+//
+// 用于对照测量「布局期帧率」与「布局质量」的取舍。仅改 euler 的运行参数，
+// 不动 src/core/config.ts 里的默认值，随时可用缺省 URL 回到原行为。
+//
+// ⚠️ 基线是 refresh=10 —— euler 自己的默认值（layout/defaults.js）。
+// config.ts 的 params[] 里那个 refresh slider 标着 default: 30，但 refresh
+// 从未写进 cytoscape 配置块，只有用户手动拖过 slider 存进 localStorage 时才
+// 经 coerceStoredParams 生效。所以全新会话里 refresh 一直是 10，别拿 30 当基线。
+//
+// 降级维度（各自的代价不同，注释标明）：
+//   ?quality=refresh5   refresh 10 → 5      每帧 tick 减半，动画卡顿感上升
+//   ?quality=refresh2   refresh 10 → 2      每帧 tick 降至 1/5，卡顿明显
+//   ?quality=theta      theta 0.666 → 0.9 斥力近似更粗，局部结构变松散
+//   ?quality=time8s     maxSimulationTime 20s → 8s   没收敛就被掐断
+//   ?quality=iter2000   maxIterations 5000 → 2000   同上，更早
+//   ?quality=frugal     refresh 5 + maxSimulationTime 8s（组合）
+//   ?quality=crippled   refresh 2 + maxSimulationTime 3s（极端下限探底）
+//   ?quality=preset     完全不跑 euler，直接用 halo 位置（最坏情况基线）
+const QUALITY_OVERRIDE = new URLSearchParams(location.search).get('quality');
+const EULER_TUNING: Record<string, Record<string, unknown>> = {
+  refresh5: { refresh: 5 },
+  refresh2: { refresh: 2 },
+  theta: { theta: 0.9 },
+  time8s: { maxSimulationTime: 8000 },
+  iter2000: { maxIterations: 2000 },
+  frugal: { refresh: 5, maxSimulationTime: 8000 },
+  crippled: { refresh: 2, maxSimulationTime: 3000 },
+  preset: {},
+};
+const EULER_OVERRIDES = QUALITY_OVERRIDE ? EULER_TUNING[QUALITY_OVERRIDE] : undefined;
+
 // ── Loading Indicator (corner pill) ───────────────────────────────────────────
 
 function updateLoadingIndicator(progress: PrebuiltProgress): void {
@@ -465,6 +497,14 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
     return;
   }
 
+  // ?quality=preset —— 极端对照组：完全不跑 euler，直接用 halo 位置。
+  // 不是"优化"，是给降级方案定一个最坏情况基线（帧率天花板 / 质量地板）。
+  if (QUALITY_OVERRIDE === 'preset') {
+    logInfo('Euler skipped (?quality=preset):', 'baseline-only control group');
+    setTimeout(completeLoading, 100);
+    return;
+  }
+
   // Run Euler — no hard timeout. The simulation itself has `maxSimulationTime`
   // (currently 20 s) and `maxIterations` (currently 5000) caps configured in
   // config.ts, so it always emits `layoutstop` on its own. A wall-clock
@@ -485,7 +525,10 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
     // 自己的 rAF 逐帧 multitick 路径，避免 cytoscape core 再叠一层 tween 插值。
     // 这里只覆盖 randomize：流式加载已经把节点放到了 halo 位置上，euler 从
     // 这些位置开始收敛即可，不需要再 randomize 重排。
-    { randomize: false },
+    //
+    // EULER_OVERRIDES 来自 ?quality= 开关（见文件顶部），缺省为 undefined，
+    // 即完全不影响现有行为。
+    { randomize: false, ...EULER_OVERRIDES },
     {
       skipEntering: true,
       onLayoutStop: () => {
