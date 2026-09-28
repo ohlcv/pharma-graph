@@ -18,5 +18,5 @@ summary:
 edges_out:
   - target: sec-antispasmodic-y2-04-02
     type: part_of
-    reason: 第二节的总结节点
+    reason: "总结节点"
 ---

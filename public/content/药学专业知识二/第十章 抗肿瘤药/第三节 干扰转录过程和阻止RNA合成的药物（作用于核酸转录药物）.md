@@ -12,6 +12,6 @@ data:
   edges_out:
     - target: ch-oncology-y2-10
       type: part_of
-      reason: 属于该章
+      reason: "属于抗肿瘤药"
   fill: cls-structure
 ---

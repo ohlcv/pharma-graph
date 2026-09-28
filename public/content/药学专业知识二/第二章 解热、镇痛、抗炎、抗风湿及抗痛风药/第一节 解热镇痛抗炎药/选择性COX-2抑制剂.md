@@ -18,5 +18,5 @@ summary:
 edges_out:
   - target: sec-nsaid-y2-02-01
     type: part_of
-    reason: 第一节解热镇痛抗炎药的分类
+    reason: "解热镇痛抗炎药的分类"
 ---
