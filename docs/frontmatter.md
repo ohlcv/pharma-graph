@@ -103,7 +103,7 @@ edges_out:
 | `named_individual`    | owl:NamedIndividual    | 具体实例               | ellipse（椭圆）             | 具体药物、具体疾病、靶点、酶 |
 | `object_property`     | owl:ObjectProperty     | 个体间关系（实体化时） | hexagon（六边形）           | 治疗、导致、抑制、代谢       |
 | `data_property`       | owl:DatatypeProperty   | 个体→数值的属性        | rectangle（矩形）           | 半衰期、剂量、生物利用度     |
-| `annotation_property` | owl:AnnotationProperty | 注释/元数据            | tag（标签形）               | 定义、概念、口诀、总结       |
+| `annotation_property` | owl:AnnotationProperty | 注释/元数据            | tag（标签形）               | 显式指定时用于注释类节点（口诀/总结默认由 fill 决定，不必填 shape） |
 | `auto`                | —                      | 由 fill 决定           | —                           | 缺省值                       |
 
 **覆盖规则**：
@@ -115,12 +115,12 @@ edges_out:
 
 ```yaml
 # 例 1：默认情况（推荐）—— 不填 shape，用 fill 的扩展形状
-fill: cls-mnemonic # → V 形（vee）+ 浅橙背景
-# 留空 shape → 节点是 V 形
+fill: cls-mnemonic # → 标签形（tag）+ 浅橙背景
+# 留空 shape → 节点是标签形
 
 # 例 2：覆盖 fill —— 想让口诀用普通椭圆
 fill: cls-mnemonic
-shape: named_individual # → 椭圆（覆盖 vee）
+shape: named_individual # → 椭圆（覆盖 tag）
 
 # 例 3：关系实体化 —— "治疗" 边转成节点
 fill: cls-feature
@@ -192,6 +192,8 @@ stroke 是自定义 AnnotationProperty `style` 的简写，值为组合枚举，
 | `disjoint_with` | DisjointClasses          | 互斥              | 对称      |
 | `equivalent_to` | EquivalentClasses        | 类等价            | 对称      |
 
+> 只有以上 5 种合法类型。旧文档中出现过的 `has_instance` 等写法已废弃，不得使用。
+>
 > `part_of` 是声明为 Transitive 的 ObjectProperty，属于 OWL2 标准用法。
 > 口诀→主知识、总结→主章节等"辅助节点→主知识"也使用 `part_of`。
 >
@@ -249,7 +251,7 @@ stroke 是自定义 AnnotationProperty `style` 的简写，值为组合枚举，
 fill: cls-drug
 stroke: double # → 双线边框（重点药特效）
 
-# 示例 2：普通药（用 fill 兜底边框色，不跟子树走）
+# 示例 2：演示 fallback 用法（仅作语法示例；药学图谱中普通药 stroke 不填，见 SKILL §1.4）
 fill: cls-drug
 stroke: fallback # → 浅蓝边框，按 fill 自身颜色着色
 

@@ -111,7 +111,7 @@
 
 **关键点**：
 
-- `fill` 是**推荐字段**而非必填——不填时节点仍可渲染（通用外观），但失去 fill 提供的语义色
+- `fill` 在**药学图谱中必填**（通用图谱可选）——技术上不填也能渲染（通用外观），但会失去 fill 提供的语义色，药学节点不应出现这种情况
 - `shape` 不填 → 用 `FILL_CONFIG[fill].shape`
 - `stroke` 不填 → 用 `FILL_CONFIG[fill].defaultStroke`（统一为 `glow`，呼吸光晕）
 - `defaultStroke`（当前 `glow`）**始终生效**：无论 md 填不填 stroke，它都是底子
@@ -184,6 +184,10 @@
 | **重点药**   | 地西泮、唑吡坦、巴氯芬 | 纸质版"临床用药评价"分支下有该药的独立框（含作用特点/临床应用/不良反应正文） |
 | **重点分类** | 巴比妥类、苯二氮䓬类   | 纸质版"临床用药评价"分支下直接出现该分类名，且其下有作用特点/不良反应        |
 
+> **例外**：`cls-summary` 中的"跨节大总结/表格"不在临床用药评价分支下，但同样写 `double`（见 §六）。
+>
+> **电子版说明**：判定依据是纸质版位置；电子版不保留"临床用药评价"分支节点（内容并入重点药 full），因此不能靠图上的层级反推。
+>
 > **关键区分**：double 的判定依据是"该节点是否出现在纸质版'临床用药评价'分支下"，不是"该分类下有没有药"或"该分类有没有代表药"。分类与作用机制分支里的分类，即使列出了代表药，也不加 double。
 >
 > **示例**：中枢肌松药的"非苯二氮䓬类"只出现在分类分支，临床用药评价分支下直接是乙哌立松/巴氯芬/氯唑沙宗三个药 → 非苯二氮䓬类不加 double，三个药加 double。
@@ -239,17 +243,17 @@
 
 > **本节是旧 `essence` 字段迁移到新 `fill`+`stroke` 字段的权威映射表**。迁移工作流（含 `data:` 包装的去除、`essence`/`depth` 字段的移除）见 [SKILL.md §8](./SKILL.md)。
 
-| 旧 essence                    | 新 fill            | 新 stroke           |
-| ----------------------------- | ------------------ | ------------------- |
-| `module`                      | `cls-structure`    | 不填                |
-| `umbrella-class` / `strict-class` | `cls-classification` | 有临床评价 → `double` |
-| `medication`                  | `cls-drug`         | `double`            |
-| `drug`                        | `cls-drug`         | 不填                |
-| `notion`（作用特点/评价）     | `cls-feature`      | 不填                |
-| `notion`（不良反应/禁忌）     | `cls-adverse`      | 不填                |
-| `concept`                     | `cls-concept`      | 不填                |
-| `summary`                     | `cls-summary`      | 跨节 → `double`     |
-| `mnemonic`                    | `cls-mnemonic`     | 不填                |
+| 旧 essence                              | 新 fill              | 新 stroke                          |
+| --------------------------------------- | -------------------- | ---------------------------------- |
+| `module`                                | `cls-structure`      | 不填                               |
+| `umbrella-class` / `strict-class`       | `cls-classification` | 有临床评价 → `double`，否则不填    |
+| `medication`                            | `cls-drug`           | `double`                           |
+| `drug`                                  | `cls-drug`           | 不填                               |
+| `notion`（作用特点/临床评价/选药原则）  | `cls-feature`        | 不填                               |
+| `notion`（不良反应/禁忌）               | `cls-adverse`        | 不填                               |
+| `concept`                               | `cls-concept`        | 不填                               |
+| `summary`                               | `cls-summary`        | 跨节 → `double`，节内不填          |
+| `mnemonic`                              | `cls-mnemonic`       | 不填                               |
 
 迁移时同时移除 `data:` 包装、`essence` 字段、`depth` 字段，改为平铺结构。
 
@@ -290,4 +294,3 @@
 | id 命名 / 前缀表 | [SKILL.md §1.2](./SKILL.md)（frontmatter §六 不再重复维护） |
 
 > **冲突处理**：若本索引指向的权威源之间出现分歧，按 [AGENTS.md §0](../AGENTS.md) 的优先级链处理（AGENTS < ARCHITECTURE < DEVELOP < **RULES**，RULES 最高）。
-
