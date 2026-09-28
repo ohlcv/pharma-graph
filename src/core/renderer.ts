@@ -32,6 +32,7 @@ cytoscape.use(euler);
  * Auto-wrap label for node display.
  *
  * Priority (first match wins):
+ *   0. Already contains '\n' — author hand-wrapped it in frontmatter, respect it
  *   1. '｜' — explicit YAML block scalar separator
  *   2. '第X章' / '第X节' followed by space and more text
  *   3. ASCII '|' — pipe char followed by text
@@ -42,6 +43,11 @@ cytoscape.use(euler);
  * line above the rest of the label. Returns unchanged if no pattern fires.
  */
 export function formatNodeLabel(label: string): string {
+  // 0. 作者已在 frontmatter 里手写好换行（YAML block scalar `|`）→ 尊重它，不再加工。
+  //    少了这道短路，规则 4 会倒着扫描时跨过 \n 抓到上一行的逗号，
+  //    把作者精心排的 2 行再切成 3 行。
+  if (label.includes('\n')) return label;
+
   // 1. Explicit block scalar separator (｜ — fullwidth U+FF5C)
   const pipeIdx = label.indexOf('｜');
   if (pipeIdx !== -1) {
@@ -67,8 +73,8 @@ export function formatNodeLabel(label: string): string {
 
   // 4. Punctuation breakpoints — split at the last separator
   //    Chinese: ，、；：？！…—
-  //    ASCII:   ,;:?!...-
-  const BREAK_CHARS = '，、；：？！…—、,;:?!…-';
+  //    ASCII:   ,;:?...
+  const BREAK_CHARS = '，、；：？！…—,;:?...';
   let splitIdx = -1;
   for (let i = label.length - 1; i >= 0; i--) {
     if (BREAK_CHARS.includes(label[i])) {
@@ -77,7 +83,9 @@ export function formatNodeLabel(label: string): string {
     }
   }
   if (splitIdx !== -1) {
-    const first = label.slice(0, splitIdx).trim();
+    // 把命中标点归到第一行末尾(标点是上一句的天然边界,
+    // 切到下行会丢掉逗号/顿号,排版上像漏了字)。
+    const first = label.slice(0, splitIdx + 1).trim();
     const rest = label.slice(splitIdx + 1).trim();
     if (first && rest) return `${first}\n${rest}`;
   }
