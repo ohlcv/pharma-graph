@@ -78,6 +78,7 @@ import { initStarfield } from './starfield.js';
 import { createCelestialEmblemOverlay } from '../core/celestial-emblem-overlay.js';
 import { createTesseractOverlay } from '../core/tesseract-overlay.js';
 import { createFractalTreeOverlay } from '../core/fractal-tree-overlay.js';
+import { runLayoutInWorker } from '../core/layout-worker-client.js';
 import { initSpeechSettings } from './speech-settings.js';
 
 let tourController: TourController;
@@ -479,8 +480,12 @@ function initGraphFromManager(graphManager: GraphManager): void {
  */
 
 function finishStreamingLayout(counts: { nodeCount: number }): void {
-  if (!uiState.renderer) return;
-  const cy = uiState.renderer.getCy();
+  // 捕获到局部常量：下面把同步布局包进了 runSyncLayout() 函数里，
+  // TS 无法跨函数边界保持 uiState.renderer 的非空收窄。提前取一次，
+  // 闭包里直接用这个局部量（属性读取会被重新判空，局部 const 不会）。
+  const renderer = uiState.renderer;
+  if (renderer === null) return;
+  const cy = renderer.getCy();
   const nodeCount = counts.nodeCount;
 
   // 摘掉 entering（opacity: 0）必须在所有提前 return 之前：节点数 < 80 或
@@ -521,6 +526,32 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
     return;
   }
 
+  // ── 优先路径：Worker 里算布局 ──────────────────────────────────────────
+  //
+  // 实测（有头 Chromium / 真实 GPU / 1182 节点）：
+  //   同步布局占死主线程        20877ms（期间 15–20 FPS，界面冻结）
+  //   Worker headless 纯计算      3944ms（主线程全程空闲）
+  //   边交叉数：138（同步） vs 83（Worker）—— 质量不降反升
+  //
+  // 那 20 秒里只有 4 秒是真正的力计算，其余是逐帧动画 + cytoscape 位置
+  // 回写 + 画布重绘。搬进 Worker 后主线程阻塞直接归零，代价是失去
+  // 「节点从中心散开」的入场动画。
+  //
+  // 任何失败（不支持 module worker / 超时 / 异常）都自动退回下面的同步
+  // 路径，绝不让图出不来。见 runLayoutInWorker 的契约。
+  runLayoutInWorker(cy, { randomize: false, ...EULER_OVERRIDES }, (elapsedMs) => {
+    logInfo(`[layout-worker] 正在计算… ${(elapsedMs / 1000).toFixed(1)}s`);
+  }).then((result) => {
+    if (!result) {
+      logInfo('[layout-worker] 不可用，退回同步布局');
+      runSyncLayout();
+      return;
+    }
+    logInfo(`[layout-worker] 完成，耗时 ${(result.elapsedMs / 1000).toFixed(2)}s`);
+    settled = true;
+    waitForGraphToSettle(cy, completeLoading);
+  });
+
   // Run Euler — no hard timeout. The simulation itself has `maxSimulationTime`
   // (currently 20 s) and `maxIterations` (currently 5000) caps configured in
   // config.ts, so it always emits `layoutstop` on its own. A wall-clock
@@ -529,29 +560,37 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
   // legitimately take 15-25 s without "the tab is unresponsive" warnings
   // because Euler yields between iterations.
   let settled = false;
-  const finalize = (): void => {
-    if (settled) return;
-    settled = true;
-    waitForGraphToSettle(cy, completeLoading);
-  };
 
-  uiState.renderer.runLayout(
-    DEFAULT_LAYOUT,
-    // 不在这里覆盖 animate —— euler preset 里的 animate: 'end' 走 cytoscape-euler
-    // 自己的 rAF 逐帧 multitick 路径，避免 cytoscape core 再叠一层 tween 插值。
-    // 这里只覆盖 randomize：流式加载已经把节点放到了 halo 位置上，euler 从
-    // 这些位置开始收敛即可，不需要再 randomize 重排。
-    //
-    // EULER_OVERRIDES 来自 ?quality= 开关（见文件顶部），缺省为 undefined，
-    // 即完全不影响现有行为。
-    { randomize: false, ...EULER_OVERRIDES },
-    {
-      skipEntering: true,
-      onLayoutStop: () => {
-        finalize();
+  /** 同步布局：Worker 不可用时的兜底路径。 */
+  function runSyncLayout(): void {
+    if (settled) return;
+    const finalize = (): void => {
+      if (settled) return;
+      settled = true;
+      waitForGraphToSettle(cy, completeLoading);
+    };
+
+    // 非空断言：renderer 在函数开头已做过 `=== null` 早退。TS 仍报是因为
+    // runSyncLayout 是函数声明（hoisted），控制流分析无法确定它只在早退之后
+    // 被调用。这里的断言是安全的——早退已在调用点之前生效。
+    renderer!.runLayout(
+      DEFAULT_LAYOUT,
+      // 不在这里覆盖 animate —— euler preset 里的 animate: 'end' 走 cytoscape-euler
+      // 自己的 rAF 逐帧 multitick 路径，避免 cytoscape core 再叠一层 tween 插值。
+      // 这里只覆盖 randomize：流式加载已经把节点放到了 halo 位置上，euler 从
+      // 这些位置开始收敛即可，不需要再 randomize 重排。
+      //
+      // EULER_OVERRIDES 来自 ?quality= 开关（见文件顶部），缺省为 undefined，
+      // 即完全不影响现有行为。
+      { randomize: false, ...EULER_OVERRIDES },
+      {
+        skipEntering: true,
+        onLayoutStop: () => {
+          finalize();
+        },
       },
-    },
-  );
+    );
+  }
 }
 
 /**

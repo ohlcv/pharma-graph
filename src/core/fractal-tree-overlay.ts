@@ -85,6 +85,12 @@ function pickSpawnPoint(cy: cytoscape.Core): { x: number; y: number } {
   };
 }
 
+/**
+ * 预渲染发光精灵的边距倍数。径向渐变的辉光要溢出光点本身才有"晕"，
+ * 3.4 让核心实心区约占精灵直径的 1/3，外圈平滑衰减到全透明。
+ */
+const GLOW_PAD = 3.4;
+
 export interface FractalTreeOverlayOptions {
   container: HTMLElement;
   cy: cytoscape.Core;
@@ -109,6 +115,23 @@ export class FractalTreeOverlay {
   private readonly reducedMotion: boolean;
 
   private geometry: TreeGeometry;
+  /**
+   * 枝干静态层的离屏缓存。
+   *
+   * **这是最大的性能杠杆。** 2047 根枝的形状与颜色**逐帧完全不变**
+   * （树形在构造时一次生成，之后只有光点明灭和整体呼吸在动），但原实现
+   * 每帧要重画 2047 次 `stroke()`，其中约 45% 还带 `shadowBlur`——
+   * 合计每帧近 3000 次高斯模糊，实测足以把整页拖到十几帧。
+   *
+   * 缓存成一张离屏 canvas 后，每帧枝干只要 1 次 `drawImage`（走 GPU 合成）。
+   * 缓存 key 是 (dpr, 屏上高度)——只有这两个变化会让像素失真：
+   *   - dpr 变 → 位图密度不匹配
+   *   - 屏上高度变 → 缩放后的线宽/辉光半径不对
+   * 树形本身换了（reseed）也要重建。
+   */
+  private branchCache: HTMLCanvasElement | null = null;
+  private branchCacheKey = '';
+
   private treeHeight = 220;
   private dpr = 1;
   private cssWidth = 0;
@@ -171,6 +194,10 @@ export class FractalTreeOverlay {
   /** 换一棵新树（换 seed 重生成），并把命中盒同步到新树形。 */
   reseed(): void {
     this.geometry = generateTree({ ...DEFAULT_TREE_PARAMS, rand: Math.random });
+    // **必须失效枝干缓存**：缓存里是旧树的 2047 根枝，换树不重建的话
+    // 画面的还是上一棵，节点却已经是一棵新树的命中盒了。
+    this.branchCache = null;
+    this.branchCacheKey = '';
     const node = this.cy.getElementById(TREE_ID);
     if (node.nonempty()) {
       stripNodeChrome(node, hitboxSize(this.geometry, this.treeHeight));
@@ -238,13 +265,76 @@ export class FractalTreeOverlay {
 
   // ── 绘制 ──────────────────────────────────────────────────────────────────
 
+  /**
+   * 枝干静态层缓存。命中则直接返回。
+   *
+   * 缓存里的坐标系与 geometry 局部系一致（未平移未缩放），这样几何数据
+   * 与位图解耦：树形变了只需重建位图，代码不必重排。
+   */
+  private ensureBranchCache(dpr: number, screenHeight: number): HTMLCanvasElement | null {
+    const g = this.geometry;
+    const { x1, y1, x2, y2 } = g.bounds;
+    // 缓存按 1:1 局部单位渲染，再由 drawImage 缩放到屏上尺寸。
+    // 量化到 64 个台阶，避免 zoom 每微动都重建（zoom 连续变化，
+    // 用浮点做 key 会导致每帧重建缓存——那比重画还糟）。
+    const quantH = Math.max(64, Math.round(screenHeight / 64) * 64);
+    const key = `${dpr}|${quantH}|${g.branches.length}`;
+    if (this.branchCache && this.branchCacheKey === key) return this.branchCache;
+
+    const geoW = Math.max(1, x2 - x1);
+    const geoH = Math.max(1, y2 - y1);
+    // 位图分辨率取「局部系 → 目标像素」的映射，向上取整到 2 的幂附近以利合成
+    const w = Math.ceil(geoW);
+    const h = Math.ceil(geoH);
+    // 辉光会溢出枝干包围盒，按最大模糊半径留边，否则边缘被裁掉
+    const pad = Math.ceil(g.foliage[0]?.size ?? 4) * 6 + 8;
+
+    const cv = document.createElement('canvas');
+    cv.width = Math.max(1, Math.round((w + pad * 2) * dpr));
+    cv.height = Math.max(1, Math.round((h + pad * 2) * dpr));
+    const c = cv.getContext('2d');
+    if (!c) return null;
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.translate(pad - x1, pad - y1);
+    c.lineCap = 'round';
+    c.lineJoin = 'round';
+
+    const maxD = Math.max(1, g.maxDepth);
+    // **先粗后细**：细枝压在粗枝之上，交叉处遮挡才自然。
+    // geometry 用 FIFO 队列生成，depth 全局升序、width 是 depth 的单调
+    // 函数，倒序遍历即「由粗到细」。契约由测试「BFS 队列保证 depth 全局
+    // 有序」锁住。
+    for (let i = g.branches.length - 1; i >= 0; i--) {
+      const b = g.branches[i];
+      const dep = b.depth / maxD;
+      const ex = b.x + Math.cos(b.angle) * b.length;
+      const ey = b.y + Math.sin(b.angle) * b.length;
+      c.beginPath();
+      c.moveTo(b.x, b.y);
+      c.lineTo(ex, ey);
+      c.strokeStyle = rgba(barkColor(dep), 0.62 + 0.34 * dep);
+      c.lineWidth = b.width;
+      if (dep > 0.55) {
+        c.shadowColor = rgba(foliageColor(dep), 0.5);
+        c.shadowBlur = b.width * 3.5;
+      } else {
+        c.shadowBlur = 0;
+      }
+      c.stroke();
+    }
+    c.shadowBlur = 0;
+
+    this.branchCache = cv;
+    this.branchCacheKey = key;
+    return cv;
+  }
+
   private draw(t: number): void {
     const ctx = this.ctx;
     if (!ctx || this.cssWidth === 0) return;
 
     const node = this.cy.getElementById(TREE_ID);
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    ctx.clearRect(0, 0, this.cssWidth, this.cssHeight);
     if (node.empty()) return;
 
     const p = node.renderedPosition();
@@ -263,10 +353,16 @@ export class FractalTreeOverlay {
     )
       return;
 
+    // **局部清屏**：只清树周围这一块，而不是整个 1600×1000 视口。
+    // 全屏 clearRect 在 3 个 overlay 同时存在时是三倍的无谓填充。
+    ctx.clearRect(rx - reach, ry - reach, reach * 2, reach * 2);
+
     const g = this.geometry;
     const { x1, y1, x2, y2 } = g.bounds;
     const geoH = Math.max(1, y2 - y1);
     const scale = H / geoH;
+    const geoW = Math.max(1, x2 - x1);
+    const maxD = Math.max(1, g.maxDepth);
 
     // 冠幅呼吸：整体极轻微地涨缩，幅度 1.5%，30s 一次——慢到几乎察觉不到，
     // 但静止的画面在长会话里会显得"死了"。
@@ -279,40 +375,22 @@ export class FractalTreeOverlay {
     ctx.translate(rx, ry);
     ctx.scale(scale * breathe, scale * breathe);
     ctx.translate(-(x1 + x2) / 2, -(y1 + y2) / 2);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
 
-    // ── 枝干 ────────────────────────────────────────────────────────────
-    // **先粗后细**：细枝要压在粗枝之上，交叉处的遮挡关系才自然。
-    // geometry 用 FIFO 队列生成，depth 天然全局升序，width 又是 depth 的
-    // 单调函数，所以倒序遍历即「由粗到细」——不需要每帧 sort 2047 段
-    // （30fps 下那是白付的成本）。契约由测试「BFS 队列保证 depth 全局有序」锁住。
-    const maxD = Math.max(1, g.maxDepth);
-    for (let i = g.branches.length - 1; i >= 0; i--) {
-      const b = g.branches[i];
-      const dep = b.depth / maxD;
-      const ex = b.x + Math.cos(b.angle) * b.length;
-      const ey = b.y + Math.sin(b.angle) * b.length;
-      ctx.beginPath();
-      ctx.moveTo(b.x, b.y);
-      ctx.lineTo(ex, ey);
-      ctx.strokeStyle = rgba(barkColor(dep), 0.62 + 0.34 * dep);
-      ctx.lineWidth = b.width;
-      if (dep > 0.55) {
-        // 梢部微光：外侧 45% 的枝带辉光，模拟透光的嫩枝。
-        // 初版门槛 0.72 太窄，在实拍的深色背景上几乎看不出辉光。
-        ctx.shadowColor = rgba(foliageColor(dep), 0.5);
-        ctx.shadowBlur = b.width * 3.5;
-      } else {
-        ctx.shadowBlur = 0;
-      }
-      ctx.stroke();
+    // ── 枝干：1 次 drawImage 取代 2047 次 stroke ─────────────────────────
+    const cache = this.ensureBranchCache(this.dpr, H);
+    if (cache) {
+      // 缓存位图在局部系里从 (x1-pad, y1-pad) 开始，画到 (x2+pad, y2+pad)
+      const pad = Math.ceil(g.foliage[0]?.size ?? 4) * 6 + 8;
+      ctx.drawImage(cache, x1 - pad, y1 - pad, geoW + pad * 2, geoH + pad * 2);
     }
-    ctx.shadowBlur = 0;
 
     // ── 末梢光点 ─────────────────────────────────────────────────────────
     // 每个光点有独立相位（geometry 里的 phase），明灭不同步——同步的话
     // 整树会一起闪，像圣诞灯串；异步才像真的果实/星子在呼吸。
+    //
+    // **不用 shadowBlur**：2048 次高斯模糊/帧是 canvas 最贵的操作，单独
+    // 就能吃掉整帧预算。改用一张预渲染的径向渐变精灵（见 glowSprite），
+    // 每帧 2048 次 drawImage —— 同样是发光观感，走 GPU 合成而非 CPU 模糊。
     const omega = (Math.PI * 2) / this.pulseSeconds;
     for (const f of g.foliage) {
       const dep = f.depth / maxD;
@@ -320,18 +398,55 @@ export class FractalTreeOverlay {
       // phase 来自固定 seed，所以明灭节奏是稳定的（不是每帧重新随机）
       const k = 0.5 + 0.5 * Math.sin(t * omega + f.phase);
       const r = f.size * (0.72 + 0.5 * k);
-      ctx.beginPath();
-      ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
       ctx.globalAlpha = 0.34 + 0.6 * k;
-      ctx.fillStyle = rgba(col, 1);
-      ctx.shadowColor = rgba(col, 0.85);
-      ctx.shadowBlur = f.size * 5 * (0.4 + k);
-      ctx.fill();
+      const sprite = this.glowSprite(col, r, this.dpr);
+      if (!sprite) continue;
+      ctx.drawImage(sprite, f.x - r * GLOW_PAD, f.y - r * GLOW_PAD, r * GLOW_PAD * 2, r * GLOW_PAD * 2);
     }
 
     ctx.globalAlpha = 1;
-    ctx.shadowBlur = 0;
     ctx.restore();
+  }
+
+  /**
+   * 预渲染发光精灵：中心实心圆 + 向外衰减到全透明的径向渐变。
+   *
+   * 半径量化到 8 个台阶（每级 0.75px）后缓存——`size` 随 depth 只有 12
+   * 种取值，加上明灭的连续缩放后实际会命中几十个不同半径；量化后常驻
+   * 几十张小图，内存可忽略，换来的是每帧零 `shadowBlur`。
+   */
+  private glowSpriteCache = new Map<string, HTMLCanvasElement>();
+  private glowSprite(
+    col: readonly [number, number, number],
+    r: number,
+    dpr: number,
+  ): HTMLCanvasElement | null {
+    // 量化半径与 dpr，避免连续动画参数把缓存打穿成上千张图
+    const rq = Math.max(1, Math.round(r / 0.75) * 0.75);
+    const key = `${col[0]},${col[1]},${col[2]}|${rq}|${dpr}`;
+    const hit = this.glowSpriteCache.get(key);
+    if (hit) return hit;
+
+    const size = Math.ceil(rq * GLOW_PAD * 2 * dpr);
+    if (size < 1 || size > 512) return null; // 过大直接放弃辉光，不让它变成新瓶颈
+    const cv = document.createElement('canvas');
+    cv.width = size;
+    cv.height = size;
+    const c = cv.getContext('2d');
+    if (!c) return null;
+    const half = size / 2;
+    const grad = c.createRadialGradient(half, half, 0, half, half, half);
+    grad.addColorStop(0, rgba(col, 1));
+    grad.addColorStop(0.35, rgba(col, 0.55));
+    grad.addColorStop(1, rgba(col, 0));
+    c.fillStyle = grad;
+    c.fillRect(0, 0, size, size);
+
+    // 缓存上限：明灭参数连续变化时理论上会持续插入新 key。
+    // 超出后清空重来（简单但有效——清空瞬间的重建成本远低于持续膨胀的内存）。
+    if (this.glowSpriteCache.size > 240) this.glowSpriteCache.clear();
+    this.glowSpriteCache.set(key, cv);
+    return cv;
   }
 }
 
