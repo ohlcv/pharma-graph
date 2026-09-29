@@ -11,23 +11,10 @@
 
 import type cytoscape from 'cytoscape';
 import type { LayoutWorkerRequest, LayoutWorkerResponse } from './layout-worker.js';
-import { halton } from './halton.js';
 
 export interface WorkerLayoutResult {
   positions: Record<string, { x: number; y: number }>;
   elapsedMs: number;
-  /**
-   * Worker 计算**开始时**各节点的位置（halo 位置），未做任何修改。
-   *
-   * 入场动画的起点。必须在写回任何坐标之前抓取——一旦 `applyPositions`
-   * 跑完，halo 位置就永久消失了，没有任何地方留有备份。
-   *
-   * ⚠️ 开了预动画（`startWaitingAnimation`）时，这**不再是** cy 里的真实
-   * 位置，而是预动画的目标位置（星尘环）。runLayoutInWorker 在发起
-   * postMessage 之后就不再动 cy，所以这里读到的值与预动画终点一致，
-   * 两段动画天然衔接。
-   */
-  startPositions: Record<string, { x: number; y: number }>;
 }
 
 /**
@@ -89,21 +76,11 @@ export async function runLayoutInWorker(
 
   return new Promise<WorkerLayoutResult | null>((resolve) => {
     let settled = false;
-    // 预动画句柄。postMessage 之后才赋值，所以 finish 里要用可选链——
-    // Worker 构造失败 / 抓取坐标抛错时它是 null，那条路径压根没启动过动画。
-    let waiting: { targets: Record<string, { x: number; y: number }>; cancel: () => void } | null = null;
 
     const finish = (r: WorkerLayoutResult | null): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      // 失败 / 超时路径上没有后续动画接手，预动画必须在这里收掉，否则
-      // 它会永远自转下去，主线程每帧白写 1182 个 position 直到页面关闭。
-      //
-      // 成功路径在调用 finish 之前已经让位过了，重复调用无害：
-      // `settled` 闸门在这里生效，而 cancel 内部有 `cancelled` 标记、
-      // applyPositions 是同值写入。两条路径共用这一处，不必再加状态位。
-      if (waiting) stopWaitingAnimation(cy, waiting.targets, waiting.cancel);
       try {
         worker.terminate();
       } catch {
@@ -127,19 +104,12 @@ export async function runLayoutInWorker(
       }
       // done
       //
-      // 起点在**此刻**抓取：`nodes` 是发请求时从 cy 读的 halo 位置，
-      // 在 applyPositions 覆盖之前它们是唯一一份备份。之后 cytoscape 里
-      // 就只剩最终坐标了。
-      //
-      // 开了预动画时用它当起点，halo 位置就此作废——Worker 的输入和
-      // 预动画的起点本来就是同一份坐标，不损失信息。
+      // 入场动画的「起点」是 cy 在 postMessage 时的位置——也就是 halo
+      // burst 留下的原点位置（halo 动画 `duration: 0` 又被 `cy.stop()`
+      // 掐掉，全部堆在原点）。Worker 路径下没有「等待预动画」再改写过
+      // 这个坐标；所以 halo 位置就是入口动画的入口。
       const startPositions: Record<string, { x: number; y: number }> = {};
       for (const n of nodes) startPositions[n.id] = { x: n.x, y: n.y };
-
-      // 先让位再放动画：预动画的 rAF 和入场动画都写 position，同一帧里
-      // 后写的赢。顺序反了的话，入场动画的头一帧会被预动画的下一帧覆盖，
-      // 表现为开头轻微抖动一下才真正动起来。
-      if (waiting) stopWaitingAnimation(cy, waiting.targets, waiting.cancel);
 
       animatePositionsTo(
         cy,
@@ -147,7 +117,7 @@ export async function runLayoutInWorker(
         msg.positions,
         prefersReducedMotion(),
       );
-      finish({ positions: msg.positions, elapsedMs: msg.elapsedMs, startPositions });
+      finish({ positions: msg.positions, elapsedMs: msg.elapsedMs });
     };
 
     worker.onerror = (e): void => {
@@ -156,22 +126,33 @@ export async function runLayoutInWorker(
     };
 
     worker.postMessage(request);
-
-    // 预动画在 postMessage **之后**启动，而不是之前：必须先保证 Worker
-    // 拿到了正确的输入坐标。反过来的话 Worker 会读到被预动画改写过的
-    // 中间位置，euler 的起始点就错了。
-    waiting = startWaitingAnimation(cy);
   });
 }
 
 /**
- * 入场动画时长（ms）。
+ * 入场动画每节点的时长区间（ms）。
  *
- * 1200ms 的依据：euler 同步路径的入场动画是 `maxSimulationTime` 20s 里
- * 逐帧收敛的，视觉上"从 halo 散开"的过程大约持续 1–2s。取 1200ms 既不
- * 拖沓（加载完成后的等待感），也够看清结构在成形。
+ * **不是**写死单一值——早期版本用 1200ms 写死，发现了两个问题：
+ *
+ *   1) 近核心节点行程只有 ~50，远外围节点行程 17000+，同样 1200ms 走完，
+ *      平均速度差 350 倍——近节点「一闪而过」、远节点「飞过去像撞墙」。
+ *
+ *   2) 整体动画被 STAGGER_MS 拉满到 1700ms，行程短的小图反而用同样长
+ *      的时间，体感拖。
+ *
+ * 现在改成 [MIN_MS, MAX_MS] 区间、按时长归一化按**终点**到质心的距离：
+ *
+ *   duration_i = MIN_MS + (dist_i / maxDist) * (MAX_MS - MIN_MS)
+ *
+ *   dist_i 小的核心节点 → MIN_MS（短程快闪），
+ *   dist_i 大的外围节点 → MAX_MS（远程慢飞）。
+ *
+ * **平均视觉速度 ≈ 常数**：所有节点都是「以同样的速度往终点漂」，
+ * 这正是「结构从中心向外结晶」的视觉前提。两端都是「试验」出来的，
+ * 改之前先在主仓跑一次 `?layout=worker&motion=always` 看看速度感。
  */
-const ENTRANCE_ANIMATION_MS = 1200;
+const ENTRANCE_MIN_MS = 600;
+const ENTRANCE_MAX_MS = 2500;
 /**
  * 错峰延迟的上限（ms）。
  *
@@ -179,135 +160,12 @@ const ENTRANCE_ANIMATION_MS = 1200;
  * 平移了一下"，而错峰后是从中心向外一层层绽开，像拓扑结构自己长出来。
  * 延迟按节点到质心的距离归一化——离中心远的先走（它们移动最远，最需要
  * 早开始），近的稍后跟上。
+ *
+ * 总动画时长 = max(delay_i + duration_i)。因为 duration 也跟距离挂钩，
+ * 这两条「距离归一化」是同向放大的：远节点早开始 + 飞得久，近节点
+ * 晚开始 + 飞得快，**总时长被 maxDist 节点钉住**（≈ STAGGER_MS + MAX_MS）。
  */
 const STAGGER_MS = 500;
-
-/**
- * 「等待预动画」的时长（ms）与半径。
- *
- * Worker 算布局约 4 秒（慢设备可能 10 秒+）。这段时间如果不处理，屏幕上
- * 就是 1182 个节点**完全重叠在原点**、静止不动的一坨——因为 halo burst
- * 的 `duration: 0` 位置动画在 `cy.stop()` 前没来得及应用（见 animatePositionsTo
- * 的注释）。观感是「加载卡住了」，而不是「正在计算」。
- *
- * 预动画把这段空窗填成：节点从原点**缓缓铺开成一片星尘**并持续轻微呼吸。
- * 4 秒后 Worker 回来，真正的入场动画（animatePositionsTo）从星尘位置
- * 接续炸开到最终结构——两段动画首尾相接，看不出接缝。
- *
- * 半径刻意取小（120–340）且远小于最终布局尺度：星尘是「待命的微缩宇宙」，
- * 不是最终结构的粗糙版本。反过来铺得太大，炸开时就没有收缩的空间了。
- */
-const WAITING_RADIUS_MIN = 120;
-const WAITING_RADIUS_MAX = 340;
-/** 铺开到位的时长；比 Worker 计算短，早到就停在原地呼吸。 */
-const WAITING_SPREAD_MS = 900;
-/** 呼吸周期。约 2.4s 一次，幅度 6% —— 只为让画面「活着」，不抢注意力。 */
-const WAITING_BREATH_PERIOD_MS = 2400;
-const WAITING_BREATH_RATIO = 0.06;
-
-/**
- * 启动等待预动画：从原点把节点铺成一片缓慢呼吸的星尘。
- *
- * ── 为什么在 core 而不是 ui ────────────────────────────────────────────────
- * 它必须和 Worker 的生命周期绑定：预动画起点是 Worker 的输入（原点），
- * 终点是入场动画的起点（星尘环）。这个衔接关系是本模块的内部知识，交给
- * 调用方拼装只会让两边约定漂移。所以由 runLayoutInWorker 内部启动。
- *
- * ── 为什么用 rAF + cy.batch 而不是 cy.animate ─────────────────────────────
- * 与 animatePositionsTo 同理：1182 个 tween 进 cytoscape 动画队列会占满
- * 主线程，而这台机器**已经被判定为低性能**。这里更不能加重负担。
- *
- * @returns 预动画句柄：`targets` 是终点坐标（入场动画的起点），
- *          `cancel` 用于掐断 rAF 循环。返回 null 表示预动画没启动
- *          （无 rAF / reduced motion / 没有可动的节点），此时调用方
- *          不做任何让位动作，入场动画会退回用 cy 里的实际位置。
- */
-function startWaitingAnimation(
-  cy: cytoscape.Core,
-): { targets: Record<string, { x: number; y: number }>; cancel: () => void } | null {
-  if (typeof requestAnimationFrame === 'undefined') return null;
-  if (prefersReducedMotion()) return null;
-
-  // 只取真实节点：layer-parent 装饰节点（太极图 / 四维空间 / 生命之树）
-  // 各自有独立的 overlay 在管位置和 rAF，这里插手会和它们打架。
-  const anim: { node: cytoscape.NodeSingular; x: number; y: number; phase: number }[] = [];
-  const targets: Record<string, { x: number; y: number }> = {};
-  let i = 0;
-  cy.nodes().forEach((n) => {
-    if (n.hasClass('layer-parent')) return;
-    // Halton 低差异序列铺角度和半径，避免纯随机聚簇成几个斑点。
-    const angle = halton(i, 2) * Math.PI * 2;
-    const radius = WAITING_RADIUS_MIN + halton(i, 3) * (WAITING_RADIUS_MAX - WAITING_RADIUS_MIN);
-    i++;
-    const x = Math.cos(angle) * radius;
-    const y = Math.sin(angle) * radius;
-    targets[n.id()] = { x, y };
-    anim.push({ node: n, x, y, phase: halton(i, 5) * Math.PI * 2 });
-  });
-  if (anim.length === 0) return null;
-
-  const t0 = performance.now();
-  console.info(`[entrance] 启动等待预动画：${anim.length} 个节点铺成星尘`);
-
-  // 取消句柄。预动画是一个自续的 rAF 循环，Worker 一回来就必须能掐断它：
-  // 它和紧随其后的入场动画都写 position，同时跑会表现为开头几帧抖动。
-  let cancelled = false;
-  let rafId = 0;
-
-  const step = (now: number): void => {
-    if (cancelled) return;
-    const t = Math.min(1, (now - t0) / WAITING_SPREAD_MS);
-    // easeOutCubic：起步快、收尾慢，和入场动画同一条曲线，两段才不像拼接的。
-    const spread = 1 - (1 - t) * (1 - t) * (1 - t);
-    // 铺完 900ms 之后进入呼吸，否则只播一次就定格成一张静态图。
-    const settled = t >= 1;
-
-    cy.batch(() => {
-      for (const a of anim) {
-        const ang = Math.atan2(a.y, a.x);
-        const base = Math.hypot(a.x, a.y);
-        // 呼吸相位按各节点自己错开，否则整片星尘会整齐地一起涨落，
-        // 看起来像缩放而不像悬浮。
-        const pulse = settled
-          ? 1 + Math.cos(((now - t0) / WAITING_BREATH_PERIOD_MS) * 2 * Math.PI + a.phase) * WAITING_BREATH_RATIO
-          : 1;
-        const rad = base * spread * pulse;
-        a.node.position({ x: Math.cos(ang) * rad, y: Math.sin(ang) * rad });
-      }
-    });
-    rafId = requestAnimationFrame(step);
-  };
-  rafId = requestAnimationFrame(step);
-
-  return {
-    targets,
-    cancel: (): void => {
-      cancelled = true;
-      if (rafId) cancelAnimationFrame(rafId);
-    },
-  };
-}
-
-/**
- * 停止等待预动画，让位给入场动画。
- *
- * Worker 回来了就立刻收手：cancel 掐断 rAF，`applyPositions` 把节点落到
- * 星尘环的**裸**坐标。
- *
- * ⚠️ 落地的是 targets 而非「呼吸中的实际坐标」，两者差最多 6% 半径。
- * 这是一次 ≤6% 的瞬时位移，一帧内完成，人眼读作「稳了一下」而不是
- * 「跳了一下」；换来的是入场动画的起点完全确定（不依赖 cancel 那一刻
- * 呼吸走到哪个相位）。这个取舍是有意的，不要「优化」成去捕获当前帧坐标
- * —— 那样入场动画的起点就会随 Worker 返回时机抖动。
- */
-function stopWaitingAnimation(
-  cy: cytoscape.Core,
-  targets: Record<string, { x: number; y: number }>,
-  cancel: () => void,
-): void {
-  cancel();
-  applyPositions(cy, targets);
-}
 
 /**
  * 把 Worker 算出的坐标一次性写回 cytoscape。
@@ -371,63 +229,46 @@ function animatePositionsTo(
     return;
   }
 
-  // 归一化基准用**终点**到质心的距离，不是起点。
-  //
-  // 起点在正常路径下恒为 (0,0)：halo burst 的位置动画是 `duration: 0`，
-  // 紧跟着又被 finishStreamingLayout 里的 `cy.stop(undefined, true)` 掐掉，
-  // 1182 个节点全部堆在原点重叠。**这正是"从中心散开"的起点形态**，
-  // 不是退化情形。曾经的 `maxDist(起点) === 0 → 跳过动画` 分支把这个
-  // 正常情况误判成退化，直接落位，于是表现为一帧散开。
-  let cx = 0;
-  let cyy = 0;
-  let n = 0;
-  for (const id in end) {
-    const e = end[id];
-    cx += e.x;
-    cyy += e.y;
-    n++;
-  }
-  if (n === 0) {
+  // 抽成纯函数（见下）后，这一节就只剩「把 schedule 的 id 解析成 cy node
+  // 引用 + 跑 rAF 循环」两件事。算法本身在 computeEntranceSchedule 里
+  // 100% 单测覆盖（tests/unit/core/layout-worker-client.test.ts）。
+  const schedule = computeEntranceSchedule(end, start, {
+    staggerMs: STAGGER_MS,
+    minMs: ENTRANCE_MIN_MS,
+    maxMs: ENTRANCE_MAX_MS,
+  });
+  if (schedule.perNode.length === 0) {
     applyPositions(cy, end);
     return;
   }
-  cx /= n;
-  cyy /= n;
 
-  // 预计算每个节点的延迟与行程，避免每帧重复算
   const anim: {
     node: cytoscape.NodeSingular;
     from: { x: number; y: number };
     to: { x: number; y: number };
     delay: number;
-    dist: number;
+    duration: number;
   }[] = [];
-  let maxDist = 0;
-  for (const id in end) {
-    const s = start[id] ?? end[id];
-    const node = cy.getElementById(id);
+  for (const p of schedule.perNode) {
+    const node = cy.getElementById(p.id);
     if (node.empty()) continue;
-    const e = end[id];
-    // 按**终点**距离分层：靠近核心的节点先动，外围的稍后跟上，
-    // 于是结构像是从中心向外一层层结晶，而不是整张图同时平移。
-    const dist = Math.hypot(e.x - cx, e.y - cyy);
-    if (dist > maxDist) maxDist = dist;
-    anim.push({ node, from: s, to: e, delay: 0, dist });
+    anim.push({
+      node,
+      from: p.from,
+      to: p.to,
+      delay: p.delay,
+      duration: p.duration,
+    });
   }
-  if (anim.length === 0 || maxDist === 0) {
-    // 终点也全同一点才是真的退化（空图 / 单节点），直接落位。
+  if (anim.length === 0) {
     applyPositions(cy, end);
     return;
   }
-  for (const a of anim) {
-    // dist / maxDist ∈ [0,1]：0 = 核心（先动），1 = 最外围（最后动）
-    a.delay = (a.dist / maxDist) * STAGGER_MS;
-  }
 
   const t0 = performance.now();
-  const total = ENTRANCE_ANIMATION_MS + STAGGER_MS;
+  const total = schedule.totalMs;
   console.info(
-    `[entrance] 启动入场动画：${anim.length} 个节点，行程 max=${maxDist.toFixed(0)}，总时长 ${total}ms`,
+    `[entrance] 启动入场动画：${anim.length} 个节点，行程 max=${schedule.maxDist.toFixed(0)}，总时长 ${total}ms（核心 ${ENTRANCE_MIN_MS}ms / 外围 ${ENTRANCE_MAX_MS}ms，自适应）`,
   );
 
   const step = (now: number): void => {
@@ -439,7 +280,7 @@ function animatePositionsTo(
     // 1 - (1-t)³：起步快、收尾慢
     cy.batch(() => {
       for (const a of anim) {
-        const t = Math.max(0, Math.min(1, (elapsed - a.delay) / ENTRANCE_ANIMATION_MS));
+        const t = Math.max(0, Math.min(1, (elapsed - a.delay) / a.duration));
         if (t <= 0) {
           a.node.position(a.from);
           continue;
@@ -454,6 +295,88 @@ function animatePositionsTo(
     requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
+}
+
+/**
+ * 入场动画调度：纯函数，无 cytoscape 依赖，可单测。
+ *
+ * 给每个节点算 `delay` + `duration`：
+ *
+ *   - delay：    dist/maxDist * staggerMs，远的先走
+ *   - duration： minMs + (dist/maxDist) * (maxMs - minMs)，远的飞得久
+ *
+ * dist 用的是**终点**到质心的距离，不是起点。归一化基准用终点后，节点
+ * 的「飞多快 / 多早动」完全由它在最终拓扑里的位置决定，跟起点无关——
+ * 这是「错峰设计意图」与算法无关的接口契约。
+ *
+ * 退化情形：
+ *
+ *   - end 为空：返回空 schedule（调用方瞬时落位）
+ *   - maxDist === 0（终点全在同一点 / 单节点）：同样 return 空 schedule，
+ *     duration 退化为 minMs 也会失真，不如不播动画
+ */
+interface EntranceScheduleOptions {
+  staggerMs: number;
+  minMs: number;
+  maxMs: number;
+}
+interface EntranceScheduleEntry {
+  id: string;
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+  delay: number;
+  duration: number;
+}
+interface EntranceSchedule {
+  perNode: EntranceScheduleEntry[];
+  totalMs: number;
+  maxDist: number;
+}
+export function computeEntranceSchedule(
+  end: Record<string, { x: number; y: number }>,
+  start: Record<string, { x: number; y: number }>,
+  opts: EntranceScheduleOptions,
+): EntranceSchedule {
+  let cx = 0;
+  let cyy = 0;
+  let n = 0;
+  for (const id in end) {
+    const e = end[id];
+    cx += e.x;
+    cyy += e.y;
+    n++;
+  }
+  if (n === 0) return { perNode: [], totalMs: 0, maxDist: 0 };
+  cx /= n;
+  cyy /= n;
+
+  const perNode: EntranceScheduleEntry[] = [];
+  const dists: number[] = [];
+  let maxDist = 0;
+  for (const id in end) {
+    const e = end[id];
+    const dist = Math.hypot(e.x - cx, e.y - cyy);
+    if (dist > maxDist) maxDist = dist;
+    const from = start[id] ?? e;
+    perNode.push({ id, from, to: e, delay: 0, duration: 0 });
+    dists.push(dist);
+  }
+  if (maxDist === 0) return { perNode: [], totalMs: 0, maxDist: 0 };
+
+  // 用 maxDist 归一化，单次循环同时算 delay 和 duration。
+  // 早先版本里这两个值写在一起（一个 t = dist/maxDist），但这里保持
+  // 两条独立公式，让 staggerMs / minMs / maxMs 三个常数互相独立——
+  // 调参的时候不会互相牵连。
+  let totalMs = 0;
+  for (let i = 0; i < perNode.length; i++) {
+    const t = dists[i] / maxDist;
+    const p = perNode[i];
+    p.delay = t * opts.staggerMs;
+    p.duration = opts.minMs + t * (opts.maxMs - opts.minMs);
+    const finishAt = p.delay + p.duration;
+    if (finishAt > totalMs) totalMs = finishAt;
+  }
+  return { perNode, totalMs, maxDist };
 }
 
 /** 读系统的「减弱动态效果」偏好；读不到时按 false（正常动画）处理。 */

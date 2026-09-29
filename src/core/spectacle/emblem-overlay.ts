@@ -520,19 +520,18 @@ function stripNodeChrome(node: cytoscape.NodeSingular, size: number): void {
     shape: 'ellipse' as cytoscape.Css.NodeShape,
 
     // ── 其它可能的可见副产物：清掉 ───────────────────────────
-    'compound-sizing-w-b': 0,
-    'compound-sizing-w-h': 0,
     padding: 0,
     opacity: 0,
     // 注意：不能写 visibility:hidden——cytoscape 会同时让 pointer 命中失效，
     // 节点就没法被点击打开详情面板。要"不画"靠 border/bg/overlay 全 transparent
     // + opacity 压 0 已经够了。
     ghost: 'no' as const,
-    'ghost-color': 'rgba(0,0,0,0)',
-    'ghost-opacity': 0,
-    'ghost-shape': 'ellipse' as cytoscape.Css.NodeShape,
-    'ghost-offset-x': 0,
-    'ghost-offset-y': 0,
+    // 这里刻意不设 compound-sizing-* / ghost-color / ghost-shape / ghost-offset-*：
+    // cytoscape 的 d.ts 收录了它们，但运行时解析 style 时会逐条报
+    // "style property is invalid" 警告（实测：每个 stripNodeChrome 调用刷 6 条
+    // warn），而它们描述的是复合父节点尺寸与 ghost 边缘拖影——对一个被压成
+    // 全透明的孤立叶子节点，两者都不产生任何可见效果。设了只是白刷警告。
+    // tesseract-overlay.ts 的 stripNodeChrome 早就避开了。
   });
 }
 
