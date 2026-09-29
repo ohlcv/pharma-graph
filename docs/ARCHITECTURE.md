@@ -60,28 +60,60 @@
 
 > 测试已迁出 `src/parser/`，见 §3.7 / §6。原 `frontmatter.test.ts`、`location-audit.test.ts` 现在位于 `tests/component/parser/`。
 
-### 3.2 `src/core/` — 图谱核心逻辑（18 文件 / 7,082 行 / 300,898 B；测试见 §3.7）
+### 3.2 `src/core/` — 图谱核心逻辑（20 文件 + 5 spectacle / 10,416 行 / 413,921 B；测试见 §3.7）
+
+**顶层（20 文件）**
 
 | 路径                                   | 职责                                               |     大小 |  行数 |
 | -------------------------------------- | -------------------------------------------------- | -------: | ----: |
-| `src/core/build-graph.ts`              | 从 frontmatter 构建节点边 + BFS 深度 / 子树算法    | 12,589 B |   348 |
-| `src/core/celestial-emblem-overlay.ts` | 节点"天徽"叠加层（Canvas 绘制星形 + 视觉令牌）     | 27,348 B |   541 |
-| `src/core/config.ts`                   | 全局配置：FILL_CONFIG / 布局 / 边类型映射 / 主题色 | 34,043 B |   811 |
-| `src/core/content-loader.ts`           | 内容加载器                                         |  3,460 B |    73 |
-| `src/core/device-capability.ts`        | 设备能力检测（移动端 / 大屏）                      |  3,212 B |    81 |
+| `src/core/build-graph.ts`              | 从 frontmatter 构建节点边 + BFS 深度 / 子树算法    | 12,584 B |   344 |
+| `src/core/config.ts`                   | 全局配置：FILL_CONFIG / 布局 / 边类型映射 / 主题色 | 34,374 B |   859 |
+| `src/core/content-loader.ts`           | 内容加载器                                         |  3,523 B |    80 |
+| `src/core/device-capability.ts`        | 设备能力检测（移动端 / 大屏 / 能否逐帧动画）      |  5,133 B |   115 |
 | `src/core/edge-builder.ts`             | 汇总 edges_out → 边数据                            |    970 B |    28 |
-| `src/core/edge-types.ts`               | 边类型词汇表                                       |  1,802 B |    39 |
-| `src/core/force-drag.ts`               | 力导向拖拽交互                                     | 10,877 B |   324 |
-| `src/core/glow-overlay.ts`             | glow / flow 光效覆盖层（独立 canvas）              | 43,480 B |   789 |
+| `src/core/edge-types.ts`               | 边类型词汇表                                       |  1,795 B |    47 |
+| `src/core/force-drag.ts`               | 力导向拖拽交互                                     | 10,922 B |   332 |
+| `src/core/glow-overlay.ts`             | glow / flow 光效覆盖层（独立 canvas）              | 44,021 B |   987 |
 | `src/core/graph-manager.ts`            | 图数据装配与缓存管理                               |  3,826 B |   110 |
-| `src/core/graph.ts`                    | 节点 / 边数据结构定义                              |  4,207 B |    95 |
-| `src/core/node-builder.ts`             | frontmatter → 节点数据                             |  2,705 B |    71 |
-| `src/core/node-shape-outline.ts`       | 节点形状描边渲染                                   |  8,078 B |   212 |
-| `src/core/optimized-content-loader.ts` | 流式 .md 加载 fallback                             | 11,421 B |   357 |
-| `src/core/prebuilt-loader.ts`          | 加载预生成 graph-data.json                         |  4,369 B |   107 |
-| `src/core/renderer.ts`                 | Cytoscape 实例 + 样式表 + 布局入口                 | 49,356 B | 1,087 |
+| `src/core/graph.ts`                    | 节点 / 边数据结构定义                              |  4,193 B |    95 |
+| `src/core/halton.ts`                   | Halton 低差异序列（预动画铺点）                    |    965 B |    25 |
+| `src/core/layout-worker.ts`            | 布局 Web Worker 入口（euler 在 worker 内算）       |  2,700 B |    85 |
+| `src/core/layout-worker-client.ts`     | Worker 客户端 + 等待预动画 + 入场插值              | 19,954 B |   470 |
+| `src/core/node-builder.ts`             | frontmatter → 节点数据                             |  2,711 B |    73 |
+| `src/core/node-shape-outline.ts`       | 节点形状描边渲染                                   |  8,089 B |   233 |
+| `src/core/optimized-content-loader.ts` | 流式 .md 加载 fallback                             | 11,475 B |   372 |
+| `src/core/prebuilt-loader.ts`          | 加载预生成 graph-data.json                         |  4,413 B |   110 |
+| `src/core/renderer.ts`                 | Cytoscape 实例 + 样式表 + 布局入口                 | 52,621 B | 1,193 |
 | `src/core/theme-colors.ts`             | 主题色读取与切换                                   |  1,392 B |    35 |
-| `src/core/tour.ts`                     | 漫游引擎（DFS/拓扑序、档位、applyRootScope）       | 74,165 B | 1,715 |
+| `src/core/tour.ts`                     | 漫游引擎（DFS/拓扑序、档位、applyRootScope）       | 83,684 B | 2,007 |
+
+**`src/core/spectacle/` — 奇观节点（5 文件 / 2,772 行 / 104,952 B）**
+
+脱离知识层的空域装置：真实 cytoscape 节点 + 独立 canvas overlay 逐帧重绘。
+打 `layer-parent` class 排除出检索 / 统计 / 漫游 / force-drag，但**参与 euler
+斥力物理**（不 lock），本体样式被 `stripNodeChrome()` 压全透明，只留命中盒。
+
+**命名规范**：文件名 = `<奇观>-overlay.ts`，后缀一律 `-overlay`（该文件产出的
+是 canvas 覆盖层，不是节点本身）。前缀直接取奇观名，**不加 `celestial-`**——
+E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 overlay 文件用
+`-geometry.ts` 等其它后缀区分。
+
+| 路径                                         | 奇观           | 职责                             |     大小 |  行数 |
+| -------------------------------------------- | -------------- | -------------------------------- | -------: | ----: |
+| `src/core/spectacle/emblem-overlay.ts`     | 太极八卦       | 十二重同心环 + 中心太极          | 28,209 B |   876 |
+| `src/core/spectacle/tesseract-overlay.ts`   | 四维空间       | 4D 超立方体 16 顶点 / 32 棱     | 22,202 B |   551 |
+| `src/core/spectacle/fractal-tree-overlay.ts`| 生命之树       | L-system 树 + 末梢光点           | 26,816 B |   650 |
+| `src/core/spectacle/fractal-tree-geometry.ts`| （树的共享几何）| 纯函数几何内核，可脱 canvas 测试  | 11,398 B |   271 |
+| `src/core/spectacle/e8-overlay.ts`         | E8 根系        | 240 根 Coxeter 平面投影 / 6720 棱 | 15,951 B |   468 |
+
+> ⚠️ **两处单点维护**，加奇观时必须同步：
+> ① `src/ui/main.ts` 的 `DECOR_KEYS`（`?decor=` 白名单）+ 调用点；
+> ② `src/core/renderer.ts` 的 `DECOR_NODE_CLASSES`（样式表压透明的 class 列表）。
+> 漏 ① → 开关关不掉；漏 ② → 节点在样式表兜底路径下露出 cytoscape 默认椭圆。
+>
+> 四份 overlay 的生命周期骨架（canvas / ResizeObserver / rAF / visibilitychange /
+> `stripNodeChrome`）**刻意各自独立不抽基类**——画法毫无共性，抽出来只会得到
+> 一个塞满互斥状态的上帝对象。这是已知技术债。
 
 > 测试已迁出 `src/core/`，见 §3.7 / §6。原 `build-graph.test.ts`、`edge-types.test.ts`、`tour.test.ts`、`tour-engine.test.ts` 现在位于 `tests/unit/core/` 或 `tests/component/core/`。原 `src/core/__tests__/`（config-layouts / cytoscape-style-tokens）已**不存在**。
 
@@ -463,7 +495,8 @@
 
 1. **新增 / 删除文件**：更新对应目录的表格，保持"路径 ↔ 职责 ↔ 大小 / 行数"一致。新增测试时必须放进 `tests/{unit,component,e2e}/`，**不放回 `src/`**。
 2. **大文件预警**（≥ 30KB）：
-   - 源码：`components.css`（86KB）、`tour.ts`（74KB）、`tour-controller.ts`（48KB）、`renderer.ts`（49KB）、`app-debug.ts`（41KB）、`glow-overlay.ts`（43KB）、`config.ts`（34KB）、`main.ts`（34KB）、`celestial-emblem-overlay.ts`（27KB）—— 接近拆分阈值，**改之前先看是否该沿职责切分**。
+   - 源码：`src/ui/styles/components.css`（106KB）、`src/core/tour.ts`（82KB）、`src/ui/tour-controller.ts`（52KB）、`src/core/renderer.ts`（51KB）、`src/ui/main.ts`（46KB）、`src/core/glow-overlay.ts`（43KB）、`src/ui/app-debug.ts`（40KB）、`src/core/config.ts`（34KB）—— 接近拆分阈值，**改之前先看是否该沿职责切分**。
+   - 样式：`src/ui/styles/tour.css`（39KB）、`glass.css`（33KB）。
    - 文档：`docs/archive/all-frontmatter-extracted.md`（630KB）为生成物，勿手改；`docs/布局参数清单.md`（64KB）为审计产物。
    - 数据：`public/graph-data.json`（1.4MB）随节点数膨胀，每次内容改动都会重建。
 3. **决策记录位置**：新决策统一写 `docs/ADR/` 目录下，文件前缀 `ADR-000N-` 续号，并在此登记。

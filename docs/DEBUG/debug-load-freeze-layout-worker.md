@@ -170,8 +170,12 @@ Worker 结果的铺开范围 4856，同步方案是 17571。**图整体更紧凑
 
 ### 5. 环境里有未归属的文件
 
-`src/core/celestial-e8-node.ts` 在本次排查期间出现（未跟踪、不被引用、
-带 3 个类型错误）。非本次工作产出，**未做处理**，留待归属确认。
+`celestial-e8-node.ts`（E8 根系，423 行）在本次排查期间出现（未跟踪、不被引用、
+带 3 个类型错误）。非本次工作产出。
+
+**已归属**（见 §9）：接入生产 + 随其它奇观迁入 `src/core/spectacle/`，
+3 个类型错误（`cytoscape.Css.BackgroundFill` / `TextEvents` / `Ghost` 在当前
+cytoscape 版本不存在）改为 `as const`，与 `emblem-overlay.ts` 保持一致。
 
 ## 后续：按设备分档 + 等待预动画
 
@@ -240,8 +244,40 @@ Worker 回来后真正的入场动画从星尘环接续炸开。两段同用 eas
 ⚠️ 预动画的**观感（半径、时长、呼吸幅度）未在真机上校准过**，
 参数是按「不抢注意力 + 不打断衔接」定的，缺实测依据。
 
+### 8. 三个调试开关分属不同的轴，别当成冗余删掉
+
+| 开关 | 决定 | 删掉会怎样 |
+| --- | --- | --- |
+| `?layout=sync` / `?layout=worker` | 布局**在哪算**（主线程 / Worker） | 只能看到能力检测选中的那一条 |
+| `?motion=always` | 入场动画**播不播** | 开了系统「减弱动态效果」时动画被跳过，无法调试 |
+| `?quality=preset` 等 | euler 参数档位 | 失去布局质量的对照基线 |
+
+`?layout=` 和 `?motion=` 是**正交**的，后者对两条计算路径都生效。
+最典型的误用：开着系统「辅助功能 → 显示 → 减弱动态效果」再访问
+`?layout=worker` —— 路径选对了，但 `prefersReducedMotion()` 为真，
+预动画在 `startWaitingAnimation` 入口 `return null`、入场动画走瞬时落位，
+**结果什么都没播**。此时必须加 `?motion=always` 才能验证动画路径。
+
+`?motion=always` 的作用点有两处，且各自**独立**读 `prefersReducedMotion()`：
+`startWaitingAnimation`（决定预动画启不启动）与 `animatePositionsTo`
+（决定入场动画播不播）。所以删掉它之后，预动画这条路就没有任何
+URL 级别的绕过手段了，只能改代码。
+
+> 这三个开关都读 URL 而非构建产物，**别为了「清理」删**：
+> 判据只有 `hardwareConcurrency` 一条，在高性能开发机上永远走 sync 分支，
+> 没有 `?layout=worker` 就无法验证低性能档。
 
 ## 复现方式
+
+### 手动验证（URL 开关，见 §8）
+
+```bash
+?layout=sync     # 主线程逐帧 euler 动画 —— 高性能档的真实路径
+?layout=worker   # Worker 计算 + 等待预动画 + 插值入场 —— 低性能档
+?motion=always   # 强制播动画，绕过系统「减弱动态效果」
+```
+
+### 量化测量（脚本）
 
 ```bash
 # 有头模式测稳态帧率（真实 GPU 数字，可信）
@@ -261,3 +297,56 @@ node tools/probe-worker-feasibility.mjs
 > 关联文档的 `tools/measure-euler-quality.mjs` 是无头的，其表格中的
 > FPS / 中位帧 / 长帧占比**受本文档开头的方法论警告影响**，
 > 质量指标（边交叉、重叠率）与时长指标仍然有效。
+
+---
+
+## 9. 奇观节点归入 `src/core/spectacle/`（2026-09-29）
+
+四个奇观节点（太极八卦 / 四维空间 / 生命之树 / E8 根系）原先平铺在
+`src/core/`，与 `renderer.ts`、`tour.ts` 等核心逻辑混在一起，共约 2,772 行。
+现在归入 `src/core/spectacle/`。
+
+**这次同时接完了 E8**（见 §5）。它此前是半成品：`main.ts` 没 import、
+`renderer.ts` 的 `DECOR_NODE_CLASSES` 没登记、配套内容文件不存在。
+
+### 命名规范
+
+统一为 `<奇观>-overlay.ts`（`e8-overlay.ts` / `emblem-overlay.ts` /
+`tesseract-overlay.ts` / `fractal-tree-overlay.ts`）。两条规则：
+
+1. **后缀按文件产出物定**，不按主体。该文件产出的是 canvas 覆盖层，
+   节点本身只是一枚命中盒，所以是 `-overlay` 而非 `-node`。
+2. **前缀取奇观名，不加 `celestial-`**。原先 `celestial-emblem-overlay.ts`
+   和 `celestial-e8-node.ts` 都带这个前缀，但 E8 根系与太极八卦没有共同
+   语义可共享——前缀在这里是噪音，去掉。
+
+几何内核类文件另用后缀区分（`fractal-tree-geometry.ts`）。
+
+### 顺带修掉的两个既有缺陷
+
+1. **`tree-node` 一直没进 `DECOR_NODE_CLASSES`**。四个装饰 class 里只有前两个
+   登记过，树的本体压透明只靠 overlay 自己的 `stripNodeChrome()`。补齐后
+   样式表兜底路径也覆盖它。
+2. **`?decor=` 是负向列举**。每加一个奇观要改四处（新增 `DISABLE_` 常量 +
+   补进其余三个的关闭条件 + `DECOR_STATE` + 调用点），漏一处就「以为关了
+   其实开着」。改成 `DECOR_KEYS` 白名单 + `decorEnabled(key)`，加奇观只需
+   改数组和调用点两处。
+
+### 新增的两处单点维护
+
+移动后奇观节点的登记点从 1 处变成 2 处，两处都要在**新增奇观时同步**：
+
+| 位置 | 漏了会怎样 |
+| --- | --- |
+| `src/ui/main.ts` 的 `DECOR_KEYS` | 开关关不掉 / `DECOR_STATE` 报错 |
+| `src/core/renderer.ts` 的 `DECOR_NODE_CLASSES` | 样式表兜底路径下露出 cytoscape 默认椭圆 |
+
+长期解法是让各 overlay 导出自己的 class 常量、由 `renderer.ts` 汇总
+（需要给 `src/core/spectacle/` 加 barrel）。**尚未做**——目前 4 个 class
+名是硬编码字符串，`stripNodeChrome` 也是 4 份近似重复实现。
+
+### 验证
+
+`tsc --noEmit` 4 错误（与改动前同基线，全在 `tour.ts`，与本次无关）、
+`npm test` 439 passed / 39 files、`npm run validate` 1184 文件全过、
+`npm run build` 通过且 E8 节点正确进入 `graph-data.json`。
