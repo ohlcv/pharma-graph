@@ -129,6 +129,15 @@ export interface RootOutOfLevelInfo {
   upgradedLevel: number;
 }
 
+/**
+ * Speech-end adapter contract. Extracted as a named type because it appears
+ * in two places that must not drift: `TourOptions.waitForSpeechEnd` and
+ * `TourEngine.setWaitForSpeechEnd`. They previously disagreed — the field
+ * was `{ promise; cancel }` while the setter took `() => Promise<void>` —
+ * so the setter could never actually receive a usable adapter.
+ */
+export type SpeechEndAdapter = () => { promise: Promise<void>; cancel: () => void };
+
 export interface TourOptions {
   interval: number;
   maxDepth: number;
@@ -163,7 +172,7 @@ export interface TourOptions {
    * adapter falls back to legacy fixed-timer scheduling. Tests can pass
    * a deterministic stub.
    */
-  waitForSpeechEnd?: () => { promise: Promise<void>; cancel: () => void };
+  waitForSpeechEnd?: SpeechEndAdapter;
   /** Called when progress metadata changes WITHOUT a real step (e.g. depth
    *  slider change). Receives the same TourStepInfo but the controller must
    *  treat it as "数字/进度条刷新" only — do NOT push to history, speak,
@@ -995,7 +1004,7 @@ export class TourEngine {
   /** Extra settle ms after `waitForSpeechEnd()` resolves. */
   private postSpeechDelayMs = 0;
   /** Adapter that returns a promise + cancel for the current utterance. */
-  private waitForSpeechEnd: (() => { promise: Promise<void>; cancel: () => void }) | null = null;
+  private waitForSpeechEnd: SpeechEndAdapter | null = null;
   private paused = false;
   private stopped = false;
   private onStep?: TourOptions['onStep'];
@@ -1518,7 +1527,7 @@ export class TourEngine {
    * resolve a Promise when the current utterance ends — see
    * TourOptions.waitForSpeechEnd for the contract.
    */
-  setWaitForSpeechEnd(adapter: (() => Promise<void>) | null): void {
+  setWaitForSpeechEnd(adapter: SpeechEndAdapter | null): void {
     this.waitForSpeechEnd = adapter;
   }
 
@@ -1656,7 +1665,11 @@ export class TourEngine {
         // Speech still going — extend the wait by another minGap so the
         // utterance can complete naturally. This is the "renewal" branch:
         // a long utterance no longer gets truncated by the floor.
-        this.speechWaitCancel = () => clearTimeout(renewalTimer);
+        // Guard against null: this closure is replaced on every renewal, and
+        // the previous handle was already consumed by whatever set `settled`.
+        this.speechWaitCancel = () => {
+          if (renewalTimer !== null) clearTimeout(renewalTimer);
+        };
         renewalTimer = setTimeout(checkFloor, minGap);
       };
 
