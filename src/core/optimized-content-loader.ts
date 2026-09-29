@@ -271,7 +271,7 @@ export async function loadContentStreaming(
         phase: 'done',
         loaded: manifest.files.length,
         total: manifest.files.length,
-        message: '准备就绪',
+        message: '大爆炸！',
       });
     });
 

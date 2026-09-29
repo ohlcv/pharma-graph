@@ -238,7 +238,7 @@ function completeLoadingWithFadeOut(nodeCount: number): void {
   if (!indicator) return;
 
   indicator.classList.add('complete');
-  if (label) label.textContent = '大爆炸';
+  if (label) label.textContent = '初始化完成。';
   if (count) count.textContent = '';
   if (percent) percent.textContent = '100%';
   console.info(

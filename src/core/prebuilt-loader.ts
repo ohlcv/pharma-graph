@@ -75,7 +75,7 @@ export async function loadGraph(onProgress?: ProgressCallback): Promise<LoadResu
   const report = onProgress ?? (() => {});
 
   // ── Fast path: prebuilt graph-data.json ─────────────────────────────────
-  report({ phase: 'prebuilt', loaded: 0, total: 1, message: '加载知识图谱…' });
+  report({ phase: 'prebuilt', loaded: 0, total: 1, message: '加载节点…' });
 
   try {
     const res = await fetch(GRAPH_DATA_URL);
@@ -87,7 +87,7 @@ export async function loadGraph(onProgress?: ProgressCallback): Promise<LoadResu
           phase: 'done',
           loaded: raw.nodes.length,
           total: raw.nodes.length,
-          message: '准备就绪',
+          message: '大爆炸！',
         });
         return { graph, files: {}, usedPrebuilt: true };
       }
