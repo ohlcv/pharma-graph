@@ -660,7 +660,10 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
       return;
     }
     logInfo(`[layout-worker] 完成，耗时 ${(result.elapsedMs / 1000).toFixed(2)}s`);
-    settled = true;
+    // 注意:这里不要设 settled = true —— settled 是 completeLoading 内部的
+    // 闸门,由入场动画收尾时(animatePositionsTo.onSettled)统一触发。
+    // 否则此处先设 true 会让 completeLoading 提前 short-circuit,
+    // 「**大爆炸**」状态条永远不会出现。
   });
 
   /**
@@ -675,7 +678,8 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
    * 墙钟超时的坏处是「节点冻在半空」，比让它跑完难看得多。
    */
   function runSyncLayout(): void {
-    if (settled) return;
+    // settled 现在只由 completeLoading 内部设,不再用作「已 resolve」闸门。
+    // runSyncLayout 是单次调用入口(同步布局路径 / worker 退化),不重复触发。
 
     // 非空断言：renderer 在函数开头已做过 `=== null` 早退。TS 仍报是因为
     // runSyncLayout 是函数声明（hoisted），控制流分析无法确定它只在早退之后
