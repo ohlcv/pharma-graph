@@ -2064,6 +2064,17 @@
             <span class="tour-dt__stat-label">步</span>
             <span class="tour-dt__stat-val" id="tour-step-badge-dt">1</span>
           </span>
+          <!-- 时间：从本次漫游 start 开始累计（暂停照走），引擎自动重启下一轮不归零，
+               仅 stop() / 下次手动 start() 时归零。复用 .tour-dt__stat 同款样式（含
+               tabular-nums，避免秒数跳变时宽度抖动）。移动版不展示。 -->
+          <span class="tour-dt__stat">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <circle cx="12" cy="12" r="9" />
+              <polyline points="12 7 12 12 16 14" />
+            </svg>
+            <span class="tour-dt__stat-label">计时</span>
+            <span class="tour-dt__stat-val" id="tour-elapsed-dt">—</span>
+          </span>
         </div>
         <!-- 分隔线 -->
         <div class="tour-dt__sep"></div>

@@ -86,6 +86,9 @@ export class TourController {
     this.setIdleUI();
     // 初始化 fill（DOM 默认 value 不会触发 input 事件，需手动同步 fill）
     for (const s of this.sliders) this.paintFill(s);
+    // idle 时显式把 elapsed 写成 0:00（paintElapsed 在 idle 状态下也会写到 0:00，
+    // 这里再调一次确保热重载后第一次 mount 立即可见）。
+    this.paintElapsed();
   }
 
   isRunning(): boolean {
@@ -97,6 +100,100 @@ export class TourController {
 
   /** 追踪期望的档位（1-5，5=全部），用于在 start() 时覆盖 DOM 滑块值 */
   private _pendingMaxDepth: number = 5;
+
+  // ── Session elapsed timer ──────────────────────────────────────────────────
+  // 累计时长：start() 时归零，stop() 时停走但保留累计；下次手动 start() 才再次归零。
+  // 引擎自动重启下一轮（restart 轮转）不重置——保持"本局会话累计"的语义。
+  // 暂停时**停走**：用户角度"实际学习时长"，暂停期间不计入。继续时从冻结处接着累加。
+  /** 墙上时钟锚点（performance.now()），减去它得到当前 session 累计 ms。null = 未启动。 */
+  private _sessionStartTs: number | null = null;
+  /** stop() 时把当前累计秒数快照到这里，保留显示。null = 本次 session 从未 start。 */
+  private _sessionAccumSec: number | null = null;
+  /** 1Hz setInterval 句柄。仅在 running 时存在；pause 时 clearInterval 冻结显示。 */
+  private _elapsedTimer: ReturnType<typeof setInterval> | null = null;
+
+  /** 当前 session 累计 ms（start→now，含正在跑和已暂停冻结的秒数）。 */
+  private getAccumulatedMs(): number {
+    if (this._sessionStartTs !== null) {
+      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      return Math.max(0, now - this._sessionStartTs);
+    }
+    return (this._sessionAccumSec ?? 0) * 1000;
+  }
+
+  /** 把秒数格式化成 h:mm:ss。超过 1 小时才显示小时位（其余 0:00 / 12:34）。 */
+  private formatElapsed(totalSec: number): string {
+    const s = Math.max(0, Math.floor(totalSec));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+  }
+
+  /** 重置锚点 + 启动 1s 心跳。幂等：若已有 timer 则先清掉。 */
+  private startElapsedTimer(): void {
+    if (this._elapsedTimer !== null) clearInterval(this._elapsedTimer);
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    this._sessionStartTs = now;
+    this._sessionAccumSec = null;
+    this._elapsedTimer = setInterval(() => this.paintElapsed(), 1000);
+    this.paintElapsed();
+  }
+
+  /** 停心跳 + 把当前 ms 快照到累计秒数（保留显示，供用户回顾）。 */
+  private stopElapsedTimer(): void {
+    if (this._elapsedTimer !== null) {
+      clearInterval(this._elapsedTimer);
+      this._elapsedTimer = null;
+    }
+    if (this._sessionStartTs !== null) {
+      this._sessionAccumSec = Math.max(0, Math.floor(this.getAccumulatedMs() / 1000));
+      this._sessionStartTs = null;
+      this.paintElapsed();
+    }
+  }
+
+  /** 暂停冻结：停心跳但不动锚点——继续时锚点代表的"累计起点"已含此前的所有累加。 */
+  private freezeElapsedTimer(): void {
+    if (this._elapsedTimer !== null) {
+      clearInterval(this._elapsedTimer);
+      this._elapsedTimer = null;
+    }
+    // 把到此刻为止的累计 ms 固化成新的"起点"——这样恢复时 getAccumulatedMs() 不会
+    // 把暂停期间的墙上时间也加进去。锚点后退，等价于"从现在起重新计时但保留之前的总量"。
+    const accMs = this.getAccumulatedMs();
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    this._sessionStartTs = now - accMs;
+  }
+
+  /** 恢复：起心跳 + paint。锚点已在 freeze 时调整好，无需重算。 */
+  private resumeElapsedTimer(): void {
+    if (this._elapsedTimer !== null) return;
+    if (this._sessionStartTs === null) return;
+    this._elapsedTimer = setInterval(() => this.paintElapsed(), 1000);
+    this.paintElapsed();
+  }
+
+  /** 把当前累计秒数写到 #tour-elapsed-dt。
+   *
+   * 区分"从未启动"（idle → —）与"启动过、累计 0 秒"（0:00）：
+   *   - _sessionStartTs !== null → 正在跑，显示累计
+   *   - _sessionAccumSec === null 且 StartTs === null → 从未启动，显示 —
+   *   - _sessionAccumSec !== null → 已 stop，保留最终累计（包括 0）
+   */
+  private paintElapsed(): void {
+    if (this._sessionStartTs !== null) {
+      const totalSec = Math.floor(this.getAccumulatedMs() / 1000);
+      this.setText('tour-elapsed-dt', this.formatElapsed(totalSec));
+      return;
+    }
+    if (this._sessionAccumSec === null) {
+      this.setText('tour-elapsed-dt', '—');
+      return;
+    }
+    this.setText('tour-elapsed-dt', this.formatElapsed(this._sessionAccumSec));
+  }
 
   start(): void {
     if (this.engine?.isRunning() || this.engine?.isPaused()) {
@@ -158,6 +255,7 @@ export class TourController {
     }
     this.running = true;
     this.paused = false;
+    this.startElapsedTimer();
     this.setRunningUI();
   }
 
@@ -173,6 +271,12 @@ export class TourController {
       this.engine.resume();
     } else {
       this.engine.pause();
+      // 暂停时立刻终止当前 TTS utterance（不要等它读完）。引擎内部的
+      // clearSpeechWait() 只清掉自己的 setTimeout/renewalTimer，不会
+      // 调 speechSynthesis.cancel()，所以语音会继续放到结束 —— 用户期望
+      // 「按暂停立刻静音」。恢复后下一个 onStep 会通过 speakNode() 自动
+      // 开启新 utterance，TTS 总开关（toggle-speech）不受影响。
+      speechController.stop();
     }
     // 同步 this.paused 到引擎的实际状态（在 onEnginePause/Resume 回调触发前）。
     // 这样暂停→拖进度条时 jumpToNode 看到的是 engine.paused=true，不会 auto-play。
@@ -198,6 +302,7 @@ export class TourController {
     this.engine = null;
     this.running = false;
     this.paused = false;
+    this.stopElapsedTimer();
     this.detailPanel.close();
     speechController.stop();
     this.setIdleUI();
@@ -968,12 +1073,14 @@ export class TourController {
   private onEnginePause(): void {
     this.paused = true;
     this.running = true;
+    this.freezeElapsedTimer();
     this.setRunningUI();
   }
 
   private onEngineResume(): void {
     this.paused = false;
     this.running = true;
+    this.resumeElapsedTimer();
     this.setRunningUI();
   }
 
