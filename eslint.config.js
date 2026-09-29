@@ -79,6 +79,12 @@ export default [
         SpeechSynthesisVoice: 'readonly',
         speechSynthesis: 'readonly',
         queueMicrotask: 'readonly',
+        // Canvas + ResizeObserver — src/core/spectacle/ 的 overlay 逐帧重绘用
+        HTMLCanvasElement: 'readonly',
+        CanvasRenderingContext2D: 'readonly',
+        ResizeObserver: 'readonly',
+        getComputedStyle: 'readonly',
+        CSSStyleDeclaration: 'readonly',
         // Node
         process: 'readonly',
         Buffer: 'readonly',

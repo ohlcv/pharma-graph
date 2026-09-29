@@ -79,6 +79,7 @@ import { initStarfield } from './starfield.js';
 import { createCelestialEmblemOverlay } from '../core/spectacle/emblem-overlay.js';
 import { createTesseractOverlay } from '../core/spectacle/tesseract-overlay.js';
 import { createFractalTreeOverlay } from '../core/spectacle/fractal-tree-overlay.js';
+import { createE8StarOverlay } from '../core/spectacle/e8-overlay.js';
 import { runLayoutInWorker } from '../core/layout-worker-client.js';
 import { initSpeechSettings } from './speech-settings.js';
 
@@ -102,25 +103,36 @@ let tourController: TourController;
  * 对照实验方便，并非作为修复手段。
  *
  * URL 参数（无需重新构建）：
- *   ?decor=off        三个都关
+ *   ?decor=off        全部关
  *   ?decor=celestial  只留太极八卦
  *   ?decor=tess       只留超立方体
  *   ?decor=tree       只留生命之树
- *   缺省              三个都开
+ *   ?decor=e8         只留 E8 根系
+ *   缺省              全部开
+ *
+ * 刻意用白名单集合（`DECOR_KEYS`）而不是逐个 `DISABLE_*` 布尔：负向列举
+ * 意味着每加一个奇观就得改四处（新增 DISABLE_ 常量 + 补进其余三个的
+ * 关闭条件 + DECOR_STATE + 调用点），漏一处就是「以为关了其实开着」。
+ * 第五个奇观 E8 接入时正是被这一点逼着重构的。
  */
 const DECOR_OVERRIDE = new URLSearchParams(location.search).get('decor');
+/** 合法奇观 key，顺序即 DECOR_STATE 与接入顺序。 */
+const DECOR_KEYS = ['celestial', 'tess', 'tree', 'e8'] as const;
 const ONLY = DECOR_OVERRIDE && DECOR_OVERRIDE !== 'off' ? DECOR_OVERRIDE : null;
-const DISABLE_TESSERACT = DECOR_OVERRIDE === 'off' || DECOR_OVERRIDE === 'celestial';
-const DISABLE_CELESTIAL = DECOR_OVERRIDE === 'off' || DECOR_OVERRIDE === 'tess';
-const DISABLE_TREE =
-  DECOR_OVERRIDE === 'off' || DECOR_OVERRIDE === 'celestial' || DECOR_OVERRIDE === 'tess';
+const decorEnabled = (key: string): boolean => (ONLY === null ? true : ONLY === key);
+const DISABLE_CELESTIAL = !decorEnabled('celestial');
+const DISABLE_TESSERACT = !decorEnabled('tess');
+const DISABLE_TREE = !decorEnabled('tree');
+const DISABLE_E8 = !decorEnabled('e8');
 /** 供调试面板查询当前开关状态。 */
 export const DECOR_STATE = {
   override: DECOR_OVERRIDE,
   only: ONLY,
+  known: DECOR_KEYS,
   tess: !DISABLE_TESSERACT,
   celestial: !DISABLE_CELESTIAL,
   tree: !DISABLE_TREE,
+  e8: !DISABLE_E8,
 };
 
 // ── 布局质量降级实验开关 (?quality=) ────────────────────────────────────────
@@ -453,7 +465,7 @@ function initGraphFromManager(graphManager: GraphManager): void {
   // Euler's repulsion physics. Must come AFTER the halo loop above (which
   // blindly touches every node including this one) and BEFORE
   // finishStreamingLayout() triggers the first Euler run — so it has a
-  // position from the very first physics tick. See celestial-emblem-overlay.ts
+  // position from the very first physics tick. See emblem-overlay.ts
   // header for the full rationale.
   if (!DISABLE_CELESTIAL) createCelestialEmblemOverlay({ container, cy });
   // 四维空间（tesseract）：与太极八卦同机制的第二个装饰节点，独立 overlay +
@@ -463,6 +475,10 @@ function initGraphFromManager(graphManager: GraphManager): void {
   // 结构与前两者平行（独立 canvas / 独立 rAF / 真 cytoscape 节点挂
   // layer-parent 排除出搜索统计），接入时机的两条约束同样适用。
   if (!DISABLE_TREE) createFractalTreeOverlay({ container, cy });
+  // E8 根系：第四个装饰节点。240 个根投影到 Coxeter 平面，6720 条棱
+  // 压进单条 path 一次描边。骨架与前三个平行（独立 canvas / 独立 rAF /
+  // 命中盒），接入时机的两条约束同样适用。
+  if (!DISABLE_E8) createE8StarOverlay({ container, cy });
 
   // ── Populate sidebar the moment the graph is ready — not after layout settles.
   // stats (node/edge/selected/highlighted + essence/edge legend) are accurate as

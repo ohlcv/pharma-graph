@@ -153,7 +153,14 @@ export const RIPPLE_COLORS = {
 // 需要"排除某 class"时走 JS 侧 collection API 的 `cy.nodes(...).not(...)`——
 // 项目里几十处 `.not('.layer-parent')` 都是这么用的。
 
-const DECOR_NODE_CLASSES = ['celestial-emblem-node', 'tesseract-node'];
+// 装饰节点本体（压透明）。这四个 class 与 src/core/spectacle/ 下各 overlay
+// 自己的 TREE_CLASS / E8_CLASS / EMBLEM_CLASS / TESSERACT_CLASS 一一对应。
+// ⚠️ 单点维护：新增奇观必须两边同时登记。漏登记的后果是该节点在样式表兜底
+// 路径下会露出 cytoscape 默认的椭圆 + 边框（overlay 的 stripNodeChrome 仍会
+// 生效，所以只在某些样式重算时机可见）——难排查。
+// 更好的做法是让各 overlay 导出 class 常量、由这里汇总，那需要给
+// src/core/spectacle/ 加 barrel，见 docs/ARCHITECTURE.md §3.2。
+const DECOR_NODE_CLASSES = ['celestial-emblem-node', 'tesseract-node', 'tree-node', 'e8-star-node'];
 /** 装饰节点本体（压透明）。逗号展开成多条规则以符合 cytoscape 的选择器语法。 */
 const DECOR_NODE = DECOR_NODE_CLASSES.map((c) => `.${c}`).join(', ');
 
