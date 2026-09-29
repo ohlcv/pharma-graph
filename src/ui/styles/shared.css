@@ -35,6 +35,16 @@
     opacity: 0;
     transform: translateX(-50%) translateY(12px);
   }
+  /* 让用户看清「**大爆炸** 100%」那一拍再渐隐 —— 用 CSS 过渡延迟替代
+   * main.ts 里的 setTimeout(800ms) 硬编码。800ms 是视觉停顿,不是业务逻辑;
+   * 改放在 CSS 里,改起来也直观(transition-delay)。
+   *
+   * 注意:必须挂在 .complete 上,而不是默认 transition —— 否则加载中
+   * 的每个 phase 切换(loaded / total 数字跳动)都会被这个延迟拖 800ms,
+   * 数字就跟不上节奏了。 */
+  .loading-indicator.complete {
+    transition-delay: 0.8s;
+  }
   .loading-indicator .loading-dot {
     width: 8px;
     height: 8px;
@@ -53,10 +63,6 @@
       0 0 18px rgba(52, 211, 153, 0.35);
     animation: dot-pulse 3s ease-in-out infinite;
   }
-  /* No extra transition-delay on .complete: main.ts already holds the pill for
- * 800ms before adding `.hidden`, then removes it from layout after 600ms.
- * A CSS delay on top of that (it used to be 0.6s) pushed the fade past the
- * moment the element was taken out of layout, so the pill just vanished. */
   .loading-label {
     letter-spacing: 0.04em;
   }

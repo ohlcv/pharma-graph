@@ -198,32 +198,53 @@ const EULER_WORKER_PARAMS: Record<string, unknown> = {
 
 // ── Loading Indicator (corner pill) ───────────────────────────────────────────
 
+/**
+ * 只更新 label / count / percent 文字 —— 不触发 fade-out。
+ *
+ * 「大爆炸」fade-out 由 completeLoading() 单独触发(在入场动画真正收尾时)，
+ * 不再让 loader 的 `phase: 'done'` 提前触发。原先两个时机共用同一个 fade-out
+ * 会导致: JSON 加载完 → fade 触发(800ms 渐隐) → 4 秒后入场动画才开始,
+ * 用户看到「状态条消失 4 秒后图才动」—— 这是 4 秒空窗的真正成因。
+ */
 function updateLoadingIndicator(progress: PrebuiltProgress): void {
-  const indicator = document.getElementById('loading-indicator');
   const label = document.getElementById('loading-label');
   const count = document.getElementById('loading-count');
   const percent = document.getElementById('loading-percent');
-
-  if (!indicator) return;
-
-  if (progress.phase === 'done') {
-    indicator.classList.add('complete');
-    if (label) label.textContent = '大爆炸';
-    if (count) count.textContent = '';
-    if (percent) percent.textContent = '100%';
-    setTimeout(() => {
-      // `.hidden` starts the 0.5s opacity fade (shared.css); take the pill out
-      // of layout only after it has finished (600ms > 500ms).
-      indicator.classList.add('hidden');
-      setTimeout(() => indicator.classList.add('u-hidden'), 600);
-    }, 800);
-    return;
-  }
 
   // Phase 'prebuilt' — show single-step progress
   if (label) label.textContent = progress.message;
   if (count) count.textContent = '';
   if (percent) percent.textContent = '';
+}
+
+/**
+ * 入场动画真正收尾时触发:显示「**大爆炸**」+ 100%,800ms 后用 CSS transitionend
+ * 把元素从布局移除。替代原先 updateLoadingIndicator('done') 的 fade-out 逻辑,
+ * 让状态条文案/渐隐与入场动画完全同步。
+ */
+function completeLoadingWithFadeOut(nodeCount: number): void {
+  const indicator = document.getElementById('loading-indicator');
+  const label = document.getElementById('loading-label');
+  const count = document.getElementById('loading-count');
+  const percent = document.getElementById('loading-percent');
+  if (!indicator) return;
+
+  indicator.classList.add('complete');
+  if (label) label.textContent = '大爆炸';
+  if (count) count.textContent = '';
+  if (percent) percent.textContent = '100%';
+
+  // 等入场动画跑完后再等一拍(让用户看清 100%),然后启动 CSS 渐隐。
+  // 时长来自 CSS .loading-indicator 的 transition(0.5s opacity + transform);
+  // transitionend 触发后从布局移除,无硬编码 setTimeout。
+  indicator.addEventListener(
+    'transitionend',
+    () => {
+      indicator.classList.add('u-hidden');
+    },
+    { once: true },
+  );
+  indicator.classList.add('hidden');
 }
 
 /**
@@ -546,18 +567,23 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
   cy.stop(undefined, true);
   cy.elements().removeClass('entering');
 
+  // `settled` 是三条路径共用的「已收尾」闸门：任何一条路径开始收尾后，
+  // 其他路径的回调都必须变成 no-op，否则加载指示器会被触发多次。
+  //
+  // 声明在 `completeLoading` 之前 —— 后者闭包按引用读它，而 `let` 有 TDZ，
+  // 跳过路径(nodeCount<80 / 慢设备 / quality=preset)会同步调用
+  // completeLoading，必须保证 `settled` 已被绑定。
+  let settled = false;
+
   const completeLoading = (): void => {
-    updateLoadingIndicator({
-      phase: 'done',
-      loaded: nodeCount,
-      total: nodeCount,
-      message: '准备就绪',
-    });
+    if (settled) return;
+    settled = true;
+    completeLoadingWithFadeOut(nodeCount);
   };
 
   // ── Skip 1: too few nodes — Euler jitter worse than halo positions ─────
   if (nodeCount < 80) {
-    setTimeout(completeLoading, 100);
+    completeLoading();
     return;
   }
 
@@ -565,7 +591,7 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
   const capability = detectDeviceCapability();
   if (!capability.shouldRunEuler) {
     logInfo('Euler skipped (slow device):', capability.reason);
-    setTimeout(completeLoading, 100);
+    completeLoading();
     return;
   }
 
@@ -573,17 +599,9 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
   // 不是"优化"，是给降级方案定一个最坏情况基线（帧率天花板 / 质量地板）。
   if (QUALITY_OVERRIDE === 'preset') {
     logInfo('Euler skipped (?quality=preset):', 'baseline-only control group');
-    setTimeout(completeLoading, 100);
+    completeLoading();
     return;
   }
-
-  // `settled` 是三条路径共用的「已收尾」闸门：任何一条路径开始收尾后，
-  // 其他路径的回调都必须变成 no-op，否则加载指示器会被触发多次。
-  //
-  // 必须声明在下面的分派**之前**——`let` 有暂时性死区，在声明之前读它
-  // 会抛 ReferenceError（runSyncLayout 是 hoisted 的函数声明，会在声明
-  // 执行前就被调用）。
-  let settled = false;
 
   // ── 三条路径，按「主线程扛不扛得住逐帧」分派 ──────────────────────────
   // 实测（有头 Chromium / 真实 GPU / 1182 节点）：
@@ -628,9 +646,14 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
   } else {
     logInfo('布局路径被 ?layout=worker 强制指定');
   }
-  runLayoutInWorker(cy, { randomize: false, ...EULER_WORKER_PARAMS }, (elapsedMs) => {
-    logInfo(`[layout-worker] 正在计算… ${(elapsedMs / 1000).toFixed(1)}s`);
-  }).then((result) => {
+  runLayoutInWorker(
+    cy,
+    { randomize: false, ...EULER_WORKER_PARAMS },
+    (elapsedMs) => {
+      logInfo(`[layout-worker] 正在计算… ${(elapsedMs / 1000).toFixed(1)}s`);
+    },
+    completeLoading, // 入场动画收尾即触发,替代 waitForGraphToSettle 的 500ms 静止 + 60s 超时 + 100ms 轮询
+  ).then((result) => {
     if (!result) {
       logInfo('[layout-worker] 不可用，退回同步布局');
       runSyncLayout();
@@ -638,9 +661,6 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
     }
     logInfo(`[layout-worker] 完成，耗时 ${(result.elapsedMs / 1000).toFixed(2)}s`);
     settled = true;
-    // 动画由 animatePositionsTo 自行推进；这里不等待它结束，
-    // waitForGraphToSettle 的「位置静止 500ms」判定天然会等完再收尾。
-    waitForGraphToSettle(cy, completeLoading);
   });
 
   /**
@@ -656,11 +676,6 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
    */
   function runSyncLayout(): void {
     if (settled) return;
-    const finalize = (): void => {
-      if (settled) return;
-      settled = true;
-      waitForGraphToSettle(cy, completeLoading);
-    };
 
     // 非空断言：renderer 在函数开头已做过 `=== null` 早退。TS 仍报是因为
     // runSyncLayout 是函数声明（hoisted），控制流分析无法确定它只在早退之后
@@ -680,92 +695,13 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
       { randomize: false, ...EULER_OVERRIDE_TUNING },
       {
         skipEntering: true,
-        onLayoutStop: () => {
-          finalize();
-        },
+        // euler 跑完 layoutstop 事件触发时即调 completeLoading——
+        // 这是 layout 算法的自然收敛信号，替代之前 waitForGraphToSettle
+        // 的「500ms 静止 + 60s 硬超时 + 100ms 轮询节流」三层硬编码。
+        onLayoutStop: completeLoading,
       },
     );
   }
-}
-
-/**
- * Wait until the graph is visibly still before declaring loading complete.
- *
- * Cytoscape's `layoutstop` describes a layout lifecycle event, not a paint
- * guarantee. We therefore sample node positions on animation frames and
- * require 500ms (`quietForMs`) with no movement (and no Cytoscape animation in progress).
- * This makes the loading pill's disappearance follow the user's perception:
- * nodes settle first; only then may the pill celebrate and fade.
- */
-function waitForGraphToSettle(cy: cytoscape.Core, onSettled: () => void): void {
-  const quietForMs = 500;
-  const timeoutMs = 60_000;
-  const epsilon = 1.0;
-  const startedAt = performance.now();
-  let quietSince = startedAt;
-  let previous = new Map<string, { x: number; y: number }>();
-
-  const sampleHasMoved = (): boolean => {
-    let moved = previous.size !== cy.nodes().length;
-    const current = new Map<string, { x: number; y: number }>();
-
-    cy.nodes().forEach((node) => {
-      const position = node.position();
-      const old = previous.get(node.id());
-      if (
-        !old ||
-        Math.abs(position.x - old.x) > epsilon ||
-        Math.abs(position.y - old.y) > epsilon
-      ) {
-        moved = true;
-      }
-      current.set(node.id(), position);
-    });
-
-    previous = current;
-    return moved;
-  };
-
-  // 轮询降到 10Hz（100ms 一次）而不是 rAF 默认的 60Hz。
-  // 大爆炸期间 sampleHasMoved() 会遍历所有 ~1041 个节点 + 调 node.position()，
-  // 每帧一次是 ~60k ops/s 的纯开销，对"判断有没有动"这件事完全没必要这么频繁。
-  // 100ms 节流后降到 ~10k ops/s，渲染管线（cytoscape 重画、glow-overlay draw）才是主线程大头，
-  // 这里省下的几毫秒/帧正好让它们跑得更顺。
-  // 响应性最差也就 100ms —— 肉眼基本察觉不到。
-  let lastSampleAt = startedAt;
-
-  const poll = (): void => {
-    const now = performance.now();
-    const moving = sampleHasMoved();
-
-    if (moving) quietSince = now;
-
-    if (now - quietSince >= quietForMs) {
-      onSettled();
-      return;
-    }
-
-    // Safety net: keep the UI recoverable if a third-party layout or browser
-    // bug leaves an animation flag stuck. 60s matches the hard Euler ceiling
-    // above — by that point the user has been staring at "大爆炸" long enough;
-    // just commit so the page becomes interactive.
-    if (now - startedAt >= timeoutMs) {
-      console.warn('[loader] graph did not become still within 60s; completing loading indicator');
-      onSettled();
-      return;
-    }
-
-    if (now - lastSampleAt < 100) {
-      requestAnimationFrame(poll);
-      return;
-    }
-    lastSampleAt = now;
-    requestAnimationFrame(poll);
-  };
-
-  // Start after at least one paint, so the snapshot observes the real final
-  // layout frame rather than the synchronous `layoutstop` call stack.
-  requestAnimationFrame(() => requestAnimationFrame(poll));
 }
 
 /**

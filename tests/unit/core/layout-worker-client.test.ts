@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { computeEntranceSchedule } from '@/core/layout-worker-client';
+import { describe, it, expect, vi } from 'vitest';
+import { animatePositionsTo, computeEntranceSchedule } from '@/core/layout-worker-client';
 
 /**
  * 入场动画调度是观感算法：固定时长版本下，远节点「飞过去像撞墙」、近节点
@@ -163,5 +163,124 @@ describe('computeEntranceSchedule', () => {
     for (const p of s.perNode) {
       expect(p.delay + p.duration).toBeLessThanOrEqual(s.totalMs + 1e-9);
     }
+  });
+});
+
+/**
+ * onSettled 回调契约 —— 取代了原来 waitForGraphToSettle 的「500ms 静止 + 60s
+ * 硬超时 + 100ms 轮询」三层硬编码。回调必须在任何收敛路径上(同步落位 / 排空
+ * schedule / 正常 rAF)都被触发一次,且只触发一次 —— 否则 loading 指示器要么
+ * 永远不收,要么重复触发渐隐动画。
+ *
+ * 因为 animatePositionsTo 内部用了 cy.batch + rAF,测试里 mock 一个最小 cy:
+ * - nodes() / getElementById(): 返回 NodeSingular 替身(支持 position())
+ * - batch(): 同步执行回调
+ * - raf: vi.useFakeTimers() 控制
+ */
+describe('animatePositionsTo onSettled', () => {
+  function makeFakeNode(id: string, x: number, y: number) {
+    return {
+      id: () => id,
+      empty: () => false,
+      position: vi.fn(),
+      _x: x,
+      _y: y,
+    };
+  }
+
+  function makeFakeCy(nodeSpecs: Array<{ id: string; x: number; y: number }>) {
+    const byId = new Map<string, ReturnType<typeof makeFakeNode>>();
+    for (const n of nodeSpecs) byId.set(n.id, makeFakeNode(n.id, n.x, n.y));
+    return {
+      nodes: () => Array.from(byId.values()),
+      getElementById: (id: string) => {
+        const n = byId.get(id);
+        return {
+          empty: () => !n,
+          position: n?.position ?? vi.fn(),
+        };
+      },
+      batch: (fn: () => void) => fn(),
+    };
+  }
+
+  it('end 为空时同步落位并立即触发 onSettled', () => {
+    const cy = makeFakeCy([]);
+    const onSettled = vi.fn();
+    animatePositionsTo(cy as never, {}, {}, false, onSettled);
+    expect(onSettled).toHaveBeenCalledTimes(1);
+  });
+
+  it('reduced motion 路径: 同步落位 + 立即触发 onSettled', () => {
+    const cy = makeFakeCy([{ id: 'a', x: 0, y: 0 }]);
+    const onSettled = vi.fn();
+    animatePositionsTo(
+      cy as never,
+      {},
+      { a: { x: 10, y: 10 } },
+      true, // reducedMotion = true
+      onSettled,
+    );
+    expect(onSettled).toHaveBeenCalledTimes(1);
+  });
+
+  it('正常 rAF 路径: totalMs 内 onSettled 不触发,totalMs 后触发一次', () => {
+    // requestAnimationFrame 在 jsdom 里不会自然 tick;用一个递推 stub:
+    // 每次 raf 注册回调,按 performance.now() 顺序触发。callback 内部如果
+    // 再 raf,新 callback 也加入队列。drain 在一轮里只处理当前时间点的回调,
+    // 避免 step(step) 自续 raf 制造无限循环。
+    const queue: Array<{ cb: (t: number) => void; at: number }> = [];
+    const raf = (cb: (t: number) => void): number => {
+      queue.push({ cb, at: 0 });
+      return queue.length;
+    };
+    const fakeNow = { t: 0 };
+    vi.stubGlobal('requestAnimationFrame', raf);
+    vi.stubGlobal('performance', { now: () => fakeNow.t });
+
+    const drainOnce = (): void => {
+      // 把所有未指定时间的回调标到「当前时间」(浏览器真实 rAF 也这么干)。
+      for (const item of queue) if (item.at === 0) item.at = fakeNow.t;
+      queue.sort((a, b) => a.at - b.at);
+      // 只取 ≤ fakeNow.t 的回调一次性跑完,跑出来的新回调下一轮再处理
+      const due = queue.filter((it) => it.at <= fakeNow.t);
+      queue.splice(0, due.length);
+      for (const { cb } of due) cb(fakeNow.t);
+    };
+
+    try {
+      // sanity check: rAF stub 真的覆盖了
+      expect(typeof requestAnimationFrame).toBe('function');
+
+      const cy = makeFakeCy([
+        { id: 'a', x: 0, y: 0 },
+        { id: 'b', x: 100, y: 100 },
+      ]);
+      const onSettled = vi.fn();
+      animatePositionsTo(
+        cy as never,
+        {},
+        { a: { x: 50, y: 50 }, b: { x: 60, y: 60 } },
+        false,
+        onSettled,
+      );
+
+      // 推进到一半 (1500ms),settled 仍未触发
+      fakeNow.t = 1500;
+      drainOnce();
+      expect(onSettled).toHaveBeenCalledTimes(0);
+
+      // 推进过 total(STAGGER 500 + ENTRANCE_MAX 2500 = 3000ms),settled 触发一次
+      fakeNow.t = 3500;
+      drainOnce();
+      expect(onSettled).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('onSettled 未传时不抛错', () => {
+    const cy = makeFakeCy([]);
+    expect(() => animatePositionsTo(cy as never, {}, {}, false)).not.toThrow();
   });
 });

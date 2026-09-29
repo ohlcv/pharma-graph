@@ -32,6 +32,10 @@ const WORKER_TIMEOUT_MS = 30000;
  * 在 Worker 里算布局。
  *
  * @param onProgress 每次心跳回调（用于「正在计算 Xs」的提示）
+ * @param onSettled 入场动画收尾回调（所有路径下都会触发：成功完成、Worker
+ *                 失败退回同步路径、退回 applyPositions 瞬时落位）。取代之前
+ *                 waitForGraphToSettle 的「500ms 静止判定」+ 「60s 硬超时」
+ *                 + 「100ms 轮询节流」三层硬编码。
  * @returns 成功返回坐标表；**任何**失败路径都返回 null，由调用方退回同步布局。
  *          永不 throw —— 让失败只表现为「退���」，不让它炸掉整个加载流程。
  */
@@ -39,6 +43,7 @@ export async function runLayoutInWorker(
   cy: cytoscape.Core,
   params: Record<string, unknown>,
   onProgress?: (elapsedMs: number) => void,
+  onSettled?: () => void,
 ): Promise<WorkerLayoutResult | null> {
   if (typeof Worker === 'undefined') return null;
 
@@ -116,6 +121,7 @@ export async function runLayoutInWorker(
         startPositions,
         msg.positions,
         prefersReducedMotion(),
+        onSettled,
       );
       finish({ positions: msg.positions, elapsedMs: msg.elapsedMs });
     };
@@ -213,11 +219,12 @@ function applyPositions(
  * 可以强制播动画，用来区分「代码没跑到」和「被 reduced motion 短路了」
  * 这两种完全不同的故障。
  */
-function animatePositionsTo(
+export function animatePositionsTo(
   cy: cytoscape.Core,
   start: Record<string, { x: number; y: number }>,
   end: Record<string, { x: number; y: number }>,
   reducedMotion: boolean,
+  onSettled?: () => void,
 ): void {
   const forced =
     typeof location !== 'undefined' &&
@@ -226,6 +233,7 @@ function animatePositionsTo(
   if ((reducedMotion && !forced) || typeof requestAnimationFrame === 'undefined') {
     console.info('[entrance] 跳过入场动画（reduced motion / 无 rAF）');
     applyPositions(cy, end);
+    onSettled?.();
     return;
   }
 
@@ -239,6 +247,7 @@ function animatePositionsTo(
   });
   if (schedule.perNode.length === 0) {
     applyPositions(cy, end);
+    onSettled?.();
     return;
   }
 
@@ -262,6 +271,7 @@ function animatePositionsTo(
   }
   if (anim.length === 0) {
     applyPositions(cy, end);
+    onSettled?.();
     return;
   }
 
@@ -275,6 +285,7 @@ function animatePositionsTo(
     const elapsed = now - t0;
     if (elapsed >= total) {
       applyPositions(cy, end);
+      onSettled?.();
       return;
     }
     // 1 - (1-t)³：起步快、收尾慢
