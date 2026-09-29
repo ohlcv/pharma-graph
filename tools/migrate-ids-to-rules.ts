@@ -38,6 +38,7 @@ const LABEL_EN = {
   药理与毒理学: 'pharmacology',
   药物化学: 'medicinal-chem',
   药动学: 'pkpd',
+  // 被下方药二的同名「生命药学」覆盖，见那里的注释
   生命药学: 'biopharmacy',
   // 药三章级
   药学服务与药品管理: 'pharmacy-service',
@@ -147,6 +148,11 @@ const LABEL_EN = {
   药物对机体的作用: 'drug-effect',
   药物毒性与用药安全: 'drug-toxicity',
   药物的体内过程: 'adme',
+  // ⚠️ 与下方「药一 篇级」的 `生命药学: 'biopharmacy'` 撞名——药一和药二
+  // 各有一章叫「生命药学」。这张表是扁平的，无法表达同名不同层级，靠后者
+  // 覆盖前者（JS 对象字面量语义），所以药一那条从未生效。这是迁移脚本的
+  // 已知取舍；真要区分得改成 `Map<book, Map<chapter, slug>>`。
+  // eslint-disable-next-line no-dupe-keys -- 药一 / 药二 同名章节，见上方注释
   生命药学: 'biopharmacy-ch',
   // 药三节级
   '第一节 药学服务与执业药师': 'pharmacy-care',

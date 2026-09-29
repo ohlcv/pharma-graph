@@ -24,7 +24,7 @@ export default [
   prettierConfig,
 
   {
-    files: ['src/**/*.ts', 'scripts/**/*.ts', 'archive/**/*.ts'],
+    files: ['src/**/*.ts', 'scripts/**/*.ts', 'archive/**/*.ts', 'tests/**/*.ts', 'tools/**/*.ts'],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
@@ -97,6 +97,14 @@ export default [
     rules: {
       // TypeScript
       'no-unused-vars': 'off',
+
+      // no-undef is a core (non-type-aware) rule that predates TypeScript.
+      // tsc already rejects undefined identifiers at compile time — and
+      // better, it understands `import type`, type-only positions, and
+      // ambient declarations, which no-undef cannot. Leaving it on produced
+      // 602 false positives (mostly `document`, `process`, `cytoscape`) that
+      // had to be suppressed by hand-maintaining a `globals` allowlist.
+      'no-undef': 'off',
       '@typescript-eslint/no-unused-vars': [
         'warn',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
@@ -162,6 +170,39 @@ export default [
     rules: {
       'no-console': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+
+  // tools/* — one-off measurement / migration scripts (AGENTS.md §2.2).
+  // Two things make the JS-recommended rules wrong here:
+  //
+  // 1. no-undef — these are plain Node ESM (process, console) and several
+  //    generate an HTML page they inject into a headless browser (document,
+  //    window, requestAnimationFrame). One file has to be both, so no single
+  //    env's globals list is right.
+  // 2. no-unused-vars — some of these build a page as a template string and
+  //    reference the imported symbols *inside* that string (see
+  //    preview-fractal-tree.mjs, which imports generateTree then injects it
+  //    into generated HTML). ESLint can't see through the string, so every
+  //    such import is a false positive.
+  //
+  // These scripts are throwaway by design and are not part of the build
+  // chain, so a slightly lax config costs nothing. Real logic still gets
+  // type-checked where it matters — the src/ and tests/ blocks below.
+  {
+    files: ['tools/**/*.mjs', 'tools/**/*.cjs', 'tools/**/*.js', 'tools/**/*.ts'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+    },
+    rules: {
+      'no-undef': 'off',
+      'no-unused-vars': 'off',
+      'no-console': 'off',
+      // Same as the src/ block: `catch {}` with no binding is used
+      // deliberately here (dev-server readiness polling swallows connection
+      // errors until the deadline).
+      'no-empty': ['warn', { allowEmptyCatch: true }],
     },
   },
 ];

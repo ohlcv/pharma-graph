@@ -63,7 +63,7 @@ function parseFile(content: string): ParsedFM & { edgesFromRoot: EdgeDef[] } {
 
 function isEnglishId(id: string): boolean {
   if (!id) return false;
-  return /^[a-zA-Z0-9_\-]+$/.test(id);
+  return /^[a-zA-Z0-9_-]+$/.test(id);
 }
 
 async function main() {
