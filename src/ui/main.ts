@@ -42,6 +42,7 @@ import { uiState } from './state.js';
 import { logInfo } from './logger.js';
 import { loadGraph, type LoadProgress as PrebuiltProgress } from '../core/prebuilt-loader.js';
 import { detectDeviceCapability } from '../core/device-capability.js';
+import { halton } from '../core/halton.js';
 import { installDispatcher, dispatchAction } from './action-dispatcher.js';
 import { updateStats, syncBottomSheetStats } from './graph-stats.js';
 import { syncLayoutDisplay, setCurrentLayout } from './layout/layout-engine.js';
@@ -152,7 +153,36 @@ const EULER_TUNING: Record<string, Record<string, unknown>> = {
   crippled: { refresh: 2, maxSimulationTime: 3000 },
   preset: {},
 };
-const EULER_OVERRIDES = QUALITY_OVERRIDE ? EULER_TUNING[QUALITY_OVERRIDE] : undefined;
+const EULER_OVERRIDE_TUNING = QUALITY_OVERRIDE ? EULER_TUNING[QUALITY_OVERRIDE] : undefined;
+
+/**
+ * 传给 layout Worker 的 euler 参数。
+ *
+ * ⚠️ 这里**必须**取 config.ts 里的真实配置，不能只传 `?quality=` 的覆盖值。
+ * 曾经写成 `{ randomize: false, ...EULER_OVERRIDES }`（覆盖值缺省为 undefined），
+ * 于是 Worker 拿到的是 cytoscape-euler 的**库默认值**，而不是项目配置的：
+ *
+ *   库默认 maxSimulationTime = 4000   项目配置 20000  → 布局 4 秒被掐断
+ *   库默认 maxIterations    = 1000   项目配置 5000   → 提前 bail
+ *   库默认 pull            = 0.001  项目配置 0       → **所有节点被往原点拉**
+ *   库默认 gravity         = -1.2   项目配置 -15     → 斥力弱一个数量级
+ *
+ * `pull` 那条正是用户看到的「节点没有完全分散开、挤在一块」——所有节点被
+ * 拉向质心，斥力又推不开。而主线程兜底路径（`runSyncLayout`）走的是
+ * `renderer.runLayout` → 读 config.ts，所以**只有 Worker 路径会挤**，这也
+ * 解释了为什么这个 bug 一直躲过了同步路径的测试。
+ *
+ * `randomize: false` 在两条路径上都成立：主线程侧节点已在 halo 位置，
+ * Worker 侧则通过 `elements[].position` 传入同一批坐标。
+ */
+const EULER_WORKER_PARAMS: Record<string, unknown> = {
+  ...LAYOUTS[DEFAULT_LAYOUT].cytoscape,
+  // animate / fit 是主线程的呈现关注点，Worker 里无意义（headless 无渲染），
+  // 且 animate:false 正是 Worker 相比主线程省下 ~16s 的原因，不能开。
+  animate: false,
+  fit: false,
+  ...EULER_OVERRIDE_TUNING,
+};
 
 // ── Loading Indicator (corner pill) ───────────────────────────────────────────
 
@@ -454,6 +484,11 @@ function initGraphFromManager(graphManager: GraphManager): void {
  * their halo positions into the organic, topology-aware structure. This is
  * the "gravity" phase of the cosmic metaphor.
  *
+ * ⚠️ 上面这句只在**同步兜底路径**成立。主路径已改为 layout Worker
+ * （见下方 runLayoutInWorker）：euler 在 Worker 里 `animate: false` 纯算
+ * 坐标，主线程拿到结果后自己播一段 1.2s 错峰插值。观感等价，但避免了
+ * euler 逐帧回写 1182 个节点位置的开销（那占了同步路径 20s 中的 16s）。
+ *
  * But Euler is expensive on slow devices — on a phone with a slow CPU the
  * simulation can take 25-40 seconds, eat battery, and risk "tab unresponsive"
  * warnings. We therefore:
@@ -526,20 +561,58 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
     return;
   }
 
-  // ── 优先路径：Worker 里算布局 ──────────────────────────────────────────
+  // `settled` 是三条路径共用的「已收尾」闸门：任何一条路径开始收尾后，
+  // 其他路径的回调都必须变成 no-op，否则加载指示器会被触发多次。
   //
+  // 必须声明在下面的分派**之前**——`let` 有暂时性死区，在声明之前读它
+  // 会抛 ReferenceError（runSyncLayout 是 hoisted 的函数声明，会在声明
+  // 执行前就被调用）。
+  let settled = false;
+
+  // ── 三条路径，按「主线程扛不扛得住逐帧」分派 ──────────────────────────
   // 实测（有头 Chromium / 真实 GPU / 1182 节点）：
   //   同步布局占死主线程        20877ms（期间 15–20 FPS，界面冻结）
   //   Worker headless 纯计算      3944ms（主线程全程空闲）
   //   边交叉数：138（同步） vs 83（Worker）—— 质量不降反升
   //
   // 那 20 秒里只有 4 秒是真正的力计算，其余是逐帧动画 + cytoscape 位置
-  // 回写 + 画布重绘。搬进 Worker 后主线程阻塞直接归零，代价是失去
-  // 「节点从中心散开」的入场动画。
+  // 回写 + 画布重绘。搬进 Worker 后主线程阻塞归零，但**代价是失去 euler
+  // 自己的逐帧动画**——而那段动画正是原始版本「从中心散开」的全部观感：
+  // 1182 个节点在原点重叠，euler 边算边把它们互相推挤着推开，有机、连续、
+  // 带物理的节奏，不是任何预计算插值能复现的。
   //
-  // 任何失败（不支持 module worker / 超时 / 异常）都自动退回下面的同步
-  // 路径，绝不让图出不来。见 runLayoutInWorker 的契约。
-  runLayoutInWorker(cy, { randomize: false, ...EULER_OVERRIDES }, (elapsedMs) => {
+  // 所以按设备能力分叉，而不是二选一：
+  //
+  //   高性能（≥8 核）→ runSyncLayout()：euler `animate: true` 逐帧跑在主线程。
+  //     观感与原始版本**完全一致**，代价是 20s 内界面偏卡。
+  //   低性能        → Worker 算坐标 + 主线程 1.2s 错峰插值（animatePositionsTo）。
+  //     界面全程可交互，观感是「聚成一点 → 炸开」，比逐帧版少一分有机感。
+  //
+  // 判据见 device-capability.ts 的 canAnimateOnMainThread —— 只看 CPU 核数。
+  //
+  // ?quality=preset 之类的实验开关、Worker 任何失败，都退回 runSyncLayout。
+  //
+  // `?layout=sync` / `?layout=worker` —— 强制指定路径，绕过能力检测。
+  // 存在的理由：判据只有 hardwareConcurrency 一条，在高性能开发机上永远
+  // 走 sync 分支，没法验证 worker 那条；这条 URL 让两条分支始终可达。
+  const LAYOUT_OVERRIDE = new URLSearchParams(location.search).get('layout');
+  if (LAYOUT_OVERRIDE === 'sync') {
+    logInfo('布局路径被 ?layout=sync 强制指定：主线程逐帧动画');
+    runSyncLayout();
+    return;
+  }
+  if (LAYOUT_OVERRIDE !== 'worker') {
+    if (capability.canAnimateOnMainThread) {
+      logInfo('主线程逐帧动画（高性能设备）：', capability.reason);
+      runSyncLayout();
+      return;
+    }
+
+    logInfo('Worker + 插值入场动画（低性能设备）：', capability.reason);
+  } else {
+    logInfo('布局路径被 ?layout=worker 强制指定');
+  }
+  runLayoutInWorker(cy, { randomize: false, ...EULER_WORKER_PARAMS }, (elapsedMs) => {
     logInfo(`[layout-worker] 正在计算… ${(elapsedMs / 1000).toFixed(1)}s`);
   }).then((result) => {
     if (!result) {
@@ -549,19 +622,22 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
     }
     logInfo(`[layout-worker] 完成，耗时 ${(result.elapsedMs / 1000).toFixed(2)}s`);
     settled = true;
+    // 动画由 animatePositionsTo 自行推进；这里不等待它结束，
+    // waitForGraphToSettle 的「位置静止 500ms」判定天然会等完再收尾。
     waitForGraphToSettle(cy, completeLoading);
   });
 
-  // Run Euler — no hard timeout. The simulation itself has `maxSimulationTime`
-  // (currently 20 s) and `maxIterations` (currently 5000) caps configured in
-  // config.ts, so it always emits `layoutstop` on its own. A wall-clock
-  // hard timeout would freeze nodes in mid-flight positions, which looks
-  // worse than letting the physics finish — and on phones the simulation can
-  // legitimately take 15-25 s without "the tab is unresponsive" warnings
-  // because Euler yields between iterations.
-  let settled = false;
-
-  /** 同步布局：Worker 不可用时的兜底路径。 */
+  /**
+   * 同步布局：euler 逐帧动画跑在主线程。
+   *
+   * 两条用途：
+   *   1. 高性能设备（≥8 核）的**正式路径** —— 观感与引入 Worker 之前完全一致。
+   *   2. 其余情况的兜底 —— Worker 不可用 / 超时 / 异常。
+   *
+   * 不设硬超时：euler 自己有 `maxSimulationTime`（20s）与 `maxIterations`
+   * （5000）两道上限（config.ts），到点必然发 `layoutstop`。外部再加一道
+   * 墙钟超时的坏处是「节点冻在半空」，比让它跑完难看得多。
+   */
   function runSyncLayout(): void {
     if (settled) return;
     const finalize = (): void => {
@@ -575,14 +651,17 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
     // 被调用。这里的断言是安全的——早退已在调用点之前生效。
     renderer!.runLayout(
       DEFAULT_LAYOUT,
-      // 不在这里覆盖 animate —— euler preset 里的 animate: 'end' 走 cytoscape-euler
-      // 自己的 rAF 逐帧 multitick 路径，避免 cytoscape core 再叠一层 tween 插值。
+      // 不在这里覆盖 animate —— config.ts 里是 `animate: true`，走
+      // cytoscape-euler 自己的 rAF 逐帧 multitick 路径，避免 cytoscape core
+      // 再叠一层 tween 插值；也正是这一层动画让节点「从 halo 位置散开」。
+      //
       // 这里只覆盖 randomize：流式加载已经把节点放到了 halo 位置上，euler 从
       // 这些位置开始收敛即可，不需要再 randomize 重排。
       //
-      // EULER_OVERRIDES 来自 ?quality= 开关（见文件顶部），缺省为 undefined，
+      // 其余力参数由 renderer.runLayout 从 config.ts 读，这里不必重复传；
+      // EULER_OVERRIDE_TUNING 来自 ?quality= 开关，缺省为 undefined，
       // 即完全不影响现有行为。
-      { randomize: false, ...EULER_OVERRIDES },
+      { randomize: false, ...EULER_OVERRIDE_TUNING },
       {
         skipEntering: true,
         onLayoutStop: () => {
@@ -746,18 +825,10 @@ function dumpDiag(graphManager?: GraphManager): void {
 /**
  * Halton sequence — low-discrepancy quasi-random number in [0,1).
  * Beats pure random because points never cluster.
+ *
+ * 实现已移到 `@/core/halton`：入场预动画（core/layout-worker-client）也要用，
+ * 而 core 不能反向依赖 ui，故共用一份。
  */
-function halton(index: number, base: number): number {
-  let f = 1;
-  let r = 0;
-  let i = index;
-  while (i > 0) {
-    f /= base;
-    r += f * (i % base);
-    i = Math.floor(i / base);
-  }
-  return r;
-}
 
 // ── Thin glue: keyboard shortcuts + resize handler + onboarding tip ──────────
 

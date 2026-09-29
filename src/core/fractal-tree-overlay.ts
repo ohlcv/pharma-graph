@@ -98,9 +98,12 @@ export interface FractalTreeOverlayOptions {
   params?: Partial<Omit<TreeParams, 'rand'>>;
   /** 树的屏幕高度（CSS px）。不给则按图幅推。 */
   height?: number;
-  /** 光点明灭的周期秒数。 */
-  pulseSeconds?: number;
-  /** 树冠整体的呼吸周期秒数；给 0 关闭。 */
+  /**
+   * 树冠整体的呼吸周期秒数；给 0 关闭所有动态效果（树变成完全静态的一幅画）。
+   *
+   * 动态层现在只有一层：整树叠加一遍的极轻微加法混合（见 draw）。
+   * **逐点异步明灭已不存在** —— 光点与枝干一起烘进了静态位图缓存。
+   */
   swaySeconds?: number;
   fps?: number;
 }
@@ -109,7 +112,6 @@ export class FractalTreeOverlay {
   private readonly cy: cytoscape.Core;
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D | null;
-  private readonly pulseSeconds: number;
   private readonly swaySeconds: number;
   private readonly frameInterval: number;
   private readonly reducedMotion: boolean;
@@ -148,7 +150,6 @@ export class FractalTreeOverlay {
 
   constructor(options: FractalTreeOverlayOptions) {
     this.cy = options.cy;
-    this.pulseSeconds = Math.max(0.5, options.pulseSeconds ?? 4.2);
     this.swaySeconds = Math.max(0, options.swaySeconds ?? 0);
     this.frameInterval = 1000 / Math.max(1, options.fps ?? 30);
     this.reducedMotion = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -236,6 +237,10 @@ export class FractalTreeOverlay {
     this.dpr = dpr;
     this.canvas.width = Math.round(w * dpr);
     this.canvas.height = Math.round(h * dpr);
+    // 改 canvas.width/height 会**自动清空**画布，所以上一帧的 box 已经
+    // 不存在了。必须忘掉它，否则下一帧会对着一个空画布再清一次——
+    // 无害，但状态与实际内容不符，同类 bug 很难查。
+    this.lastDrawnBox = null;
   }
 
   private start(): void {
@@ -270,28 +275,42 @@ export class FractalTreeOverlay {
    *
    * 缓存里的坐标系与 geometry 局部系一致（未平移未缩放），这样几何数据
    * 与位图解耦：树形变了只需重建位图，代码不必重排。
+   *
+   * ── 分辨率策略：固定 1×，不跟屏幕走 ──────────────────────────────────
+   * 这个方向试错过两次，两次都错在「让缓存追屏幕分辨率」上：
+   *
+   *   1. 键绑屏上高度（量化 64px 台阶）→ 缩放手势一帧跨几个台阶就重建，
+   *      每帧重画 2047 根带辉光的枝。比不缓存还糟。
+   *   2. 键绑所需倍率且**只增不减** → 放大到 4× 后每帧都要把一张 4× 大位图
+   *      drawImage 缩放绘制，实测放大时中位帧从 17ms 劣化到 100ms（10 FPS）。
+   *
+   * 结论：**缓存的职责是「把 2047 次 stroke 变成 1 次 drawImage」，
+   * 不是「提供高分辨率」。** 位图按 1× 局部单位渲染一次，之后所有缩放
+   * 都交给 drawImage 的 GPU 插值。放大后树会略糊——那正是「2047 根细枝
+   * 在屏幕上占几百像素」的物理现实，不是缺陷。真正该接受的是成本，
+   * 而不是用无限大的位图去掩盖它。
    */
-  private ensureBranchCache(dpr: number, screenHeight: number): HTMLCanvasElement | null {
+  private ensureBranchCache(dpr: number): HTMLCanvasElement | null {
     const g = this.geometry;
     const { x1, y1, x2, y2 } = g.bounds;
-    // 缓存按 1:1 局部单位渲染，再由 drawImage 缩放到屏上尺寸。
-    // 量化到 64 个台阶，避免 zoom 每微动都重建（zoom 连续变化，
-    // 用浮点做 key 会导致每帧重建缓存——那比重画还糟）。
-    const quantH = Math.max(64, Math.round(screenHeight / 64) * 64);
-    const key = `${dpr}|${quantH}|${g.branches.length}`;
+
+    // **键与屏幕状态完全无关**：树形与 dpr 变了才重建。
+    // 这条约束是整个缓存能否生效的关键——一旦把 zoom / 屏上尺寸塞进键，
+    // 缩放手势期间就会每帧重建，而这正是「越缩放越卡」的成因。
+    const key = `${dpr}|${g.branches.length}`;
     if (this.branchCache && this.branchCacheKey === key) return this.branchCache;
 
     const geoW = Math.max(1, x2 - x1);
     const geoH = Math.max(1, y2 - y1);
-    // 位图分辨率取「局部系 → 目标像素」的映射，向上取整到 2 的幂附近以利合成
-    const w = Math.ceil(geoW);
-    const h = Math.ceil(geoH);
-    // 辉光会溢出枝干包围盒，按最大模糊半径留边，否则边缘被裁掉
-    const pad = Math.ceil(g.foliage[0]?.size ?? 4) * 6 + 8;
+    // 留边统一由 cachePad() 决定（枝干辉光与光点渐变的较大者）。
+    // 这里**必须**用同一个函数，否则绘制时的 drawImage 尺寸与位图实际
+    // 尺寸对不上，裁切边缘会被插值拉成一片残影。
+    const pad = this.cachePad();
 
     const cv = document.createElement('canvas');
-    cv.width = Math.max(1, Math.round((w + pad * 2) * dpr));
-    cv.height = Math.max(1, Math.round((h + pad * 2) * dpr));
+    // 1× 局部单位 → dpr 像素。再高只是让每帧的 drawImage 更贵。
+    cv.width = Math.max(1, Math.round((geoW + pad * 2) * dpr));
+    cv.height = Math.max(1, Math.round((geoH + pad * 2) * dpr));
     const c = cv.getContext('2d');
     if (!c) return null;
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -324,10 +343,52 @@ export class FractalTreeOverlay {
     }
     c.shadowBlur = 0;
 
+    // ── 末梢光点：**也烘进静态层** ─────────────────────────────────────
+    // 这是本轮简化的核心认知：**光点的位置和基准大小同样是静态的**，
+    // 逐帧变的只有相位造成的明灭。既然如此，就该和枝干一样缓存起来。
+    //
+    // 原来每帧要画 2048 次 drawImage（即使已用精灵替掉 shadowBlur，
+    // 2048 次调用本身在缩放手势中也会叠加成卡顿）。现在它是一次性的。
+    //
+    // 画的是**最亮峰值**的形态，动态明灭改由下面叠加的一层整体透明度
+    // 呼吸来近似——见 draw 里的 pulseLayer。代价是个别光点不再异步
+    // 明灭（原来每点独立相位），换来每帧只剩 2 次 drawImage。
+    for (const f of g.foliage) {
+      const dep = f.depth / maxD;
+      const col = foliageColor(dep);
+      const r = f.size * 0.97; // 峰值半径（与动态版的上界一致）
+      const g2 = c.createRadialGradient(f.x, f.y, 0, f.x, f.y, r * GLOW_PAD);
+      g2.addColorStop(0, rgba(col, 1));
+      g2.addColorStop(0.35, rgba(col, 0.55));
+      g2.addColorStop(1, rgba(col, 0));
+      c.fillStyle = g2;
+      // 中心实心核，让光点在密集枝叶间仍能读出
+      c.beginPath();
+      c.arc(f.x, f.y, r * 0.42, 0, Math.PI * 2);
+      c.fillStyle = rgba(col, 0.9);
+      c.fill();
+      c.beginPath();
+      c.arc(f.x, f.y, r * 0.42, 0, Math.PI * 2);
+      c.fillStyle = g2;
+      c.fill();
+    }
+
     this.branchCache = cv;
     this.branchCacheKey = key;
     return cv;
   }
+
+  /**
+   * 上一帧树的**实际绘制区域**（视口坐标，矩形）。
+   *
+   * 必须记住它，因为 clearRect 要清的是「上一帧画过的地方」，
+   * 而**不是**「这一帧要画的地方」——平移或缩放手势中两者完全不同。
+   * 只清当前位置就是残影的来源：上一帧的像素再也不会被覆盖，也永远不会被清。
+   *
+   * 存**半宽 / 半高**而不是半径：树是 1.59 倍宽的矩形，用一个「半径」
+   * 去近似必然清不全两侧（见 draw 里的说明）。
+   */
+  private lastDrawnBox: { x: number; y: number; hw: number; hh: number } | null = null;
 
   private draw(t: number): void {
     const ctx = this.ctx;
@@ -335,7 +396,6 @@ export class FractalTreeOverlay {
 
     const node = this.cy.getElementById(TREE_ID);
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    if (node.empty()) return;
 
     const p = node.renderedPosition();
     const zoom = this.cy.zoom();
@@ -344,25 +404,51 @@ export class FractalTreeOverlay {
     const rx = p.x,
       ry = p.y;
 
-    const reach = H * 0.62 + 24;
-    if (
-      rx + reach < 0 ||
-      rx - reach > this.cssWidth ||
-      ry + reach < 0 ||
-      ry - reach > this.cssHeight
-    )
-      return;
-
-    // **局部清屏**：只清树周围这一块，而不是整个 1600×1000 视口。
-    // 全屏 clearRect 在 3 个 overlay 同时存在时是三倍的无谓填充。
-    ctx.clearRect(rx - reach, ry - reach, reach * 2, reach * 2);
-
+    // ── 清屏范围必须等于实际绘制范围，一像素都不能少 ──────────────────
+    //
+    // 这里原来写的是 `reach = H * 0.62 + 24`，把树当成一个**圆**来清。
+    // 但树实际画出来是**矩形**，宽高比 1.59（实测 523×329 局部单位）。
+    // 于是横向永远清不全：H=220 时两侧各溢出 60px，H=880 时各溢出 311px
+    // —— 正是「两侧大量残影」的成因，而纵向一个像素都不溢出。
+    //
+    // 现在按包围盒的真实比例算半宽 / 半高，**与 drawImage 的目标尺寸
+    // 用同一份数据**，结构上不可能再错配。
     const g = this.geometry;
     const { x1, y1, x2, y2 } = g.bounds;
     const geoH = Math.max(1, y2 - y1);
-    const scale = H / geoH;
     const geoW = Math.max(1, x2 - x1);
-    const maxD = Math.max(1, g.maxDepth);
+    const scale = H / geoH;
+    const cachePad = this.cachePad();
+    // 绘制目标尺寸 = 包围盒 + 两侧留边（辉光/渐变的外溢）
+    const drawW = (geoW + cachePad * 2) * scale;
+    const drawH = (geoH + cachePad * 2) * scale;
+    const hw = drawW / 2;
+    const hh = drawH / 2;
+
+    const offscreen =
+      node.empty() ||
+      rx + hw < 0 ||
+      rx - hw > this.cssWidth ||
+      ry + hh < 0 ||
+      ry - hh > this.cssHeight;
+
+    // **清上一帧的实际区域，不是这一帧的区域。** 手势中两者不同：
+    // 平移时树已挪位，上一帧的像素留在旧位置；缩放时尺寸变了，上一帧的
+    // 区域比现在大。两种情况都只有 clearRect(上一帧的 box) 才能清干净。
+    //
+    // 早退分支也必须清——树移出视口后，它的像素还留在画布上。
+    if (this.lastDrawnBox) {
+      const b = this.lastDrawnBox;
+      // 落在视口外的部分先夹一下，避免 clearRect 收到天量尺寸
+      const cx1 = Math.max(0, b.x - b.hw);
+      const cy1 = Math.max(0, b.y - b.hh);
+      const cx2 = Math.min(this.cssWidth, b.x + b.hw);
+      const cy2 = Math.min(this.cssHeight, b.y + b.hh);
+      if (cx2 > cx1 && cy2 > cy1) ctx.clearRect(cx1, cy1, cx2 - cx1, cy2 - cy1);
+    }
+    this.lastDrawnBox = null;
+
+    if (offscreen) return;
 
     // 冠幅呼吸：整体极轻微地涨缩，幅度 1.5%，30s 一次——慢到几乎察觉不到，
     // 但静止的画面在长会话里会显得"死了"。
@@ -376,77 +462,78 @@ export class FractalTreeOverlay {
     ctx.scale(scale * breathe, scale * breathe);
     ctx.translate(-(x1 + x2) / 2, -(y1 + y2) / 2);
 
-    // ── 枝干：1 次 drawImage 取代 2047 次 stroke ─────────────────────────
-    const cache = this.ensureBranchCache(this.dpr, H);
+    // ── 整棵树：2 次 drawImage 取代 4095 stroke + 2048 sprite ───────────
+    // 枝干与光点都已烘进静态层（见 ensureBranchCache），这里每帧只画两次。
+    const cache = this.ensureBranchCache(this.dpr);
     if (cache) {
-      // 缓存位图在局部系里从 (x1-pad, y1-pad) 开始，画到 (x2+pad, y2+pad)
-      const pad = Math.ceil(g.foliage[0]?.size ?? 4) * 6 + 8;
-      ctx.drawImage(cache, x1 - pad, y1 - pad, geoW + pad * 2, geoH + pad * 2);
-    }
+      // 目标尺寸与上面 hw/hh 用的是同一份 geoW/geoH/cachePad，
+      // 两者在结构上不可能不一致。
+      ctx.drawImage(cache, x1 - cachePad, y1 - cachePad, geoW + cachePad * 2, geoH + cachePad * 2);
 
-    // ── 末梢光点 ─────────────────────────────────────────────────────────
-    // 每个光点有独立相位（geometry 里的 phase），明灭不同步——同步的话
-    // 整树会一起闪，像圣诞灯串；异步才像真的果实/星子在呼吸。
-    //
-    // **不用 shadowBlur**：2048 次高斯模糊/帧是 canvas 最贵的操作，单独
-    // 就能吃掉整帧预算。改用一张预渲染的径向渐变精灵（见 glowSprite），
-    // 每帧 2048 次 drawImage —— 同样是发光观感，走 GPU 合成而非 CPU 模糊。
-    const omega = (Math.PI * 2) / this.pulseSeconds;
-    for (const f of g.foliage) {
-      const dep = f.depth / maxD;
-      const col = foliageColor(dep);
-      // phase 来自固定 seed，所以明灭节奏是稳定的（不是每帧重新随机）
-      const k = 0.5 + 0.5 * Math.sin(t * omega + f.phase);
-      const r = f.size * (0.72 + 0.5 * k);
-      ctx.globalAlpha = 0.34 + 0.6 * k;
-      const sprite = this.glowSprite(col, r, this.dpr);
-      if (!sprite) continue;
-      ctx.drawImage(sprite, f.x - r * GLOW_PAD, f.y - r * GLOW_PAD, r * GLOW_PAD * 2, r * GLOW_PAD * 2);
+      // 第 2 次：呼吸层。同一位图叠加一遍，整体透明度做极轻微起伏——
+      // 这是「树在缓慢呼吸」的观感来源。
+      //
+      // 原来是 2048 个光点各自按独立相位明灭（像真的果实/星子）。现在
+      // 退化为整树同步的一层淡入淡出：观感损失很小（幅度只有 12%），
+      // 但每帧从 2048 次 drawImage 降到 1 次。
+      //
+      // 用 `lighter` 叠加而非 alpha 混合：呼吸层是同一份光，加法混合
+      // 正好对应「整体更亮 / 更暗」而不是「整棵树变半透明」。
+      if (this.swaySeconds > 0) {
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.06 + 0.06 * Math.sin((t / this.swaySeconds) * Math.PI * 2);
+        ctx.drawImage(
+          cache,
+          x1 - cachePad,
+          y1 - cachePad,
+          geoW + cachePad * 2,
+          geoH + cachePad * 2,
+        );
+        ctx.globalCompositeOperation = 'source-over';
+      }
     }
 
     ctx.globalAlpha = 1;
     ctx.restore();
+
+    // 记下本帧实际区域，供下一帧清屏用。
+    // **带呼吸的 1.5% 涨缩**：清屏范围若不算进去，呼气到峰值时最外圈
+    // 辉光会露在下一帧的清屏区之外——那也是残影，而且只在缓慢呼吸的
+    // 节奏里偶发，极难定位。
+    this.lastDrawnBox = { x: rx, y: ry, hw: hw * breathe, hh: hh * breathe };
   }
 
   /**
-   * 预渲染发光精灵：中心实心圆 + 向外衰减到全透明的径向渐变。
+   * 缓存位图相对包围盒的留边宽度。
    *
-   * 半径量化到 8 个台阶（每级 0.75px）后缓存——`size` 随 depth 只有 12
-   * 种取值，加上明灭的连续缩放后实际会命中几十个不同半径；量化后常驻
-   * 几十张小图，内存可忽略，换来的是每帧零 `shadowBlur`。
+   * **必须同时覆盖枝干辉光与光点渐变，取两者较大值。** 这里算错过一次：
+   * 原来只按光点算（`foliage[0].size * 6 + 8` = 20px），而枝干的
+   * `shadowBlur` 外溢需求是 `最粗枝宽 * 3.5` ≈ 26px。少给的 10px 被位图
+   * 裁掉，`drawImage` 放大时裁切边缘被插值拉成一片可见的模糊残留
+   * （实测平移后区域外残留 47234 像素）。
+   *
+   * 构成：
+   *   - 枝干：最粗枝的半宽 + 模糊半径（canvas 的 shadowBlur 向两侧各扩 blur）
+   *   - 光点：最大光点的渐变外溢半径（size × GLOW_PAD）
+   *   - 一点余量，吸收 stroke 的半宽与抗锯齿
    */
-  private glowSpriteCache = new Map<string, HTMLCanvasElement>();
-  private glowSprite(
-    col: readonly [number, number, number],
-    r: number,
-    dpr: number,
-  ): HTMLCanvasElement | null {
-    // 量化半径与 dpr，避免连续动画参数把缓存打穿成上千张图
-    const rq = Math.max(1, Math.round(r / 0.75) * 0.75);
-    const key = `${col[0]},${col[1]},${col[2]}|${rq}|${dpr}`;
-    const hit = this.glowSpriteCache.get(key);
-    if (hit) return hit;
+  private cachePad(): number {
+    const g = this.geometry;
+    let maxBranchW = 0;
+    for (const b of g.branches) {
+      if (b.width > maxBranchW) maxBranchW = b.width;
+    }
+    // shadowBlur = b.width * 3.5，向外单侧扩这么多，加半宽覆盖 stroke 本身
+    const branchNeed = maxBranchW * 3.5 + maxBranchW * 0.5;
 
-    const size = Math.ceil(rq * GLOW_PAD * 2 * dpr);
-    if (size < 1 || size > 512) return null; // 过大直接放弃辉光，不让它变成新瓶颈
-    const cv = document.createElement('canvas');
-    cv.width = size;
-    cv.height = size;
-    const c = cv.getContext('2d');
-    if (!c) return null;
-    const half = size / 2;
-    const grad = c.createRadialGradient(half, half, 0, half, half, half);
-    grad.addColorStop(0, rgba(col, 1));
-    grad.addColorStop(0.35, rgba(col, 0.55));
-    grad.addColorStop(1, rgba(col, 0));
-    c.fillStyle = grad;
-    c.fillRect(0, 0, size, size);
+    let maxFoliage = 0;
+    for (const f of g.foliage) {
+      if (f.size > maxFoliage) maxFoliage = f.size;
+    }
+    // 渐变外溢到 size * GLOW_PAD 处才衰减到全透明
+    const foliageNeed = maxFoliage * GLOW_PAD;
 
-    // 缓存上限：明灭参数连续变化时理论上会持续插入新 key。
-    // 超出后清空重来（简单但有效——清空瞬间的重建成本远低于持续膨胀的内存）。
-    if (this.glowSpriteCache.size > 240) this.glowSpriteCache.clear();
-    this.glowSpriteCache.set(key, cv);
-    return cv;
+    return Math.ceil(Math.max(branchNeed, foliageNeed)) + 4;
   }
 }
 

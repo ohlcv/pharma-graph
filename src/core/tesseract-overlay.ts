@@ -43,14 +43,14 @@ const TESSERACT_CLASS = 'tesseract-node';
 /** 拉取内容用的 md 路径——跟太极八卦同目录同惯例。 */
 const CONTENT_REL_PATH = '个人成长与生存策略/四维空间.md';
 
-type Vec3 = readonly [number, number, number];
-type Vec4 = readonly [number, number, number, number];
+export type Vec3 = readonly [number, number, number];
+export type Vec4 = readonly [number, number, number, number];
 
 /**
  * 16 个顶点：v 的第 k 位是 1 → 第 k 维取 +1，是 0 → 取 -1。
  * 展开写出来是 [(±1,±1,±1,±1)] 的全部 16 种组合，正是 4D 超立方体的顶点集。
  */
-const VERTICES_4D: readonly Vec4[] = Array.from({ length: 16 }, (_, v) => [
+export const VERTICES_4D: readonly Vec4[] = Array.from({ length: 16 }, (_, v) => [
   v & 1 ? 1 : -1,
   v & 2 ? 1 : -1,
   v & 4 ? 1 : -1,
@@ -70,7 +70,7 @@ const VERTICES_4D: readonly Vec4[] = Array.from({ length: 16 }, (_, v) => [
  * 无自环、无越界索引；每条棱两端恰好相差一个坐标。
  * 按第四维 w 的符号拆分应为 内胞 12 + 外胞 12 + 跨胞连接棱 8。
  */
-const EDGES: readonly (readonly [number, number])[] = (() => {
+export const EDGES: readonly (readonly [number, number])[] = (() => {
   const seen = new Set<string>();
   const out: (readonly [number, number])[] = [];
   for (let v = 0; v < 16; v++) {
@@ -156,6 +156,19 @@ function project4D(p: Vec4): Vec3 {
 function project3D([x, y, z]: Vec3): Vec3 {
   const k = Z_DISTANCE / (Z_DISTANCE - z);
   return [x * k, -y * k, k];
+}
+
+/**
+ * 整条投影链：16 个 4D 顶点 → 旋转 → 4D→3D → 3D→2D。
+ * 返回每个顶点的 [x, y, k]，第三分量是最后一次透视的缩放系数（> 1 靠近观察者），
+ * 供深度排序与空气透视使用。抽成纯函数是为了能脱离 canvas 单独验证几何。
+ */
+export function projectTesseract(alpha: number, beta: number): readonly Vec3[] {
+  const cosA = Math.cos(alpha);
+  const sinA = Math.sin(alpha);
+  const cosB = Math.cos(beta);
+  const sinB = Math.sin(beta);
+  return VERTICES_4D.map((v) => project3D(project4D(rotateZW(rotateXY(v, cosA, sinA), cosB, sinB))));
 }
 
 export interface TesseractOverlayOptions {
@@ -334,14 +347,7 @@ export class TesseractOverlay {
     // 4D → 3D → 2D，预先把 16 个顶点都算好，棱的绘制循环里只做查表。
     // 每个顶点是 [x, y, k]：k 是 3D→2D 那步的透视缩放系数，> 1 靠近观察者，
     // 同时充当深度排序与空气透视的输入。
-    const cosA = Math.cos(alpha);
-    const sinA = Math.sin(alpha);
-    const cosB = Math.cos(beta);
-    const sinB = Math.sin(beta);
-    const projected: readonly Vec3[] = VERTICES_4D.map((v) => {
-      const r = rotateZW(rotateXY(v, cosA, sinA), cosB, sinB);
-      return project3D(project4D(r));
-    });
+    const projected = projectTesseract(alpha, beta);
 
     // 棱的单元长度：4D 超立方体棱长 2，旋转保长，两次透视各放大 k，
     // 合成缩放约 modelRadius（归一化基准）——乘半边长得到 2D 下的棱长。
@@ -505,17 +511,14 @@ function stripNodeChrome(node: cytoscape.NodeSingular, size: number): void {
     shape: 'ellipse' as cytoscape.Css.NodeShape,
 
     // ── 其它可能的可见副产物：清掉 ───────────────────────────
-    'compound-sizing-w-b': 0,
-    'compound-sizing-w-h': 0,
     padding: 0,
     opacity: 0,
     // 不能写 visibility:hidden——cytoscape 会同时让 pointer 命中失效。
-    ghost: 'no' as const,
-    'ghost-color': 'rgba(0,0,0,0)',
-    'ghost-opacity': 0,
-    'ghost-shape': 'ellipse' as cytoscape.Css.NodeShape,
-    'ghost-offset-x': 0,
-    'ghost-offset-y': 0,
+    //
+    // 这里刻意不设 compound-sizing-* / ghost-*：cytoscape 的 d.ts 收录了它们，
+    // 但运行时解析 style 时会逐条报 "style property is invalid" 警告，而它们
+    // 描述的是复合父节点尺寸与 ghost 边缘拖影——对一个被压成全透明的孤立
+    // 叶子节点，两者都不产生任何可见效果。设了只是白刷警告。
   });
 }
 

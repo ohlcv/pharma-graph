@@ -136,16 +136,26 @@ export const RIPPLE_COLORS = {
 // 本体必须彻底透明（否则会盖住 canvas 画的图案），同时命中盒要跟着视觉半径
 // 走（否则点不到自己眼睛看到的东西）。两者的差异只在 canvas 那一侧。
 //
-// 下面三处必须始终同步覆盖这两个 class：
+// 下面几处必须始终同步覆盖这两个 class：
 //   ① 强透明规则本体；② hover 排除；③ selected / highlighted 排除。
 // 漏掉 ②③ 的后果是：选中装饰节点时 cytoscape 会给它画 1×1 的 accent2 边框，
 // 正好落在图案正中央，像一块盖在画上的小方块。
+//
+// 装饰节点在图里身份唯一（class 各不相同），所以兜底只需这一条"本体全透明"
+// 规则——不必像普通节点那样为每个交互态各写一份 `:not(...)` 排除版。
+// cytoscape 同优先级下后声明的规则覆盖先声明的，而本条位于 .hovered /
+// .selected-node / .highlighted 之后，因此无论这些状态 class 有没有被加上，
+// 装饰节点本体始终是透明的 1×1，图案（由 canvas 画）永不被盖住。
+// 选中态的视觉反馈仍由 glow-overlay 按节点位置画强光提供，这是预期行为。
+//
+// ⚠️ 不要再给样式表里的选择器加 `:not()`：cytoscape 的选择器解析器不支持它，
+// 整条规则会被静默丢弃（只在控制台留一条 "selector is invalid" warning）。
+// 需要"排除某 class"时走 JS 侧 collection API 的 `cy.nodes(...).not(...)`——
+// 项目里几十处 `.not('.layer-parent')` 都是这么用的。
 
 const DECOR_NODE_CLASSES = ['celestial-emblem-node', 'tesseract-node'];
-/** 装饰节点自身（本体压透明）。 */
-const DECOR_NODE = `.${DECOR_NODE_CLASSES.join(', .')}`;
-/** "不是装饰节点"的伪类拼装，喂给需要排除交互态的规则。 */
-const NOT_DECOR = DECOR_NODE_CLASSES.map((c) => `:not(.${c})`).join('');
+/** 装饰节点本体（压透明）。逗号展开成多条规则以符合 cytoscape 的选择器语法。 */
+const DECOR_NODE = DECOR_NODE_CLASSES.map((c) => `.${c}`).join(', ');
 
 // ── Stylesheet (built per Renderer, and again on theme change / new subtree) ────
 
@@ -430,7 +440,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
         label: '',
         width: 1,
         height: 1,
-        events: 'yes' as cytoscape.Css.Event,
+        events: 'yes' as const,
       },
     },
     // 边默认样式
@@ -481,7 +491,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
     },
     { selector: '.entering', style: { opacity: 0 } },
     {
-      selector: `.hovered${NOT_DECOR}`,
+      selector: '.hovered',
       style: {
         opacity: 1,
         'border-width': 3,
@@ -494,7 +504,7 @@ const STYLESHEET: (maxDepth: number, subtreeColorMap: Record<string, string>) =>
       },
     },
     {
-      selector: `.selected-node${NOT_DECOR}, .highlighted${NOT_DECOR}`,
+      selector: '.selected-node, .highlighted',
       style: {
         opacity: 1,
         'border-width': 4,
