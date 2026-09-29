@@ -1,4 +1,4 @@
-// src/core/celestial-emblem-node.ts
+// src/core/spectacle/emblem-overlay.ts
 // 太极八卦（及其余十重）：图谱里一个真实存在、参与力学模拟、却孤立无边的节点。
 //
 // 十二重同心环，由内向外：八卦 · 十天干 · 十二地支 · 十二律 · 十二长生 ·
@@ -31,7 +31,7 @@
 // euler 之【前】——即加在 initGraphFromManager() 函数体的最后几行。
 
 import type cytoscape from 'cytoscape';
-import { parseFrontmatter } from '../parser/frontmatter.js';
+import { parseFrontmatter } from '../../parser/frontmatter.js';
 
 // ── 数据：原样迁自 data.js ───────────────────────────────────────────────
 

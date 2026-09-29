@@ -10,7 +10,7 @@
 //   把关的判据。
 
 import { describe, expect, it } from 'vitest';
-import { EDGES, projectTesseract, VERTICES_4D } from '@/core/tesseract-overlay';
+import { EDGES, projectTesseract, VERTICES_4D } from '@/core/spectacle/tesseract-overlay';
 
 describe('tesseract geometry — 顶点与棱', () => {
   it('有 16 个顶点，取遍 (±1,±1,±1,±1) 的全部组合', () => {

@@ -76,9 +76,9 @@ import { initSearchUI } from './search-ui.js';
 import { initMusicPlayer } from './music-player.js';
 import { installDebugBridge } from './debug-bridge.js';
 import { initStarfield } from './starfield.js';
-import { createCelestialEmblemOverlay } from '../core/celestial-emblem-overlay.js';
-import { createTesseractOverlay } from '../core/tesseract-overlay.js';
-import { createFractalTreeOverlay } from '../core/fractal-tree-overlay.js';
+import { createCelestialEmblemOverlay } from '../core/spectacle/emblem-overlay.js';
+import { createTesseractOverlay } from '../core/spectacle/tesseract-overlay.js';
+import { createFractalTreeOverlay } from '../core/spectacle/fractal-tree-overlay.js';
 import { runLayoutInWorker } from '../core/layout-worker-client.js';
 import { initSpeechSettings } from './speech-settings.js';
 

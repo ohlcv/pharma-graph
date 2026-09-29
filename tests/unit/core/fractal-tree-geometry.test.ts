@@ -8,7 +8,7 @@ import {
   rgba,
   DEFAULT_TREE_PARAMS,
   type TreeParams,
-} from '@/core/fractal-tree-geometry';
+} from '@/core/spectacle/fractal-tree-geometry';
 
 /** 固定 seed 的伪随机（mulberry32），保证测试完全可复现。 */
 function seeded(seed: number): () => number {
@@ -203,7 +203,9 @@ describe('generateTree — 可复现性', () => {
   });
 
   it('depthDecay 让分枝角随深度单调收缩（深层趋于沿父枝延伸）', () => {
-    const g = generateTree(p({ maxDepth: 5, jitter: 0, gravity: 0, spreadAngle: 0.6, depthDecay: 0.8 }));
+    const g = generateTree(
+      p({ maxDepth: 5, jitter: 0, gravity: 0, spreadAngle: 0.6, depthDecay: 0.8 }),
+    );
     const d1 = g.branches.filter((b) => b.depth === 1);
     const d2 = g.branches.filter((b) => b.depth === 2);
     const root = g.branches.find((b) => b.depth === 0)!;
@@ -215,7 +217,9 @@ describe('generateTree — 可复现性', () => {
   });
 
   it('depthDecay=1 时角度不随深度变化（对照）', () => {
-    const g = generateTree(p({ maxDepth: 3, jitter: 0, gravity: 0, spreadAngle: 0.5, depthDecay: 1 }));
+    const g = generateTree(
+      p({ maxDepth: 3, jitter: 0, gravity: 0, spreadAngle: 0.5, depthDecay: 1 }),
+    );
     const d1 = g.branches.filter((b) => b.depth === 1);
     const d2 = g.branches.filter((b) => b.depth === 2);
     const root = g.branches.find((b) => b.depth === 0)!;
@@ -224,7 +228,9 @@ describe('generateTree — 可复现性', () => {
   });
 
   it('gravity 让梢部偏离竖直方向更多（枝条下垂）', () => {
-    const g = generateTree(p({ maxDepth: 4, jitter: 0, gravity: 0.4, spreadAngle: 0.3, depthDecay: 0.9 }));
+    const g = generateTree(
+      p({ maxDepth: 4, jitter: 0, gravity: 0.4, spreadAngle: 0.3, depthDecay: 0.9 }),
+    );
     const UP = -Math.PI / 2;
     const tiltOf = (d: number) => {
       const at = g.branches.filter((b) => b.depth === d);

@@ -1,7 +1,7 @@
-// src/core/tesseract-overlay.ts
+// src/core/spectacle/tesseract-overlay.ts
 // 四维空间（tesseract）：图谱里第二个真实存在、参与力学模拟、却孤立无边的装饰节点。
 //
-// 架构刻意与 celestial-emblem-overlay.ts 平行而不是复用：太极八卦是一叠
+// 架构刻意与 emblem-overlay.ts 平行而不是复用：太极八卦是一叠
 // 同心文字环，它的绘制循环跟"3D 投影 + 深度排序"毫无关系；超立方体每帧要
 // 重新旋转 16 个顶点、算深度、决定 32 条棱的绘制顺序。硬塞进同一个类会得到
 // 一个既有两个职责、又有互斥状态（pause/resume/reroll/destroy）的上帝对象。
@@ -35,7 +35,7 @@
 // 之【前】。两行 create 调用紧挨着放即可。
 
 import type cytoscape from 'cytoscape';
-import { parseFrontmatter } from '../parser/frontmatter.js';
+import { parseFrontmatter } from '../../parser/frontmatter.js';
 
 /** 图上这个节点固定用这个 id。 */
 export const TESSERACT_ID = 'tesseract-space';
@@ -115,7 +115,7 @@ function pickRadius(cy: cytoscape.Core): number {
   return clamp(graphSpread(cy).spread * 0.052, 96, 230);
 }
 
-/** 命中盒边长——从视觉半径换算，不写死数字。见 celestial-emblem-overlay.ts
+/** 命中盒边长——从视觉半径换算，不写死数字。见 emblem-overlay.ts
  *  同样的理由：半径变了必须跟着重算，否则命中盒和画面对不上。
  *  1.05 是给最外圈棱线的余量：正方体投影后角点比包围圆还稍远一点点。 */
 function hitboxSize(radius: number): number {
@@ -168,7 +168,9 @@ export function projectTesseract(alpha: number, beta: number): readonly Vec3[] {
   const sinA = Math.sin(alpha);
   const cosB = Math.cos(beta);
   const sinB = Math.sin(beta);
-  return VERTICES_4D.map((v) => project3D(project4D(rotateZW(rotateXY(v, cosA, sinA), cosB, sinB))));
+  return VERTICES_4D.map((v) =>
+    project3D(project4D(rotateZW(rotateXY(v, cosA, sinA), cosB, sinB))),
+  );
 }
 
 export interface TesseractOverlayOptions {
@@ -467,7 +469,7 @@ export function spawnTesseractNode(cy: cytoscape.Core): cytoscape.NodeSingular {
 
 /**
  * 抹掉 cytoscape 自身画的所有可见 chrome：本体完全透明，只留一个与视觉半径
- * 同步的圆形命中盒。逐条属性的理由见 celestial-emblem-overlay.ts 的同名函数。
+ * 同步的圆形命中盒。逐条属性的理由见 emblem-overlay.ts 的同名函数。
  *
  * `events`/pointer 相关属性不在这里关——否则点击不到节点，详情面板永远打不开。
  */

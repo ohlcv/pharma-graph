@@ -1,7 +1,7 @@
-// src/core/fractal-tree-geometry.ts
+// src/core/spectacle/fractal-tree-geometry.ts
 // 分形树的几何内核：L-system 风格递归生成的枝干骨架 + 季节色标度。
 //
-// 与 tesseract-overlay.ts / celestial-emblem-overlay.ts 的分工：那两个文件把
+// 与 tesseract-overlay.ts / emblem-overlay.ts 的分工：那两个文件把
 // 数学、canvas 绘制、节点生命周期、Markdown 加载全塞在一个类里。这里刻意把
 // **几何抽成纯函数**，因为分形树的成败几乎全在参数上（分枝角度/长度衰减/
 // 层级/粗细），必须能脱离浏览器反复试——把调参困在 canvas 类里就只能靠
@@ -113,16 +113,8 @@ function widthAt(depth: number, maxDepth: number, rootWidth: number): number {
  * 配 30fps + 可见性暂停（与现有两个奇观一致）。
  */
 export function generateTree(params: TreeParams = DEFAULT_TREE_PARAMS): TreeGeometry {
-  const {
-    maxDepth,
-    lengthDecay,
-    trunkLength,
-    spreadAngle,
-    depthDecay,
-    jitter,
-    gravity,
-    rand,
-  } = params;
+  const { maxDepth, lengthDecay, trunkLength, spreadAngle, depthDecay, jitter, gravity, rand } =
+    params;
   const branches: Branch[] = [];
   const foliage: Foliage[] = [];
 
@@ -152,7 +144,14 @@ export function generateTree(params: TreeParams = DEFAULT_TREE_PARAMS): TreeGeom
   for (let head = 0; head < queue.length; head++) {
     const cur = queue[head];
     const w = widthAt(cur.depth, maxDepth, rootWidth);
-    branches.push({ x: cur.x, y: cur.y, angle: cur.angle, length: cur.length, depth: cur.depth, width: w });
+    branches.push({
+      x: cur.x,
+      y: cur.y,
+      angle: cur.angle,
+      length: cur.length,
+      depth: cur.depth,
+      width: w,
+    });
 
     // 枝干尖端的世界坐标
     const ex = cur.x + Math.cos(cur.angle) * cur.length;
@@ -195,7 +194,10 @@ export function generateTree(params: TreeParams = DEFAULT_TREE_PARAMS): TreeGeom
   }
 
   // 局部包围盒：从枝段端点算，再把 rootWidth 的一半留出，避免最粗的树干切边
-  let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+  let x1 = Infinity,
+    y1 = Infinity,
+    x2 = -Infinity,
+    y2 = -Infinity;
   for (const b of branches) {
     const ex = b.x + Math.cos(b.angle) * b.length;
     const ey = b.y + Math.sin(b.angle) * b.length;
