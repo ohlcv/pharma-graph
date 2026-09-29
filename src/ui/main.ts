@@ -223,27 +223,42 @@ function updateLoadingIndicator(progress: PrebuiltProgress): void {
  * 让状态条文案/渐隐与入场动画完全同步。
  */
 function completeLoadingWithFadeOut(nodeCount: number): void {
+  console.info('[loader-debug] completeLoadingWithFadeOut 进入');
   const indicator = document.getElementById('loading-indicator');
   const label = document.getElementById('loading-label');
   const count = document.getElementById('loading-count');
   const percent = document.getElementById('loading-percent');
+  console.info(
+    '[loader-debug] completeLoadingWithFadeOut 元素查找: indicator=%s label=%s count=%s percent=%s',
+    indicator ? indicator.id : 'null',
+    label ? label.id : 'null',
+    count ? count.id : 'null',
+    percent ? percent.id : 'null',
+  );
   if (!indicator) return;
 
   indicator.classList.add('complete');
   if (label) label.textContent = '大爆炸';
   if (count) count.textContent = '';
   if (percent) percent.textContent = '100%';
+  console.info(
+    '[loader-debug] 状态条已设文字=大爆炸 classList=%s textContent=%s',
+    indicator.className,
+    label ? label.textContent : 'null',
+  );
 
   // 等入场动画跑完后再等一拍(让用户看清 100%),然后启动 CSS 渐隐。
   // 时长来自 CSS .loading-indicator 的 transition(0.5s opacity + transform);
   // transitionend 触发后从布局移除,无硬编码 setTimeout。
   indicator.addEventListener(
     'transitionend',
-    () => {
+    (ev) => {
+      console.info('[loader-debug] transitionend 触发: property=%s', ev.propertyName);
       indicator.classList.add('u-hidden');
     },
     { once: true },
   );
+  console.info('[loader-debug] 准备加 hidden class');
   indicator.classList.add('hidden');
 }
 
@@ -559,6 +574,7 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
   if (renderer === null) return;
   const cy = renderer.getCy();
   const nodeCount = counts.nodeCount;
+  console.info(`[loader-debug] finishStreamingLayout 进入, nodeCount=${nodeCount}`);
 
   // 摘掉 entering（opacity: 0）必须在所有提前 return 之前：节点数 < 80 或
   // 慢设备跳过 Euler 时，如果这里不摘，节点会一直透明只剩边（见 .entering 样式）。
@@ -652,7 +668,10 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
     (elapsedMs) => {
       logInfo(`[layout-worker] 正在计算… ${(elapsedMs / 1000).toFixed(1)}s`);
     },
-    completeLoading, // 入场动画收尾即触发,替代 waitForGraphToSettle 的 500ms 静止 + 60s 超时 + 100ms 轮询
+    () => {
+      console.info('[loader-debug] runLayoutInWorker.onSettled 触发 → completeLoading');
+      completeLoading();
+    },
   ).then((result) => {
     if (!result) {
       logInfo('[layout-worker] 不可用，退回同步布局');
@@ -680,6 +699,7 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
   function runSyncLayout(): void {
     // settled 现在只由 completeLoading 内部设,不再用作「已 resolve」闸门。
     // runSyncLayout 是单次调用入口(同步布局路径 / worker 退化),不重复触发。
+    console.info('[loader-debug] runSyncLayout 启动');
 
     // 非空断言：renderer 在函数开头已做过 `=== null` 早退。TS 仍报是因为
     // runSyncLayout 是函数声明（hoisted），控制流分析无法确定它只在早退之后
@@ -702,7 +722,10 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
         // euler 跑完 layoutstop 事件触发时即调 completeLoading——
         // 这是 layout 算法的自然收敛信号，替代之前 waitForGraphToSettle
         // 的「500ms 静止 + 60s 硬超时 + 100ms 轮询节流」三层硬编码。
-        onLayoutStop: completeLoading,
+        onLayoutStop: () => {
+          console.info('[loader-debug] runSyncLayout.onLayoutStop 触发 → completeLoading');
+          completeLoading();
+        },
       },
     );
   }

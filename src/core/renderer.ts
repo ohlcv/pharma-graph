@@ -1060,6 +1060,7 @@ export class Renderer {
       // A newer layout may have replaced this one while it was running.
       // Ignore the old instance's stop event: it must not settle the loading
       // state or overwrite overlap data for the active layout.
+      console.info('[loader-debug] renderer.runLayout.layoutstop 触发');
       if (this.currentLayoutInstance !== layoutInstance) return;
       // 恢复 overlay 的标准 30fps 节流 + 启动 rAF。
       // 注意：之前在这里调过 pause()/redraw()，但 pause 期间 overlay 完全
@@ -1084,6 +1085,7 @@ export class Renderer {
     //     看起来"抖"，但在大爆炸本身已经抖的状态下不影响视觉），开销降到
     //     ~50ms × 10fps = 500ms/s，省下的 1s/s 正好让 cytoscape 渲染跑顺。
     this.glowOverlay?.setFps(10);
+    console.info(`[loader-debug] renderer.runLayout 启动 ${name}, animate=${(base as Record<string, unknown>).animate}`);
     layoutInstance.run();
   }
 
