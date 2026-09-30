@@ -147,6 +147,14 @@ export function initGraphEvents(deps: GraphEventDeps): void {
     if (evt.target === cy) {
       clearShapeFilter();
       deps.highlight.reset();
+      // 点画布空白关掉高亮后，需要刷一下侧边栏"图谱状态"卡片里的
+      // 高亮节点/边计数 —— highlight.reset() 只动 cytoscape 的 class，
+      // 不会通知 stats DOM。点图例（legend-manager）那条路径已经显式
+      // 调 updateStats + syncBottomSheetStats（见 highlightFillFilter
+      // toggle-off / highlightEdgeTypeFilter toggle-off），这里补对称，
+      // 否则"选总结→30→点画布→3" 不刷新就卡在 30。
+      updateStats(cy);
+      syncBottomSheetStats(cy);
       deps.detailPanel.close();
       deps.tourController.refreshStartHintFromHighlight();
       // Tapping the empty canvas while a tour is active stops the tour.
