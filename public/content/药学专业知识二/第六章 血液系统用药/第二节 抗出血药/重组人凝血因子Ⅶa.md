@@ -1,0 +1,20 @@
+---
+id: drug-fviia-recomb-y2-06-02
+label: 重组人凝血因子Ⅶa
+fill: cls-drug
+location:
+  book: 药学专业知识二
+  chapter: 第六章 血液系统用药
+  section: 第二节 抗出血药
+  item: 分类与代表药品
+tags:
+  - 重组人凝血因子Ⅶa
+  - 凝血因子
+summary:
+  short:
+  full:
+edges_out:
+  - target: cls-coagfactor-y2-06-02
+    type: instance_of
+    reason: 重组人凝血因子Ⅶa是凝血因子的代表药物
+---
