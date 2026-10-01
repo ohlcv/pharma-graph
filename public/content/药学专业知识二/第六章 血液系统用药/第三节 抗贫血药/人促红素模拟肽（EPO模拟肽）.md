@@ -12,6 +12,7 @@ tags:
   - EPO模拟肽
   - 红细胞生成刺激剂
   - 抗贫血药
+  - 培莫沙肽
 summary:
   short:
   full: |

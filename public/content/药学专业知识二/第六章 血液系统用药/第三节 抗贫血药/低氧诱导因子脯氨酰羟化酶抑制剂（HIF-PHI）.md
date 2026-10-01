@@ -12,6 +12,8 @@ tags:
   - HIF-PHI
   - 红细胞生成刺激剂
   - 抗贫血药
+  - 罗沙司他
+  - 恩那度司他
 summary:
   short:
   full: |
