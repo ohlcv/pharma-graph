@@ -129,6 +129,11 @@ function bindGranularityButtons(): void {
   });
 }
 
+// 遍历模式（顺序 / 倒序 / 随机）的 UI 绑定 + 持久化都由
+// TourController 自己处理（见 tour-controller.ts 的 bindModeButtons +
+// setMode），不在这里重复——理由：mode 切换需要通知运行中的 engine，
+// 而 controller 才持有 engine 引用，tour-settings 模块拿不到。
+
 /** Format the rate for display: "1.0x" (one decimal place, always). */
 function formatRate(v: number): string {
   return `${v.toFixed(1)}x`;

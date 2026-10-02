@@ -31,6 +31,7 @@ import {
   unregisterStrategy,
   TourCompleteInfo,
   getStrategy,
+  type SequenceParams,
 } from '@/core/tour';
 
 /** Single-node graph — sufficient for onComplete reason-routing tests that
@@ -320,6 +321,237 @@ describe('TourEngine shouldRestart hook (issue #7)', () => {
     engine.stop();
     // 清理：撤销测试策略，防止泄漏到后续测试。
     unregisterStrategy('test-no-restart');
+  });
+});
+
+// ── 遍历模式参数：has-dfs + 顺序/倒序/随机 ──────────────────────────────
+//
+// 验证 TourEngine 通过 SequenceParams 把 mode (sequential / reverse / random)
+// 正确传给策略的 buildSequence：
+//   - 'sequential' (默认) = forward + sequential，等价于历史行为
+//   - 'reverse'    = 章节层反序、章内正序
+//   - 'random'     = 整体 Fisher-Yates 洗牌，每轮循环重新摇一次
+//
+// 测试策略：注册一个记录"最近一次 params 是什么"的 stub，重启时断言
+// 拿到了新序列——比直接断言乱序结果更稳定（乱序结果是随机的）。
+
+describe('TourEngine traversal mode (sequential / reverse / random)', () => {
+  it('default mode is "sequential" — params default to forward + sequential', () => {
+    let captured: SequenceParams | undefined;
+    registerStrategy({
+      id: 'test-capture-params',
+      label: 'Test: capture params',
+      buildSequence: (_cy, params) => {
+        captured = params;
+        return ['a'];
+      },
+    });
+    const cy = cytoscape({ headless: true, styleEnabled: false });
+    cy.add([{ group: 'nodes', data: { id: 'a' } }]);
+    const engine = new TourEngine(cy);
+    engine.start('a', {
+      interval: 1_000_000,
+      maxDepth: -1,
+      strategy: asStrategy('test-capture-params'),
+    });
+    // mode 字段未传 → 'sequential' → direction:'forward', shuffle:'sequential'
+    expect(captured?.direction).toBe('forward');
+    expect(captured?.shuffle).toBe('sequential');
+    engine.stop();
+    unregisterStrategy('test-capture-params');
+  });
+
+  it('mode "reverse" maps to direction:reverse + shuffle:sequential', () => {
+    let captured: SequenceParams | undefined;
+    registerStrategy({
+      id: 'test-reverse-mode',
+      label: 'Test: reverse mode',
+      buildSequence: (_cy, params) => {
+        captured = params;
+        return ['a'];
+      },
+    });
+    const cy = cytoscape({ headless: true, styleEnabled: false });
+    cy.add([{ group: 'nodes', data: { id: 'a' } }]);
+    const engine = new TourEngine(cy);
+    engine.start('a', {
+      interval: 1_000_000,
+      maxDepth: -1,
+      strategy: asStrategy('test-reverse-mode'),
+      mode: 'reverse',
+    });
+    expect(captured?.direction).toBe('reverse');
+    expect(captured?.shuffle).toBe('sequential');
+    engine.stop();
+    unregisterStrategy('test-reverse-mode');
+  });
+
+  it('mode "random" maps to direction:forward + shuffle:random', () => {
+    let captured: SequenceParams | undefined;
+    registerStrategy({
+      id: 'test-random-mode',
+      label: 'Test: random mode',
+      buildSequence: (_cy, params) => {
+        captured = params;
+        return ['a'];
+      },
+    });
+    const cy = cytoscape({ headless: true, styleEnabled: false });
+    cy.add([{ group: 'nodes', data: { id: 'a' } }]);
+    const engine = new TourEngine(cy);
+    engine.start('a', {
+      interval: 1_000_000,
+      maxDepth: -1,
+      strategy: asStrategy('test-random-mode'),
+      mode: 'random',
+    });
+    expect(captured?.direction).toBe('forward');
+    expect(captured?.shuffle).toBe('random');
+    engine.stop();
+    unregisterStrategy('test-random-mode');
+  });
+
+  it('setMode() mid-tour regenerates the seq — params reflect the new mode on the next call', () => {
+    const calls: SequenceParams[] = [];
+    registerStrategy({
+      id: 'test-setmode',
+      label: 'Test: setMode',
+      buildSequence: (_cy, params) => {
+        calls.push(params!);
+        return ['a', 'b'];
+      },
+      hooks: { shouldRestart: () => true }, // 强制允许重启，便于观察 rebuild
+    });
+    const cy = cytoscape({ headless: true, styleEnabled: false });
+    cy.add([
+      { group: 'nodes', data: { id: 'a' } },
+      { group: 'nodes', data: { id: 'b' } },
+    ]);
+    const engine = new TourEngine(cy);
+    engine.start('a', {
+      interval: 1_000_000,
+      maxDepth: -1,
+      strategy: asStrategy('test-setmode'),
+      mode: 'sequential',
+    });
+    // start 调用了 1 次 buildSequence
+    expect(calls.length).toBe(1);
+    expect(calls[0]?.shuffle).toBe('sequential');
+    // 用户切到 reverse → setMode 触发 regenerateSeq
+    engine.setMode('reverse');
+    expect(calls.length).toBe(2);
+    expect(calls[1]?.direction).toBe('reverse');
+    expect(calls[1]?.shuffle).toBe('sequential');
+    engine.stop();
+    unregisterStrategy('test-setmode');
+  });
+
+  it('"random" + injected RNG: buildSequence receives the deterministic RNG (testing seam)', () => {
+    let capturedRng: (() => number) | undefined;
+    registerStrategy({
+      id: 'test-rng-injection',
+      label: 'Test: rng injection',
+      buildSequence: (_cy, params) => {
+        capturedRng = params?.rng;
+        return ['a'];
+      },
+    });
+    const cy = cytoscape({ headless: true, styleEnabled: false });
+    cy.add([{ group: 'nodes', data: { id: 'a' } }]);
+    const engine = new TourEngine(cy);
+    const seeded = () => 0.42;
+    engine.start('a', {
+      interval: 1_000_000,
+      maxDepth: -1,
+      strategy: asStrategy('test-rng-injection'),
+      mode: 'random',
+      rng: seeded,
+    });
+    expect(capturedRng).toBe(seeded);
+    engine.stop();
+    unregisterStrategy('test-rng-injection');
+  });
+
+  it('"每轮循环都摇一次"语义：has-dfs + mode:random + restart 路径每次都调 rng', () => {
+    // 用真实注册的 has-dfs 策略——这是"每轮循环都摇一次"语义的关键。
+    // 验证：
+    //   1. start 阶段 rng 被调 1 次
+    //   2. 走完一轮后 visitNext restart 分支触发，会再调 buildSequence（带 params）
+    //   3. 这次 rng 又被调（实现"重摇"）
+    //
+    // 怎么观察 rng 调用次数：注入一个计数器 rng + 用 spy 跟踪。rng 被
+    // 调用的次数 == buildSequence 里 shuffleInPlaceWithRng 的 O(n) 次。
+    // 简化：我们关心"shuffle 是否在第二轮被调用"，而不是具体次数。
+    const cy = cytoscape({ headless: true, styleEnabled: false });
+    cy.add([
+      { group: 'nodes', data: { id: 'a' } },
+      { group: 'nodes', data: { id: 'b' } },
+      { group: 'nodes', data: { id: 'c' } },
+    ]);
+    const engine = new TourEngine(cy);
+    // 注入 spy rng，每次返回 0.5（固定），让 shuffle 行为可预期。
+    const rng = vi.fn(() => 0.5);
+    engine.start('a', {
+      interval: 1_000_000,
+      maxDepth: -1,
+      strategy: asStrategy('has-dfs'),
+      mode: 'random',
+      rng,
+    });
+    const callsAfterStart = rng.mock.calls.length;
+    expect(callsAfterStart).toBeGreaterThan(0); // start 阶段已经摇过
+    // 手动驱动 visitNext 把第一轮走完并触发 restart 路径。
+    // start 已经访问 a（seqIndex=1），visitNext 两次后越过末尾 → restart 分支
+    // → buildSequence 第二次被调（rng 又被摇）。
+    (engine as unknown as { visitNext: () => void }).visitNext(); // visit b
+    (engine as unknown as { visitNext: () => void }).visitNext(); // visit c
+    (engine as unknown as { visitNext: () => void }).visitNext(); // → restart, buildSequence 再调
+    expect(rng.mock.calls.length).toBeGreaterThan(callsAfterStart); // rng 在第二轮又被摇
+    engine.stop();
+  });
+
+  it('mode:"reverse" + has-dfs 真的反转章节层（has-dfs 用 sortedStructures.reverse）', () => {
+    // 用真实图（有结构节点）来验证 direction:'reverse' 下 seq 顺序确实反了。
+    const cy = cytoscape({ headless: true, styleEnabled: false });
+    // 三个 structure 节点，按 locationKey 排序后是 y2<y3<y4
+    cy.add([
+      {
+        group: 'nodes',
+        data: {
+          id: 'a',
+          fill: 'cls-structure',
+          location: { book: 'y2', chapter: '第一章' },
+        },
+      },
+      {
+        group: 'nodes',
+        data: {
+          id: 'b',
+          fill: 'cls-structure',
+          location: { book: 'y3', chapter: '第二章' },
+        },
+      },
+      {
+        group: 'nodes',
+        data: {
+          id: 'c',
+          fill: 'cls-structure',
+          location: { book: 'y4', chapter: '第三章' },
+        },
+      },
+    ]);
+    const seqForward = getStrategy(asStrategy('has-dfs')).buildSequence(cy, {
+      direction: 'forward',
+      shuffle: 'sequential',
+    });
+    const seqReverse = getStrategy(asStrategy('has-dfs')).buildSequence(cy, {
+      direction: 'reverse',
+      shuffle: 'sequential',
+    });
+    // forward = [a, b, c]
+    expect(seqForward).toEqual(['a', 'b', 'c']);
+    // reverse = [c, b, a]（章节层反序）
+    expect(seqReverse).toEqual(['c', 'b', 'a']);
   });
 });
 

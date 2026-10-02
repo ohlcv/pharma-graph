@@ -975,6 +975,23 @@
                           aria-label="朗读后额外停顿"
                         />
                       </div>
+                      <!-- ── 遍历顺序（顺序 / 倒序 / 随机）───────────────────────
+                           与底部抽屉的同一组控件对齐。data-tour-mode 在两个 DOM
+                           树里都用，controller.syncModeButtons() 一次性扫两边。 -->
+                      <div class="tour-mode-row">
+                        <div class="param-label">遍历顺序</div>
+                        <div class="seg-group" role="radiogroup" aria-label="遍历顺序">
+                          <button class="seg-btn" type="button" data-tour-mode="sequential" aria-pressed="false">
+                            顺序
+                          </button>
+                          <button class="seg-btn" type="button" data-tour-mode="reverse" aria-pressed="false">
+                            倒序
+                          </button>
+                          <button class="seg-btn" type="button" data-tour-mode="random" aria-pressed="false">
+                            随机
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1549,6 +1566,21 @@
                       value="0"
                       aria-label="朗读后额外停顿"
                     />
+                  </div>
+                  <!-- ── 遍历顺序（顺序 / 倒序 / 随机）───────────────────────
+                       仅对教材顺序策略生效；topo-prereq（层级依赖）忽略此控件。
+                       data-tour-mode 是 controller.bindModeButtons 的选择器。 -->
+                  <div class="bs-section__label">遍历顺序</div>
+                  <div class="bs-speech-grid">
+                    <button class="bs-speech-btn" type="button" data-tour-mode="sequential" aria-pressed="false">
+                      顺序
+                    </button>
+                    <button class="bs-speech-btn" type="button" data-tour-mode="reverse" aria-pressed="false">
+                      倒序
+                    </button>
+                    <button class="bs-speech-btn" type="button" data-tour-mode="random" aria-pressed="false">
+                      随机
+                    </button>
                   </div>
                 </div>
               </div>

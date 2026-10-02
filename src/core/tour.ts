@@ -202,6 +202,16 @@ export interface TourOptions {
    * - 不传 / 空集合 = 不隔离（保留原有行为）
    */
   universeNodeIds?: Set<string>;
+  /**
+   * 遍历模式（仅对 has-dfs 生效；topo-prereq 等无方向语义的策略忽略）。
+   * - 'sequential' = 正序（默认，与历史行为一致）
+   * - 'reverse'    = 章节层反序，章内正序
+   * - 'random'     = 整体 Fisher-Yates 洗牌；每轮循环重摇一次
+   * 不传 = 'sequential'。
+   */
+  mode?: 'sequential' | 'reverse' | 'random';
+  /** 可选 RNG（返回 0..1）。不传 = Math.random()。测试可注入确定性 RNG。 */
+  rng?: () => number;
 }
 
 export interface TourStepInfo {
@@ -241,9 +251,54 @@ export interface TourStrategyDef {
   label: string;
   /** 一句话副标题，解释这个策略适合什么场景。显示在 label 下方。 */
   description?: string;
-  buildSequence: (cy: cytoscape.Core) => string[];
+  /**
+   * 构建本策略的遍历序列。
+   * @param cy 图实例
+   * @param params 遍历模式参数（direction / shuffle），由 TourOptions 注入。
+   *               不传 = 默认 {direction: 'forward', shuffle: 'sequential'}，
+   *               老调用方（previewSequence / 测试）天然兼容。
+   *               topo-prereq 等无方向语义的策略可以安全忽略这两个字段。
+   */
+  buildSequence: (cy: cytoscape.Core, params?: SequenceParams) => string[];
   /** 可选钩子集合；详见 StrategyHooks 注释。 */
   hooks?: StrategyHooks;
+}
+
+/** 遍历模式参数：影响 buildSequence(方向 / 乱序)。
+ *  - direction: 'forward' = 正序（教材：y2 → y3 → y1 → y4）；'reverse' = 反序（倒序）。
+ *    'reverse' 语义在 has-dfs 里是"章节层反字典序、章内正序"。
+ *  - shuffle: 'sequential' = 策略序列原序；'random' = 整体 Fisher-Yates 洗牌。
+ *    'random' 时每次调用都产生不同序列——用于"每轮循环都摇一次"语义。
+ *  - rng: 可选 RNG（0..1 返回）。不传 = Math.random()。测试可注入确定性 RNG。
+ */
+export interface SequenceParams {
+  direction: 'forward' | 'reverse';
+  shuffle: 'sequential' | 'random';
+  rng?: () => number;
+}
+
+export const DEFAULT_SEQUENCE_PARAMS: SequenceParams = {
+  direction: 'forward',
+  shuffle: 'sequential',
+};
+
+/** 把 UI 端"顺序 / 倒序 / 随机"单选映射到 buildSequence 的 (direction, shuffle) 对。
+ *  - sequential → forward + sequential
+ *  - reverse    → reverse  + sequential
+ *  - random     → forward  + random（章节顺序照旧但整体洗牌）
+ *  章节倒序与随机洗牌互斥——一次只能改一个轴。 */
+export function modeToSequenceParams(
+  mode: 'sequential' | 'reverse' | 'random',
+): Pick<SequenceParams, 'direction' | 'shuffle'> {
+  switch (mode) {
+    case 'reverse':
+      return { direction: 'reverse', shuffle: 'sequential' };
+    case 'random':
+      return { direction: 'forward', shuffle: 'random' };
+    case 'sequential':
+    default:
+      return { direction: 'forward', shuffle: 'sequential' };
+  }
 }
 
 /**
@@ -586,6 +641,15 @@ function shuffleInPlace<T>(arr: T[]): void {
   }
 }
 
+/** 可注入 RNG 的 Fisher-Yates 洗牌。rng 返回 0..1 浮点数。
+ *  rng 不传则退回到 shuffleInPlace（Math.random），保持默认行为一致。 */
+function shuffleInPlaceWithRng<T>(arr: T[], rng: () => number): void {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
 function getLocationField(node: cytoscape.NodeSingular, field: string): string {
   const loc = node.data('location');
   if (typeof loc === 'object' && loc !== null) {
@@ -705,7 +769,10 @@ registerStrategy({
   id: 'has-dfs',
   label: '教材顺序（深度优先）',
   description: '按书 → 章 → 节 → 分类 → 药 → 口诀的顺序走，适合初次复习整本书。',
-  buildSequence(cy) {
+  buildSequence(cy, params) {
+    const direction = params?.direction ?? 'forward';
+    const shuffle = params?.shuffle ?? 'sequential';
+    const rng = params?.rng ?? Math.random;
     // 书籍优先级：y2(药二)→y3(药综)→y1(药一)→y4(法规)
     // key 兼容正则捕获的 'y2'/'2' 两种格式
     const BOOK_ORDER: Record<string, number> = {
@@ -851,6 +918,11 @@ registerStrategy({
         lb = getLocationKey(b);
       return la < lb ? -1 : la > lb ? 1 : 0;
     });
+    // 倒序 = 章节层（allStructures）反序，章内 DFS 不变。
+    // 章内反序会让用户在同一章里看"口诀 → 药物 → 分类 → 节标题"，
+    // 反人类（人脑是"先骨架后细节"），所以只翻章节层。
+    // 实现：原 sort 已经按 bookOrder + locationKey 排好，直接 reverse 即可。
+    if (direction === 'reverse') sortedStructures.reverse();
 
     for (const structure of sortedStructures) {
       if (visited.has(structure.id())) continue;
@@ -864,6 +936,15 @@ registerStrategy({
     // 一个无家可归的节点"。现在改用共享的 insertOrphansNearAncestors 工具，
     // 让游离节点尽量紧贴它的 location 祖先出现。
     insertOrphansNearAncestors(cy, result, visited);
+
+    // ── 第三步：随机洗牌（仅 shuffle === 'random'）────────────────────
+    // 用可注入的 rng（测试可传确定性 RNG）。在孤儿已就位之后才洗——避免
+    // 把"被插到 location 祖先附近的孤儿"再次打散到无关位置。
+    // 每轮循环 buildSequence 都会重摇一次（参见 session 内部 restart 路径），
+    // 实现"每轮循环都摇一次"的语义。
+    if (shuffle === 'random') {
+      shuffleInPlaceWithRng(result, rng);
+    }
 
     return result;
   },
@@ -880,7 +961,9 @@ registerStrategy({
   hooks: {
     shouldRestart: () => false,
   },
-  buildSequence(cy) {
+  buildSequence(cy, _params) {
+    // topo-prereq 是无方向的拓扑序，direction / shuffle 参数语义上无意义，显式忽略。
+    // params 仍然保留在签名里以便和 TourStrategyDef.buildSequence 接口一致。
     const nodes = cy.nodes().not('.layer-parent');
     const edges = cy.edges();
 
@@ -1005,6 +1088,16 @@ export class TourEngine {
   private postSpeechDelayMs = 0;
   /** Adapter that returns a promise + cancel for the current utterance. */
   private waitForSpeechEnd: SpeechEndAdapter | null = null;
+  /**
+   * 遍历模式（仅对 has-dfs 生效；topo-prereq 等无方向语义的策略忽略）。
+   * - 'sequential' = 正序（默认）
+   * - 'reverse'   = 章节层反序，章内正序
+   * - 'random'    = 整体洗牌；每轮循环都重摇一次
+   * 注入 strategy.buildSequence 时拆解成 {direction, shuffle, rng}。
+   */
+  private _mode: 'sequential' | 'reverse' | 'random' = 'sequential';
+  /** 可选 RNG。null = Math.random()。测试可注入确定性 RNG。 */
+  private _rng: (() => number) | null = null;
   private paused = false;
   private stopped = false;
   private onStep?: TourOptions['onStep'];
@@ -1096,6 +1189,11 @@ export class TourEngine {
     this.waitForSpeech = options.waitForSpeech ?? false;
     this.postSpeechDelayMs = options.postSpeechDelayMs ?? 0;
     this.waitForSpeechEnd = options.waitForSpeechEnd ?? null;
+    // 遍历模式：direction / shuffle 注入到策略的 buildSequence。
+    // restart 路径（visitNext 内 strategy.buildSequence 重调）会自动用同样的参数，
+    // 实现"每轮循环都摇一次"——rng 每次都会重摇新序列。
+    this._mode = options.mode ?? 'sequential';
+    this._rng = options.rng ?? null;
     // Guard against an empty graph or a bad rootId (e.g. the pickRoot
     // fallback returning '' when no candidate node exists). Without
     // this, every subsequent cy.getElementById(rootId) would silently
@@ -1127,7 +1225,15 @@ export class TourEngine {
     this._visited = [];
 
     // Build full sequence
-    this.seq = normalizeSeq(this.cy, strategy.buildSequence(this.cy));
+    const { direction, shuffle } = modeToSequenceParams(this._mode);
+    this.seq = normalizeSeq(
+      this.cy,
+      strategy.buildSequence(this.cy, {
+        direction,
+        shuffle,
+        ...(this._rng ? { rng: this._rng } : {}),
+      }),
+    );
     // Remember the root so subsequent restarts can re-scope the tour to the
     // same subtree instead of jumping back to book-y2.
     this._rootId = rootId;
@@ -1522,6 +1628,65 @@ export class TourEngine {
   }
 
   /**
+   * Update the traversal mode. When the engine is running, this regenerates
+   * the current sequence in-place so the change takes effect on the next
+   * step (no need to restart the tour). No-op when value is unchanged.
+   *
+   * 'random' 下每次切换都会重摇一次 seq（rng 调用 builtIn
+   * or Math.random），所以"随机"按钮其实比"倒序"更"动"——但都属于
+   * 用户主动切模的合理副作用。
+   */
+  setMode(mode: 'sequential' | 'reverse' | 'random'): void {
+    if (this._mode === mode) return;
+    this._mode = mode;
+    if (!this.stopped) this.regenerateSeq();
+  }
+
+  /** Inject a deterministic RNG (testing only). Pass null to revert to Math.random.
+   *  No-op when not in random mode — sequential / reverse don't call rng. */
+  setRng(rng: (() => number) | null): void {
+    this._rng = rng;
+    if (!this.stopped && this._mode === 'random') this.regenerateSeq();
+  }
+
+  /** 当前遍历模式（供调试 / UI 显示）。 */
+  getMode(): 'sequential' | 'reverse' | 'random' {
+    return this._mode;
+  }
+
+  /**
+   * Rebuild the current seq using the latest mode / rng.
+   * Preserves the user's current rootId / universeNodeIds, and rewinds seqIndex
+   * to the start of the new sequence so the tour continues from the top.
+   *
+   * Called by setMode / setRng when those mutate mid-tour. The natural
+   * "每轮循环都摇一次" path (visitNext restart branch) does NOT go through
+   * here — that path uses the same params but resets seqIndex inside its
+   * own while-loop. This method is for user-driven mid-tour changes.
+   */
+  private regenerateSeq(): void {
+    const strategy = getStrategy(this.strategyId);
+    const { direction, shuffle } = modeToSequenceParams(this._mode);
+    this.seq = normalizeSeq(
+      this.cy,
+      strategy.buildSequence(this.cy, {
+        direction,
+        shuffle,
+        ...(this._rng ? { rng: this._rng } : {}),
+      }),
+    );
+    this.applyRootScope();
+    this.seqIndex = 0;
+    this.currentStep = 0;
+    this._visited = [];
+    this.recomputeTotal();
+    // Notify the controller so it can re-render the progress badge. The current
+    // pulsing node is preserved (the user is mid-tour at a specific node); we
+    // just signal "progress reset, new cycle about to begin".
+    this.notifyStepForDepthChange();
+  }
+
+  /**
    * Inject the speech-end adapter. Called once by the UI layer on boot
    * (after the speech controller is constructed) so the core engine can
    * resolve a Promise when the current utterance ends — see
@@ -1836,7 +2001,18 @@ export class TourEngine {
           strategyAllowsRestart(getStrategy(this.getStrategyId()), this._restartAttempts, this.cy)
         ) {
           const strategy = getStrategy(this.getStrategyId());
-          this.seq = normalizeSeq(this.cy, strategy.buildSequence(this.cy));
+          // 重启路径同样走 buildSequence 的 params 注入。"每轮循环都摇一次"语义
+          // 就在这里生效：mode === 'random' 下每次循环都会重新调 rng，序列
+          // 跟上一轮不同；否则（sequential / reverse）序列跟起点一致。
+          const { direction, shuffle } = modeToSequenceParams(this._mode);
+          this.seq = normalizeSeq(
+            this.cy,
+            strategy.buildSequence(this.cy, {
+              direction,
+              shuffle,
+              ...(this._rng ? { rng: this._rng } : {}),
+            }),
+          );
           // Re-apply the rootId scoping that was set up in start(). Without
           // this, the restart would regenerate the FULL graph sequence (641
           // nodes) and lose the user's "start from here" intent — the tour

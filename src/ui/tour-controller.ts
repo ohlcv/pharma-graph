@@ -28,6 +28,32 @@ import { uiState, registerTourBarToggle } from './state.js';
 import { UiToggle } from './ui-toggle.js';
 import { showToast } from './ui-helpers.js';
 import { speechController } from './speech.js';
+
+/** Storage key for the traversal mode preference (sequential / reverse / random).
+ *  uiState.tour.mode is the in-memory mirror; this localStorage entry is the
+ *  cross-reload persistence. */
+const TOUR_MODE_KEY = 'pg:tour:mode';
+
+/** Read the persisted traversal mode. Defaults to 'sequential' (= historical
+ *  behavior). Invalid / corrupted values fall back to default rather than
+ *  throwing — the mode buttons are best-effort visible. */
+function loadTourMode(): 'sequential' | 'reverse' | 'random' {
+  try {
+    const v = localStorage.getItem(TOUR_MODE_KEY);
+    if (v === 'sequential' || v === 'reverse' || v === 'random') return v;
+  } catch {
+    /* ignore */
+  }
+  return 'sequential';
+}
+
+function saveTourMode(mode: 'sequential' | 'reverse' | 'random'): void {
+  try {
+    localStorage.setItem(TOUR_MODE_KEY, mode);
+  } catch {
+    /* ignore */
+  }
+}
 import { registerSpeechSettingsChange } from './tour-settings.js';
 import { UNIVERSE_ROOTS } from '../core/config.js';
 import { HIERARCHY_EDGE_TYPES } from '../core/edge-types.js';
@@ -80,10 +106,14 @@ export class TourController {
     this.bindActions();
     this.bindSliders();
     this.bindStrategyToggle();
+    this.bindModeButtons();
     this.bindMobileCollapse();
     this.bindSelectionHint();
     this.bindSpeechSettingsBridge();
     this.setIdleUI();
+    // 遍历模式：从 localStorage 恢复（覆盖 uiState 默认值），同步 active class。
+    uiState.tour.mode = loadTourMode();
+    this.syncModeButtons(uiState.tour.mode);
     // 初始化 fill（DOM 默认 value 不会触发 input 事件，需手动同步 fill）
     for (const s of this.sliders) this.paintFill(s);
     // idle 时显式把 elapsed 写成 0:00（paintElapsed 在 idle 状态下也会写到 0:00，
@@ -208,6 +238,8 @@ export class TourController {
       // 传递档位（5=全部），TourEngine 内部会处理为无限模式
       maxDepth: this._pendingMaxDepth,
       strategy: uiState.tour.strategy,
+      // 遍历模式：顺序 / 倒序 / 随机。topo-prereq 内部忽略 mode（无方向语义）。
+      mode: uiState.tour.mode,
       // 体系边界：跨体系隔离。tour.ts 的 applyRootScope 会用这个 Set
       // 过滤 BFS 后代——保证选 y2 节点后只跑体系一的节点，
       // 选 sum-neurodiversity 后只跑体系二的节点。
@@ -584,6 +616,38 @@ export class TourController {
     this.setStrategy(next);
   }
 
+  /**
+   * Set the traversal mode (sequential / reverse / random).
+   * Persists to uiState + localStorage, syncs the visible button state, and
+   * (if a tour is running) regenerates the current seq in-place. The engine
+   * continues from the new sequence's start without restarting the tour.
+   *
+   * topo-prereq strategy ignores mode entirely (no-op for it).
+   */
+  setMode(next: 'sequential' | 'reverse' | 'random'): void {
+    if (uiState.tour.mode === next) return;
+    uiState.tour.mode = next;
+    saveTourMode(next);
+    this.syncModeButtons(next);
+    this.flashModeButtons();
+    if (this.engine) this.engine.setMode(next);
+    // Reset progress so the UI badge re-renders for the new seq.
+    this.resetProgress();
+  }
+
+  /** Bind click handlers to every traversal-mode button (`[data-tour-mode]`).
+   *  Three buttons share the data attribute across both desktop sidebar and
+   *  mobile bottom sheet; one querySelectorAll covers both UIs. */
+  private bindModeButtons(): void {
+    document.querySelectorAll<HTMLButtonElement>('[data-tour-mode]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const m = btn.dataset['tourMode'] as 'sequential' | 'reverse' | 'random' | undefined;
+        if (!m) return;
+        this.setMode(m);
+      });
+    });
+  }
+
   // ── DOM binding ────────────────────────────────────────────────────────────
 
   private bindActions(): void {
@@ -935,6 +999,33 @@ export class TourController {
     el.classList.add('strategy-switched');
     el.addEventListener('animationend', () => el.classList.remove('strategy-switched'), {
       once: true,
+    });
+  }
+
+  /**
+   * Mirror `uiState.tour.mode` into every `[data-tour-mode]` button across
+   * the document (desktop sidebar + mobile bottom sheet both share the same
+   * data attribute, so one querySelectorAll pass covers both UIs).
+   */
+  private syncModeButtons(mode: 'sequential' | 'reverse' | 'random'): void {
+    document.querySelectorAll<HTMLButtonElement>('[data-tour-mode]').forEach((btn) => {
+      const active = btn.dataset['tourMode'] === mode;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', String(active));
+    });
+  }
+
+  /** Visual confirmation when the user changes traversal mode.
+   *  Reuses the strategy-switched CSS animation class so the visual language
+   *  stays consistent with the strategy selector (which already does this). */
+  private flashModeButtons(): void {
+    document.querySelectorAll<HTMLButtonElement>('[data-tour-mode]').forEach((btn) => {
+      btn.classList.remove('strategy-switched');
+      void btn.offsetWidth; // force reflow
+      btn.classList.add('strategy-switched');
+      btn.addEventListener('animationend', () => btn.classList.remove('strategy-switched'), {
+        once: true,
+      });
     });
   }
 

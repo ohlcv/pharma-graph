@@ -68,6 +68,16 @@ export const uiState = {
     pathHistory: [] as string[],
     /** Currently selected tour strategy */
     strategy: 'has-dfs' as TourStrategy,
+    /**
+     * 遍历模式。仅对 has-dfs（教材顺序）策略生效；topo-prereq 忽略。
+     * - 'sequential' = 正序（y2 → y3 → y1 → y4，章内正序）；= 历史默认行为
+     * - 'reverse'   = 倒序（章节层反序，章内正序）
+     * - 'random'    = 整体 Fisher-Yates 洗牌；每轮循环都重摇一次
+     *
+     * UI 端"顺序 / 倒序 / 随机"三按钮单选 → 映射到这三个值之一。
+     * 持久化于 localStorage 'pg:tour:mode'。
+     */
+    mode: 'sequential' as 'sequential' | 'reverse' | 'random',
   },
 
   /** Window resize debounce handle */
