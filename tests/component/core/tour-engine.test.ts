@@ -554,6 +554,90 @@ describe('TourEngine traversal mode (sequential / reverse / random)', () => {
     expect(seqReverse).toEqual(['c', 'b', 'a']);
   });
 
+  // ── Regression: reverse 模式下，章内子节（cls-structure 兄弟）也要 reverse。
+  // 旧逻辑只翻章节层（allStructures.reverse()），章内子节保持正向——用户报告
+  // "reverse 还是从药二第一章第一节开始，而不是最后一章最后一节"。修复：dfsChildren
+  // 在 direction === 'reverse' && fill === 'cls-structure' 时对兄弟节点 reverse。
+  // 子节内的 cls-classification / cls-drug / cls-mnemonic 等保持正向（"先骨架后
+  // 细节"在 reverse 模式下也成立——用户原话："节下面还是先分类再药名"）。
+  it('mode:"reverse" + has-dfs：章内子节兄弟节点 reverse，子节内其他 fill 保持正序', () => {
+    const cy = cytoscape({ headless: true, styleEnabled: false });
+    // tour.ts 通过节点 data.edges_out 读关系（不通过 cytoscape edge）——这是
+    // build-graph 把 frontmatter 关系塞进节点的格式。生产代码只看这部分。
+    cy.add([
+      // book-y2 (no edges_out = no parent)
+      { group: 'nodes', data: { id: 'book-y2', fill: 'cls-structure', location: { book: 'y2' } } },
+      // sec-y2-01（第一章）：用 subclass_of 边指向 book-y2
+      {
+        group: 'nodes',
+        data: {
+          id: 'sec-y2-01',
+          fill: 'cls-structure',
+          location: { book: 'y2', chapter: '第一章' },
+          edges_out: [{ type: 'subclass_of', target: 'book-y2' }],
+        },
+      },
+      // sec-y2-01-第一节：part_of sec-y2-01
+      {
+        group: 'nodes',
+        data: {
+          id: 'sec-y2-01-第一节',
+          fill: 'cls-structure',
+          location: { book: 'y2', chapter: '第一章', section: '第一节' },
+          edges_out: [{ type: 'part_of', target: 'sec-y2-01' }],
+        },
+      },
+      // sec-y2-01-第三节：part_of sec-y2-01
+      {
+        group: 'nodes',
+        data: {
+          id: 'sec-y2-01-第三节',
+          fill: 'cls-structure',
+          location: { book: 'y2', chapter: '第一章', section: '第三节' },
+          edges_out: [{ type: 'part_of', target: 'sec-y2-01' }],
+        },
+      },
+      // cls-y2-01（分类）：part_of sec-y2-01
+      {
+        group: 'nodes',
+        data: {
+          id: 'cls-y2-01',
+          fill: 'cls-classification',
+          location: { book: 'y2', chapter: '第一章' },
+          edges_out: [{ type: 'part_of', target: 'sec-y2-01' }],
+        },
+      },
+      // drug-y2-01（药）：part_of sec-y2-01
+      {
+        group: 'nodes',
+        data: {
+          id: 'drug-y2-01',
+          fill: 'cls-drug',
+          location: { book: 'y2', chapter: '第一章' },
+          edges_out: [{ type: 'part_of', target: 'sec-y2-01' }],
+        },
+      },
+    ]);
+    const seqReverse = getStrategy(asStrategy('has-dfs')).buildSequence(cy, {
+      direction: 'reverse',
+      shuffle: 'sequential',
+    });
+    // reverse 序关键断言（仅相对顺序，不假设绝对位置）：
+    //   1. book-y2 不在 seq[0]（章节层 reverse 后 book-y2 在最末）
+    //   2. sec-y2-01-第三节（第三节）排在 sec-y2-01-第一节（第一节）之前
+    //      （章内子节 reverse）
+    //   3. cls-y2-01（分类）排在 drug-y2-01（药）之前
+    //      （"先骨架后细节"在 reverse 模式下也成立）
+    const idxBookY2 = seqReverse.indexOf('book-y2');
+    const idxSecA = seqReverse.indexOf('sec-y2-01-第一节');
+    const idxSecC = seqReverse.indexOf('sec-y2-01-第三节');
+    const idxCls = seqReverse.indexOf('cls-y2-01');
+    const idxDrug = seqReverse.indexOf('drug-y2-01');
+    expect(idxBookY2).not.toBe(0); // book-y2 不在最前（章节层 reverse）
+    expect(idxSecC).toBeLessThan(idxSecA); // 第三节排在第一节之前
+    expect(idxCls).toBeLessThan(idxDrug); // 分类排在药之前
+  });
+
   // ── Regression: reverse / random 模式下，applyRootScope 不再强行 unshift rootId。
   // 旧逻辑下不管 mode 是什么，都把 rootId 提到 seq 第一位——reverse 序列失效，
   // 用户报告"选了倒序怎么还是从第一章开始"。

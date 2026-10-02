@@ -878,9 +878,17 @@ registerStrategy({
       walking.add(parentId);
       try {
         for (const fill of FILL_VISIT_ORDER) {
-          const kids = (children.get(parentId) ?? []).filter(
+          // reverse 模式下，cls-structure 兄弟节点按 location 降序遍历——
+          //   - 章一级：[第九章, ..., 第一章]（reverse 期望从最后一章往前）
+          //   - 子节一级：[第三节, 第二节, 第一节]（reverse 期望从最后节往前）
+          // 其他 fill（cls-classification / cls-drug / cls-mnemonic 等）保持
+          // 正向 FILL_VISIT_ORDER 顺序——这是"先骨架后细节"语义在 reverse 模式下
+          // 仍然成立的关键（用户反馈："节下面还是先分类再药名"）。
+          const kidsRaw = (children.get(parentId) ?? []).filter(
             (k) => (k.data('fill') as string) === fill,
           );
+          const kids =
+            direction === 'reverse' && fill === 'cls-structure' ? [...kidsRaw].reverse() : kidsRaw;
           for (const k of kids) {
             if (!visited.has(k.id())) {
               visited.add(k.id());
@@ -889,11 +897,14 @@ registerStrategy({
             dfsChildren(k.id());
           }
         }
-        // 其他所有类型（非 FILL_VISIT_ORDER 中列出的新 fill 值）
-        for (const k of (children.get(parentId) ?? []).filter(
+        // 其他所有类型（非 FILL_VISIT_ORDER 中列出的新 fill 值）——保持正向。
+        // "先骨架后细节"在 reverse 模式下也成立——所有 fill（包括未来新增的
+        // 非 FILL_VISIT_ORDER 中的 fill）都按正向 location 遍历，不因 reverse 翻向。
+        const otherKids = (children.get(parentId) ?? []).filter(
           (k) =>
             !FILL_VISIT_ORDER.includes((k.data('fill') ?? '') as (typeof FILL_VISIT_ORDER)[number]),
-        )) {
+        );
+        for (const k of otherKids) {
           if (!visited.has(k.id())) {
             visited.add(k.id());
             result.push(k.id());
@@ -918,10 +929,15 @@ registerStrategy({
         lb = getLocationKey(b);
       return la < lb ? -1 : la > lb ? 1 : 0;
     });
-    // 倒序 = 章节层（allStructures）反序，章内 DFS 不变。
-    // 章内反序会让用户在同一章里看"口诀 → 药物 → 分类 → 节标题"，
-    // 反人类（人脑是"先骨架后细节"），所以只翻章节层。
-    // 实现：原 sort 已经按 bookOrder + locationKey 排好，直接 reverse 即可。
+    // 倒序 = 章节层 + 子节层都反序，章内其他 fill（分类 / 药 / 口诀）保持正序。
+    //   - 章节层 allStructures 反序 → 章/节从上往下走变成从下往上走。
+    //   - 子节层（cls-structure 兄弟节点）：reverse 模式下 dfsChildren 内部按
+    //     location 降序遍历——[第九章, ..., 第一章] / [第三节, 第二节, 第一节]。
+    //   - 章内其他 fill（cls-classification / cls-drug / cls-mnemonic 等）
+    //     保持正向 FILL_VISIT_ORDER 顺序——这是"先骨架后细节"在 reverse 模式下
+    //     仍然成立的关键（用户反馈："节下面还是先分类再药名"）。
+    // 实现：原 sort 已经按 bookOrder + locationKey 排好，直接 reverse 即可；
+    // 子节层 reverse 在 dfsChildren 内部按 fill === 'cls-structure' 时生效。
     if (direction === 'reverse') sortedStructures.reverse();
 
     for (const structure of sortedStructures) {

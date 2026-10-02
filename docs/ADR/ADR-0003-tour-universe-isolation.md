@@ -48,19 +48,24 @@ export const UNIVERSE_ROOTS: ReadonlySet<string> = new Set<string>([
 `TourOptions` 新增 `universeNodeIds: Set<string>`，由 `TourController.pickRoot()` 算出后传入。
 
 ```typescript
-// 核心契约（2026-10-02 修正）：universe = universeRootId 的 strict descendants
-// 理由（修正前）：
+// 核心契约（2026-10-02 二次修正）：universe 永远是 candidateId 的 strict descendants。
+// 理由（最初）：
 //   - 选 book-y2 → universe = book-y2 子树
 //   - 选 sec-y2-01 → universe = sec-y2-01 子树（章节级隔离）
 //   - 不选节点 → pickDefaultRoot() 选 book-y2 → universe = book-y2 子树
-// 修正（reverse 漫游在体系级真正生效）：
-//   - 用 universeRootId 的子树作 universe（即体系级），因为当 rootId 不是体系根
-//     时（如默认起点 book-y2），“universe = rootId subtree”会把范围卡在单本书
-//     子树下，章节层只能正向，reverse 在体系级失效，退化成 forward。
-//   - 修正后所有路径 univere 都是“体系根子树”，保留“跨体系不混播”语义的同时，
-//     让 reverse / random 模式能在体系级跨越 4 本教材。
-//   - detectUniverseRoot 返回 null（孤悬节点或测试环境无体系根）时回退到
-//     rootId subtree，保持老路径行为。
+// 第一次修正（828c315）：用 universeRootId 的子树作 universe（体系级），理由是 reverse
+//   漫游在体系级真正生效。但用户反馈："为什么倒序把药一也掺和进来了" /
+//   "选中节点却走了整个体系一"——universe 扩到体系根破坏了"我选什么就只看什么"的
+//   用户期望边界。
+// 二次修正（本次 commit）：universe 永远是 candidateId subtree。
+//   - 不选节点默认 = 药二子树（1115 节点），不跨书。
+//   - 选节点 → 节点子树（章节级隔离），保留"选一个循环就只看这一个"的传统行为。
+//   - universeRootId 字段保留在 pickRoot() 返回值中（用于检测），但不影响 universe 来源。
+// reverse 在 book-y2 子树内的章节层 + 子节层 reverse 由 has-dfs.buildSequence 内部处理：
+//   - 章节层（sortedStructures）：reverse 模式全翻
+//   - 子节层（dfsChildren 内的 cls-structure 兄弟）：reverse 模式翻
+//   - 子节内其他 fill（cls-classification / cls-drug / cls-mnemonic）：保持正向
+//     FILL_VISIT_ORDER 顺序——"先骨架后细节"在 reverse 模式下仍然成立。
 ```
 
 `TourEngine.applyRootScope()` 用这个 Set 过滤 seq：

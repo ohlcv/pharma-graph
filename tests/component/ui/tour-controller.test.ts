@@ -453,7 +453,7 @@ describe('TourController.pickRoot — universe boundary is 体系级，不是 ro
     return cy;
   }
 
-  it('用户没选节点时，universe 是 rootR1（体系根）子树，而不是 book-y2（默认根）子树', () => {
+  it('用户没选节点时，universe 是 book-y2（默认根）子树，保持只轮播药二的传统行为', () => {
     const cy = makeDualUniverseGraph();
     // 让 pickRoot 内部的 detectUniverseRoot 把 rootR1/rootR2 当作体系根
     // (production 代码读 UNIVERSE_ROOTS 常量；这里 stub 私有方法)
@@ -498,19 +498,21 @@ describe('TourController.pickRoot — universe boundary is 体系级，不是 ro
     ).pickRoot();
     // 默认 rootId = book-y2（pickDefaultRoot 走 book priority）
     expect(result.rootId).toBe('book-y2');
+    // universeRootId 仍然是体系根（只是用于检测，不用于算 universe）
     expect(result.universeRootId).toBe('rootR1');
-    // 关键修复点：universe 包含体系一所有成员（包括 rootR1），不只 book-y2 子树
-    expect(result.universeNodeIds.has('rootR1')).toBe(true);
+    // 关键点：universe 是 book-y2 subtree（不是 rootR1 subtree）——
+    // 不选节点时，只轮播药二，不跨体系跑 y1/y3/y4
     expect(result.universeNodeIds.has('book-y2')).toBe(true);
     expect(result.universeNodeIds.has('sec-y2-01')).toBe(true);
     expect(result.universeNodeIds.has('topic-y2-01-a')).toBe(true);
     // 跨体系节点绝不能出现
+    expect(result.universeNodeIds.has('rootR1')).toBe(false);
     expect(result.universeNodeIds.has('rootR2')).toBe(false);
     expect(result.universeNodeIds.has('otherBook')).toBe(false);
     expect(result.universeNodeIds.has('otherCh')).toBe(false);
   });
 
-  it('用户选 y2-ch01 时，universe 仍是体系一根子树（不是 chapter subtree）——reverse 才能跨章节层', () => {
+  it('用户选 y2-ch01 时，universe 是 sec-y2-01 subtree，保持只循环该章节的传统行为', () => {
     const cy = makeDualUniverseGraph();
     // 模拟"选 sec-y2-01"：给它打上 selected-node class
     cy.getElementById('sec-y2-01').addClass('selected-node');
@@ -551,10 +553,16 @@ describe('TourController.pickRoot — universe boundary is 体系级，不是 ro
     ).pickRoot();
     // 关键点：rootId 仍是用户选的 sec-y2-01
     expect(result.rootId).toBe('sec-y2-01');
-    // 但 universe 是 rootR1（体系根）子树——不是 sec-y2-01 子树
+    // 用户选了节点 → 走章节级隔离（universe = sec-y2-01 subtree），不是体系根子树
     expect(result.universeRootId).toBe('rootR1');
-    expect(result.universeNodeIds.has('rootR1')).toBe(true);
-    expect(result.universeNodeIds.has('book-y2')).toBe(true);
+    expect(result.universeNodeIds.has('sec-y2-01')).toBe(true);
+    // sec-y2-01 的子孙（topic-y2-01-a）进入 universe
+    expect(result.universeNodeIds.has('topic-y2-01-a')).toBe(true);
+    // 关键隔离：不在 sec-y2-01 子树内的节点被排除——
+    //   - book-y2 是 sec-y2-01 的父（不是子孙），应该被排除
+    //   - rootR1 是体系根，不在 sec-y2-01 子树内
+    expect(result.universeNodeIds.has('book-y2')).toBe(false);
+    expect(result.universeNodeIds.has('rootR1')).toBe(false);
     // 跨体系节点：不在
     expect(result.universeNodeIds.has('rootR2')).toBe(false);
   });

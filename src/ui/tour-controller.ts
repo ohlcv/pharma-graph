@@ -231,7 +231,9 @@ export class TourController {
     }
     // 新一次漫游 = 新的用户意图，面板跟随恢复
     uiState.panelClosedByUser = false;
-    const { rootId, universeRootId, universeNodeIds } = this.pickRoot();
+    // universeRootId 在这里没用到（universe 来源固定为 candidateId subtree），
+    // 但 pickRoot() 仍返回它用于检测/调试——解构里也保留位置，未来可能要用。
+    const { rootId, universeNodeIds } = this.pickRoot();
     this.engine = new TourEngine(this.cy);
     const ok = this.engine.start(rootId, {
       interval: this.currentInterval(),
@@ -523,18 +525,18 @@ export class TourController {
     const candidateNode = this.cy.getElementById(candidateId);
     const universeRootId = candidateNode.nonempty() ? this.detectUniverseRoot(candidateNode) : null;
 
-    // universe 边界 = 体系根的 strict descendants（含体系根自身）。
-    //   - 语义"两部电视剧不混播"：seq 必须只含该体系根子树里的节点。
-    //   - 关键设计（2026-10-02 reverse 漫游修 bug）：旧版用 `getStrictDescendants(candidateId)`，
-    //     但当 rootId 不是体系根（例如默认起点的 book-y2）时，universe 被卡在
-    //     单本书子树下、章节层只能正向——reverse 在章节层失效，退化成 forward。
-    //     改用 universeRootId 的子树后，reverse 在体系级 reverse 里跨 4 本书
-    //     真正生效；同时保持"跨体系不混播"的承诺（不同体系根的子树互不相交）。
-    //   - 当 detectUniverseRoot 返回 null（孤悬节点或测试环境无体系根）→
-    //     回退到 rootId subtree（向后兼容）。
-    const universeNodeIds = universeRootId
-      ? this.getStrictDescendants(universeRootId)
-      : this.getStrictDescendants(candidateId);
+    // universe 边界 = candidateId 的 strict descendants（含 candidateId 自身）。
+    //   - 语义"两部电视剧不混播"：seq 必须只含该子树里的节点，所以 universe
+    //     直接由 candidateId 决定就够了。
+    //   - 这统一了三种情况（命中体系根 / 选中节点 / 默认起点）：
+    //     universeNodeIds 都是 candidateId subtree。
+    //   - 关键设计（2026-10-02 reverse 漫游修 bug）：之前一度尝试把 universe
+    //     扩到 universeRootId subtree（体系级），让 reverse 跨章节层真正生效——
+    //     但这导致不选节点时从"轮播 book-y2"变成了"轮播整个体系一"（4 本书一起
+    //     跑），用户反馈"为什么倒序把药一也掺和进来了"。回归旧设计：universe
+    //     永远是 candidateId subtree。reverse 在 book-y2 子树内章节层反向生效，
+    //     不会跨出 book-y2。
+    const universeNodeIds = this.getStrictDescendants(candidateId);
 
     return { rootId: candidateId, universeRootId, universeNodeIds };
   }
