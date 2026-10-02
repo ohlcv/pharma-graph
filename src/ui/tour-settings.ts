@@ -1,8 +1,10 @@
-// src/ui/speech-settings.ts
-// Wires the "朗读设置" sub-accordion inside the advanced-settings panel.
+// src/ui/tour-settings.ts
+// Wires the "漫游设置" sub-accordion inside the advanced-settings panel.
+// 原 speech-settings.ts,2026-10-02 改名扩域：折叠块改名"漫游设置"以容纳
+// 即将加入的"遍历顺序"控件。原模块仍管朗读相关粒度/速率/停顿/等待。
 //
 // Responsibilities:
-//   1. Mobile bottom-sheet collapse/expand (`.bs-speech-setting`) — mirrors
+//   1. Mobile bottom-sheet collapse/expand (`.bs-tour-setting`) — mirrors
 //      the layout-params sheet pattern but lives in its own module so the
 //      layout module can stay focused.
 //   2. Granularity segmented control: 4 buttons, one per SpeechGranularity.
@@ -36,10 +38,10 @@ import {
 } from './speech.js';
 import { registerAction } from './action-dispatcher.js';
 
-/** Storage key for the mobile-sheet "朗读设置" sub-accordion open state.
+/** Storage key for the mobile-sheet "漫游设置" sub-accordion open state.
  *  Lives here (not in layout-store) because it's not layout-related — speech
  *  module owns the persistence of its own UI prefs. */
-const BS_SPEECH_SETTING_OPEN_KEY = 'pg:speech:bsSettingOpen';
+const BS_TOUR_SETTING_OPEN_KEY = 'pg:tour:bsSettingOpen';
 
 /** Listener set invoked whenever the user changes a speech setting.
  *  Used by tour-controller to push the new values into the running
@@ -67,25 +69,25 @@ function fireChange(kind: SpeechSettingsKind, value: unknown): void {
   }
 }
 
-function loadBsSpeechSettingOpen(): boolean {
+function loadBsTourSettingOpen(): boolean {
   try {
-    return localStorage.getItem(BS_SPEECH_SETTING_OPEN_KEY) === '1';
+    return localStorage.getItem(BS_TOUR_SETTING_OPEN_KEY) === '1';
   } catch {
     return false;
   }
 }
 
-function saveBsSpeechSettingOpen(open: boolean): void {
+function saveBsTourSettingOpen(open: boolean): void {
   try {
-    localStorage.setItem(BS_SPEECH_SETTING_OPEN_KEY, open ? '1' : '0');
+    localStorage.setItem(BS_TOUR_SETTING_OPEN_KEY, open ? '1' : '0');
   } catch {
     /* ignore */
   }
 }
 
-function applyBsSpeechSettingOpen(open: boolean): void {
-  const block = document.getElementById('bs-speech-setting');
-  const head = document.getElementById('bs-speech-setting-toggle');
+function applyBsTourSettingOpen(open: boolean): void {
+  const block = document.getElementById('bs-tour-setting');
+  const head = document.getElementById('bs-tour-setting-toggle');
   if (!block) return;
   block.classList.toggle('collapsed', !open);
   block.classList.toggle('open', open);
@@ -93,13 +95,13 @@ function applyBsSpeechSettingOpen(open: boolean): void {
 }
 
 /** Toggle handler — registered with the global action dispatcher so the
- *  button in index.html can use `data-action="toggle-bs-speech-setting"`. */
-function toggleBsSpeechSetting(): void {
-  const block = document.getElementById('bs-speech-setting');
+ *  button in index.html can use `data-action="toggle-bs-tour-setting"`. */
+function toggleBsTourSetting(): void {
+  const block = document.getElementById('bs-tour-setting');
   if (!block) return;
   const willOpen = block.classList.contains('collapsed');
-  applyBsSpeechSettingOpen(willOpen);
-  saveBsSpeechSettingOpen(willOpen);
+  applyBsTourSettingOpen(willOpen);
+  saveBsTourSettingOpen(willOpen);
 }
 
 /** Sync the visible `active` class on all granularity buttons (both sidebar
@@ -261,15 +263,15 @@ function clampPostDelay(v: number): number {
   return Math.max(SPEECH_POST_DELAY_MIN, Math.min(SPEECH_POST_DELAY_MAX, snapped));
 }
 
-/** Mount the speech-settings UI. Safe to call once at boot.
+/** Mount the tour-settings UI. Safe to call once at boot.
  *  Idempotent: re-running rebinds the same listeners (acceptable; only
  *  called from boot()). */
-export function initSpeechSettings(): void {
-  registerAction('toggle-bs-speech-setting', () => toggleBsSpeechSetting());
+export function initTourSettings(): void {
+  registerAction('toggle-bs-tour-setting', () => toggleBsTourSetting());
   bindGranularityButtons();
   syncGranularityButtons(speechController.currentGranularity);
   // Restore the bottom-sheet sub-accordion's previous open/closed state.
-  applyBsSpeechSettingOpen(loadBsSpeechSettingOpen());
+  applyBsTourSettingOpen(loadBsTourSettingOpen());
 
   // "等读完再跳转" — primary id is the mobile one (#bs-speech-wait), the
   // desktop mirror uses the same data attribute and gets picked up by the

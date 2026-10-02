@@ -28,7 +28,7 @@ import { uiState, registerTourBarToggle } from './state.js';
 import { UiToggle } from './ui-toggle.js';
 import { showToast } from './ui-helpers.js';
 import { speechController } from './speech.js';
-import { registerSpeechSettingsChange } from './speech-settings.js';
+import { registerSpeechSettingsChange } from './tour-settings.js';
 import { UNIVERSE_ROOTS } from '../core/config.js';
 import { HIERARCHY_EDGE_TYPES } from '../core/edge-types.js';
 
@@ -1023,7 +1023,7 @@ export class TourController {
   }
 
   /**
-   * Wire the speech-settings panel's change events to the running engine.
+   * Wire the tour-settings panel's change events to the running engine.
    * The panel calls `fireChange()` on every user interaction; we route
    * each kind into the matching engine setter. The setter immediately
    * reschedules the next step, so mid-tour changes take effect on the

@@ -81,7 +81,7 @@ import { createTesseractOverlay } from '../core/spectacle/tesseract-overlay.js';
 import { createFractalTreeOverlay } from '../core/spectacle/fractal-tree-overlay.js';
 import { createE8StarOverlay } from '../core/spectacle/e8-overlay.js';
 import { runLayoutInWorker } from '../core/layout-worker-client.js';
-import { initSpeechSettings } from './speech-settings.js';
+import { initTourSettings } from './tour-settings.js';
 
 let tourController: TourController;
 
@@ -457,7 +457,7 @@ function initGraphFromManager(graphManager: GraphManager): void {
   initKeyboardShortcuts();
   initBigscreen();
   installDebugBridge(uiState.renderer);
-  initSpeechSettings();
+  initTourSettings();
   initSearchUI(uiState.renderer.getCy(), uiState.highlight!, uiState.search!, uiState.detailPanel!);
   // Background stars follow the camera (pan/zoom) — needs cy, nothing else.
   initStarfield(uiState.renderer.getCy());

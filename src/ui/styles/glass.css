@@ -298,7 +298,7 @@
  * （components.css 里那条对齐规则是按 glass 之前的几何算的，这里以 glass 为准。）
  * selector 命中「高级设置」内部所有子 section，避免每个新子项都得手动加。 */
   [data-section='advanced'] [data-section='layout-setting'] > .sidebar-section__head,
-  [data-section='advanced'] [data-section='speech-setting'] > .sidebar-section__head {
+  [data-section='advanced'] [data-section='tour-setting'] > .sidebar-section__head {
     padding-left: 7px;
   }
 

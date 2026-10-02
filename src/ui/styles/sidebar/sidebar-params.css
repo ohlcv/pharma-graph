@@ -142,7 +142,7 @@
     height: 12px;
   }
 
-  /* ── 朗读粒度分段控件 (data-section="speech-setting") ─────────────────
+  /* ── 朗读粒度分段控件 (data-section="tour-setting") ─────────────────
    * 与大屏 sheet 的 .bs-layout-grid 视觉一致(4 列 chip 按钮组),但放在
    * 侧栏里,所以走 sidebar 这一套参数。点击切换 active,active 样式复用
    * 大屏 .bs-layout-btn.active 的视觉规范:accent 背景 + 发光边框。 */
@@ -187,7 +187,7 @@
   }
 
   /* ── 等读完再跳转 + 朗读速度 + 读完后停顿 ──────────────────────
-   * 桌面侧栏 (data-section="speech-setting") 内的三个新控件容器。
+   * 桌面侧栏 (data-section="tour-setting") 内的三个新控件容器。
    * 复用 .param-row / .param-label / .param-label__val / .param-slider
    * 视觉规范(.bs-toggle 通用样式在 components.css 里,这里只补容器)。 */
 

@@ -895,7 +895,7 @@
  *    字号与条高已由上面的统一规格覆盖，这里只管缩进。
  *    selector 命中「高级设置」内部所有子 section，避免每个新子项都得手动加。 */
   [data-section='advanced'] [data-section='layout-setting'] > .sidebar-section__head,
-  [data-section='advanced'] [data-section='speech-setting'] > .sidebar-section__head {
+  [data-section='advanced'] [data-section='tour-setting'] > .sidebar-section__head {
     padding-left: 16px;
   }
 
@@ -3094,13 +3094,13 @@
     display: none;
   }
 
-  /* ── 朗读设置 (与 .bs-layout-setting 同结构,视觉一致) ────────── */
-  .bs-speech-setting {
+  /* ── 漫游设置 (与 .bs-layout-setting 同结构,视觉一致) ────────── */
+  .bs-tour-setting {
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     overflow: hidden;
   }
-  .bs-speech-setting__head {
+  .bs-tour-setting__head {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -3116,23 +3116,23 @@
     font-family: inherit;
     cursor: pointer;
   }
-  .bs-speech-setting__chev {
+  .bs-tour-setting__chev {
     width: 14px;
     height: 14px;
     color: var(--muted);
     transition: transform 0.2s ease;
   }
-  .bs-speech-setting.open .bs-speech-setting__chev {
+  .bs-tour-setting.open .bs-tour-setting__chev {
     transform: rotate(90deg);
   }
-  .bs-speech-setting__body {
+  .bs-tour-setting__body {
     border-top: 1px solid var(--border);
     padding: 10px 14px 12px;
     display: flex;
     flex-direction: column;
     gap: 8px;
   }
-  .bs-speech-setting.collapsed .bs-speech-setting__body {
+  .bs-tour-setting.collapsed .bs-tour-setting__body {
     display: none;
   }
   .bs-speech-grid {
