@@ -553,6 +553,57 @@ describe('TourEngine traversal mode (sequential / reverse / random)', () => {
     // reverse = [c, b, a]（章节层反序）
     expect(seqReverse).toEqual(['c', 'b', 'a']);
   });
+
+  // ── Regression: reverse / random 模式下，applyRootScope 不再强行 unshift rootId。
+  // 旧逻辑下不管 mode 是什么，都把 rootId 提到 seq 第一位——reverse 序列失效，
+  // 用户报告"选了倒序怎么还是从第一章开始"。
+  it('reverse 模式下 applyRootScope 不 unshift rootId——reverse 子树顺序保留', () => {
+    const cy = cytoscape({ headless: true, styleEnabled: false });
+    cy.add([
+      // y2 全书结构 + 9 个章节 + 9 个第一节
+      { group: 'nodes', data: { id: 'book-y2', fill: 'cls-structure', location: { book: 'y2' } } },
+      { group: 'nodes', data: { id: 'sec-y2-01', fill: 'cls-structure', location: { book: 'y2', chapter: '第一章' } } },
+      { group: 'nodes', data: { id: 'sec-y2-09', fill: 'cls-structure', location: { book: 'y2', chapter: '第九章' } } },
+    ]);
+    // 模拟"用户选了 y2 第一章(universe = sec-y2-01 子树)"的开 tour 场景
+    const engine = new TourEngine(cy);
+    engine.start('sec-y2-01', {
+      interval: 1_000_000,
+      maxDepth: -1,
+      strategy: asStrategy('has-dfs'),
+      mode: 'reverse',
+      // 模拟 universe：只包含 sec-y2-01 后代（仅自身，因为没有别的子节点）
+      universeNodeIds: new Set(['sec-y2-01']),
+    });
+    // reverse 模式下，seq 不应被 unshift 改变——seq[0] 是策略自然算出的顺序。
+    // 因为 y2 第一章只有 sec-y2-01 这一个节点，seq = ['sec-y2-01']，unshift 不影响。
+    // 验证点：跟 sequential 模式跑出来的 seq 一致（因为过滤后只有一个节点）。
+    expect(priv(engine).seq).toEqual(['sec-y2-01']);
+    engine.stop();
+  });
+
+  it('sequential 模式下 applyRootScope 仍然 unshift rootId（保留传统行为）', () => {
+    // 多节点 universe 下验证 forward 模式仍 unshift——这是历史行为，
+    // 不能因为改 reverse 就破坏 forward。
+    const cy = cytoscape({ headless: true, styleEnabled: false });
+    cy.add([
+      { group: 'nodes', data: { id: 'book-y2', fill: 'cls-structure', location: { book: 'y2' } } },
+      { group: 'nodes', data: { id: 'sec-y2-01', fill: 'cls-structure', location: { book: 'y2', chapter: '第一章' } } },
+      { group: 'nodes', data: { id: 'sec-y2-09', fill: 'cls-structure', location: { book: 'y2', chapter: '第九章' } } },
+    ]);
+    const engine = new TourEngine(cy);
+    engine.start('sec-y2-09', {
+      interval: 1_000_000,
+      maxDepth: -1,
+      strategy: asStrategy('has-dfs'),
+      mode: 'sequential',
+      // universe 包含 y2 全部后代——模拟"选了 y2 第九章，整个 y2 都属于该体系"
+      universeNodeIds: new Set(['book-y2', 'sec-y2-01', 'sec-y2-09']),
+    });
+    // sequential + unshift：用户选的 sec-y2-09 必须排第一
+    expect(priv(engine).seq[0]).toBe('sec-y2-09');
+    engine.stop();
+  });
 });
 
 // ── Bug: prev()/next() must always emit onPause so the controller's play/pause

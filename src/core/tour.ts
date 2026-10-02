@@ -1936,12 +1936,23 @@ export class TourEngine {
     this.seq = this.seq.filter((id) => this._universeNodeIds.has(id));
     // 过滤只保留策略顺序，不保证 rootId 排第一（多父节点可能被别的父节点提前带出来）。
     // start() 直接把 seq[0] 当起点，所以这里显式把用户选中的节点提到最前。
-    const rootIdx = this.seq.indexOf(rootId);
-    if (rootIdx > 0) {
-      this.seq.splice(rootIdx, 1);
-      this.seq.unshift(rootId);
-    } else if (rootIdx < 0) {
-      this.seq.unshift(rootId);
+    //
+    // 重要豁免：reverse / random 模式下不 unshift。
+    //   - reverse：把 rootId 塞回去会让 reverse 序列失效（例如 reverse 期望从
+    //     y2 第九章开始，但用户选了 y2 第一章 → unshift 后变第一章）。reverse 的
+    //     设计意图是"按 reverse 顺序自然走起"，用户的 rootId 会自然出现在 reverse
+    //     子序列里被访问到。
+    //   - random：每轮循环都重摇，用户选的 rootId 也按随机子序列被访问。
+    //   - 只有 forward (sequential) 模式 unshift——这是"选了 y2 第一章就从这里开始"
+    //     的传统行为。
+    if (this._mode === 'sequential') {
+      const rootIdx = this.seq.indexOf(rootId);
+      if (rootIdx > 0) {
+        this.seq.splice(rootIdx, 1);
+        this.seq.unshift(rootId);
+      } else if (rootIdx < 0) {
+        this.seq.unshift(rootId);
+      }
     }
     this.recomputeTotal();
     return;
