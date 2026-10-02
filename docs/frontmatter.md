@@ -89,7 +89,7 @@ edges_out:
 
 | 字段    | 类型   | 必填 | 说明                                                            |
 | ------- | ------ | ---- | --------------------------------------------------------------- |
-| `id`    | string | ✅   | 唯一标识，英文/拉丁文，格式 `{前缀}-{英文名}-{书简写}{章}-{节}` |
+| `id`    | string | ✅   | 唯一标识，英文/拉丁文，格式 `{前缀}-{英文名}-{书简写}-{章号}-{节号}` |
 | `label` | string | ✅   | 显示名称，中文；文件名 = label                                  |
 
 ### 3.2 shape — OWL2 实体类型（覆盖 fill 的默认形状）
@@ -168,8 +168,9 @@ stroke 是自定义 AnnotationProperty `style` 的简写，值为组合枚举，
 ### 3.6 tags — 检索关键词
 
 - 类型：`string[]`
-- 从 summary 加粗词抽取，语义去重
+- 由两部分组成：**结构标签**（节点名称、归属分类、节名等，由规则生成）+ **重点提示词标签**（取自 `summary.full` 中被标记为重点的词）
 - 用于检索和筛选
+- 取词来源、前缀分类与抽取流程由各领域工作流规定；药学图谱见 [SKILL.md §5.4](./SKILL.md)
 
 ### 3.7 summary — 节点详情
 
@@ -178,9 +179,9 @@ stroke 是自定义 AnnotationProperty `style` 的简写，值为组合枚举，
 | `short` | string | 一句话定义，关键词用 `**加粗**`（口诀节点例外：可多行换行对齐，详见 [SKILL.md §6.4](./SKILL.md)） |
 | `full`  | string | 详细解释，用 `\|` block scalar 保留换行，【标签】分段 |
 
-**full 标签**（按需使用）：`【药理作用】` `【适应症】` `【不良反应】` `【禁忌】` `【相互作用】` `【药代动力学】` `【临床应用注意】` `【作用机制】` `【代表药】` `【关联用药】` `【用药特点】` `【用法】` `【口诀】`
+**full 标签**：取自纸质版框名原样（如 `【总论】` `【作用机制】` `【作用特点】` `【典型不良反应】` `【禁忌】` `【药物相互作用】`），不自拟；药学领域的常见框名见 [SKILL.md §5.2](./SKILL.md)。
 
-> 无用户资料时 `full` 留空，不 AI 自动填充。
+> 药学图谱：`full` 是纸质版的**逐字转录**，没有纸质版内容时留空，不由 AI 填充（口诀节点除外），详见 [SKILL.md §零](./SKILL.md)。
 
 ### 3.8 edges_out — OWL2 公理（5 种）
 
@@ -220,19 +221,7 @@ stroke 是自定义 AnnotationProperty `style` 的简写，值为组合枚举，
 
 ### 4.1 stroke 链路速查
 
-边框本体（线型/颜色）取色优先级（覆盖层特效独立叠加）：
-
-1. 用户填 `stroke: double` → 双线边框，取色同 auto（subtreeRoot 色 / fill 兜底）
-2. 用户填 `stroke: fallback` → 直接用 `FILL_BORDER_HINTS[fill]`，**跳过 subtreeRoot**
-3. 用户填 `stroke: glow` → 呼吸光晕（有子树时被子树色覆盖，无子树用固定紫）
-4. 用户填 `stroke: flow` → 取色同 auto，外加旋转光点
-5. 用户填 `stroke: auto` + 有 subtreeRoot → subtreeRoot 色
-6. 用户填 `stroke: auto` + 无 subtreeRoot → `FILL_BORDER_HINTS[fill]`（fill 兜底边框色）
-7. 用户不填 stroke → `FILL_CONFIG[fill].defaultStroke`（当前统一为 `glow`）
-8. 节点连 fill 都没填 → `FILL_BORDER_DEFAULT`（中性灰）
-
-> **特效叠加**：`defaultStroke` 的 glow/flow 特效始终生效，md 填的 `stroke` 特效在此基础上再叠加。
-> 合并方式由 `STROKE_MERGE_MODE` 决定：`coexist`（默认）两者并存；`override` 时 md 填了 stroke 就完全接管。
+边框本体（线型/颜色）取色的完整优先级链路，以及 `defaultStroke` 与 `STROKE_MERGE_MODE` 的叠加规则，**只在 [RULES.md §5.1](./RULES.md) 维护**（唯一权威源），本节不再复述。
 
 ### 4.2 auto vs fallback
 
@@ -268,6 +257,6 @@ fill: cls-drug # 默认 stroke=glow（呼吸光晕）
 ## 五、文件名与 id 命名
 
 - **文件名** = `label`（中文），如 `地西泮.md`、`苯二氮䓬类.md`
-- **id** = 英文/拉丁文，格式 `{前缀}-{英文名}-{书简写}{章}-{节}`
+- **id** = 英文/拉丁文，格式 `{前缀}-{英文名}-{书简写}-{章号}-{节号}`
 
 完整的前缀表与药学 id 命名细则（权威）见 [SKILL.md §1.2](./SKILL.md)。本节不重复维护，以避免双份漂移。

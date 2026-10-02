@@ -10,6 +10,7 @@ location:
 tags:
   - 重组人凝血因子Ⅶa
   - 凝血因子
+  - 抗出血药
 summary:
   short:
   full:
