@@ -48,11 +48,19 @@ export const UNIVERSE_ROOTS: ReadonlySet<string> = new Set<string>([
 `TourOptions` 新增 `universeNodeIds: Set<string>`，由 `TourController.pickRoot()` 算出后传入。
 
 ```typescript
-// 核心契约：universe = rootId 的 strict descendants
-// 理由：选 book-y2 → universe = book-y2 子树
-//       选 sec-y2-01 → universe = sec-y2-01 子树（章节级隔离）
-//       不选节点 → pickDefaultRoot() 选 book-y2 → universe = book-y2 子树
-// 所有"选节点 / 不选节点"走同一条路径——只算一次 rootId subtree
+// 核心契约（2026-10-02 修正）：universe = universeRootId 的 strict descendants
+// 理由（修正前）：
+//   - 选 book-y2 → universe = book-y2 子树
+//   - 选 sec-y2-01 → universe = sec-y2-01 子树（章节级隔离）
+//   - 不选节点 → pickDefaultRoot() 选 book-y2 → universe = book-y2 子树
+// 修正（reverse 漫游在体系级真正生效）：
+//   - 用 universeRootId 的子树作 universe（即体系级），因为当 rootId 不是体系根
+//     时（如默认起点 book-y2），“universe = rootId subtree”会把范围卡在单本书
+//     子树下，章节层只能正向，reverse 在体系级失效，退化成 forward。
+//   - 修正后所有路径 univere 都是“体系根子树”，保留“跨体系不混播”语义的同时，
+//     让 reverse / random 模式能在体系级跨越 4 本教材。
+//   - detectUniverseRoot 返回 null（孤悬节点或测试环境无体系根）时回退到
+//     rootId subtree，保持老路径行为。
 ```
 
 `TourEngine.applyRootScope()` 用这个 Set 过滤 seq：

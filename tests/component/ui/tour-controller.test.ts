@@ -398,3 +398,195 @@ describe('TourController — keyboard shortcuts', () => {
     expect(engine.resume).not.toHaveBeenCalled();
   });
 });
+
+// ── Regression: reverse 漫游在体系根 boundary 下不能退化成 forward ──
+//
+// 2026-10-02 bug：pickRoot() 把 universeNodeIds 算成 `candidateId 的 strict descendants`，
+// 默认 rootId=book-y2 时这把 universe 卡在 1115 节点（单本书子树），reverse 在章节层
+// 失效。修复后 universe 改为 `universeRootId 的 strict descendants`（体系级），
+// 让 reverse 在跨 4 本书的体系级真正生效。
+describe('TourController.pickRoot — universe boundary is 体系级，不是 rootId subtree', () => {
+  // 微型双体系图：体系一 (rootR1) 含 book-y2 + 一章 + 一节
+  //              体系二 (rootR2) 含 otherBook + otherCh + otherSec
+  // 这两个体系根会被识别为 UNIVERSE_ROOTS（测试用替代品）
+  function makeDualUniverseGraph() {
+    const cy = cytoscape({ headless: true, styleEnabled: false });
+    // 体系根必须是 cls-structure（UNIVERSE_ROOTS 内部不要求 fill，
+    // 但我们测试走 detectUniverseRoot → 这里直接用 stub 方法）。
+    cy.add([
+      // 体系一根 + 它的子孙（建立层级边 child→parent）
+      { group: 'nodes', data: { id: 'rootR1' } },
+      { group: 'nodes', data: { id: 'book-y2' } },
+      { group: 'nodes', data: { id: 'sec-y2-01' } },
+      { group: 'nodes', data: { id: 'topic-y2-01-a' } },
+      // 体系二根 + 它的子孙
+      { group: 'nodes', data: { id: 'rootR2' } },
+      { group: 'nodes', data: { id: 'otherBook' } },
+      { group: 'nodes', data: { id: 'otherCh' } },
+      { group: 'nodes', data: { id: 'otherSec' } },
+      // 层级边：child→parent (source=child, target=parent)
+      {
+        group: 'edges',
+        data: { id: 'e1', source: 'book-y2', target: 'rootR1', edgeType: 'part_of' },
+      },
+      {
+        group: 'edges',
+        data: { id: 'e2', source: 'sec-y2-01', target: 'book-y2', edgeType: 'part_of' },
+      },
+      {
+        group: 'edges',
+        data: { id: 'e3', source: 'topic-y2-01-a', target: 'sec-y2-01', edgeType: 'part_of' },
+      },
+      {
+        group: 'edges',
+        data: { id: 'e4', source: 'otherBook', target: 'rootR2', edgeType: 'part_of' },
+      },
+      {
+        group: 'edges',
+        data: { id: 'e5', source: 'otherCh', target: 'otherBook', edgeType: 'part_of' },
+      },
+      {
+        group: 'edges',
+        data: { id: 'e6', source: 'otherSec', target: 'otherCh', edgeType: 'part_of' },
+      },
+    ]);
+    return cy;
+  }
+
+  it('用户没选节点时，universe 是 rootR1（体系根）子树，而不是 book-y2（默认根）子树', () => {
+    const cy = makeDualUniverseGraph();
+    // 让 pickRoot 内部的 detectUniverseRoot 把 rootR1/rootR2 当作体系根
+    // (production 代码读 UNIVERSE_ROOTS 常量；这里 stub 私有方法)
+    const renderer = { getCy: () => cy } as unknown as Renderer;
+    const detailPanel = {
+      close: () => {},
+      closeSilently: () => {},
+      show: () => {},
+    } as unknown as DetailPanel;
+    const c = new TourController(cy, renderer, detailPanel);
+    // Stub detectUniverseRoot：因为 UNIVERSE_ROOTS 是常量，test 里塞不进新根，
+    // 所以 override 私有方法返回我们图里的 rootR1
+    const p = c as unknown as {
+      detectUniverseRoot: (n: cytoscape.NodeSingular) => string | null;
+    };
+    p.detectUniverseRoot = (n) => {
+      const id = n.id();
+      // 沿父链 BFS 找 rootR1/rootR2
+      const queue = [id];
+      const seen = new Set<string>();
+      while (queue.length) {
+        const cur = queue.shift()!;
+        if (seen.has(cur)) continue;
+        seen.add(cur);
+        if (cur === 'rootR1' || cur === 'rootR2') return cur;
+        cy.getElementById(cur)
+          .outgoers('edge')
+          .forEach((edge) => {
+            if (edge.data('edgeType') === 'part_of') queue.push(edge.target().id());
+          });
+      }
+      return null;
+    };
+    const result = (
+      c as unknown as {
+        pickRoot: () => {
+          rootId: string;
+          universeRootId: string | null;
+          universeNodeIds: Set<string>;
+        };
+      }
+    ).pickRoot();
+    // 默认 rootId = book-y2（pickDefaultRoot 走 book priority）
+    expect(result.rootId).toBe('book-y2');
+    expect(result.universeRootId).toBe('rootR1');
+    // 关键修复点：universe 包含体系一所有成员（包括 rootR1），不只 book-y2 子树
+    expect(result.universeNodeIds.has('rootR1')).toBe(true);
+    expect(result.universeNodeIds.has('book-y2')).toBe(true);
+    expect(result.universeNodeIds.has('sec-y2-01')).toBe(true);
+    expect(result.universeNodeIds.has('topic-y2-01-a')).toBe(true);
+    // 跨体系节点绝不能出现
+    expect(result.universeNodeIds.has('rootR2')).toBe(false);
+    expect(result.universeNodeIds.has('otherBook')).toBe(false);
+    expect(result.universeNodeIds.has('otherCh')).toBe(false);
+  });
+
+  it('用户选 y2-ch01 时，universe 仍是体系一根子树（不是 chapter subtree）——reverse 才能跨章节层', () => {
+    const cy = makeDualUniverseGraph();
+    // 模拟"选 sec-y2-01"：给它打上 selected-node class
+    cy.getElementById('sec-y2-01').addClass('selected-node');
+    const renderer = { getCy: () => cy } as unknown as Renderer;
+    const detailPanel = {
+      close: () => {},
+      closeSilently: () => {},
+      show: () => {},
+    } as unknown as DetailPanel;
+    const c = new TourController(cy, renderer, detailPanel);
+    const p = c as unknown as {
+      detectUniverseRoot: (n: cytoscape.NodeSingular) => string | null;
+    };
+    p.detectUniverseRoot = (n) => {
+      const queue = [n.id()];
+      const seen = new Set<string>();
+      while (queue.length) {
+        const cur = queue.shift()!;
+        if (seen.has(cur)) continue;
+        seen.add(cur);
+        if (cur === 'rootR1' || cur === 'rootR2') return cur;
+        cy.getElementById(cur)
+          .outgoers('edge')
+          .forEach((edge) => {
+            if (edge.data('edgeType') === 'part_of') queue.push(edge.target().id());
+          });
+      }
+      return null;
+    };
+    const result = (
+      c as unknown as {
+        pickRoot: () => {
+          rootId: string;
+          universeRootId: string | null;
+          universeNodeIds: Set<string>;
+        };
+      }
+    ).pickRoot();
+    // 关键点：rootId 仍是用户选的 sec-y2-01
+    expect(result.rootId).toBe('sec-y2-01');
+    // 但 universe 是 rootR1（体系根）子树——不是 sec-y2-01 子树
+    expect(result.universeRootId).toBe('rootR1');
+    expect(result.universeNodeIds.has('rootR1')).toBe(true);
+    expect(result.universeNodeIds.has('book-y2')).toBe(true);
+    // 跨体系节点：不在
+    expect(result.universeNodeIds.has('rootR2')).toBe(false);
+  });
+
+  it('detectUniverseRoot 返回 null（孤悬节点）→ universe 回退到 rootId subtree（向后兼容）', () => {
+    const cy = cytoscape({ headless: true, styleEnabled: false });
+    cy.add([
+      { group: 'nodes', data: { id: 'orphan' } },
+      { group: 'nodes', data: { id: 'child' } },
+      { group: 'edges', data: { id: 'e', source: 'child', target: 'orphan', edgeType: 'part_of' } },
+    ]);
+    const renderer = { getCy: () => cy } as unknown as Renderer;
+    const detailPanel = {
+      close: () => {},
+      closeSilently: () => {},
+      show: () => {},
+    } as unknown as DetailPanel;
+    const c = new TourController(cy, renderer, detailPanel);
+    const result = (
+      c as unknown as {
+        pickRoot: () => {
+          rootId: string;
+          universeRootId: string | null;
+          universeNodeIds: Set<string>;
+        };
+      }
+    ).pickRoot();
+    // 没有 book-yX 节点 → pickDefaultRoot 走 fallback（maxDegree），会选 orphan
+    // orphan 没有体系根 → universeRootId = null
+    expect(result.universeRootId).toBeNull();
+    // 回退：universe = orphan subtree (含 child)
+    expect(result.universeNodeIds.has('orphan')).toBe(true);
+    expect(result.universeNodeIds.has('child')).toBe(true);
+  });
+});
