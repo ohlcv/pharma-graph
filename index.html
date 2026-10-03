@@ -411,7 +411,7 @@
         <button
           id="btn-tour"
           class="btn"
-          title="漫游（T）— 按所选策略依次访问节点；再次点击停止"
+          aria-label="漫游（T）— 悬停查看用法说明"
           data-tour-action="toggle"
         >
           <svg
@@ -2916,12 +2916,12 @@
       </main>
     </noscript>
 
-    <script type="module" src="/src/ui/main.ts"></script>
-
     <!-- 大爆炸过渡幕布——加载完成后 2s 从中心炸开，淡出后消失。
      z-index: 9999 确保在最顶层。
      pointer-events: none 让它不挡任何交互（用户在大爆炸期间仍可操作）。
      aria-hidden 符合无障碍。 -->
     <div id="bigbang-veil" aria-hidden="true"></div>
+
+    <script type="module" src="/src/ui/main.ts"></script>
   </body>
 </html>

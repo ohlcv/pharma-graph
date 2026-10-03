@@ -837,4 +837,93 @@
       animation: none;
     }
   }
+
+  /* ── 通用 tooltip ─────────────────────────────────────────────────────────
+     浮层级玻璃：同菜单 / toast / 缩放提示，小尺寸 + 大模糊。
+     由 src/ui/tooltip.ts 挂 body 直属，脱离触发元素的 overflow / 包含块。 */
+  .ui-tooltip {
+    position: fixed;
+    z-index: calc(var(--z-toast, 100) + 10);
+    max-width: 300px;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    color: var(--text);
+    font-size: var(--text-sm);
+    line-height: 1.55;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+    transition:
+      opacity 0.15s var(--ease-out),
+      transform 0.15s var(--ease-out);
+    visibility: hidden;
+    /* 玻璃材质：左上角一道白高光渐隐 + 半透明深色底（配好之后透过画布可见背景） */
+    background:
+      radial-gradient(120% 70% at 0% 0%, rgba(255, 255, 255, 0.13) 0%, transparent 60%),
+      rgba(13, 18, 36, 0.3);
+    /* 浅色半透明底（0.30）——tooltip 是短提示、悬停于画布上方，需要让
+     * 画布透出来才能看出毛玻璃；0.52 面板档太实心，像纯色块。 */
+    -webkit-backdrop-filter: var(--lg-filter-lg);
+    backdrop-filter: var(--lg-filter-lg);
+    border: 1px solid var(--lg-line);
+    box-shadow: var(--lg-bevel), var(--lg-shadow-sm);
+  }
+
+  .ui-tooltip--visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    visibility: visible;
+  }
+
+  .ui-tooltip__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  .ui-tooltip__title {
+    font-weight: 600;
+    font-size: var(--text-base);
+    /* 底色提到 0.30 后透出深色画布，--text-2 可能不够亮。图片/节点高亮区域
+     * 透上来会更杂，用 --text（最亮）+ text-shadow 保证任意背景下可读。 */
+    color: var(--text);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+
+  .ui-tooltip__kbd {
+    font-size: var(--text-xs);
+    padding: 1px 7px;
+    border-radius: 4px;
+    border: 1px solid var(--lg-line);
+    background: var(--lg-fill-hi);
+    color: var(--text-2);
+    font-family: var(--font-mono, monospace);
+  }
+
+  .ui-tooltip__group {
+    margin-top: 6px;
+  }
+
+  .ui-tooltip__group:first-of-type {
+    margin-top: 0;
+  }
+
+  .ui-tooltip__group-label {
+    font-size: var(--text-xs);
+    color: var(--accent);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    margin-bottom: 2px;
+  }
+
+  .ui-tooltip__line {
+    color: var(--text);
+    /* 同上：浅透底 + 任意背景 → 文字加轻微投影兜底可读。 */
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+
+  .ui-tooltip__line + .ui-tooltip__line {
+    margin-top: 2px;
+  }
 }

@@ -10,7 +10,7 @@ import { HighlightEngine } from './highlight-engine.js';
 import { DetailPanel } from './detail-panel.js';
 import { TourController } from './tour-controller.js';
 import { updateStats, syncBottomSheetStats } from './graph-stats.js';
-import { clearShapeFilter } from './legend-manager.js';
+import { clearShapeFilter, clearAllFilters } from './legend-manager.js';
 import { isBigscreen, exitBigscreen } from './bigscreen.js';
 import {
   onDragStart as forceDragStart,
@@ -83,6 +83,11 @@ export function initGraphEvents(deps: GraphEventDeps): void {
 
   cy.on('tap', 'node', (evt) => {
     const node = evt.target;
+    // 单选节点与侧边栏筛选互斥：点节点 = 退出筛选模式，回到「单选子树」语义。
+    // 否则 legend 的 activeShapeFilter / activeEdgeFilter 仍记着旧筛选，
+    // 漫游会误以为还在筛选模式；且再点同一筛选会走 toggle-off 分支，
+    // 造成「筛选没点掉却消失了」的行为错乱。
+    clearAllFilters();
     // 按需查找：#debug-toggle 是 initDebugOverlay() 才注入的，而它在 initGraphEvents() 之后执行，
     // 在这里提前缓存拿到的永远是 null。
     const dbgBtn = document.getElementById('debug-toggle');

@@ -363,6 +363,7 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 | `docs/ADR/ADR-0006-applyRootScope-子树漫游算法重写.md`      | 子树漫游算法重写 + 档位自动升级                               | 16,512 B |   373 |
 | `docs/ADR/ADR-0007-visual-tokens.md`                        | 视觉令牌体系（颜色 / 形状 / 间距统一来源）                    |  6,557 B |   175 |
 | `docs/ADR/ADR-0008-surface-shadow-transition-tokens.md`     | 表面 / 阴影 / 过渡令牌                                        |  4,555 B |   110 |
+| `docs/ADR/ADR-0009-tour-scope-modes.md`                    | 漫游范围模式（单选子树 / 筛选集合）                           |  5,411 B |   126 |
 | `docs/ADR/migration-report-ADR-0001-APPLY.md`               | ADR-0001 迁移执行报告（217 文件 / 167 isa 转换 / 2026-07-14） | 90,810 B | 1,251 |
 
 ### 5.3 调试记录 `docs/DEBUG/`

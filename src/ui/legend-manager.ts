@@ -24,6 +24,39 @@ export function getActiveShapeFilter(): string | null {
   return activeShapeFilter;
 }
 
+export function getActiveEdgeFilter(): string | null {
+  return activeEdgeFilter;
+}
+
+/**
+ * 当前激活筛选（侧边栏分类 / 边关系）命中的节点 id 集合。
+ *
+ * 供 TourController 读取"筛选模式"的漫游范围：用户先点侧边栏筛选
+ * （高亮一批节点），再点漫游 → 只在这批节点里走，而不是选中节点的子树。
+ * 只依赖 legend 的主动筛选状态（activeShapeFilter / activeEdgeFilter），
+ * 不读裸 `.highlighted` class —— 因为鼠标单选节点时邻居也会被加
+ * `.highlighted`（那是浏览高亮，不是筛选意图）。
+ *
+ * 返回 null 表示当前没有筛选模式（漫游应回落到单选子树逻辑）。
+ */
+export function getActiveFilterNodeIds(cy: Core): string[] | null {
+  if (activeShapeFilter === null && activeEdgeFilter === null) return null;
+  const LAYER_PARENT = 'layer-parent';
+  if (activeShapeFilter !== null) {
+    return cy
+      .nodes(`[fill = "${activeShapeFilter}"]`)
+      .not(`.${LAYER_PARENT}`)
+      .map((n) => n.id());
+  }
+  // activeEdgeFilter：该类型边的两端节点
+  const ids = new Set<string>();
+  cy.edges(`[edgeType = "${activeEdgeFilter}"]`).forEach((e) => {
+    ids.add(e.source().id());
+    ids.add(e.target().id());
+  });
+  return [...ids];
+}
+
 export function clearShapeFilter(): void {
   clearAllFilters();
   activeShapeFilter = null;

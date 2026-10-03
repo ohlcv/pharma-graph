@@ -28,6 +28,8 @@ import { uiState, registerTourBarToggle } from './state.js';
 import { UiToggle } from './ui-toggle.js';
 import { showToast } from './ui-helpers.js';
 import { speechController } from './speech.js';
+import { getActiveFilterNodeIds } from './legend-manager.js';
+import { mountTooltip, type TooltipHandle } from './tooltip.js';
 
 /** Storage key for the traversal mode preference (sequential / reverse / random).
  *  uiState.tour.mode is the in-memory mirror; this localStorage entry is the
@@ -109,6 +111,7 @@ export class TourController {
     this.bindModeButtons();
     this.bindMobileCollapse();
     this.bindSelectionHint();
+    this.bindTourTooltip();
     this.bindSpeechSettingsBridge();
     this.setIdleUI();
     // 遍历模式：从 localStorage 恢复（覆盖 uiState 默认值），同步 active class。
@@ -511,6 +514,24 @@ export class TourController {
     universeRootId: string | null;
     universeNodeIds: Set<string>;
   } {
+    // ── 筛选模式优先：侧边栏分类 / 边关系筛选激活时，漫游范围 = 整个筛选集合 ──
+    // 用户点侧边栏（高亮一批节点）→ 点漫游 → 只在这批节点里循环。
+    // 单选节点时 clearAllFilters() 已把筛选状态清掉，所以这里不会误吞
+    // 「选中节点 + 邻居」的浏览高亮。
+    const filterIds = getActiveFilterNodeIds(this.cy);
+    if (filterIds !== null && filterIds.length > 0) {
+      const rootId = filterIds[0];
+      const candidateNode = this.cy.getElementById(rootId);
+      const universeRootId = candidateNode.nonempty()
+        ? this.detectUniverseRoot(candidateNode)
+        : null;
+      return {
+        rootId,
+        universeRootId,
+        universeNodeIds: new Set(filterIds),
+      };
+    }
+
     // 注意：选中节点用 .selected-node class（不是 .node-selected，也不是 cytoscape 的 :selected）
     const sel = this.cy.nodes('.selected-node').not('.layer-parent');
     let candidateId: string;
@@ -711,6 +732,8 @@ export class TourController {
     if (this._boundKeydown) {
       document.removeEventListener('keydown', this._boundKeydown);
     }
+    this._tourTooltip?.unmount();
+    this._tourTooltip = null;
     this.stop();
     // 取消挂起的 start-hint 刷新帧，避免 dispose 之后还回调进已销毁的 cy
     if (this.startHintRaf) {
@@ -1091,6 +1114,9 @@ export class TourController {
    * 一帧最多扫一次。
    */
   private startHintRaf = 0;
+  /** 漫游 tooltip 的悬停定时器与清理句柄。 */
+  private _tourTooltip: TooltipHandle | null = null;
+  private _tooltipRetried = false;
 
   private scheduleStartHint(): void {
     if (this.startHintRaf) return;
@@ -1119,6 +1145,48 @@ export class TourController {
     // 而真正会改变 hint 状态的只有 .selected-node，它由 highlightNode()
     // 设置，之后 graph-events 会显式调用 refreshStartHintFromHighlight()。
     // 所以这个监听器是纯冗余，删除。
+  }
+
+  /**
+   * 漫游按钮的用法 tooltip：交给通用 tooltip 组件（src/ui/tooltip.ts），
+   * 玻璃主题样式在 glass.css 的 .ui-tooltip。这里只提供内容 HTML 并保存
+   * 句柄以便 dispose 时卸载。
+   */
+  private bindTourTooltip(): void {
+    const btn = document.getElementById('btn-tour');
+    if (!btn) {
+      // 防御：mount() 时若 DOM 尚未就绪（如 DOM 顺序被改动），下帧重试一次。
+      // 只重试一次——元素真的缺失时静默跳过，不无限递归。
+      if (!this._tooltipRetried) {
+        this._tooltipRetried = true;
+        requestAnimationFrame(() => this.bindTourTooltip());
+      }
+      return;
+    }
+    this._tourTooltip = mountTooltip(btn, {
+      html: `
+        <div class="ui-tooltip__head">
+          <span class="ui-tooltip__title">漫游</span>
+          <span class="ui-tooltip__kbd">T</span>
+        </div>
+        <div class="ui-tooltip__body">
+          <div class="ui-tooltip__group">
+            <div class="ui-tooltip__group-label">范围</div>
+            <div class="ui-tooltip__line">选中一个节点 → 漫游它的整棵子树</div>
+            <div class="ui-tooltip__line">侧边栏筛选（分类 / 边关系）→ 漫游筛选出的全部节点</div>
+          </div>
+          <div class="ui-tooltip__group">
+            <div class="ui-tooltip__group-label">顺序</div>
+            <div class="ui-tooltip__line">教材顺序（深度优先）或 层级依赖（广度优先）</div>
+            <div class="ui-tooltip__line">遍历方向：顺序 / 倒序 / 随机</div>
+          </div>
+          <div class="ui-tooltip__group">
+            <div class="ui-tooltip__group-label">深度</div>
+            <div class="ui-tooltip__line">结构 → 概览 → 重点 → 全面 → 全部，5 档可调</div>
+          </div>
+        </div>
+      `,
+    });
   }
 
   /**

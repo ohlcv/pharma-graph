@@ -27,6 +27,7 @@ import cytoscape from 'cytoscape';
 import { TourController } from '@/ui/tour-controller';
 import { Renderer } from '@/core/renderer';
 import { DetailPanel } from '@/ui/detail-panel';
+import * as legendManager from '@/ui/legend-manager';
 import type { TourEngine, TourOptions, TourCompleteInfo } from '@/core/tour';
 
 const NAME_IDS = ['tour-dt-node-name'];
@@ -596,5 +597,77 @@ describe('TourController.pickRoot — universe boundary is 体系级，不是 ro
     // 回退：universe = orphan subtree (含 child)
     expect(result.universeNodeIds.has('orphan')).toBe(true);
     expect(result.universeNodeIds.has('child')).toBe(true);
+  });
+});
+
+describe('TourController.pickRoot — 筛选模式漫游（侧边栏分类/边关系 → 高亮集合）', () => {
+  beforeEach(setupDom);
+
+  it('筛选激活时，漫游范围 = 整个筛选节点集合（rootId 取集合首元素）', () => {
+    const cy = cytoscape({ headless: true, styleEnabled: false });
+    cy.add([
+      { group: 'nodes', data: { id: 'drug-a', label: 'A', fill: 'cls-drug' } },
+      { group: 'nodes', data: { id: 'drug-b', label: 'B', fill: 'cls-drug' } },
+      { group: 'nodes', data: { id: 'mem-c', label: 'C', fill: 'cls-mnemonic' } },
+    ]);
+    const renderer = { getCy: () => cy } as unknown as Renderer;
+    const detailPanel = {
+      close: () => {},
+      closeSilently: () => {},
+      show: () => {},
+    } as unknown as DetailPanel;
+    const c = new TourController(cy, renderer, detailPanel);
+
+    // 模拟侧边栏筛选已激活：getActiveFilterNodeIds 返回筛选集合
+    const spy = vi.spyOn(legendManager, 'getActiveFilterNodeIds').mockReturnValue(['drug-b', 'drug-a']);
+
+    const result = (
+      c as unknown as {
+        pickRoot: () => {
+          rootId: string;
+          universeRootId: string | null;
+          universeNodeIds: Set<string>;
+        };
+      }
+    ).pickRoot();
+
+    expect(result.rootId).toBe('drug-b');
+    expect(result.universeNodeIds).toEqual(new Set(['drug-b', 'drug-a']));
+    expect(result.universeNodeIds.has('mem-c')).toBe(false);
+    spy.mockRestore();
+  });
+
+  it('没有筛选激活（返回 null）时，回落原有单选子树逻辑', () => {
+    const cy = cytoscape({ headless: true, styleEnabled: false });
+    cy.add([
+      { group: 'nodes', data: { id: 'root', fill: 'cls-classification' } },
+      { group: 'nodes', data: { id: 'child', fill: 'cls-drug' } },
+      { group: 'edges', data: { id: 'e', source: 'child', target: 'root', edgeType: 'instance_of' } },
+    ]);
+    const renderer = { getCy: () => cy } as unknown as Renderer;
+    const detailPanel = {
+      close: () => {},
+      closeSilently: () => {},
+      show: () => {},
+    } as unknown as DetailPanel;
+    const c = new TourController(cy, renderer, detailPanel);
+
+    const spy = vi.spyOn(legendManager, 'getActiveFilterNodeIds').mockReturnValue(null);
+
+    // 选中 root
+    cy.getElementById('root').addClass('selected-node');
+    const result = (
+      c as unknown as {
+        pickRoot: () => {
+          rootId: string;
+          universeRootId: string | null;
+          universeNodeIds: Set<string>;
+        };
+      }
+    ).pickRoot();
+
+    expect(result.rootId).toBe('root');
+    expect(result.universeNodeIds.has('child')).toBe(true);
+    spy.mockRestore();
   });
 });
