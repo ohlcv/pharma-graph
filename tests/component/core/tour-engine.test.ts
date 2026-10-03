@@ -646,8 +646,22 @@ describe('TourEngine traversal mode (sequential / reverse / random)', () => {
     cy.add([
       // y2 全书结构 + 9 个章节 + 9 个第一节
       { group: 'nodes', data: { id: 'book-y2', fill: 'cls-structure', location: { book: 'y2' } } },
-      { group: 'nodes', data: { id: 'sec-y2-01', fill: 'cls-structure', location: { book: 'y2', chapter: '第一章' } } },
-      { group: 'nodes', data: { id: 'sec-y2-09', fill: 'cls-structure', location: { book: 'y2', chapter: '第九章' } } },
+      {
+        group: 'nodes',
+        data: {
+          id: 'sec-y2-01',
+          fill: 'cls-structure',
+          location: { book: 'y2', chapter: '第一章' },
+        },
+      },
+      {
+        group: 'nodes',
+        data: {
+          id: 'sec-y2-09',
+          fill: 'cls-structure',
+          location: { book: 'y2', chapter: '第九章' },
+        },
+      },
     ]);
     // 模拟"用户选了 y2 第一章(universe = sec-y2-01 子树)"的开 tour 场景
     const engine = new TourEngine(cy);
@@ -672,8 +686,22 @@ describe('TourEngine traversal mode (sequential / reverse / random)', () => {
     const cy = cytoscape({ headless: true, styleEnabled: false });
     cy.add([
       { group: 'nodes', data: { id: 'book-y2', fill: 'cls-structure', location: { book: 'y2' } } },
-      { group: 'nodes', data: { id: 'sec-y2-01', fill: 'cls-structure', location: { book: 'y2', chapter: '第一章' } } },
-      { group: 'nodes', data: { id: 'sec-y2-09', fill: 'cls-structure', location: { book: 'y2', chapter: '第九章' } } },
+      {
+        group: 'nodes',
+        data: {
+          id: 'sec-y2-01',
+          fill: 'cls-structure',
+          location: { book: 'y2', chapter: '第一章' },
+        },
+      },
+      {
+        group: 'nodes',
+        data: {
+          id: 'sec-y2-09',
+          fill: 'cls-structure',
+          location: { book: 'y2', chapter: '第九章' },
+        },
+      },
     ]);
     const engine = new TourEngine(cy);
     engine.start('sec-y2-09', {
@@ -863,6 +891,184 @@ describe('TourEngine setMaxDepth (depth-level switch)', () => {
     engine.setMaxDepth(1);
     // seqIndex = 1（start 后已经访问了 seq[0]），但 seq[0] 是 cls-structure，档位 1 可见
     expect(priv(engine).currentStep).toBe(1);
+    expect(priv(engine).totalSteps()).toBe(2);
+    engine.stop();
+  });
+});
+
+// ── Bug: 选中分类节点 + 低档位时，漫游退化成"只走 root 自己"（进度条 1/1）。
+// 旧守卫只在 totalSteps === 0 时自动升档（ADR-0006 §3.3）；root 自己在档内时
+// 计数是 1 不是 0，于是 L2/L3 下选一个子树里没有重点药（stroke: double）的
+// 分类节点，漫游就永远停在 root 上。修复：totalSteps === 1 且子树还有别的节点
+// 时也自动升档，逐级升到第一个 totalSteps > 1 的档位。
+describe('TourEngine auto-upgrade subtree-filtered root (1/1 degenerate tour)', () => {
+  /** 苯二氮卓类子树：分类(root, stroke:double 也是普通分类) + 8 个普通药 + 2 个口诀。
+   *  L3(重点)下只有 root 自己进档 → 应升到 L4（结构+分类+全部药，9 步）。 */
+  function makeBenzodiazepineCy() {
+    const cy = cytoscape({ headless: true, styleEnabled: false });
+    cy.add([
+      { group: 'nodes', data: { id: 'cls-benzodiazepine-y2-01-01', fill: 'cls-classification' } },
+      { group: 'nodes', data: { id: 'drug-triazolam-y2-01-01', fill: 'cls-drug' } },
+      { group: 'nodes', data: { id: 'drug-lorazepam-y2-01-01', fill: 'cls-drug' } },
+      { group: 'nodes', data: { id: 'drug-midazolam-y2-01-01', fill: 'cls-drug' } },
+      { group: 'nodes', data: { id: 'drug-diazepam-y2-01-01', fill: 'cls-drug' } },
+      { group: 'nodes', data: { id: 'drug-quazepam-y2-01-01', fill: 'cls-drug' } },
+      { group: 'nodes', data: { id: 'drug-temazepam-y2-01-01', fill: 'cls-drug' } },
+      { group: 'nodes', data: { id: 'drug-clonazepam-y2-01-01', fill: 'cls-drug' } },
+      { group: 'nodes', data: { id: 'drug-estazolam-y2-01-01', fill: 'cls-drug' } },
+      { group: 'nodes', data: { id: 'mem-benzodiazepine-y2-01-01', fill: 'cls-mnemonic' } },
+      { group: 'nodes', data: { id: 'mem-benzodiazepine-cls-y2-01-01', fill: 'cls-mnemonic' } },
+      // 子→父（part_of / subclass_of）：root 是 8 药 + 2 口诀的父
+      {
+        group: 'edges',
+        data: { source: 'drug-triazolam-y2-01-01', target: 'cls-benzodiazepine-y2-01-01' },
+      },
+      {
+        group: 'edges',
+        data: { source: 'drug-lorazepam-y2-01-01', target: 'cls-benzodiazepine-y2-01-01' },
+      },
+      {
+        group: 'edges',
+        data: { source: 'drug-midazolam-y2-01-01', target: 'cls-benzodiazepine-y2-01-01' },
+      },
+      {
+        group: 'edges',
+        data: { source: 'drug-diazepam-y2-01-01', target: 'cls-benzodiazepine-y2-01-01' },
+      },
+      {
+        group: 'edges',
+        data: { source: 'drug-quazepam-y2-01-01', target: 'cls-benzodiazepine-y2-01-01' },
+      },
+      {
+        group: 'edges',
+        data: { source: 'drug-temazepam-y2-01-01', target: 'cls-benzodiazepine-y2-01-01' },
+      },
+      {
+        group: 'edges',
+        data: { source: 'drug-clonazepam-y2-01-01', target: 'cls-benzodiazepine-y2-01-01' },
+      },
+      {
+        group: 'edges',
+        data: { source: 'drug-estazolam-y2-01-01', target: 'cls-benzodiazepine-y2-01-01' },
+      },
+      {
+        group: 'edges',
+        data: { source: 'mem-benzodiazepine-y2-01-01', target: 'cls-benzodiazepine-y2-01-01' },
+      },
+      {
+        group: 'edges',
+        data: { source: 'mem-benzodiazepine-cls-y2-01-01', target: 'cls-benzodiazepine-y2-01-01' },
+      },
+    ]);
+    return cy;
+  }
+
+  it('L3 on a classification subtree with no key drugs: auto-upgrades to L4, not L5', () => {
+    const cy = makeBenzodiazepineCy();
+    const engine = new TourEngine(cy);
+    const upgrades: Array<{ requested: number; upgraded: number; reason: string }> = [];
+    const ok = engine.start('cls-benzodiazepine-y2-01-01', {
+      interval: 1_000_000,
+      maxDepth: 3,
+      strategy: asStrategy('has-dfs'),
+      universeNodeIds: new Set([
+        'cls-benzodiazepine-y2-01-01',
+        'drug-triazolam-y2-01-01',
+        'drug-lorazepam-y2-01-01',
+        'drug-midazolam-y2-01-01',
+        'drug-diazepam-y2-01-01',
+        'drug-quazepam-y2-01-01',
+        'drug-temazepam-y2-01-01',
+        'drug-clonazepam-y2-01-01',
+        'drug-estazolam-y2-01-01',
+        'mem-benzodiazepine-y2-01-01',
+        'mem-benzodiazepine-cls-y2-01-01',
+      ]),
+      onRootOutOfLevel: (info) =>
+        upgrades.push({
+          requested: info.requestedLevel,
+          upgraded: info.upgradedLevel,
+          reason: info.reason,
+        }),
+      onStep: () => {},
+      onProgress: () => {},
+      onComplete: () => {},
+    });
+    expect(ok).toBe(true);
+    expect(upgrades).toHaveLength(1);
+    expect(upgrades[0]).toEqual({ requested: 3, upgraded: 4, reason: 'subtree-filtered' });
+    // L4 = root + 8 普通药（9 步）；mnemonic 不属于 L4，保持 9。
+    expect(priv(engine).totalSteps()).toBe(9);
+    engine.stop();
+  });
+
+  it('L2 on the same subtree also upgrades (classification + drugs only at L4)', () => {
+    const cy = makeBenzodiazepineCy();
+    const engine = new TourEngine(cy);
+    const upgrades: Array<{ requested: number; upgraded: number; reason: string }> = [];
+    engine.start('cls-benzodiazepine-y2-01-01', {
+      interval: 1_000_000,
+      maxDepth: 2,
+      strategy: asStrategy('has-dfs'),
+      universeNodeIds: new Set([
+        'cls-benzodiazepine-y2-01-01',
+        'drug-triazolam-y2-01-01',
+        'drug-lorazepam-y2-01-01',
+        'drug-midazolam-y2-01-01',
+        'drug-diazepam-y2-01-01',
+        'drug-quazepam-y2-01-01',
+        'drug-temazepam-y2-01-01',
+        'drug-clonazepam-y2-01-01',
+        'drug-estazolam-y2-01-01',
+        'mem-benzodiazepine-y2-01-01',
+        'mem-benzodiazepine-cls-y2-01-01',
+      ]),
+      onRootOutOfLevel: (info) =>
+        upgrades.push({
+          requested: info.requestedLevel,
+          upgraded: info.upgradedLevel,
+          reason: info.reason,
+        }),
+      onStep: () => {},
+      onProgress: () => {},
+      onComplete: () => {},
+    });
+    expect(upgrades).toHaveLength(1);
+    expect(upgrades[0]).toEqual({ requested: 2, upgraded: 4, reason: 'subtree-filtered' });
+    expect(priv(engine).totalSteps()).toBe(9);
+    engine.stop();
+  });
+
+  it('a subtree that already has a key drug at L3 does NOT upgrade (root counts, so >1)', () => {
+    const cy = makeBenzodiazepineCy();
+    // 给其中一个药打上 stroke: double —— L3 下就能走出 root + 重点药，不该升档。
+    cy.getElementById('drug-diazepam-y2-01-01').data('stroke', 'double');
+    const engine = new TourEngine(cy);
+    const upgrades: unknown[] = [];
+    engine.start('cls-benzodiazepine-y2-01-01', {
+      interval: 1_000_000,
+      maxDepth: 3,
+      strategy: asStrategy('has-dfs'),
+      universeNodeIds: new Set([
+        'cls-benzodiazepine-y2-01-01',
+        'drug-triazolam-y2-01-01',
+        'drug-lorazepam-y2-01-01',
+        'drug-midazolam-y2-01-01',
+        'drug-diazepam-y2-01-01',
+        'drug-quazepam-y2-01-01',
+        'drug-temazepam-y2-01-01',
+        'drug-clonazepam-y2-01-01',
+        'drug-estazolam-y2-01-01',
+        'mem-benzodiazepine-y2-01-01',
+        'mem-benzodiazepine-cls-y2-01-01',
+      ]),
+      onRootOutOfLevel: () => upgrades.push('upgrade'),
+      onStep: () => {},
+      onProgress: () => {},
+      onComplete: () => {},
+    });
+    expect(upgrades).toHaveLength(0);
+    // L3 下 root + 1 重点药 = 2 步，不再退化。
     expect(priv(engine).totalSteps()).toBe(2);
     engine.stop();
   });

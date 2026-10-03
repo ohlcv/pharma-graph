@@ -118,15 +118,24 @@ export interface TourCompleteInfo {
 }
 
 /** Payload for onRootOutOfLevel — fired when the engine auto-upgrades the
- *  depth level because rootId's fill type doesn't match the requested
- *  level. Controllers should surface a UI hint ("auto-upgraded to L5")
- *  and optionally resync the depth slider to the new level. */
+ *  depth level because the requested level can't produce a real tour over
+ *  rootId's subtree. Controllers should surface a UI hint ("auto-upgraded
+ *  to L4") and resync the depth slider to the new level. */
 export interface RootOutOfLevelInfo {
   rootId: string;
   /** The level the user originally requested (1-5). */
   requestedLevel: number;
-  /** The level the engine upgraded to (always 5 for now). */
+  /** The level the engine upgraded to. */
   upgradedLevel: number;
+  /**
+   * 升档原因。两种降级形态的文案不同，用户据此判断该调档还是该换节点：
+   *   - `root-filtered`：root 自己就不在档位内（老叶子节点场景，ADR-0006 覆盖）。
+   *   - `subtree-filtered`：root 在档位内，但子树里**再没有第二个**节点能进档，
+   *     于是漫游退化成"只走 root 自己"、进度条永远 1/1。典型场景：选了分类节点
+   *     但档位调到"重点"（L3 = 结构 + 分类 + stroke:double 重点药），而该分类
+   *     子树下的药一个都没标 double。
+   */
+  reason: 'root-filtered' | 'subtree-filtered';
 }
 
 /**
@@ -1292,30 +1301,55 @@ export class TourEngine {
       return false;
     }
 
-    // ── Auto-upgrade depth level if root is filtered out ──
-    // When the user picks a leaf node (drug, summary, mnemonic) at a low
-    // depth level (e.g. L1 = structure only), the subtree is non-empty
-    // (root itself is in seq) but every node gets filtered by isNodeInLevel.
-    // Without this guard the tour would start with totalSteps=0 and bail.
+    // ── Auto-upgrade depth level when the requested level can't tour ──
+    // 两条退化路径，都要处理，否则用户点"开始"看到的不是空转就是"只走自己"：
     //
-    // Decision: if the root node itself doesn't match the current level,
-    // silently upgrade to L5 (comprehensive). Notify via onRootOutOfLevel
-    // so the UI can show "auto-upgraded to L5".
+    //   (A) root-filtered（ADR-0006 原有）：root 自己就不在档位内。比如用户选了
+    //       一颗 drug 却停在 L1 = 仅结构，子树里每个节点都被 isNodeInLevel 滤掉，
+    //       totalSteps = 0。直接升到 L5。
+    //
+    //   (B) subtree-filtered（本次新增）：root 在档位内，但子树里**再没有第二个**
+    //       节点能进档，totalSteps = 1 —— 漫游退化成"永远停在 root 自己"、进度条
+    //       恒为 1/1。典型场景：选了分类节点 + 档位 L3（重点 = 结构 + 分类 +
+    //       stroke:double 重点药），而该分类下的药一个都没标 double。老守卫只看
+    //       `=== 0`，root 自己在档内所以计数是 1，漏掉了这条路径。
+    //
+    // 决策：(A) 沿用 ADR-0006 的"直跳 L5"；(B) 改为**最小升档**——逐级往上找
+    // 第一个能覆盖子树多个节点的档位就停。直接跳 L5 会把用户没要求的 mnemonic /
+    // concept 一次性塞进来（例如苯二氮卓类子树：L4 = 9 步刚好够用，L5 = 11 步
+    // 多带 2 个口诀节点）。真实叶子（seq 只有 root 自己）任何档位都只有 1 步，
+    // 那是 ADR-0006 §5.2.1 认可的 by design 行为，不动。
     const rootNodeForLevel = this.cy.getElementById(rootId);
-    if (
-      this._depthLevel < 5 &&
-      this._cachedTotalSteps === 0 &&
-      !rootNodeForLevel.empty() &&
-      !isNodeInLevel(rootNodeForLevel, this._depthLevel)
-    ) {
+    if (this._depthLevel < 5 && !rootNodeForLevel.empty()) {
+      const rootInLevel = isNodeInLevel(rootNodeForLevel, this._depthLevel);
       const requestedLevel = this._depthLevel;
-      this._depthLevel = 5;
-      this.recomputeTotal();
-      this.onRootOutOfLevel?.({
-        rootId,
-        requestedLevel,
-        upgradedLevel: this._depthLevel,
-      });
+      let reason: RootOutOfLevelInfo['reason'] | null = null;
+
+      if (!rootInLevel && this._cachedTotalSteps === 0) {
+        // 路径 (A)：整棵子树在当前档位下被滤空 → ADR-0006 的 L5 兜底。
+        this._depthLevel = 5;
+        reason = 'root-filtered';
+      } else if (rootInLevel && this._cachedTotalSteps === 1 && this.seq.length > 1) {
+        // 路径 (B)：只剩 root 自己。从 requestedLevel+1 起逐级试，停在第一个
+        // totalSteps > 1 的档位。
+        reason = 'subtree-filtered';
+        for (let lv = requestedLevel + 1; lv <= 5; lv++) {
+          this._depthLevel = lv;
+          this.recomputeTotal();
+          if (this._cachedTotalSteps > 1) break;
+        }
+      }
+
+      if (reason) {
+        // 兜底重算：路径 (A) 换了档位、(B) 循环里已算过，这里统一对齐一次。
+        this.recomputeTotal();
+        this.onRootOutOfLevel?.({
+          rootId,
+          requestedLevel,
+          upgradedLevel: this._depthLevel,
+          reason,
+        });
+      }
     }
 
     if (this._cachedTotalSteps === 0) {

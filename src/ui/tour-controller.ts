@@ -1284,19 +1284,27 @@ export class TourController {
   }
 
   /**
-   * Engine auto-upgraded the depth level because rootId's fill type doesn't
-   * match the slider (e.g. user picked a drug at L1=structure). Surface a
-   * toast so the user understands why their tour suddenly covers everything
-   * instead of stopping instantly.
+   * Engine auto-upgraded the depth level because the requested level can't
+   * produce a real tour over the selected subtree. Surface a toast so the
+   * user understands why their tour suddenly covers more than they asked for
+   * instead of stopping instantly or looping on the root alone.
    */
   private onRootOutOfLevel(info: {
     rootId: string;
     requestedLevel: number;
     upgradedLevel: number;
+    reason: 'root-filtered' | 'subtree-filtered';
   }): void {
     const requested = TOUR_DEPTH_CONFIG.getLabel(info.requestedLevel);
     const upgraded = TOUR_DEPTH_CONFIG.getLabel(info.upgradedLevel);
-    showToast(`所选节点不在【${requested}】档位内，已自动切换到【${upgraded}】漫游`, 'info');
+    // 两种降级形态要分开说，否则用户在"重点"档选了分类节点、看到进度条只有 1/1
+    // 却又被告知"不在档位内"，会以为是节点本身有问题（其实它在档内，是子树里
+    // 没有第二个节点能进档）。
+    const message =
+      info.reason === 'subtree-filtered'
+        ? `【${requested}】档位下所选子树只有当前节点，已自动切换到【${upgraded}】漫游`
+        : `所选节点不在【${requested}】档位内，已自动切换到【${upgraded}】漫游`;
+    showToast(message, 'info');
     this.announceStatus(`深度档位已自动从 ${requested} 升到 ${upgraded}`);
     // Sync the slider DOM so the user sees the new value. The engine already
     // updated internally; this keeps the UI consistent.
