@@ -1,6 +1,6 @@
 ---
 id: cls-acei-hyper-y2-05-02
-label: 血管紧张素转化酶抑制剂(ACEI)
+label: 血管紧张素转化酶抑制剂(ACEI)（抗高血压药）
 fill: cls-classification
 stroke: double
 location:
@@ -39,4 +39,7 @@ edges_out:
   - target: cls-ras-inhibitor-y2-05-02
     type: subclass_of
     reason: 是肾素-血管紧张素系统(RAS)抑制药下的一个亚类，且属于临床用药评价分支下的重点分类
+  - target: cls-acei-y2-05-05
+    type: equivalent_to
+    reason: 与抗心力衰竭药中的血管紧张素转化酶抑制剂(ACEI)为同一药物类别
 ---

@@ -10,7 +10,7 @@ location:
 tags:
   - PCSK9抑制剂
   - 主要降胆固醇
-  - 药理作用：阻止LDLR降解促进LDL-C清除
+  - 药理作用：阻止LDLR降解
   - ADR：注射部位反应
 summary:
   short:

@@ -1,6 +1,6 @@
 ---
 id: cls-acei-y2-05-05
-label: 血管紧张素转化酶抑制剂(ACEI)
+label: 血管紧张素转化酶抑制剂(ACEI)（抗心力衰竭药）
 fill: cls-classification
 location:
   book: 药学专业知识二

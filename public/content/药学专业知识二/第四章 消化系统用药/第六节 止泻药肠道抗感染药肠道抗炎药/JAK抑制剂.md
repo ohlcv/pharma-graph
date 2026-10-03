@@ -1,6 +1,6 @@
 ---
 id: cls-jak-inhibitor-y2-04-06
-label: JAK抑制剂
+label: JAK抑制剂（止泻药肠道抗感染药肠道抗炎药）
 fill: cls-classification
 location:
   book: 药学专业知识二

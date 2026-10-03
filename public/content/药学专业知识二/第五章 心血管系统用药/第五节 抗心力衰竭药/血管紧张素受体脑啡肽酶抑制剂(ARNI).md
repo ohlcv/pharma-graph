@@ -1,6 +1,6 @@
 ---
 id: cls-arni-y2-05-05
-label: 血管紧张素受体脑啡肽酶抑制剂(ARNI)
+label: 血管紧张素受体脑啡肽酶抑制剂(ARNI)（抗心力衰竭药）
 fill: cls-classification
 location:
   book: 药学专业知识二

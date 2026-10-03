@@ -1,6 +1,6 @@
 ---
 id: cls-arni-hyper-y2-05-02
-label: 血管紧张素受体脑啡肽酶抑制剂(ARNI)
+label: 血管紧张素受体脑啡肽酶抑制剂(ARNI)（抗高血压药）
 fill: cls-classification
 location:
   book: 药学专业知识二
@@ -16,4 +16,7 @@ edges_out:
   - target: cls-ras-inhibitor-y2-05-02
     type: subclass_of
     reason: 是肾素-血管紧张素系统(RAS)抑制药下的一个亚类
+  - target: cls-arni-y2-05-05
+    type: equivalent_to
+    reason: 与抗心力衰竭药中的血管紧张素受体脑啡肽酶抑制剂(ARNI)为同一药物类别
 ---

@@ -1,6 +1,6 @@
 ---
 id: cls-arb-y2-05-05
-label: 血管紧张素受体拮抗剂(ARB)
+label: 血管紧张素受体拮抗剂(ARB)（抗心力衰竭药）
 fill: cls-classification
 location:
   book: 药学专业知识二
