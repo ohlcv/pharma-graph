@@ -279,7 +279,13 @@ export class GlowOverlay {
     // 基础层（所有 glow / flow 节点的呼吸光晕）。
     if (!this.started) return;
     if (this.lastVisibleCount <= SYNC_DRAW_MAX_NODES) {
-      if (now - this.lastDrawAt < this.frameInterval) return; // 帧率节流：把有效重画频率锁回设计好的 30fps
+      // 视口在动（pan/zoom）时必须立即重画，跳过 30fps 节流：cytoscape 已经把
+      // 节点画到新位置，覆盖层若停在上一帧，光晕就和节点错开成"残影"。节流只在
+      // 视口静止、仅有呼吸相位变化时才生效——那时两张画布本就同步，30fps 完全够。
+      // 注意：draw() 内部会再次调用 viewportMoved() 把 lastVp 更新到本帧值，所以
+      // 下一帧 onRender 在这里能正确比较出"动过没有"。
+      const moved = this.viewportMoved();
+      if (!moved && now - this.lastDrawAt < this.frameInterval) return;
       this.lastDrawAt = now; // 让紧随其后的 rAF tick 跳过这一帧，不重复画
       this.draw(this.reducedMotion ? 0 : now - this.startedAt);
       return;
