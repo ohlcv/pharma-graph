@@ -131,13 +131,6 @@ const EMPH_SPRITE_RADIUS_QUANTUM_PX = 4;
  */
 const EMPH_SPRITE_CACHE_SOFT_CAP = 2048;
 
-/**
- * 视口内 glow/flow 节点数不超过这个值时，基础光晕层在 cytoscape 每画完一帧后
- * 立刻同步重画（见 onRender）。超过就仍走 30fps 的 rAF 节流，避免几百个径向渐变
- * 每帧都画。漫游时镜头是放大聚焦的，视口内节点很少，正好落在这个范围里。
- */
-const SYNC_DRAW_MAX_NODES = 120;
-
 /** `#rrggbb` / `rgb(...)` → `rgba(r,g,b,a)`。解析失败时回退到当前主题的主色。 */
 function withAlpha(color: string, alpha: number): string {
   const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color.trim());
@@ -199,13 +192,8 @@ export class GlowOverlay {
   private startedAt = 0;
   /** start() 已调用且未 stop()。onRender 只在覆盖层"已启用"时才重画基础层。 */
   private started = false;
-  /** 上一次 draw() 画到的视口内 glow+flow 节点数，决定 onRender 能否同步重画。 */
-  private lastVisibleCount = 0;
   /** 上一次 draw()/检查时的镜头（pan + zoom），用来判断停帧状态下镜头是否动过。 */
   private lastVp = { x: NaN, y: NaN, z: NaN };
-  /** viewport 抖动时最后一次 scheduleStaticRefresh 的时间戳，避免 pan 抖动时反复 clear。 */
-  private lastStaticRefreshAt = 0;
-  private staleTimer: number | null = null;
 
   /** 缓存的 glow/flow 节点集合；图变动时置脏，下一帧重新查询。 */
   private glowNodes: cytoscape.NodeCollection | null = null;
@@ -274,32 +262,31 @@ export class GlowOverlay {
    */
   private readonly onRender = (): void => {
     if (document.hidden) return;
+    if (!this.started) return;
     const now = performance.now();
 
-    // 基础层（所有 glow / flow 节点的呼吸光晕）。
-    if (!this.started) return;
-    if (this.lastVisibleCount <= SYNC_DRAW_MAX_NODES) {
-      // 视口在动（pan/zoom）时必须立即重画，跳过 30fps 节流：cytoscape 已经把
-      // 节点画到新位置，覆盖层若停在上一帧，光晕就和节点错开成"残影"。节流只在
-      // 视口静止、仅有呼吸相位变化时才生效——那时两张画布本就同步，30fps 完全够。
-      // 注意：draw() 内部会再次调用 viewportMoved() 把 lastVp 更新到本帧值，所以
-      // 下一帧 onRender 在这里能正确比较出"动过没有"。
-      const moved = this.viewportMoved();
-      if (!moved && now - this.lastDrawAt < this.frameInterval) return;
-      this.lastDrawAt = now; // 让紧随其后的 rAF tick 跳过这一帧，不重复画
-      this.draw(this.reducedMotion ? 0 : now - this.startedAt);
-      return;
-    }
-    // 节点太多、已经停帧成静态图：镜头一动，静态图就和节点错位了。
-    // 先清掉（不留错位的鬼影），一帧后再补画（缩短空白窗到 1 帧：150 → 16ms）。
-    // 同时给 viewport 抖动加 200ms 节流，避免 pan 中反复 clear + resume 让光晕"边画边抖"。
-    if (this.rafId === null && this.viewportMoved()) {
-      // 给 viewport 抖动加 200ms 节流，避免 pan 中反复 clear + resume 让光晕"边画边抖"。
-      if (now - this.lastStaticRefreshAt >= 200) {
-        this.lastStaticRefreshAt = now;
-        this.clearAll();
-        this.scheduleStaticRefresh(16);
-      }
+    // 视口在动（pan/zoom）时必须立即重画，跳过 30fps 节流：cytoscape 已经把节点画到
+    // 新位置，覆盖层若停在上一帧就和节点错开成"残影"。节流只在视口静止、仅有呼吸
+    // 相位变化时才生效——那时两张画布本就同步，30fps 完全够。
+    //
+    // 之前分两段（≤SYNC_DRAW_MAX_NODES 同步重画 / > 阈值走停帧分支）会漏掉
+    // 121~150 这档：rAF 仍在跑所以停帧分支不进，同步分支又因 >120 不进，onRender
+    // 什么都不做，光晕只靠 30fps rAF tick 重画 → 节流期间残影。停帧分支的 200ms
+    // 节流 + 16ms setTimeout 补画也会在缩放期间留 200ms 残影和 16ms 空白窗。
+    // 统一改成"视口动就立即 draw"，覆盖所有节点数档位。
+    //
+    // 注意：draw() 内部会再次调用 viewportMoved() 把 lastVp 更新到本帧值，所以
+    // 下一帧 onRender 在这里能正确比较出"动过没有"。
+    const moved = this.viewportMoved();
+    if (!moved && now - this.lastDrawAt < this.frameInterval) return;
+    this.lastDrawAt = now; // 让紧随其后的 rAF tick 跳过这一帧，不重复画
+    this.draw(this.reducedMotion ? 0 : now - this.startedAt);
+    // 停帧状态（节点 > maxAnimatedNodes 把 rAF 停了）下视口动时：上面 draw 已经
+    // 画了一帧让光晕跟随节点；若节点数已降到 ≤ maxAnimatedNodes，需要重启 rAF
+    // 让呼吸继续。不调用 start()——它会把 startedAt 重置为 now，缩放期间反复
+    // onRender -> start 会让呼吸相位永远卡在 0。直接 schedule tick，相位保留。
+    if (moved && this.rafId === null && !this.reducedMotion) {
+      this.rafId = requestAnimationFrame(this.tick);
     }
   };
 
@@ -309,14 +296,6 @@ export class GlowOverlay {
     const moved = p.x !== this.lastVp.x || p.y !== this.lastVp.y || z !== this.lastVp.z;
     this.lastVp = { x: p.x, y: p.y, z };
     return moved;
-  }
-
-  private scheduleStaticRefresh(delayMs = 16): void {
-    if (this.staleTimer !== null) window.clearTimeout(this.staleTimer);
-    this.staleTimer = window.setTimeout(() => {
-      this.staleTimer = null;
-      this.resume();
-    }, delayMs);
   }
 
   private readonly onGraphChange = (): void => {
@@ -483,10 +462,6 @@ export class GlowOverlay {
 
   destroy(): void {
     this.started = false;
-    if (this.staleTimer !== null) {
-      window.clearTimeout(this.staleTimer);
-      this.staleTimer = null;
-    }
     this.pause();
     if (this.redrawTimer !== null) {
       window.clearTimeout(this.redrawTimer);
@@ -775,7 +750,6 @@ export class GlowOverlay {
 
     const halos = this.collectHalos();
     const rings = this.collectFlowRings();
-    this.lastVisibleCount = halos.length + rings.length;
     this.viewportMoved(); // 记录这一帧对应的镜头，供停帧状态下判断"镜头动过没有"
 
     // 只清上一帧画过的区域。整张 clearRect 在 dpr=2 的 iPad 上每帧也要花掉
