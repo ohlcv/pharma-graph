@@ -902,7 +902,7 @@ describe('TourEngine setMaxDepth (depth-level switch)', () => {
 // 分类节点，漫游就永远停在 root 上。修复：totalSteps === 1 且子树还有别的节点
 // 时也自动升档，逐级升到第一个 totalSteps > 1 的档位。
 describe('TourEngine auto-upgrade subtree-filtered root (1/1 degenerate tour)', () => {
-  /** 苯二氮卓类子树：分类(root, stroke:double 也是普通分类) + 8 个普通药 + 2 个口诀。
+  /** 苯二氮䓬类子树：分类(root, stroke:double 也是普通分类) + 8 个普通药 + 2 个口诀。
    *  L3(重点)下只有 root 自己进档 → 应升到 L4（结构+分类+全部药，9 步）。 */
   function makeBenzodiazepineCy() {
     const cy = cytoscape({ headless: true, styleEnabled: false });

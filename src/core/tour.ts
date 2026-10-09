@@ -1316,7 +1316,7 @@ export class TourEngine {
     //
     // 决策：(A) 沿用 ADR-0006 的"直跳 L5"；(B) 改为**最小升档**——逐级往上找
     // 第一个能覆盖子树多个节点的档位就停。直接跳 L5 会把用户没要求的 mnemonic /
-    // concept 一次性塞进来（例如苯二氮卓类子树：L4 = 9 步刚好够用，L5 = 11 步
+    // concept 一次性塞进来（例如苯二氮䓬类子树：L4 = 9 步刚好够用，L5 = 11 步
     // 多带 2 个口诀节点）。真实叶子（seq 只有 root 自己）任何档位都只有 1 步，
     // 那是 ADR-0006 §5.2.1 认可的 by design 行为，不动。
     const rootNodeForLevel = this.cy.getElementById(rootId);
