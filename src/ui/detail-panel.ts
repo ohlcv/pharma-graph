@@ -23,6 +23,8 @@ import { parseFrontmatter } from '../parser/frontmatter.js';
 
 export class DetailPanel {
   private _currentNodeId: string | null = null;
+  /** 正在拉取正文的节点 id，防止同一节点并发重复 fetch。 */
+  private _loadingNodeId: string | null = null;
 
   private panel!: HTMLElement;
   private overviewPage!: HTMLElement;
@@ -92,7 +94,7 @@ export class DetailPanel {
     registerPinToggle(this.pinToggle);
 
     this.overviewTab.addEventListener('click', () => switchDesktopTab('overview'));
-    this.bodyTab.addEventListener('click', () => switchDesktopTab('body'));
+    this.bodyTab.addEventListener('click', () => this.switchBodyTab());
 
     this.pinBtn.addEventListener('click', () => {
       this.pinToggle.toggle();
@@ -152,6 +154,10 @@ export class DetailPanel {
     if (node.empty()) return;
 
     this._currentNodeId = nodeId;
+    // 保持页签状态：漫游/manual 导航时沿用用户当前所停留的页签
+    // （自动切换 body 页签会打断用户阅读行为）。当前节点若是 body
+    // 页签,继续自动加载正文——用户正在看正文流。
+    const bodyTabActive = uiState.activeTab === 'body';
     // 只有用户手动触发打开面板时才重置"用户关闭过"的标记，
     // 程序自动调用（如漫游切节点）不应重置，否则用户关面板后漫游仍会弹出
     if (userInitiated) {
@@ -164,11 +170,11 @@ export class DetailPanel {
       buildHeroHtml(d) + buildSummaryHtml(d) + buildEdgesHtml(node, this.cy);
     this.bodyPage.innerHTML = buildBodyHtml(d, sourcePath);
 
-    // body 不进 graph-data.json（构建期刻意排除），按 sourcePath 懒加载；
-    // 拿到后写回节点数据，下次打开直接命中。bodyLoaded 标记防止对无正文
-    // 节点反复空 fetch。
-    if (!d.body && sourcePath && !d.bodyLoaded) {
-      void this.loadBody(nodeId, sourcePath);
+    // body 不进 graph-data.json（构建期刻意排除），按 sourcePath 懒加载。
+    // 加载策略：只有用户停留在“文”页签时才发起 fetch（避免打开面板就
+    // 白白下载正文）；已在缓存里的节点直接渲染，不必重复请求。
+    if (bodyTabActive) {
+      void this.ensureBodyLoaded(nodeId, sourcePath);
     }
 
     this.applySectionState();
@@ -185,6 +191,20 @@ export class DetailPanel {
     }
   }
 
+  /** 切到“文”页签：如果当前节点正文尚未加载，先展示加载态再拉取。 */
+  private switchBodyTab(): void {
+    switchDesktopTab('body');
+    // 页签从“概”切到“文”，此时面板停靠节点可能有正文未加载。
+    if (this._currentNodeId) {
+      const node = this.cy.getElementById(this._currentNodeId);
+      if (!node.empty()) {
+        const d = node.data();
+        const sourcePath = typeof d.sourcePath === 'string' ? d.sourcePath : '';
+        void this.ensureBodyLoaded(this._currentNodeId, sourcePath, true);
+      }
+    }
+  }
+
   close(): void {
     uiState.panelClosedByUser = true;
     this.panel.classList.remove('visible');
@@ -193,14 +213,65 @@ export class DetailPanel {
   }
 
   /**
-   * 懒加载节点正文：prebuilt 模式下 graph-data.json 不含 body（构建期排除），
-   * 详情面板打开时按 sourcePath 拉取原始 md、解析出正文写回节点数据。
-   * URL 构造与 optimized-content-loader / spectacle overlays 保持一致。
+   * 确保节点正文已进入 DOM：已加载直接渲染；未加载且允许请求时发起
+   * fetch（带“加载中”占位过渡）。`bodyLoaded` 标记防止对无正文节点反复
+   * 空 fetch。`userRequested` 表示用户主动切到文页签——此时先渲加载占位。
+   *
+   * 两种数据来源都要兼容：
+   *   - prebuilt（graph-data.json）：构建期刻意排除 body，节点上 `body`
+   *     是 undefined → 需要按 sourcePath 懒加载。
+   *   - md 兜底（逐个下载全部 md）：buildGraph 把 `body: content.trim()`
+   *     写进节点，正文**开局就已在内存里** → 直接渲染，永不 fetch。
+   *     注意判据是"是否为字符串"而非"是否非空"：md 兜底路径下 body 恒为
+   *     字符串（无正文时是空串），而 prebuilt 下恒为 undefined，所以空串
+   *     同样代表"已确定无正文"，再 fetch 一次也是白请求。
    */
-  private async loadBody(nodeId: string, sourcePath: string): Promise<void> {
+  private async ensureBodyLoaded(
+    nodeId: string,
+    sourcePath: string,
+    userRequested = false,
+  ): Promise<void> {
     const node = this.cy.getElementById(nodeId);
     if (node.empty()) return;
-    node.data('bodyLoaded', true);
+
+    // md 兜底路径：正文已随全量 md 一起下载并解析，节点数据里就有。
+    // 这是"一开始就把所有 md 下完"方案的核心收益——漫游/手动打开详情
+    // 都不产生任何网络请求。
+    if (typeof node.data('body') === 'string') {
+      node.data('bodyLoaded', true);
+      if (this._currentNodeId === nodeId) {
+        this.bodyPage.innerHTML = buildBodyHtml(node.data(), sourcePath);
+      }
+      return;
+    }
+
+    // 已缓存（成功/失败过一次）——直接回填当前渲染结果，不重复请求。
+    if (node.data('bodyLoaded')) {
+      if (this._currentNodeId === nodeId) {
+        this.bodyPage.innerHTML = buildBodyHtml(node.data(), sourcePath);
+      }
+      return;
+    }
+
+    // 同一节点的 fetch 正在途中——避免并发重复请求。
+    if (this._loadingNodeId === nodeId) return;
+
+    // 没有任何可加载正文的路径，直接标记完成，避免反复空请求。
+    if (!sourcePath) {
+      node.data('bodyLoaded', true);
+      if (this._currentNodeId === nodeId) {
+        this.bodyPage.innerHTML = buildBodyHtml(node.data(), sourcePath);
+      }
+      return;
+    }
+
+    // 用户主动切到文页签：先渲“加载中”占位，fetch 完成后再平滑替换。
+    // 漫游自动切换（未停留文页签不会走到这）：保持安静加载，不显示占位。
+    if (userRequested) {
+      this.bodyPage.innerHTML = BODY_LOADING_HTML;
+    }
+
+    this._loadingNodeId = nodeId;
     try {
       const url =
         '/content/' +
@@ -211,16 +282,28 @@ export class DetailPanel {
       const res = await fetch(url);
       // dev server 对不存在路径会回退 index.html——HTML 响应一律视为无正文
       const contentType = res.headers.get('content-type') ?? '';
-      if (!res.ok || contentType.includes('text/html')) return;
+      if (!res.ok || contentType.includes('text/html')) {
+        node.data('bodyLoaded', true);
+        if (this._currentNodeId === nodeId) {
+          this.bodyPage.innerHTML = buildBodyHtml(node.data(), sourcePath);
+        }
+        return;
+      }
       const fm = parseFrontmatter(await res.text(), sourcePath);
-      if (!fm.body) return;
-      node.data('body', fm.body);
+      node.data('body', fm.body ?? '');
+      node.data('bodyLoaded', true);
       // 用户可能已切到别的节点——只有面板仍停在该节点时才重渲染正文页签
       if (this._currentNodeId === nodeId) {
         this.bodyPage.innerHTML = buildBodyHtml(node.data(), sourcePath);
       }
     } catch {
       /* 网络失败 / 解析失败都保持正文页签为空 */
+      node.data('bodyLoaded', true);
+      if (this._currentNodeId === nodeId) {
+        this.bodyPage.innerHTML = buildBodyHtml(node.data(), sourcePath);
+      }
+    } finally {
+      if (this._loadingNodeId === nodeId) this._loadingNodeId = null;
     }
   }
 
@@ -491,6 +574,13 @@ function buildBodyHtml(d: cytoscape.NodeDataDefinition, sourcePath: string): str
     )
     .join('');
 }
+
+/** 文页签首次切到、正文尚未返回时的占位内容。 */
+const BODY_LOADING_HTML = `
+  <div class="np-body-loading">
+    <span class="np-body-loading__spinner"></span>
+    <span class="np-body-loading__text">正在加载正文…</span>
+  </div>`;
 
 // ── Shared utils ──────────────────────────────────────────────────────────────
 

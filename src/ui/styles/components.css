@@ -1796,6 +1796,27 @@
     color: var(--text);
     line-height: 1.7;
   }
+  .np-body-loading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 4px;
+    color: var(--muted);
+    font-size: var(--text-sm);
+  }
+  .np-body-loading__spinner {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid rgba(var(--accent-rgb), 0.25);
+    border-top-color: var(--accent);
+    animation: np-body-spin 0.8s linear infinite;
+  }
+  @keyframes np-body-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
 
   .np-hero {
     display: flex;
