@@ -65,7 +65,7 @@ location: # 教材/资料定位（不参与图形编码）
   book: string # 必填
   chapter: string # 必填
   section: string # 可选
-  item: string # 可选，节内排序/子项
+  item: string # 已废弃（保留字段，默认不用；历史数据兼容）
 
 tags: string[] # 检索关键词（rdfs:seeAlso）
 
@@ -161,7 +161,7 @@ stroke 是自定义 AnnotationProperty `style` 的简写，值为组合枚举，
 | `book`    | string | ✅   | 根文件名/教材名 |
 | `chapter` | string | ✅   | 章              |
 | `section` | string | 可选 | 节              |
-| `item`    | string | 可选 | 节内排序/子项   |
+| `item`    | string | 已废弃 | 保留字段，默认不用（历史数据兼容） |
 
 > location 不参与图形编码，仅用于节点详情展示。
 
