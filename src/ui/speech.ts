@@ -323,6 +323,13 @@ class SpeechController {
   private silentCheckTimer: ReturnType<typeof setTimeout> | null = null;
   /** Cached speechSynthesis reference; null when unsupported. */
   private readonly synth: SpeechSynthesis | null;
+  /**
+   * 已知对 Web Speech API 支持残缺的内核/浏览器名（夸克 U4、UC、微信 X5/TBS
+   * 等）。检测到时，toast 与按钮 title 会把"推荐用 Chrome/Safari 打开"的文案
+   * 降级为指名道姓的提示，让用户少猜到底是哪个浏览器在作怪。iOS 上所有浏览器
+   * 都被强制使用 WebKit，引擎是完好的，因此 iOS 一律返回 null（用泛化文案）。
+   */
+  private readonly unsupportedBrowserHint: string | null;
   /** Current read-aloud fields (persisted under SPEECH_FIELDS_KEY). */
   private fields: SpeechFields = loadSpeechFields();
   /** Current utterance rate (persisted under SPEECH_RATE_KEY). */
@@ -355,6 +362,8 @@ class SpeechController {
 
   constructor() {
     this.synth = getSpeechSynthesis();
+    this.unsupportedBrowserHint =
+      typeof navigator !== 'undefined' ? knownSilentWebViewLabel(navigator.userAgent) : null;
     if (!this.synth) return;
     this.supported = probeSpeechApi(this.synth);
     if (!this.supported) return;
@@ -756,7 +765,10 @@ class SpeechController {
       }
       this.updateButtonState();
       showToast(
-        '当前浏览器的朗读引擎无法输出声音，已自动关闭朗读（推荐用 Chrome/Safari 打开）',
+        this.browserHintText(
+          '当前浏览器的朗读引擎无法输出声音，已自动关闭朗读',
+          '请用 Chrome/Safari 打开',
+        ),
         'info',
       );
     }, SILENT_ENGINE_TIMEOUT_MS);
@@ -814,14 +826,57 @@ class SpeechController {
         btn.disabled = false;
         btn.removeAttribute('aria-disabled');
         btn.title = !this.supported
-          ? '当前浏览器可能不支持朗读（推荐用 Chrome/Safari 打开）'
+          ? this.browserHintText('当前浏览器可能不支持朗读', '推荐用 Chrome/Safari 打开')
           : this.engineState === 'silent'
-            ? '此浏览器朗读引擎无声音输出，已自动关闭（推荐用 Chrome/Safari 打开）'
+            ? this.browserHintText(
+                '此浏览器朗读引擎无声音输出，已自动关闭',
+                '推荐用 Chrome/Safari 打开',
+              )
             : this.active
               ? '关闭朗读'
               : '开启朗读';
       });
   }
+
+  /**
+   * 组合浏览器不兼容提示文案。
+   *
+   * 检测到已知"哑巴/残缺"内核（夸克 U4、UC、微信 X5/TBS 等）时，把泛化的
+   * "推荐用 Chrome/Safari"升级为指名道姓的文案——用户一眼就知道该换哪个
+   * 浏览器，而不是把锅甩给"手机不支持"。iOS 上所有浏览器都是完好的 WebKit，
+   * 不会走到这里（见 knownSilentWebViewLabel）。
+   */
+  private browserHintText(before: string, after: string): string {
+    if (this.unsupportedBrowserHint) {
+      return `${before}（${this.unsupportedBrowserHint}，请用 Chrome/Safari 打开）`;
+    }
+    return `${before}（${after}）`;
+  }
+}
+
+/**
+ * 识别已知对 Web Speech API 支持残缺的 Android 浏览器内核，返回点名文案；
+ * 其他情况返回 null（此时使用泛化的"推荐用 Chrome/Safari 打开"文案）。
+ *
+ * 判断依据（UA 关键词，顺序重要）：
+ *   - iOS 平台（iPhone/iPad/Mac）：强制 WebKit，引擎完好，一律不点名 —— 避免
+ *     在 iOS 上出现"夸克不支持"的误导（iOS 夸克其实是 Safari 内核，正常）。
+ *   - 微信内置：X5/XWEB（旧）或 TBS（新）内核，speechSynthesis 是"哑巴 stub"。
+ *   - 夸克：U4 内核，speak() 可能同步抛错或静默失败。
+ *   - UC：UCBrowser，对 TTS 支持残缺。
+ *   - 其他安卓 WebView：泛化提示（不点名，因为可能是厂商定制内核）。
+ *
+ * 纯函数，便于单测直接断言。
+ */
+export function knownSilentWebViewLabel(ua: string): string | null {
+  if (/iPhone|iPad|iPod/i.test(ua)) return null;
+  if (/Macintosh|Mac OS X/i.test(ua) && !/Android/i.test(ua)) return null;
+  if (/MicroMessenger/i.test(ua)) {
+    return /XWEB|TBS|X5/i.test(ua) ? '微信内置浏览器（X5/TBS 内核）' : '微信内置浏览器';
+  }
+  if (/Quark|U4/i.test(ua)) return '夸克浏览器（U4 内核）';
+  if (/UCBrowser/i.test(ua)) return 'UC 浏览器';
+  return null;
 }
 
 /**

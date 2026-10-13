@@ -102,6 +102,23 @@ describe('speech button DOM side-effects (jsdom)', () => {
     expect(btn.title).toMatch(/不支持朗读/);
   });
 
+  it('button title names the culprit browser on Android WebView (WeChat X5)', async () => {
+    // Simulate a WeChat X5 UA; assert the title singles out WeChat instead of
+    // the generic "推荐用 Chrome/Safari" copy.
+    Object.defineProperty(navigator, 'userAgent', {
+      value:
+        'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Mobile MicroMessenger/8.0.40 XWEB/11300',
+      configurable: true,
+    });
+    installStub(null);
+    const { speechController } = await import('@/ui/speech');
+
+    speechController.toggle();
+    const btn = document.querySelector<HTMLButtonElement>('[data-tour-action="toggle-speech"]')!;
+    expect(btn.title).toMatch(/微信内置浏览器/);
+    expect(btn.title).toMatch(/Chrome\/Safari/);
+  });
+
   it('button gets active class + aria-pressed=true when toggled ON (supported API)', async () => {
     installStub({ speakCalls: [], cancelCalls: 0 });
     const { speechController } = await import('@/ui/speech');
