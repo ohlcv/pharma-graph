@@ -142,10 +142,11 @@
     height: 12px;
   }
 
-  /* ── 朗读粒度分段控件 (data-section="tour-setting") ─────────────────
-   * 与大屏 sheet 的 .bs-layout-grid 视觉一致(4 列 chip 按钮组),但放在
-   * 侧栏里,所以走 sidebar 这一套参数。点击切换 active,active 样式复用
-   * 大屏 .bs-layout-btn.active 的视觉规范:accent 背景 + 发光边框。 */
+  /* ── 朗读粒度多选控件 (data-section="tour-setting") ─────────────────
+   * 与大屏 sheet 的 .bs-layout-grid 视觉一致(2×2 chip 按钮组),但放在
+   * 侧栏里,所以走 sidebar 这一套参数。每个 chip 独立 toggle,可同时点亮
+   * 多个;active 样式复用大屏 .bs-layout-btn.active 的视觉规范:accent
+   * 背景 + 发光边框。 */
   .speech-granularity-row {
     display: flex;
     flex-direction: column;

@@ -3135,6 +3135,7 @@
   .bs-tour-setting.collapsed .bs-tour-setting__body {
     display: none;
   }
+  /* 朗读字段 chip:多选,可同时点亮多个(:active 与 .active 两态并存)。 */
   .bs-speech-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;

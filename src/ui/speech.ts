@@ -13,10 +13,11 @@
 //   voices are still loading so iOS does not silently drop the unlock
 //   utterance).
 // - Rate: user-controllable via the 朗读设置 panel (0.5x–2.0x, default
-//   1.0x). Was hardcoded to 1.25 historically.
+//   1.3x). Was hardcoded to 1.25 historically.
 // - State is NOT persisted — TTS is off by default on every page load.
-// - Granularity (4 modes) IS persisted under one key — the user picks how
-//   much of a node to read; survives reloads.
+// - Read-aloud field selection IS persisted under one key — the user picks
+//   which parts of a node to read (标题/关联/标签/摘要, any combination);
+//   survives reloads.
 //
 // Two layers of degradation, because one probe isn't enough:
 //
@@ -57,43 +58,53 @@
 //           engine (which never sends a wake-up event to cancel the
 //           detector anyway).
 
+import { uiState } from './state.js';
 import { showToast } from './ui-helpers.js';
 
 type Voice = SpeechSynthesisVoice | null;
 
 /**
- * Read-aloud granularity for a node. Determines what fields of the node
- * get joined into the utterance. User picks one in the advanced-settings
- * panel; default is 'label-edges' (a step up from the legacy label-only
- * behaviour, but still concise enough not to overwhelm during a tour).
+ * Read-aloud field: one independent piece of a node that can be toggled on
+ * or off. The user picks any combination in the 漫游设置 panel; the spoken
+ * text concatenates the selected fields in SPEECH_FIELD_ORDER.
  */
-export type SpeechGranularity =
-  /** Only the node label. */
+export type SpeechField =
+  /** Node label (标题). */
   | 'label'
-  /** Label + outgoing edges (targets joined by commas). */
-  | 'label-edges'
-  /** Label + outgoing edges + tags. */
-  | 'label-edges-tags'
-  /** Label + the full summary text. */
-  | 'label-full-summary';
+  /** Outgoing edge reasons (关联). */
+  | 'edges'
+  /** Node tags (标签). */
+  | 'tags'
+  /** Full summary text (摘要). */
+  | 'summary';
 
-export const SpeechGranularityOptions: ReadonlyArray<SpeechGranularity> = [
+/** A selected combination of read-aloud fields. */
+export type SpeechFields = readonly SpeechField[];
+
+export const SpeechFieldOptions: ReadonlyArray<SpeechField> = [
   'label',
-  'label-edges',
-  'label-edges-tags',
-  'label-full-summary',
+  'edges',
+  'tags',
+  'summary',
 ] as const;
 
-/** Human label shown on the granularity segmented control. */
-export const SpeechGranularityLabels: Record<SpeechGranularity, string> = {
-  label: '仅标题',
-  'label-edges': '标题和关联',
-  'label-edges-tags': '标题和关联和标签',
-  'label-full-summary': '标题和摘要',
+/** Canonical concatenation order — makes the utterance independent of the
+ *  order in which the user toggled the fields on. */
+export const SPEECH_FIELD_ORDER: ReadonlyArray<SpeechField> = SpeechFieldOptions;
+
+/** Human label shown on each multi-select chip. */
+export const SpeechFieldLabels: Record<SpeechField, string> = {
+  label: '标题',
+  edges: '关联',
+  tags: '标签',
+  summary: '摘要',
 };
 
-/** Single localStorage key holding the chosen granularity. */
-export const SPEECH_GRANULARITY_KEY = 'pg:speech:granularity';
+/** Single localStorage key holding the selected read-aloud field
+ *  combination. Value format: fields joined by '+' (e.g. 'label+edges+tags').
+ *  Legacy single-select preset values are migrated on read. The literal is
+ *  unchanged so existing users keep their preference. */
+export const SPEECH_FIELDS_KEY = 'pg:speech:granularity';
 
 /** Single localStorage key holding the chosen read-aloud rate (0.5–2.0). */
 export const SPEECH_RATE_KEY = 'pg:speech:rate';
@@ -106,7 +117,7 @@ export const SPEECH_POST_DELAY_KEY = 'pg:speech:postDelay';
 
 export const SPEECH_RATE_MIN = 0.5;
 export const SPEECH_RATE_MAX = 2.0;
-export const SPEECH_RATE_DEFAULT = 1.25;
+export const SPEECH_RATE_DEFAULT = 1.3;
 export const SPEECH_POST_DELAY_MIN = 0;
 export const SPEECH_POST_DELAY_MAX = 2000;
 export const SPEECH_POST_DELAY_STEP = 100;
@@ -175,22 +186,66 @@ function savePostDelay(ms: number): void {
   }
 }
 
-function loadGranularity(): SpeechGranularity {
-  try {
-    const raw = localStorage.getItem(SPEECH_GRANULARITY_KEY);
-    if (!raw) return 'label-edges-tags';
-    if ((SpeechGranularityOptions as readonly string[]).includes(raw)) {
-      return raw as SpeechGranularity;
+/** Default combination: 标题 + 关联. */
+const SPEECH_FIELDS_DEFAULT: SpeechFields = ['label', 'edges'];
+
+/** Legacy single-select presets → the field combination each one stood for,
+ *  so a user who saved a preset before the multi-select migration keeps the
+ *  same read-aloud output. */
+const LEGACY_GRANULARITY_MAP: Record<string, SpeechFields> = {
+  label: ['label'],
+  'label-edges': ['label', 'edges'],
+  'label-edges-tags': ['label', 'edges', 'tags'],
+  'label-full-summary': ['label', 'summary'],
+};
+
+/** Dedupe a field array and order it into canonical SPEECH_FIELD_ORDER. */
+function canonicalizeSpeechFields(fields: SpeechFields): SpeechFields {
+  const set = new Set(fields);
+  return SPEECH_FIELD_ORDER.filter((f) => set.has(f));
+}
+
+/**
+ * Parse a persisted granularity value into a field set. Pure (no storage
+ * access) so it can be unit-tested directly.
+ *
+ * Format detection:
+ *   - contains '+' → new multi-select format (`label+edges+tags`). Every
+ *     token must be valid; one bad token rejects the WHOLE value (no
+ *     half-trusted partial parse) and falls back to the default.
+ *   - otherwise → legacy single-select preset, mapped via
+ *     LEGACY_GRANULARITY_MAP.
+ *   - missing / unrecognised → default.
+ *
+ * Always returns a non-empty set in canonical order.
+ */
+export function parseSpeechFields(raw: string | null | undefined): SpeechFields {
+  if (raw && raw.includes('+')) {
+    const tokens = raw.split('+');
+    const allValid = tokens.every((t) => (SpeechFieldOptions as readonly string[]).includes(t));
+    if (allValid && tokens.length > 0) {
+      return canonicalizeSpeechFields(tokens as SpeechField[]);
     }
+    return SPEECH_FIELDS_DEFAULT;
+  }
+  const legacy = raw ? LEGACY_GRANULARITY_MAP[raw] : undefined;
+  if (legacy) return canonicalizeSpeechFields(legacy);
+  return SPEECH_FIELDS_DEFAULT;
+}
+
+function loadSpeechFields(): SpeechFields {
+  let raw: string | null = null;
+  try {
+    raw = localStorage.getItem(SPEECH_FIELDS_KEY);
   } catch {
     /* ignore */
   }
-  return 'label-edges-tags';
+  return parseSpeechFields(raw);
 }
 
-function saveGranularity(g: SpeechGranularity): void {
+function saveSpeechFields(fields: SpeechFields): void {
   try {
-    localStorage.setItem(SPEECH_GRANULARITY_KEY, g);
+    localStorage.setItem(SPEECH_FIELDS_KEY, fields.join('+'));
   } catch {
     /* ignore */
   }
@@ -257,8 +312,8 @@ class SpeechController {
   private silentCheckTimer: ReturnType<typeof setTimeout> | null = null;
   /** Cached speechSynthesis reference; null when unsupported. */
   private readonly synth: SpeechSynthesis | null;
-  /** Current read-aloud granularity (persisted under SPEECH_GRANULARITY_KEY). */
-  private granularity: SpeechGranularity = loadGranularity();
+  /** Current read-aloud fields (persisted under SPEECH_FIELDS_KEY). */
+  private fields: SpeechFields = loadSpeechFields();
   /** Current utterance rate (persisted under SPEECH_RATE_KEY). */
   private rate: number = loadRate();
   /**
@@ -324,18 +379,23 @@ class SpeechController {
     return this.engineState === 'silent';
   }
 
-  /** Currently selected read-aloud granularity. */
-  get currentGranularity(): SpeechGranularity {
-    return this.granularity;
+  /** Currently selected read-aloud fields. */
+  get currentSpeechFields(): SpeechFields {
+    return this.fields;
   }
 
   /**
-   * Persist a new granularity. Subsequent `speakNode()` calls use it.
-   * Safe to call at any time; the next speak picks it up.
+   * Persist a new field combination. An empty set is rejected (a node is
+   * never spoken as nothing); fields are normalised into canonical order
+   * before being stored. Returns whether the change was accepted, so the UI
+   * can re-read the controller and bounce back on a rejected toggle.
    */
-  setGranularity(g: SpeechGranularity): void {
-    this.granularity = g;
-    saveGranularity(g);
+  setSpeechFields(fields: SpeechFields): boolean {
+    const normalized = canonicalizeSpeechFields(fields);
+    if (normalized.length === 0) return false;
+    this.fields = normalized;
+    saveSpeechFields(normalized);
+    return true;
   }
 
   /** Current utterance rate (multiplier on the engine default). */
@@ -553,7 +613,7 @@ class SpeechController {
   }
 
   /**
-   * Speak a node according to the current granularity setting. Composes the
+   * Speak a node according to the current field selection. Composes the
    * utterance text from the node's fields and delegates to speak(). Returns
    * immediately if TTS is inactive, just like speak().
    *
@@ -563,7 +623,7 @@ class SpeechController {
    */
   speakNode(node: SpeakableNode | null | undefined): void {
     if (!node) return;
-    const text = composeSpeechText(node, this.granularity);
+    const text = composeSpeechText(node, this.fields, uiState.summaryMode);
     if (text) this.speak(text);
   }
 
@@ -696,15 +756,18 @@ export interface SpeakableNode {
 }
 
 /**
- * Build the text to be spoken for a node at the given granularity. Pure
- * function — exported so unit tests can exercise every (granularity, fields)
- * combination without going through the SpeechController.
+ * Build the text to be spoken for a node from the selected fields. Pure
+ * function — exported so unit tests can exercise every field combination
+ * without going through the SpeechController.
  *
- * Concatenation rules:
- *   - 'label'             → node.label
- *   - 'label-edges'       → label + ', ' + edge reasons joined with '、'
- *   - 'label-edges-tags'  → label-edges + ', ' + tags joined with '、'
- *   - 'label-full-summary' → label + ', ' + fullSummary
+ * Fields are concatenated in SPEECH_FIELD_ORDER (label → edges → tags →
+ * summary) regardless of the order they appear in `fields`, so the order the
+ * user toggled them on never changes the utterance:
+ *   - label   → node.label
+ *   - edges   → edges_out[*].reason joined with '、'
+ *   - tags    → tags joined with '、'
+ *   - summary → node.shortSummary 或 node.fullSummary,由 summaryMode 决定;
+ *               所选那一段缺失时回落到另一段,绝不把两段都读出来
  *
  * "关联" 朗读的是 edges_out[*].reason (来自 frontmatter 的中文语义说明,
  * 例如 "镇静催眠药的一种分类"),而不是 target id — id 是机器用的,
@@ -713,26 +776,41 @@ export interface SpeakableNode {
  * Empty trailing parts are dropped so we don't read "卡马西平, " followed by
  * silence. Whitespace-only fields are skipped too.
  */
-export function composeSpeechText(node: SpeakableNode, granularity: SpeechGranularity): string {
+export function composeSpeechText(
+  node: SpeakableNode,
+  fields: SpeechFields,
+  summaryMode: 'short' | 'full' = 'short',
+): string {
+  const selected = new Set(fields);
   const parts: string[] = [];
-  const label = (node.label ?? '').trim();
-  if (label) parts.push(label);
 
-  if (granularity === 'label-edges' || granularity === 'label-edges-tags') {
+  if (selected.has('label')) {
+    const label = (node.label ?? '').trim();
+    if (label) parts.push(label);
+  }
+
+  if (selected.has('edges')) {
     const edges = (node.edges_out ?? [])
       .map((e) => (e.reason ?? '').trim())
       .filter((s) => s.length > 0);
     if (edges.length > 0) parts.push(edges.join('、'));
   }
 
-  if (granularity === 'label-edges-tags') {
+  if (selected.has('tags')) {
     const tags = (node.tags ?? []).map((t) => t.trim()).filter((s) => s.length > 0);
     if (tags.length > 0) parts.push(tags.join('、'));
   }
 
-  if (granularity === 'label-full-summary') {
-    const summary = (node.fullSummary ?? '').trim();
-    if (summary) parts.push(summary);
+  if (selected.has('summary')) {
+    // 摘要跟随详情面板的「简短 / 详细」当前选择(uiState.summaryMode),
+    // 与 detail-panel.buildSummaryHtml 的回落逻辑一致:所选模式对应的
+    // 摘要缺失时退到另一段。二者只读其一,不拼接。
+    const summary =
+      summaryMode === 'full'
+        ? (node.fullSummary ?? node.shortSummary)
+        : (node.shortSummary ?? node.fullSummary);
+    const trimmed = (summary ?? '').trim();
+    if (trimmed) parts.push(trimmed);
   }
 
   return parts.join('，');

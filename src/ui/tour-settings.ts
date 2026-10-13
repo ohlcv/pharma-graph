@@ -7,10 +7,10 @@
 //   1. Mobile bottom-sheet collapse/expand (`.bs-tour-setting`) — mirrors
 //      the layout-params sheet pattern but lives in its own module so the
 //      layout module can stay focused.
-//   2. Granularity segmented control: 4 buttons, one per SpeechGranularity.
-//      Active state is synced from the controller on mount and pushed back
-//      to it on click. The controller already persists the choice to
-//      localStorage; this module only mirrors it into the DOM.
+//   2. Read-aloud field chips: 4 multi-select toggles (标题/关联/标签/摘要),
+//      any combination allowed. Active state is synced from the controller on
+//      mount and pushed back to it on click. The controller already persists
+//      the choice to localStorage; this module only mirrors it into the DOM.
 //   3. Rate slider (0.5x–2.0x, persisted under SPEECH_RATE_KEY).
 //   4. "等读完再跳转" switch (boolean, persisted under SPEECH_WAIT_KEY).
 //   5. Post-speech pause slider (0–2000ms in 100ms steps, persisted under
@@ -27,8 +27,9 @@
 
 import {
   speechController,
-  SpeechGranularityOptions,
-  type SpeechGranularity,
+  SpeechFieldOptions,
+  type SpeechField,
+  type SpeechFields,
   SPEECH_RATE_DEFAULT,
   SPEECH_RATE_MIN,
   SPEECH_RATE_MAX,
@@ -104,27 +105,34 @@ function toggleBsTourSetting(): void {
   saveBsTourSettingOpen(willOpen);
 }
 
-/** Sync the visible `active` class on all granularity buttons (both sidebar
- *  `.seg-btn` and mobile `.bs-speech-btn`) to the controller's current value.
- *  Called on mount and after every `setGranularity` click. */
-function syncGranularityButtons(granularity: SpeechGranularity): void {
-  document.querySelectorAll<HTMLButtonElement>('[data-speech-granularity]').forEach((btn) => {
-    const active = btn.dataset['speechGranularity'] === granularity;
+/** Sync the visible `active` class on every read-aloud field chip (both
+ *  sidebar `.seg-btn` and mobile `.bs-speech-btn`) to the controller's
+ *  current field set. Called on mount and after every toggle. */
+function syncSpeechFieldButtons(fields: SpeechFields): void {
+  document.querySelectorAll<HTMLButtonElement>('[data-speech-field]').forEach((btn) => {
+    const field = btn.dataset['speechField'] as SpeechField | undefined;
+    const active = !!field && fields.includes(field);
     btn.classList.toggle('active', active);
     btn.setAttribute('aria-pressed', String(active));
   });
 }
 
-/** Bind click handlers to every granularity button in the document.
- *  Both sidebar and mobile sheet share the same data attribute, so one
- *  listener tree covers all of them. */
-function bindGranularityButtons(): void {
-  document.querySelectorAll<HTMLButtonElement>('[data-speech-granularity]').forEach((btn) => {
+/** Bind click handlers to every field chip in the document. Both sidebar and
+ *  mobile sheet share the same data attribute, so one listener tree covers
+ *  all of them. A click toggles that field in the controller's current set;
+ *  the controller rejects an empty set, and we always re-read it afterwards
+ *  so a rejected toggle simply bounces the chip back. */
+function bindSpeechFieldButtons(): void {
+  document.querySelectorAll<HTMLButtonElement>('[data-speech-field]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const g = btn.dataset['speechGranularity'] as SpeechGranularity | undefined;
-      if (!g || !SpeechGranularityOptions.includes(g)) return;
-      speechController.setGranularity(g);
-      syncGranularityButtons(g);
+      const field = btn.dataset['speechField'] as SpeechField | undefined;
+      if (!field || !SpeechFieldOptions.includes(field)) return;
+      const current = speechController.currentSpeechFields;
+      const next = current.includes(field)
+        ? current.filter((f) => f !== field)
+        : [...current, field];
+      speechController.setSpeechFields(next);
+      syncSpeechFieldButtons(speechController.currentSpeechFields);
     });
   });
 }
@@ -273,8 +281,8 @@ function clampPostDelay(v: number): number {
  *  called from boot()). */
 export function initTourSettings(): void {
   registerAction('toggle-bs-tour-setting', () => toggleBsTourSetting());
-  bindGranularityButtons();
-  syncGranularityButtons(speechController.currentGranularity);
+  bindSpeechFieldButtons();
+  syncSpeechFieldButtons(speechController.currentSpeechFields);
   // Restore the bottom-sheet sub-accordion's previous open/closed state.
   applyBsTourSettingOpen(loadBsTourSettingOpen());
 

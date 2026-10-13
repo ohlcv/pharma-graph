@@ -1,17 +1,19 @@
 // tests/unit/ui/speech-granularity.test.ts
-// Pure-function tests for composeSpeechText — the only pure piece in
-// src/ui/speech.ts. Every (granularity × field-presence) combination is
-// covered so future field additions can't silently regress concatenation.
+// Pure-function tests for composeSpeechText + parseSpeechFields — the only
+// pure pieces in src/ui/speech.ts. 朗读粒度 is a multi-select field set
+// (标题/关联/标签/摘要); these tests pin down both the concatenation order
+// (must NOT depend on toggle order) and the legacy single-select → field-set
+// migration. 摘要的朗读内容跟随 summaryMode(简短/详细),二者只读其一。
 //
 // "关联" reads edges_out[*].reason (the human-readable Chinese rationale
 // from frontmatter), NOT target. Reading target id was the original bug —
 // ids are noise when spoken aloud.
 
 import { describe, it, expect } from 'vitest';
-import { composeSpeechText } from '@/ui/speech';
+import { composeSpeechText, parseSpeechFields } from '@/ui/speech';
 import type { SpeakableNode } from '@/ui/speech';
 
-describe('composeSpeechText: 4 granularities × full-node payload', () => {
+describe('composeSpeechText: field combinations × full-node payload', () => {
   const fullNode: SpeakableNode = {
     label: '卡马西平',
     edges_out: [
@@ -23,50 +25,91 @@ describe('composeSpeechText: 4 granularities × full-node payload', () => {
     fullSummary: '完整摘要文本',
   };
 
-  it('"label" returns just the label', () => {
-    expect(composeSpeechText(fullNode, 'label')).toBe('卡马西平');
+  it('仅 标题 → 只有 label', () => {
+    expect(composeSpeechText(fullNode, ['label'])).toBe('卡马西平');
   });
 
-  it('"label-edges" returns label + edge reasons joined by 、 (NOT target ids)', () => {
-    expect(composeSpeechText(fullNode, 'label-edges')).toBe(
+  it('标题 + 关联 → label + edge reasons joined by 、 (NOT target ids)', () => {
+    expect(composeSpeechText(fullNode, ['label', 'edges'])).toBe(
       '卡马西平，是一种抗癫痫药、属于镇静催眠药',
     );
   });
 
-  it('"label-edges-tags" returns label + edges + tags joined by 、', () => {
-    expect(composeSpeechText(fullNode, 'label-edges-tags')).toBe(
+  it('标题 + 关联 + 标签 → 与旧默认预设等价', () => {
+    expect(composeSpeechText(fullNode, ['label', 'edges', 'tags'])).toBe(
       '卡马西平，是一种抗癫痫药、属于镇静催眠药，肝药酶诱导剂、窄治疗窗',
     );
   });
 
-  it('"label-full-summary" returns label + full summary', () => {
-    expect(composeSpeechText(fullNode, 'label-full-summary')).toBe('卡马西平，完整摘要文本');
+  it('标题 + 摘要(详细模式) → label + fullSummary', () => {
+    expect(composeSpeechText(fullNode, ['label', 'summary'], 'full')).toBe(
+      '卡马西平，完整摘要文本',
+    );
+  });
+
+  it('标题 + 摘要(简短模式) → label + shortSummary', () => {
+    expect(composeSpeechText(fullNode, ['label', 'summary'], 'short')).toBe('卡马西平，短摘要');
+  });
+
+  it('四项全选(详细模式) → label，edges，tags，summary 依次拼接', () => {
+    expect(composeSpeechText(fullNode, ['label', 'edges', 'tags', 'summary'], 'full')).toBe(
+      '卡马西平，是一种抗癫痫药、属于镇静催眠药，肝药酶诱导剂、窄治疗窗，完整摘要文本',
+    );
+  });
+
+  it('四项全选(简短模式) → 摘要段换成 shortSummary', () => {
+    expect(composeSpeechText(fullNode, ['label', 'edges', 'tags', 'summary'], 'short')).toBe(
+      '卡马西平，是一种抗癫痫药、属于镇静催眠药，肝药酶诱导剂、窄治疗窗，短摘要',
+    );
+  });
+
+  it('输出与勾选顺序无关(倒序输入结果一致)', () => {
+    expect(composeSpeechText(fullNode, ['summary', 'tags', 'edges', 'label'])).toBe(
+      composeSpeechText(fullNode, ['label', 'edges', 'tags', 'summary']),
+    );
+  });
+
+  it('只勾 关联(不勾标题) → 只有关联内容', () => {
+    expect(composeSpeechText(fullNode, ['edges'])).toBe('是一种抗癫痫药、属于镇静催眠药');
+  });
+
+  it('只勾 标签 → 只有标签', () => {
+    expect(composeSpeechText(fullNode, ['tags'])).toBe('肝药酶诱导剂、窄治疗窗');
+  });
+
+  it('空集 → 空字符串(纯函数底线;controller 会拒绝写入空集)', () => {
+    expect(composeSpeechText(fullNode, [])).toBe('');
+  });
+
+  it('重复字段去重后只念一次', () => {
+    expect(composeSpeechText(fullNode, ['label', 'label'])).toBe('卡马西平');
   });
 });
 
 describe('composeSpeechText: missing-field edge cases', () => {
-  it('label-only node under "label-edges" returns only the label', () => {
-    expect(composeSpeechText({ label: 'X' }, 'label-edges')).toBe('X');
+  it('label-only node 勾 关联 → 只剩 label', () => {
+    expect(composeSpeechText({ label: 'X' }, ['label', 'edges'])).toBe('X');
   });
 
-  it('label-only node under "label-edges-tags" returns only the label', () => {
-    expect(composeSpeechText({ label: 'X' }, 'label-edges-tags')).toBe('X');
+  it('label-only node 勾 标签 → 只剩 label', () => {
+    expect(composeSpeechText({ label: 'X' }, ['label', 'tags'])).toBe('X');
   });
 
-  it('label-only node under "label-full-summary" returns only the label', () => {
-    expect(composeSpeechText({ label: 'X' }, 'label-full-summary')).toBe('X');
+  it('label-only node 勾 摘要 → 只剩 label', () => {
+    expect(composeSpeechText({ label: 'X' }, ['label', 'summary'])).toBe('X');
   });
 
-  it('node with edges but no tags under "label-edges-tags" returns label + edges', () => {
+  it('有 edges 无 tags,勾 标签 → label + edges', () => {
     expect(
-      composeSpeechText(
-        { label: 'X', edges_out: [{ target: 'Y', reason: '一种关联' }] },
-        'label-edges-tags',
-      ),
+      composeSpeechText({ label: 'X', edges_out: [{ target: 'Y', reason: '一种关联' }] }, [
+        'label',
+        'edges',
+        'tags',
+      ]),
     ).toBe('X，一种关联');
   });
 
-  it('edges_out with empty/whitespace-only reason strings are skipped', () => {
+  it('edges_out 中空 / 纯空白 reason 被跳过', () => {
     expect(
       composeSpeechText(
         {
@@ -77,22 +120,21 @@ describe('composeSpeechText: missing-field edge cases', () => {
             { target: 'c', reason: '   ' },
           ],
         },
-        'label-edges',
+        ['label', 'edges'],
       ),
     ).toBe('X，真实关联');
   });
 
-  it('edges_out with target but no reason field produces nothing for that edge', () => {
-    // 真实场景:有的边没填 reason(老数据 / 简化 frontmatter)。不应念 target id。
+  it('edge 只有 target 没有 reason → 该边不发音(不念 target id)', () => {
     expect(
-      composeSpeechText(
-        { label: 'X', edges_out: [{ target: 'sec-sedative-y2-01-01' }] },
-        'label-edges',
-      ),
+      composeSpeechText({ label: 'X', edges_out: [{ target: 'sec-sedative-y2-01-01' }] }, [
+        'label',
+        'edges',
+      ]),
     ).toBe('X');
   });
 
-  it('tags with whitespace-only entries are skipped', () => {
+  it('tags 中纯空白项被跳过', () => {
     expect(
       composeSpeechText(
         {
@@ -100,12 +142,12 @@ describe('composeSpeechText: missing-field edge cases', () => {
           edges_out: [{ target: 'a', reason: '一种关联' }],
           tags: ['', '  ', '真实标签'],
         },
-        'label-edges-tags',
+        ['label', 'edges', 'tags'],
       ),
     ).toBe('X，一种关联，真实标签');
   });
 
-  it('tags with all-whitespace entries leave just label + edges', () => {
+  it('tags 全为空白 → 只剩 label + edges', () => {
     expect(
       composeSpeechText(
         {
@@ -113,32 +155,91 @@ describe('composeSpeechText: missing-field edge cases', () => {
           edges_out: [{ target: 'a', reason: '一种关联' }],
           tags: ['', '  '],
         },
-        'label-edges-tags',
+        ['label', 'edges', 'tags'],
       ),
     ).toBe('X，一种关联');
   });
 
-  it('empty fullSummary under "label-full-summary" returns only the label', () => {
-    expect(composeSpeechText({ label: 'X', fullSummary: '   ' }, 'label-full-summary')).toBe('X');
-  });
-
-  it('node without a label AND no other fields produces empty string', () => {
-    expect(composeSpeechText({}, 'label')).toBe('');
-    expect(composeSpeechText({}, 'label-edges')).toBe('');
-    expect(composeSpeechText({}, 'label-edges-tags')).toBe('');
-    expect(composeSpeechText({}, 'label-full-summary')).toBe('');
-  });
-
-  it('label-edges with no label but with edges returns just the edges', () => {
+  it('详细模式下 fullSummary 为空白且无 short → 只剩 label', () => {
     expect(
-      composeSpeechText(
-        { edges_out: [{ target: 'a', reason: '一种关联' }] },
-        'label-edges',
-      ),
-    ).toBe('一种关联');
+      composeSpeechText({ label: 'X', fullSummary: '   ' }, ['label', 'summary'], 'full'),
+    ).toBe('X');
   });
 
-  it('label with surrounding whitespace is trimmed', () => {
-    expect(composeSpeechText({ label: '  卡马西平  ' }, 'label')).toBe('卡马西平');
+  it('简短模式但只有 fullSummary → 回落到 fullSummary', () => {
+    expect(
+      composeSpeechText({ label: 'X', fullSummary: '完整' }, ['label', 'summary'], 'short'),
+    ).toBe('X，完整');
+  });
+
+  it('详细模式但只有 shortSummary → 回落到 shortSummary', () => {
+    expect(
+      composeSpeechText({ label: 'X', shortSummary: '简短' }, ['label', 'summary'], 'full'),
+    ).toBe('X，简短');
+  });
+
+  it('short 与 full 都有时只读所选那一段,绝不拼接两段', () => {
+    const both = { label: 'X', shortSummary: '简短', fullSummary: '详细' };
+    expect(composeSpeechText(both, ['label', 'summary'], 'short')).toBe('X，简短');
+    expect(composeSpeechText(both, ['label', 'summary'], 'full')).toBe('X，详细');
+  });
+
+  it('无 label 且无其他字段 → 空字符串', () => {
+    expect(composeSpeechText({}, ['label'])).toBe('');
+    expect(composeSpeechText({}, ['label', 'edges'])).toBe('');
+    expect(composeSpeechText({}, ['label', 'edges', 'tags'])).toBe('');
+    expect(composeSpeechText({}, ['label', 'summary'])).toBe('');
+  });
+
+  it('无 label 但有 edges,只勾 关联 → 只剩 edges 内容', () => {
+    expect(composeSpeechText({ edges_out: [{ target: 'a', reason: '一种关联' }] }, ['edges'])).toBe(
+      '一种关联',
+    );
+  });
+
+  it('label 两端空白被 trim', () => {
+    expect(composeSpeechText({ label: '  卡马西平  ' }, ['label'])).toBe('卡马西平');
+  });
+});
+
+describe('parseSpeechFields: 新格式 (multi-select)', () => {
+  it('按 + 分割并归一化为规范顺序', () => {
+    expect(parseSpeechFields('label+edges+tags')).toEqual(['label', 'edges', 'tags']);
+    expect(parseSpeechFields('tags+label')).toEqual(['label', 'tags']);
+  });
+
+  it('重复 token 去重', () => {
+    expect(parseSpeechFields('label+label+tags')).toEqual(['label', 'tags']);
+  });
+
+  it('任一非法 token → 整体回落默认(不做半信任拼接)', () => {
+    expect(parseSpeechFields('label+bogus')).toEqual(['label', 'edges']);
+  });
+});
+
+describe('parseSpeechFields: legacy 预设迁移', () => {
+  it('"label" → [label]', () => {
+    expect(parseSpeechFields('label')).toEqual(['label']);
+  });
+
+  it('"label-edges" → [label, edges]', () => {
+    expect(parseSpeechFields('label-edges')).toEqual(['label', 'edges']);
+  });
+
+  it('"label-edges-tags" → [label, edges, tags]', () => {
+    expect(parseSpeechFields('label-edges-tags')).toEqual(['label', 'edges', 'tags']);
+  });
+
+  it('"label-full-summary" → [label, summary]', () => {
+    expect(parseSpeechFields('label-full-summary')).toEqual(['label', 'summary']);
+  });
+});
+
+describe('parseSpeechFields: 缺失 / 非法 → 默认', () => {
+  it('null / undefined / 空串 / 未知值 都回落默认 label+edges', () => {
+    expect(parseSpeechFields(null)).toEqual(['label', 'edges']);
+    expect(parseSpeechFields(undefined)).toEqual(['label', 'edges']);
+    expect(parseSpeechFields('')).toEqual(['label', 'edges']);
+    expect(parseSpeechFields('nonsense')).toEqual(['label', 'edges']);
   });
 });

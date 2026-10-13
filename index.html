@@ -898,30 +898,38 @@
                     <div class="sidebar-section__body-inner">
                       <div class="speech-granularity-row">
                         <div class="param-label">朗读粒度</div>
-                        <div class="seg-group" role="radiogroup" aria-label="朗读粒度">
-                          <button class="seg-btn" type="button" data-speech-granularity="label">
-                            仅标题
+                        <div class="seg-group" role="group" aria-label="朗读粒度">
+                          <button
+                            class="seg-btn active"
+                            type="button"
+                            data-speech-field="label"
+                            aria-pressed="true"
+                          >
+                            标题
+                          </button>
+                          <button
+                            class="seg-btn active"
+                            type="button"
+                            data-speech-field="edges"
+                            aria-pressed="true"
+                          >
+                            关联
                           </button>
                           <button
                             class="seg-btn"
                             type="button"
-                            data-speech-granularity="label-edges"
+                            data-speech-field="tags"
+                            aria-pressed="false"
                           >
-                            标题和关联
+                            标签
                           </button>
                           <button
                             class="seg-btn"
                             type="button"
-                            data-speech-granularity="label-edges-tags"
+                            data-speech-field="summary"
+                            aria-pressed="false"
                           >
-                            标题和关联和标签
-                          </button>
-                          <button
-                            class="seg-btn"
-                            type="button"
-                            data-speech-granularity="label-full-summary"
-                          >
-                            标题和摘要
+                            摘要
                           </button>
                         </div>
                       </div>
@@ -946,7 +954,7 @@
                       <div class="speech-rate-row">
                         <label class="param-label" for="speech-rate">
                           <span>朗读速度</span>
-                          <span class="param-label__val" id="speech-rate-val">1.0x</span>
+                          <span class="param-label__val" id="speech-rate-val">1.3x</span>
                         </label>
                         <input
                           id="speech-rate"
@@ -955,7 +963,7 @@
                           min="0.5"
                           max="2.0"
                           step="0.1"
-                          value="1.0"
+                          value="1.3"
                           aria-label="朗读速度"
                         />
                       </div>
@@ -1492,29 +1500,37 @@
                 <div class="bs-tour-setting__body" id="bs-tour-setting-body">
                   <div class="bs-section__label">朗读粒度</div>
                   <div class="bs-speech-grid">
-                    <button class="bs-speech-btn" type="button" data-speech-granularity="label">
-                      仅标题
+                    <button
+                      class="bs-speech-btn active"
+                      type="button"
+                      data-speech-field="label"
+                      aria-pressed="true"
+                    >
+                      标题
+                    </button>
+                    <button
+                      class="bs-speech-btn active"
+                      type="button"
+                      data-speech-field="edges"
+                      aria-pressed="true"
+                    >
+                      关联
                     </button>
                     <button
                       class="bs-speech-btn"
                       type="button"
-                      data-speech-granularity="label-edges"
+                      data-speech-field="tags"
+                      aria-pressed="false"
                     >
-                      标题和关联
+                      标签
                     </button>
                     <button
                       class="bs-speech-btn"
                       type="button"
-                      data-speech-granularity="label-edges-tags"
+                      data-speech-field="summary"
+                      aria-pressed="false"
                     >
-                      标题和关联和标签
-                    </button>
-                    <button
-                      class="bs-speech-btn"
-                      type="button"
-                      data-speech-granularity="label-full-summary"
-                    >
-                      标题和摘要
+                      摘要
                     </button>
                   </div>
                   <div class="bs-speech-row bs-speech-row--wait">
@@ -1538,7 +1554,7 @@
                   <div class="bs-speech-row bs-speech-row--rate">
                     <label class="bs-param-label" for="bs-speech-rate">
                       <span>朗读速度</span>
-                      <span class="bs-param-label__val" id="bs-speech-rate-val">1.0x</span>
+                      <span class="bs-param-label__val" id="bs-speech-rate-val">1.3x</span>
                     </label>
                     <input
                       id="bs-speech-rate"
@@ -1547,7 +1563,7 @@
                       min="0.5"
                       max="2.0"
                       step="0.1"
-                      value="1.0"
+                      value="1.3"
                       aria-label="朗读速度"
                     />
                   </div>
