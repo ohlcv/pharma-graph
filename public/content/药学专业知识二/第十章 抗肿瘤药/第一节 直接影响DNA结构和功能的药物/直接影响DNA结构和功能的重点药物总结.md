@@ -6,7 +6,6 @@ location:
   book: 药学专业知识二
   chapter: 第十章 抗肿瘤药
   section: 第一节 直接影响DNA结构和功能的药物
-  item: 总结
 tags:
   - 直接影响DNA结构和功能的重点药物总结
   - 直接影响DNA结构和功能的药物

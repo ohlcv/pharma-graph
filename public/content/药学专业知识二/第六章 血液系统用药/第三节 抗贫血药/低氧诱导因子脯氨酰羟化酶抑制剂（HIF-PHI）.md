@@ -6,7 +6,6 @@ location:
   book: 药学专业知识二
   chapter: 第六章 血液系统用药
   section: 第三节 抗贫血药
-  item: 分类与作用机制-红细胞生成刺激剂（ESAs）-低氧诱导因子脯氨酰羟化酶抑制剂（HIF-PHI）
 tags:
   - 低氧诱导因子脯氨酰羟化酶抑制剂
   - HIF-PHI

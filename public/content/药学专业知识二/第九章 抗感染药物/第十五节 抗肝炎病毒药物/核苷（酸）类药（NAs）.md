@@ -7,7 +7,6 @@ location:
   book: 药学专业知识二
   chapter: 第九章 抗感染药物
   section: 第十五节 抗肝炎病毒药物
-  item: 临床用药评价-核苷（酸）类
 tags:
   - 核苷（酸）类药（NAs）
   - 治疗慢性乙型肝炎药

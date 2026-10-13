@@ -6,7 +6,6 @@ location:
   book: 药学专业知识二
   chapter: 第九章 抗感染药物
   section: 第一节 抗菌药物总论
-  item: 常用术语
 tags:
   - 抗生素后效应(PAE)
   - 抗菌药物总论

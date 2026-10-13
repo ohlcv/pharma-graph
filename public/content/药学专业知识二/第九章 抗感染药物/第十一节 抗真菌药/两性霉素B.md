@@ -7,7 +7,6 @@ location:
   book: 药学专业知识二
   chapter: 第九章 抗感染药物
   section: 第十一节 抗真菌药
-  item: 临床用药评价-两性霉素B
 tags:
   - 两性霉素B
   - 多烯类

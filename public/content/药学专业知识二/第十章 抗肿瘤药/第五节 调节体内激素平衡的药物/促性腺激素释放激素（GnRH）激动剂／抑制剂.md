@@ -7,7 +7,6 @@ location:
   book: 药学专业知识二
   chapter: 第十章 抗肿瘤药
   section: 第五节 调节体内激素平衡的药物
-  item: 临床用药评价-促性腺激素释放激素（GnRH）激动剂/抑制剂
 tags:
   - GnRH激动剂/抑制剂
   - 调节体内激素平衡的药物

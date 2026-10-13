@@ -6,7 +6,6 @@ location:
   book: 药学专业知识二
   chapter: 第九章 抗感染药物
   section: 第十四节 抗新型冠状病毒药
-  item: 分类与代表药品-单克隆抗体
 tags:
   - 单克隆抗体
   - 抗新型冠状病毒药

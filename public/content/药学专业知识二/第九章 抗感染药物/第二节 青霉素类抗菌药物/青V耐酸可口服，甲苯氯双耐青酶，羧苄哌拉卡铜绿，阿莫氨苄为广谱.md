@@ -10,7 +10,6 @@ location:
   book: 药学专业知识二
   chapter: 第九章 抗感染药物
   section: 第二节 青霉素类抗菌药物
-  item: 分类与作用机制
 tags:
   - 口诀
   - 青霉素类抗菌药物
