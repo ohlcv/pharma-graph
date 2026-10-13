@@ -17,6 +17,7 @@ import { forEachStatic } from './dom-cache.js';
 import { UiToggle } from './ui-toggle.js';
 import { restorePanelBounds, hasSavedBounds } from './drag-manager.js';
 import { renderMarkdown } from './markdown.js';
+import { parseFrontmatter } from '../parser/frontmatter.js';
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -163,6 +164,13 @@ export class DetailPanel {
       buildHeroHtml(d) + buildSummaryHtml(d) + buildEdgesHtml(node, this.cy);
     this.bodyPage.innerHTML = buildBodyHtml(d, sourcePath);
 
+    // body 不进 graph-data.json（构建期刻意排除），按 sourcePath 懒加载；
+    // 拿到后写回节点数据，下次打开直接命中。bodyLoaded 标记防止对无正文
+    // 节点反复空 fetch。
+    if (!d.body && sourcePath && !d.bodyLoaded) {
+      void this.loadBody(nodeId, sourcePath);
+    }
+
     this.applySectionState();
 
     const wasVisible = this.panel.classList.contains('visible');
@@ -182,6 +190,38 @@ export class DetailPanel {
     this.panel.classList.remove('visible');
     this._currentNodeId = null;
     this.onClose();
+  }
+
+  /**
+   * 懒加载节点正文：prebuilt 模式下 graph-data.json 不含 body（构建期排除），
+   * 详情面板打开时按 sourcePath 拉取原始 md、解析出正文写回节点数据。
+   * URL 构造与 optimized-content-loader / spectacle overlays 保持一致。
+   */
+  private async loadBody(nodeId: string, sourcePath: string): Promise<void> {
+    const node = this.cy.getElementById(nodeId);
+    if (node.empty()) return;
+    node.data('bodyLoaded', true);
+    try {
+      const url =
+        '/content/' +
+        sourcePath
+          .split('/')
+          .map((s) => encodeURI(s).replace(/#/g, '%23').replace(/\?/g, '%3F'))
+          .join('/');
+      const res = await fetch(url);
+      // dev server 对不存在路径会回退 index.html——HTML 响应一律视为无正文
+      const contentType = res.headers.get('content-type') ?? '';
+      if (!res.ok || contentType.includes('text/html')) return;
+      const fm = parseFrontmatter(await res.text(), sourcePath);
+      if (!fm.body) return;
+      node.data('body', fm.body);
+      // 用户可能已切到别的节点——只有面板仍停在该节点时才重渲染正文页签
+      if (this._currentNodeId === nodeId) {
+        this.bodyPage.innerHTML = buildBodyHtml(node.data(), sourcePath);
+      }
+    } catch {
+      /* 网络失败 / 解析失败都保持正文页签为空 */
+    }
   }
 
   /**

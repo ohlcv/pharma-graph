@@ -1161,6 +1161,8 @@ export class Renderer {
             location: n.location,
             tags: n.tags ?? [],
             body: n.body,
+            // 详情面板按它懒加载正文（body 不进 graph-data.json，见 detail-panel.loadBody）
+            sourcePath: n.sourcePath,
             weight: n.weight ?? 60,
             edges_out: n.edges_out ?? [],
             // 颜色（基于 FILL_CONFIG）
