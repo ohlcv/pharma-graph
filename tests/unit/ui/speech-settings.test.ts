@@ -38,10 +38,7 @@ describe('SpeechController persistence + onEnd subscriber (unit)', () => {
       }
     }
     vi.stubGlobal('SpeechSynthesisUtterance', FakeUtterance);
-    vi.stubGlobal(
-      'speechSynthesis',
-      makeStubSpeechSynthesis() as unknown as SpeechSynthesis,
-    );
+    vi.stubGlobal('speechSynthesis', makeStubSpeechSynthesis() as unknown as SpeechSynthesis);
     mod = await import('@/ui/speech');
   });
 
@@ -212,6 +209,63 @@ describe('SpeechController persistence + onEnd subscriber (unit)', () => {
     }
   });
 
+  it('loadBodyThenSpeak: isBodyLoading toggles, onBodyLoaded fires, body is spoken', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        headers: { get: () => 'text/markdown' },
+        text: async () => '---\nid: x\n---\n正文第一段。\n\n- 项目一\n- 项目二',
+      })),
+    );
+    const c = mod.speechController;
+    c.toggle();
+    c.setSpeechFields(['body']);
+    const loaded = vi.fn();
+    c.onBodyLoaded(loaded);
+
+    const node = { label: 'X', sourcePath: 'book/chapter.md' };
+    c.speakNode(node);
+
+    // Fetch is async: after one microtask the body has been fetched,
+    // composed, and spoken; loading state cleared.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(c.isBodyLoading).toBe(false);
+    expect(loaded).toHaveBeenCalledTimes(1);
+    expect(node.body).toContain('正文第一段');
+    const utterance = lastQueued();
+    expect(utterance.text).toContain('正文第一段');
+    expect(utterance.text).toContain('项目一；项目二');
+    c.stop();
+    vi.unstubAllGlobals();
+  });
+
+  it('loadBodyThenSpeak: onBodyLoaded fires even when fetch fails (fallback speaks rest)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false, headers: { get: () => 'text/html' } })),
+    );
+    const c = mod.speechController;
+    c.toggle();
+    c.setSpeechFields(['label', 'body']);
+    const loaded = vi.fn();
+    c.onBodyLoaded(loaded);
+
+    const node = { label: 'X', sourcePath: 'book/chapter.md' };
+    c.speakNode(node);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(c.isBodyLoading).toBe(false);
+    expect(loaded).toHaveBeenCalledTimes(1);
+    const utterance = lastQueued();
+    expect(utterance.text).toBe('X');
+    c.stop();
+    vi.unstubAllGlobals();
+  });
+
   function lastQueued(): SpeechSynthesisUtterance {
     const synth = speechSynthesis as unknown as { speak: ReturnType<typeof vi.fn> };
     const calls = synth.speak.mock.calls;
@@ -234,15 +288,16 @@ function makeStubSpeechSynthesis(): {
   onvoiceschanged: null;
 } {
   return {
-    getVoices: () => [
-      {
-        lang: 'zh-CN',
-        name: 'zh',
-        voiceURI: 'zh',
-        localService: true,
-        default: true,
-      },
-    ] as SpeechSynthesisVoice[],
+    getVoices: () =>
+      [
+        {
+          lang: 'zh-CN',
+          name: 'zh',
+          voiceURI: 'zh',
+          localService: true,
+          default: true,
+        },
+      ] as SpeechSynthesisVoice[],
     speak: vi.fn(),
     cancel: vi.fn(),
     addEventListener: vi.fn(),

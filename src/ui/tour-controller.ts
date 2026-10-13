@@ -431,43 +431,65 @@ export class TourController {
   } {
     let cancelled = false;
     let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
-    let unsubscribeEnd: (() => void) | null = null;
+    /** Currently-registered one-shot unsubscribe (onEnd or onBodyLoaded). */
+    let unsubscribeCurrent: (() => void) | null = null;
     let resolveOnce: () => void = () => {};
+
+    const cleanup = (): void => {
+      if (unsubscribeCurrent !== null) {
+        unsubscribeCurrent();
+        unsubscribeCurrent = null;
+      }
+      if (fallbackTimer !== null) {
+        clearTimeout(fallbackTimer);
+        fallbackTimer = null;
+      }
+    };
+
     const promise = new Promise<void>((resolve) => {
       resolveOnce = () => {
         if (cancelled) return;
         cancelled = true; // single-shot: any path that fires first wins
-        if (unsubscribeEnd !== null) {
-          unsubscribeEnd();
-          unsubscribeEnd = null;
-        }
-        if (fallbackTimer !== null) {
-          clearTimeout(fallbackTimer);
-          fallbackTimer = null;
-        }
+        cleanup();
         resolve();
       };
 
-      if (speechController.isActive && speechController.isSpeaking) {
-        // 无绝对超时：长摘要必须读完。silent-stub 判定会以 fireEnd()
-        // 释放本等待（见 speech.ts scheduleSilentCheck），死引擎不会
-        // 永久锁死漫游。
-        unsubscribeEnd = speechController.onEnd(resolveOnce);
+      /** Wait for the utterance to end, or fall back to the fixed timer. */
+      const waitForEnd = (): void => {
+        if (speechController.isActive && speechController.isSpeaking) {
+          // 无绝对超时：长摘要必须读完。silent-stub 判定会以 fireEnd()
+          // 释放本等待（见 speech.ts scheduleSilentCheck），死引擎不会
+          // 永久锁死漫游。
+          unsubscribeCurrent = speechController.onEnd(resolveOnce);
+          return;
+        }
+        // TTS is off (or no utterance yet). Preserve the legacy fixed-timer
+        // pacing so a tour that started without TTS still waits `interval`
+        // ms between steps — otherwise every step takes ~0ms and the graph
+        // blurs by.
+        const fallbackMs = Math.max(0, intervalMs - 600);
+        fallbackTimer = setTimeout(resolveOnce, fallbackMs);
+      };
+
+      if (speechController.isBodyLoading) {
+        // 正文字段在 prebuilt 模式下是懒加载的：此刻没有 utterance，
+        // 不能走固定定时器（会在 fetch 回来前切走，正文完全不读）。
+        // 先等加载结束，再接续等 utterance end（或 fallback 定时器）。
+        unsubscribeCurrent = speechController.onBodyLoaded(() => {
+          if (cancelled) return;
+          if (unsubscribeCurrent !== null) {
+            unsubscribeCurrent();
+            unsubscribeCurrent = null;
+          }
+          waitForEnd();
+        });
         return;
       }
-
-      // TTS is off (or no utterance yet). Preserve the legacy fixed-timer
-      // pacing so a tour that started without TTS still waits `interval`
-      // ms between steps — otherwise every step takes ~0ms and the graph
-      // blurs by.
-      const fallbackMs = Math.max(0, intervalMs - 600);
-      fallbackTimer = setTimeout(resolveOnce, fallbackMs);
+      waitForEnd();
     });
     return {
       promise,
-      cancel: () => {
-        resolveOnce();
-      },
+      cancel: () => resolveOnce(),
     };
   }
 

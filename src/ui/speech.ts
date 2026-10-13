@@ -74,21 +74,27 @@ type Voice = SpeechSynthesisVoice | null;
 export type SpeechField =
   /** Node label (标题). */
   | 'label'
+  /** Source location path (位置: 书/部/章/节/小节). */
+  | 'location'
   /** Outgoing edge reasons (关联). */
   | 'edges'
   /** Node tags (标签). */
   | 'tags'
   /** Full summary text (摘要). */
-  | 'summary';
+  | 'summary'
+  /** Full body markdown text (正文,「文」页签). */
+  | 'body';
 
 /** A selected combination of read-aloud fields. */
 export type SpeechFields = readonly SpeechField[];
 
 export const SpeechFieldOptions: ReadonlyArray<SpeechField> = [
   'label',
+  'location',
   'edges',
   'tags',
   'summary',
+  'body',
 ] as const;
 
 /** Canonical concatenation order — makes the utterance independent of the
@@ -98,9 +104,11 @@ export const SPEECH_FIELD_ORDER: ReadonlyArray<SpeechField> = SpeechFieldOptions
 /** Human label shown on each multi-select chip. */
 export const SpeechFieldLabels: Record<SpeechField, string> = {
   label: '标题',
+  location: '位置',
   edges: '关联',
   tags: '标签',
   summary: '摘要',
+  body: '正文',
 };
 
 /** Single localStorage key holding the selected read-aloud field
@@ -334,6 +342,16 @@ class SpeechController {
    *  the iOS-unlock probe doesn't fire these; the silent-stub verdict fires
    *  them once to release waiting tour steps — see scheduleSilentCheck). */
   private endListeners: Set<() => void> = new Set();
+  /**
+   * True while speakNode() is fetching a node's body markdown (the 正文
+   * field, lazy-loaded in prebuilt mode). The tour engine's speech-wait
+   * needs to know about this: while loading, no utterance exists yet, so
+   * without this signal makeSpeechWait would fall back to the fixed timer
+   * and advance before the body ever gets spoken.
+   */
+  private bodyLoading = false;
+  /** Listeners notified once a body fetch settles (spoken or failed). */
+  private bodyLoadListeners: Set<() => void> = new Set();
 
   constructor() {
     this.synth = getSpeechSynthesis();
@@ -465,6 +483,32 @@ class SpeechController {
     return () => {
       this.endListeners.delete(listener);
     };
+  }
+
+  /**
+   * True while a node body is being fetched for the 正文 read-aloud field.
+   * The tour engine checks this when scheduling the next step — if a fetch
+   * is in flight there is no utterance yet, and the step must wait for the
+   * load to settle instead of racing ahead on the fixed timer.
+   */
+  get isBodyLoading(): boolean {
+    return this.bodyLoading;
+  }
+
+  /**
+   * Subscribe to "body fetch settled" — fires once after loadBodyThenSpeak
+   * either spoke (with body) or fell back (without body). A single-shot
+   * subscription, mirroring onEnd's use in the tour engine.
+   */
+  onBodyLoaded(listener: () => void): () => void {
+    this.bodyLoadListeners.add(listener);
+    return () => {
+      this.bodyLoadListeners.delete(listener);
+    };
+  }
+
+  private fireBodyLoaded(): void {
+    for (const l of this.bodyLoadListeners) l();
   }
 
   private fireEnd(): void {
@@ -624,11 +668,68 @@ class SpeechController {
    * The `node` shape is intentionally loose — the call site (tour-controller)
    * passes a cytoscape node data dump (label / shortSummary / fullSummary /
    * tags / edges_out). Missing fields are skipped gracefully.
+   *
+   * The 正文 (body) field is special: in prebuilt mode the body is NOT in
+   * graph-data — it's lazy-loaded from /content/<sourcePath> on demand.
+   * speakNode() handles that here: when the user has selected 正文 and the
+   * body isn't cached yet, it fetches once, writes the result back onto the
+   * node (so DetailPanel and future steps reuse it), then speaks. The fetch
+   * is user-opt-in — selecting the 正文 field is an explicit request to read
+   * the full body, so a network round-trip is the accepted cost.
    */
   speakNode(node: SpeakableNode | null | undefined): void {
     if (!node) return;
+    const wantsBody = this.fields.includes('body');
+    const bodyReady = (node.body ?? '').trim().length > 0;
+    if (wantsBody && !bodyReady && node.sourcePath) {
+      void this.loadBodyThenSpeak(node);
+      return;
+    }
     const text = composeSpeechText(node, this.fields, uiState.summaryMode);
     if (text) this.speak(text);
+  }
+
+  /**
+   * Fetch a node's body markdown from /content/<sourcePath>, cache it back
+   * onto the node data, then speak with the fresh body. Used only when the
+   * 正文 field is selected and the body hasn't been loaded yet.
+   */
+  private async loadBodyThenSpeak(node: SpeakableNode): Promise<void> {
+    this.bodyLoading = true;
+    try {
+      const path = (node.sourcePath ?? '')
+        .split('/')
+        .map((s) => encodeURI(s).replace(/#/g, '%23').replace(/\?/g, '%3F'))
+        .join('/');
+      const res = await fetch(`/content/${path}`);
+      let body = '';
+      if (res.ok && !(res.headers.get('content-type') ?? '').includes('text/html')) {
+        const text = await res.text();
+        // Strip the frontmatter block (---…---) — composeSpeechText only
+        // wants the markdown body. The same delimiter the parser uses.
+        body = text.startsWith('---') ? (text.split(/^---\s*$/m)[2] ?? '') : text;
+        node.body = body.trim();
+      }
+      // TTS may have been toggled off (or the tour moved on) while the
+      // fetch was in flight — respect the current state instead of speaking
+      // on a stale step.
+      if (!this.active) return;
+      const composed = composeSpeechText(node, this.fields, uiState.summaryMode);
+      if (composed) this.speak(composed);
+    } catch {
+      // Network failure — fall back to whatever fields are available without
+      // the body (silently skip body, keep reading the rest).
+      if (!this.active) return;
+      const composed = composeSpeechText(
+        { ...node, body: undefined },
+        this.fields,
+        uiState.summaryMode,
+      );
+      if (composed) this.speak(composed);
+    } finally {
+      this.bodyLoading = false;
+      this.fireBodyLoaded();
+    }
   }
 
   /**
@@ -756,6 +857,20 @@ function probeSpeechApi(api: SpeechSynthesis): boolean {
 export interface SpeakableNode {
   label?: string;
   /**
+   * Source location path from frontmatter — which book / part / chapter /
+   * section / subsection the node lives in. Values already carry their own
+   * Chinese prefixes ("第一章 认知底色"), so we just join the present parts
+   * with a pause. Spoken only when the 位置 field is toggled on.
+   */
+  location?: {
+    book?: string;
+    part?: string;
+    chapter?: string;
+    section?: string;
+    subsection?: string;
+    item?: string;
+  };
+  /**
    * Outgoing edges. For TTS we read `reason` (the human-readable Chinese
    * rationale from the source frontmatter, e.g. "镇静催眠药的一种分类"),
    * NOT `target` — the target id is meaningless when spoken aloud. Nodes
@@ -765,6 +880,14 @@ export interface SpeakableNode {
   tags?: string[];
   shortSummary?: string;
   fullSummary?: string;
+  /**
+   * Full body markdown (「文」页签 content). In prebuilt mode this is
+   * `undefined` until fetched from /content/<sourcePath>; speakNode() loads
+   * it on demand when the 正文 field is selected.
+   */
+  body?: string;
+  /** Path of the source markdown relative to /content/, used to fetch body. */
+  sourcePath?: string;
 }
 
 /**
@@ -858,8 +981,7 @@ export function cleanSummaryForSpeech(raw: string): string {
 
         // Append a pause at the END of a structural unit.
         const end = kind === 'list' || kind === 'table' ? '；' : '。';
-        const alreadyEnds =
-          /[。！？；，、：.?!;,]$/.test(body) || kind === 'para';
+        const alreadyEnds = /[。！？；，、：.?!;,]$/.test(body) || kind === 'para';
         out.push(body + (alreadyEnds ? '' : end));
       }
       // Paragraph-level close: a plain-text paragraph should end with a
@@ -874,6 +996,15 @@ export function cleanSummaryForSpeech(raw: string): string {
       return joined;
     })
     .filter(Boolean)
+    .map((para, i, arr) => {
+      // A list/table paragraph closes with `；`. When ANOTHER paragraph
+      // follows, that boundary is a sentence break — promote the `；` to
+      // `。` so the transition is audible (otherwise the mid-sentence
+      // space-strip below would glue them together; the join adds the
+      // single separating space).
+      if (i < arr.length - 1 && /；$/.test(para)) return para.replace(/；$/, '。');
+      return para;
+    })
     .join(' ');
 
   // 8. Tidy: collapse spaces around punctuation, drop repeated ；, strip
@@ -909,6 +1040,8 @@ export function cleanSummaryForSpeech(raw: string): string {
  * summary) regardless of the order they appear in `fields`, so the order the
  * user toggled them on never changes the utterance:
  *   - label   → node.label
+ *   - location → node.location 各段按 book/part/chapter/section/subsection/
+ *                item 顺序拼接,用「。 」停顿;缺失的层级跳过
  *   - edges   → edges_out[*].reason joined with '、'
  *   - tags    → tags joined with '、'
  *   - summary → node.shortSummary 或 node.fullSummary,由 summaryMode 决定;
@@ -934,6 +1067,16 @@ export function composeSpeechText(
     if (label) parts.push(label);
   }
 
+  if (selected.has('location')) {
+    const loc = node.location;
+    if (loc) {
+      const segments = [loc.book, loc.part, loc.chapter, loc.section, loc.subsection, loc.item]
+        .map((s) => (s ?? '').trim())
+        .filter((s) => s.length > 0);
+      if (segments.length > 0) parts.push(segments.join('。 '));
+    }
+  }
+
   if (selected.has('edges')) {
     const edges = (node.edges_out ?? [])
       .map((e) => (e.reason ?? '').trim())
@@ -956,6 +1099,11 @@ export function composeSpeechText(
         : (node.shortSummary ?? node.fullSummary);
     const cleaned = (summary ?? '').trim();
     if (cleaned) parts.push(cleanSummaryForSpeech(cleaned));
+  }
+
+  if (selected.has('body')) {
+    const body = (node.body ?? '').trim();
+    if (body) parts.push(cleanSummaryForSpeech(body));
   }
 
   return parts.join('，');

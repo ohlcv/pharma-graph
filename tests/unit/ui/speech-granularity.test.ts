@@ -55,7 +55,7 @@ describe('cleanSummaryForSpeech: Markdown → speakable plain text', () => {
     const markdown = ['## 头部标题', '', '- 第一项', '- 第二项', '', '1. 有序一', '2. 有序二'].join(
       '\n',
     );
-    expect(cleanSummaryForSpeech(markdown)).toBe('头部标题。 第一项；第二项；有序一；有序二；');
+    expect(cleanSummaryForSpeech(markdown)).toBe('头部标题。 第一项；第二项。 有序一；有序二；');
   });
 
   it('keeps paragraph breaks as 。 so the pause is audible', () => {
@@ -87,6 +87,11 @@ describe('cleanSummaryForSpeech: Markdown → speakable plain text', () => {
 describe('composeSpeechText: field combinations × full-node payload', () => {
   const fullNode: SpeakableNode = {
     label: '卡马西平',
+    location: {
+      book: '个人成长与生存策略',
+      chapter: '第一章 认知底色',
+      section: '第三节 本体与认知',
+    },
     edges_out: [
       { type: 'instance_of', target: 'drug-carbamazepine', reason: '是一种抗癫痫药' },
       { type: 'subclass_of', target: 'cls-sedative-hypnotic', reason: '属于镇静催眠药' },
@@ -132,6 +137,70 @@ describe('composeSpeechText: field combinations × full-node payload', () => {
     expect(composeSpeechText(fullNode, ['label', 'edges', 'tags', 'summary'], 'short')).toBe(
       '卡马西平，是一种抗癫痫药、属于镇静催眠药，肝药酶诱导剂、窄治疗窗，短摘要。',
     );
+  });
+
+  it('位置 → 按 书/部/章/节/小节 顺序拼接，段间用「。 」停顿', () => {
+    expect(composeSpeechText(fullNode, ['location'])).toBe(
+      '个人成长与生存策略。 第一章 认知底色。 第三节 本体与认知',
+    );
+  });
+
+  it('标题 + 位置 → 位置紧跟标题之后(位置在 SPEECH_FIELD_ORDER 中排第二)', () => {
+    expect(composeSpeechText(fullNode, ['label', 'location'])).toBe(
+      '卡马西平，个人成长与生存策略。 第一章 认知底色。 第三节 本体与认知',
+    );
+  });
+
+  it('位置缺失的层级被跳过,不产生多余停顿', () => {
+    expect(
+      composeSpeechText({ label: 'X', location: { book: '某书', section: '第三节' } }, [
+        'label',
+        'location',
+      ]),
+    ).toBe('X，某书。 第三节');
+  });
+
+  it('无 location 字段时勾选位置 → 只剩 label', () => {
+    expect(composeSpeechText({ label: 'X' }, ['label', 'location'])).toBe('X');
+  });
+
+  it('五项全选 → label，location，edges，tags，summary 依次拼接', () => {
+    expect(
+      composeSpeechText(fullNode, ['label', 'location', 'edges', 'tags', 'summary'], 'short'),
+    ).toBe(
+      '卡马西平，个人成长与生存策略。 第一章 认知底色。 第三节 本体与认知，是一种抗癫痫药、属于镇静催眠药，肝药酶诱导剂、窄治疗窗，短摘要。',
+    );
+  });
+
+  it('输出与勾选顺序无关(位置在任意输入顺序下位置一致)', () => {
+    expect(composeSpeechText(fullNode, ['location', 'summary', 'label', 'edges'])).toBe(
+      composeSpeechText(fullNode, ['label', 'location', 'edges', 'summary']),
+    );
+  });
+
+  it('正文 → body 全文，Markdown 符号清理 + 停顿', () => {
+    const withBody: SpeakableNode = {
+      label: 'X',
+      body: '## 小标题\n\n- 第一项\n- 第二项\n\n段落一。',
+    };
+    expect(composeSpeechText(withBody, ['body'])).toBe('小标题。 第一项；第二项。 段落一。');
+  });
+
+  it('摘要 + 正文 → 先摘要后正文(正文在 SPEECH_FIELD_ORDER 中排最后)', () => {
+    expect(
+      composeSpeechText({ label: 'X', shortSummary: '短句', body: '正文内容。' }, [
+        'summary',
+        'body',
+      ]),
+    ).toBe('短句。，正文内容。');
+  });
+
+  it('body 缺失(未加载)时勾选正文 → 其余字段照常朗读', () => {
+    expect(composeSpeechText({ label: 'X', shortSummary: '短句' }, ['label', 'body'])).toBe('X');
+  });
+
+  it('body 为空白字符串时视为无正文', () => {
+    expect(composeSpeechText({ label: 'X', body: '   ' }, ['label', 'body'])).toBe('X');
   });
 
   it('输出与勾选顺序无关(倒序输入结果一致)', () => {

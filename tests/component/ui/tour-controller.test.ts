@@ -22,13 +22,14 @@ if (typeof globalThis.requestAnimationFrame !== 'function') {
   globalThis.cancelAnimationFrame = (id: number) => clearTimeout(id);
 }
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import cytoscape from 'cytoscape';
 import { TourController } from '@/ui/tour-controller';
 import { Renderer } from '@/core/renderer';
 import { DetailPanel } from '@/ui/detail-panel';
 import * as legendManager from '@/ui/legend-manager';
 import type { TourEngine, TourOptions, TourCompleteInfo } from '@/core/tour';
+import { speechController } from '@/ui/speech';
 
 const NAME_IDS = ['tour-dt-node-name'];
 const COUNT_IDS = [
@@ -91,6 +92,10 @@ type PrivateControllerFields = {
   onEngineResume: () => void;
   onTourKey: (e: KeyboardEvent) => void;
   togglePause: () => void;
+  makeSpeechWait: (intervalMs: number) => {
+    promise: Promise<void>;
+    cancel: () => void;
+  };
 };
 function poke(c: TourController): PrivateControllerFields {
   return c as unknown as PrivateControllerFields;
@@ -619,7 +624,9 @@ describe('TourController.pickRoot — 筛选模式漫游（侧边栏分类/边�
     const c = new TourController(cy, renderer, detailPanel);
 
     // 模拟侧边栏筛选已激活：getActiveFilterNodeIds 返回筛选集合
-    const spy = vi.spyOn(legendManager, 'getActiveFilterNodeIds').mockReturnValue(['drug-b', 'drug-a']);
+    const spy = vi
+      .spyOn(legendManager, 'getActiveFilterNodeIds')
+      .mockReturnValue(['drug-b', 'drug-a']);
 
     const result = (
       c as unknown as {
@@ -642,7 +649,10 @@ describe('TourController.pickRoot — 筛选模式漫游（侧边栏分类/边�
     cy.add([
       { group: 'nodes', data: { id: 'root', fill: 'cls-classification' } },
       { group: 'nodes', data: { id: 'child', fill: 'cls-drug' } },
-      { group: 'edges', data: { id: 'e', source: 'child', target: 'root', edgeType: 'instance_of' } },
+      {
+        group: 'edges',
+        data: { id: 'e', source: 'child', target: 'root', edgeType: 'instance_of' },
+      },
     ]);
     const renderer = { getCy: () => cy } as unknown as Renderer;
     const detailPanel = {
@@ -669,5 +679,82 @@ describe('TourController.pickRoot — 筛选模式漫游（侧边栏分类/边�
     expect(result.rootId).toBe('root');
     expect(result.universeNodeIds.has('child')).toBe(true);
     spy.mockRestore();
+  });
+});
+
+// ── 正文懒加载期间的步进等待 ────────────────────────────────────────────
+//
+// Regression guard for the 正文 read-aloud field: in prebuilt mode the body
+// is lazy-loaded from /content/<sourcePath> on demand. While that fetch is
+// in flight there is NO utterance yet, so the old makeSpeechWait fell back
+// to the fixed `interval - 600ms` timer and the tour advanced before the
+// body was ever spoken ("fetch 没回来就切走，正文完全不读").
+//
+// The fix: makeSpeechWait now checks speechController.isBodyLoading and,
+// while true, waits for the load to settle (onBodyLoaded) instead of
+// starting the fixed timer. After the load, the normal wait-for-end path
+// takes over.
+
+describe('TourController — makeSpeechWait defers while body is loading', () => {
+  beforeEach(setupDom);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('does NOT resolve on the fixed timer while a body fetch is in flight', async () => {
+    // A fetch that never settles on its own — we control the release.
+    let releaseFetch: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      releaseFetch = resolve;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        gate.then(() => ({
+          ok: true,
+          headers: { get: () => 'text/markdown' },
+          text: async () => '---\nid: x\n---\n正文内容',
+        })),
+      ),
+    );
+
+    const c = makeController();
+    // Turn TTS on so the controller would normally speak. We don't need a
+    // real speech engine — speakNode() only composes + calls speak(), and
+    // the body-loading path short-circuits before that.
+    const node = { label: 'X', sourcePath: 'book/chapter.md' };
+    speechController.toggle();
+    speechController.setSpeechFields(['body']);
+    speechController.speakNode(node);
+    expect(speechController.isBodyLoading).toBe(true);
+
+    const wait = poke(c).makeSpeechWait(1000);
+    let resolved = false;
+    void wait.promise.then(() => {
+      resolved = true;
+    });
+
+    // The old behavior would resolve after max(0, 1000-600)=400ms. Wait
+    // past that — the promise must NOT resolve while the fetch is pending.
+    await new Promise((r) => setTimeout(r, 550));
+    expect(resolved).toBe(false);
+    expect(speechController.isBodyLoading).toBe(true);
+
+    // Now release the fetch: the load settles, body is spoken, and the
+    // wait (which by then waits on the utterance end) resolves when the
+    // utterance ends.
+    releaseFetch?.();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(speechController.isBodyLoading).toBe(false);
+
+    // The node data now carries the body; the wait may be waiting on the
+    // utterance end event, so resolve it by stopping (which fires the end
+    // listeners via currentUtterance=null + fireEnd? — stop() clears
+    // currentUtterance without firing end; use cancel() to short-circuit).
+    wait.cancel();
+    await Promise.resolve();
+    expect(resolved).toBe(true);
+    speechController.stop();
   });
 });
