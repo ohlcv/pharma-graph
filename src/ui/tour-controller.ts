@@ -36,6 +36,16 @@ import { mountTooltip, type TooltipHandle } from './tooltip.js';
  *  cross-reload persistence. */
 const TOUR_MODE_KEY = 'pg:tour:mode';
 
+/** Storage key for the tour depth-level preference (1-5). Read on mount to
+ *  restore the user's last-chosen 档位 across reloads; written on every
+ *  slider change. Defaults to level 3 (重点) for first-time visitors. */
+const TOUR_DEPTH_KEY = 'pg:tour:depth';
+
+/** Default depth level shown to first-time visitors: 3 = 重点 (structure +
+ *  classification + key drugs). The previous default was 5 (全部), but 深度
+ * 策略默认改为第三档 per product decision — a more focused learning walk. */
+export const TOUR_DEPTH_DEFAULT = 3;
+
 /** Read the persisted traversal mode. Defaults to 'sequential' (= historical
  *  behavior). Invalid / corrupted values fall back to default rather than
  *  throwing — the mode buttons are best-effort visible. */
@@ -52,6 +62,29 @@ function loadTourMode(): 'sequential' | 'reverse' | 'random' {
 function saveTourMode(mode: 'sequential' | 'reverse' | 'random'): void {
   try {
     localStorage.setItem(TOUR_MODE_KEY, mode);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Read the persisted tour depth level. Valid range 1-5; corrupted / missing
+ *  values fall back to TOUR_DEPTH_DEFAULT (level 3, 重点). */
+export function loadTourDepth(): number {
+  try {
+    const v = localStorage.getItem(TOUR_DEPTH_KEY);
+    if (v !== null) {
+      const n = Number(v);
+      if (Number.isInteger(n) && n >= 1 && n <= 5) return n;
+    }
+  } catch {
+    /* ignore */
+  }
+  return TOUR_DEPTH_DEFAULT;
+}
+
+export function saveTourDepth(level: number): void {
+  try {
+    localStorage.setItem(TOUR_DEPTH_KEY, String(level));
   } catch {
     /* ignore */
   }
@@ -117,6 +150,18 @@ export class TourController {
     // 遍历模式：从 localStorage 恢复（覆盖 uiState 默认值），同步 active class。
     uiState.tour.mode = loadTourMode();
     this.syncModeButtons(uiState.tour.mode);
+    // 漫游深度档位：从 localStorage 恢复（默认第三档"重点"，首次访问亦然），
+    // 把缓存值写进两个滑块 + 值标签，确保刷新后 UI 与引擎档位一致。
+    this._pendingMaxDepth = loadTourDepth();
+    const restoredDepth = this.findSlider('maxdepth');
+    if (restoredDepth) {
+      restoredDepth.range.value = String(this._pendingMaxDepth);
+      if (restoredDepth.mirror) restoredDepth.mirror.value = String(this._pendingMaxDepth);
+      const label =
+        this._pendingMaxDepth >= 5 ? '\u221e' : TOUR_DEPTH_CONFIG.getLabel(this._pendingMaxDepth);
+      if (restoredDepth.value) restoredDepth.value.textContent = label;
+      this.paintFill(restoredDepth);
+    }
     // 初始化 fill（DOM 默认 value 不会触发 input 事件，需手动同步 fill）
     for (const s of this.sliders) this.paintFill(s);
     // idle 时显式把 elapsed 写成 0:00（paintElapsed 在 idle 状态下也会写到 0:00，
@@ -131,8 +176,12 @@ export class TourController {
     return this.paused;
   }
 
-  /** 追踪期望的档位（1-5，5=全部），用于在 start() 时覆盖 DOM 滑块值 */
-  private _pendingMaxDepth: number = 5;
+  /**
+   * 追踪期望的档位（1-5，5=全部），用于在 start() 时覆盖 DOM 滑块值。
+   * 初始值来自 localStorage（首次访问为默认第三档"重点"），mount() 时再
+   * 同步进滑块 DOM——这样刷新后滑块位置和引擎档位都恢复用户上次选择。
+   */
+  private _pendingMaxDepth: number = loadTourDepth();
 
   // ── Session elapsed timer ──────────────────────────────────────────────────
   // 累计时长：start() 时归零，stop() 时停走但保留累计；下次手动 start() 才再次归零。
@@ -842,6 +891,8 @@ export class TourController {
           (v) => {
             // 同时更新追踪状态和 DOM 滑块值，确保下次 start() 时使用正确的值
             this._pendingMaxDepth = v;
+            // 持久化用户选择的档位，刷新后仍保持（默认第三档见 TOUR_DEPTH_DEFAULT）。
+            saveTourDepth(v);
             // 同步更新 DOM 滑块
             const depthSlider = this.findSlider('maxdepth');
             if (depthSlider) {
