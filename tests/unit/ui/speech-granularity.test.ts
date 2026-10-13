@@ -10,8 +10,79 @@
 // ids are noise when spoken aloud.
 
 import { describe, it, expect } from 'vitest';
-import { composeSpeechText, parseSpeechFields } from '@/ui/speech';
+import { composeSpeechText, parseSpeechFields, cleanSummaryForSpeech } from '@/ui/speech';
 import type { SpeakableNode } from '@/ui/speech';
+
+describe('cleanSummaryForSpeech: Markdown → speakable plain text', () => {
+  it('strips bold / italic / strikethrough / code markers, keeps inner text', () => {
+    expect(cleanSummaryForSpeech('**重点**、*斜体*、~~删除~~、`代码`、普通文字')).toBe(
+      '重点、斜体、删除、代码、普通文字。',
+    );
+  });
+
+  it('binds ** before * so bold text is not mangled', () => {
+    expect(cleanSummaryForSpeech('**加粗内容**里面的*单个星号*')).toBe('加粗内容里面的单个星号。');
+  });
+
+  it('does NOT strip math subscript underscores (z_{n+1}, r_s)', () => {
+    // Real data regression: `_x_` is math subscript, not emphasis. Stripping
+    // it turned `z_{n+1} = z_n^2` into `z{n+1} = zn^2` — content loss.
+    expect(cleanSummaryForSpeech('迭代映射 z_{n+1} = z_n^2 + c')).toBe(
+      '迭代映射 z_{n+1} = z_n^2 + c。',
+    );
+    expect(cleanSummaryForSpeech('光子球 r_s 处有圆轨道')).toBe('光子球 r_s 处有圆轨道。');
+  });
+
+  it('turns links into their label only', () => {
+    expect(cleanSummaryForSpeech('见[姊妹节点](feat-x)与[文档](https://a.b/c)')).toBe(
+      '见姊妹节点与文档。',
+    );
+  });
+
+  it('flattens GFM table rows to cells joined by ， and rows separated by ；', () => {
+    const table = [
+      '| 类别 | 等级 | 要求 |',
+      '| --- | --- | --- |',
+      '| 伴侣 | Class4 | 必须 |',
+      '| 父母 | Class3 | 必须 |',
+    ].join('\n');
+    expect(cleanSummaryForSpeech(table)).toBe(
+      '类别，等级，要求；伴侣，Class4，必须；父母，Class3，必须；',
+    );
+  });
+
+  it('translates heading / list breaks into spoken pauses (。 / ；)', () => {
+    const markdown = ['## 头部标题', '', '- 第一项', '- 第二项', '', '1. 有序一', '2. 有序二'].join(
+      '\n',
+    );
+    expect(cleanSummaryForSpeech(markdown)).toBe('头部标题。 第一项；第二项；有序一；有序二；');
+  });
+
+  it('keeps paragraph breaks as 。 so the pause is audible', () => {
+    expect(cleanSummaryForSpeech('第一段。\n\n第二段。')).toBe('第一段。 第二段。');
+    // A paragraph WITHOUT its own sentence-final punctuation gets one, so
+    // the boundary is audible even when the source text omitted it.
+    expect(cleanSummaryForSpeech('第一段没有句号\n\n第二段也没有')).toBe(
+      '第一段没有句号。 第二段也没有。',
+    );
+  });
+
+  it('soft line breaks inside a paragraph stay word-joined (no pause)', () => {
+    expect(cleanSummaryForSpeech('迭代映射\nz_{n+1} = z_n^2 + c')).toBe(
+      '迭代映射 z_{n+1} = z_n^2 + c。',
+    );
+  });
+
+  it('removes leading/trailing punctuation noise left by stripped rows', () => {
+    expect(cleanSummaryForSpeech('---\n正文，\n')).toBe('正文。');
+    expect(cleanSummaryForSpeech('，。、正文,')).toBe('正文。');
+  });
+
+  it('collapses indentation on list continuation lines', () => {
+    expect(cleanSummaryForSpeech('  缩进 文本')).toBe('缩进 文本。');
+    expect(cleanSummaryForSpeech('    · 项目符号项')).toBe('· 项目符号项。');
+  });
+});
 
 describe('composeSpeechText: field combinations × full-node payload', () => {
   const fullNode: SpeakableNode = {
@@ -43,23 +114,23 @@ describe('composeSpeechText: field combinations × full-node payload', () => {
 
   it('标题 + 摘要(详细模式) → label + fullSummary', () => {
     expect(composeSpeechText(fullNode, ['label', 'summary'], 'full')).toBe(
-      '卡马西平，完整摘要文本',
+      '卡马西平，完整摘要文本。',
     );
   });
 
   it('标题 + 摘要(简短模式) → label + shortSummary', () => {
-    expect(composeSpeechText(fullNode, ['label', 'summary'], 'short')).toBe('卡马西平，短摘要');
+    expect(composeSpeechText(fullNode, ['label', 'summary'], 'short')).toBe('卡马西平，短摘要。');
   });
 
   it('四项全选(详细模式) → label，edges，tags，summary 依次拼接', () => {
     expect(composeSpeechText(fullNode, ['label', 'edges', 'tags', 'summary'], 'full')).toBe(
-      '卡马西平，是一种抗癫痫药、属于镇静催眠药，肝药酶诱导剂、窄治疗窗，完整摘要文本',
+      '卡马西平，是一种抗癫痫药、属于镇静催眠药，肝药酶诱导剂、窄治疗窗，完整摘要文本。',
     );
   });
 
   it('四项全选(简短模式) → 摘要段换成 shortSummary', () => {
     expect(composeSpeechText(fullNode, ['label', 'edges', 'tags', 'summary'], 'short')).toBe(
-      '卡马西平，是一种抗癫痫药、属于镇静催眠药，肝药酶诱导剂、窄治疗窗，短摘要',
+      '卡马西平，是一种抗癫痫药、属于镇静催眠药，肝药酶诱导剂、窄治疗窗，短摘要。',
     );
   });
 
@@ -169,19 +240,19 @@ describe('composeSpeechText: missing-field edge cases', () => {
   it('简短模式但只有 fullSummary → 回落到 fullSummary', () => {
     expect(
       composeSpeechText({ label: 'X', fullSummary: '完整' }, ['label', 'summary'], 'short'),
-    ).toBe('X，完整');
+    ).toBe('X，完整。');
   });
 
   it('详细模式但只有 shortSummary → 回落到 shortSummary', () => {
     expect(
       composeSpeechText({ label: 'X', shortSummary: '简短' }, ['label', 'summary'], 'full'),
-    ).toBe('X，简短');
+    ).toBe('X，简短。');
   });
 
   it('short 与 full 都有时只读所选那一段,绝不拼接两段', () => {
     const both = { label: 'X', shortSummary: '简短', fullSummary: '详细' };
-    expect(composeSpeechText(both, ['label', 'summary'], 'short')).toBe('X，简短');
-    expect(composeSpeechText(both, ['label', 'summary'], 'full')).toBe('X，详细');
+    expect(composeSpeechText(both, ['label', 'summary'], 'short')).toBe('X，简短。');
+    expect(composeSpeechText(both, ['label', 'summary'], 'full')).toBe('X，详细。');
   });
 
   it('无 label 且无其他字段 → 空字符串', () => {

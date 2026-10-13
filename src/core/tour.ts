@@ -159,8 +159,8 @@ export interface TourOptions {
    * step, plus `postSpeechDelayMs` of settle time. When `waitForSpeech`
    * is true the engine treats `interval` as a MINIMUM step gap (per the
    * design decision: short texts still wait the configured interval,
-   * long texts wait as long as they need to, but never longer than
-   * SPEECH_WAIT_TIMEOUT_MS as an absolute safety cap).
+   * long texts wait as long as they need to — there is no absolute cap
+   * on a single step, so a long summary is read to its natural end).
    *
    * When false, the legacy behavior holds: a fixed-duration setTimeout
    * equal to `interval - 600ms` decides the next step.
@@ -171,8 +171,7 @@ export interface TourOptions {
   /**
    * Wait-for-speech adapter. Called on every step when `waitForSpeech`
    * is true. The returned `promise` resolves when the current speech
-   * utterance ends naturally, errors out, or the adapter's internal
-   * safety timer fires — whichever first. The returned `cancel` MUST
+   * utterance ends naturally or errors out. The returned `cancel` MUST
    * short-circuit the adapter immediately (so a pause / stop / manual
    * advance can't be followed by a stale `visitNext`).
    *
@@ -581,17 +580,6 @@ const INFINITE_DEPTH = -1;
 
 /** 安全循环上限，防止无限循环 */
 const LOOP_SAFETY_LIMIT = 20000;
-
-/**
- * Absolute upper bound (ms) for how long the engine will wait for speech
- * to end before giving up and advancing anyway. Defends against WebViews
- * whose `onend` never fires (the same class of bug the silent-check timer
- * already guards against) and against any case where the speech adapter
- * itself hangs. The value is generous enough to cover a 200-character
- * utterance at the slowest supported rate (~30s) and still leaves room
- * for the post-speech pause below it.
- */
-const SPEECH_WAIT_TIMEOUT_MS = 30000;
 
 /** Total animation time (pan + pulse) the scheduler subtracts from the
  *  user-facing interval so "next step" fires as the animation finishes. */
@@ -1816,10 +1804,10 @@ export class TourEngine {
   }
 
   /**
-   * Cancel any in-flight speech-end Promise (its safety timer + the
-   * "first event wins" race). Called before every reschedule so a stale
-   * speech wait never fires `visitNext()` on a tour that's already
-   * paused, stopped, or manually advanced.
+   * Cancel any in-flight speech-end Promise (the "first event wins"
+   * race). Called before every reschedule so a stale speech wait never
+   * fires `visitNext()` on a tour that's already paused, stopped, or
+   * manually advanced.
    */
   private clearSpeechWait(): void {
     if (this.speechWaitCancel) {
@@ -1851,12 +1839,16 @@ export class TourEngine {
       //     is the key insight: the floor must NOT truncate a long
       //     utterance just because `interval` happens to be smaller than
       //     the read-aloud duration.
-      //   - SPEECH_WAIT_TIMEOUT_MS caps the wait absolutely so a wedged
-      //     TTS engine can never lock the tour.
+      //   - There is NO absolute cap: a long summary is read to its
+      //     natural end. The wait ends only when the adapter resolves
+      //     (utterance ended/errored), the tour pauses/stops, or the
+      //     speech controller independently judges the engine a silent
+      //     stub and releases the wait (see speech.ts
+      //     scheduleSilentCheck).
       //
       // Implementation: every `minGap`, ask "is the speaker done?". If
       // yes, finish; if not, schedule another check in `minGap`. Stop
-      // the loop once speech resolves OR the safety timer fires.
+      // the loop once speech resolves or the tour pauses/stops.
       const minGap = Math.max(500, this.interval - ANIMATION_BUDGET_MS);
 
       let settled = false;
@@ -1880,16 +1872,10 @@ export class TourEngine {
         // Speech still going — extend the wait by another minGap so the
         // utterance can complete naturally. This is the "renewal" branch:
         // a long utterance no longer gets truncated by the floor.
-        // Guard against null: this closure is replaced on every renewal, and
-        // the previous handle was already consumed by whatever set `settled`.
-        this.speechWaitCancel = () => {
-          if (renewalTimer !== null) clearTimeout(renewalTimer);
-        };
         renewalTimer = setTimeout(checkFloor, minGap);
       };
 
       let renewalTimer: ReturnType<typeof setTimeout> | null = null;
-      let safetyTimer: ReturnType<typeof setTimeout> | null = null;
       const adapter = this.waitForSpeechEnd();
       this.speechWaitCancel = () => {
         if (settled) return;
@@ -1899,16 +1885,11 @@ export class TourEngine {
           clearTimeout(renewalTimer);
           renewalTimer = null;
         }
-        if (safetyTimer !== null) {
-          clearTimeout(safetyTimer);
-          safetyTimer = null;
-        }
       };
       // First check after minGap: if speech has finished by then (short
       // text or TTS off), finish immediately; otherwise the renewal
       // branch starts polling every minGap until speech resolves.
       renewalTimer = setTimeout(checkFloor, minGap);
-      safetyTimer = setTimeout(finish, SPEECH_WAIT_TIMEOUT_MS);
       adapter.promise.then(() => {
         if (settled) return;
         speechEnded = true;

@@ -182,6 +182,36 @@ describe('SpeechController persistence + onEnd subscriber (unit)', () => {
     c.stop();
   });
 
+  it('silent-stub verdict releases onEnd waiters + clears in-flight utterance', () => {
+    // The speech wait has no absolute timeout anymore (long summaries must
+    // be read to the end). If the engine is judged a mute stub — no event
+    // ever arrives within SILENT_ENGINE_TIMEOUT_MS — the controller must
+    // release any tour step waiting on that utterance (fireEnd) so the
+    // tour can keep moving instead of locking forever.
+    vi.useFakeTimers();
+    try {
+      const c = mod.speechController;
+      c.toggle();
+      const listener = vi.fn();
+      c.onEnd(listener);
+      c.speak('never plays');
+      expect(c.isSpeaking).toBe(true);
+      expect(c.isSilentStub).toBe(false);
+      expect(listener).not.toHaveBeenCalled();
+
+      // SILENT_ENGINE_TIMEOUT_MS = 5000; advance past it.
+      vi.advanceTimersByTime(6000);
+
+      expect(c.isSilentStub).toBe(true);
+      expect(c.isActive).toBe(false);
+      expect(c.isSpeaking).toBe(false);
+      expect(listener).toHaveBeenCalledTimes(1);
+      c.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   function lastQueued(): SpeechSynthesisUtterance {
     const synth = speechSynthesis as unknown as { speak: ReturnType<typeof vi.fn> };
     const calls = synth.speak.mock.calls;

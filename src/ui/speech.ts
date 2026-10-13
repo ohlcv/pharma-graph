@@ -48,7 +48,10 @@
 //           cancel kills the one utterance that would have proven it
 //           alive. The live probe only stops *future* speak() calls and
 //           flips the UI off — it never reaches back and silences a
-//           genuinely in-flight utterance.
+//           genuinely in-flight utterance. It DOES release any tour step
+//           waiting on that utterance (fireEnd), so a mute engine can't
+//           wedge the tour now that the speech wait has no absolute
+//           timeout — releasing a waiter never touches the audio itself.
 //
 //        c) The detector is armed once per "unknown" phase, not re-armed
 //           on every speak() call. If it re-armed every time, a tour
@@ -328,7 +331,8 @@ class SpeechController {
    */
   private postSpeechDelayMs: number = loadPostDelay();
   /** Listeners notified on every utterance `end` / `error` event (real only;
-   *  iOS-unlock probe and silent-check timer don't fire these). */
+   *  the iOS-unlock probe doesn't fire these; the silent-stub verdict fires
+   *  them once to release waiting tour steps — see scheduleSilentCheck). */
   private endListeners: Set<() => void> = new Set();
 
   constructor() {
@@ -641,6 +645,14 @@ class SpeechController {
       if (this.engineState !== 'unknown') return; // an event already arrived
       this.engineState = 'silent';
       this.active = false;
+      // 解除等待本次朗读的漫游步进：哑巴引擎不会再发 end/error，若不
+      // 释放，去掉绝对上限后漫游会永久卡死。这里只 fireEnd（通知等待者
+      // "结束"），不调用 synth.cancel() —— 不触碰可能还在播放的音频
+      //（silent 只是"没收到任何事件"，见文件级注释 (b)）。
+      if (this.currentUtterance !== null) {
+        this.currentUtterance = null;
+        this.fireEnd();
+      }
       this.updateButtonState();
       showToast(
         '当前浏览器的朗读引擎无法输出声音，已自动关闭朗读（推荐用 Chrome/Safari 打开）',
@@ -756,6 +768,139 @@ export interface SpeakableNode {
 }
 
 /**
+ * Clean a summary's raw Markdown so it reads naturally when spoken aloud.
+ *
+ * The summary field in source frontmatter is rich text (bold, lists,
+ * tables, headings) — the raw text contains symbols that Web Speech API
+ * would read out verbatim ("卡马西平，** 是..." or "| 列一 | 列二 |"). This
+ * strips the markup and keeps the words:
+ *
+ *   - `**bold**` / `*italic*` / ~~del~~                  → inner text
+ *   - inline code `` `x` `` and escaped `\*`              → inner text
+ *   - links `[label](url)`                                → label only
+ *   - headings `## ` / list markers / table cells         → text, with a
+ *     spoken pause after each structural break
+ *
+ * Pauses matter: Web Speech API generally ignores raw newlines (it treats
+ * them as ordinary whitespace), so a multi-line summary would otherwise be
+ * read as one breathless run-on ("零维：一个点一维：一条线段..."). We
+ * translate structural line breaks into the punctuation TTS reliably
+ * pauses on:
+ *   - list items / table rows                                → ；
+ *   - headings & paragraph breaks                            → 。
+ *   - a soft line break inside a paragraph (e.g. a math formula) → keep
+ *     as a plain space, no pause (the sentence continues)
+ *
+ * Pure function — exported so unit tests can pin down every rule.
+ */
+export function cleanSummaryForSpeech(raw: string): string {
+  let s = raw;
+
+  // 1. Remove HTML-ish artifacts that could be spoken as literal tags
+  //    (none in current data, but cheap insurance for future content).
+  s = s.replace(/<\s*br\s*\/?\s*>/gi, '\n');
+  s = s.replace(/<\/?[a-z][a-z0-9-]*(?:\s[^>]*)?>/gi, '');
+
+  // 2. Inline markup: bold/italic/strikethrough/code. Remove the wrapping
+  //    symbols, keep the text. `**` must be handled before `*`.
+  //    NOTE: `_underscore_` is deliberately NOT stripped — in real data
+  //    it's math subscript notation (z_{n+1}, r_s), never emphasis.
+  s = s.replace(/\*\*([^*]+)\*\*/g, '$1'); // **bold**
+  s = s.replace(/\*([^*\n]+)\*/g, '$1'); // *italic*
+  s = s.replace(/~~([^~]+)~~/g, '$1'); // ~~strike~~
+  s = s.replace(/`([^`\n]+)`/g, '$1'); // `code`
+  // Escaped markdown characters: \* \_ \` \# \| \- etc.
+  s = s.replace(/\\([*_`#|~-])/g, '$1');
+
+  // 3. Links: [label](url) → label only; bare urls → keep as text.
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1');
+
+  // 4-7. Structural breaks → spoken punctuation.
+  //
+  // We work at TWO levels so the pauses we add are semantically right:
+  //   - Paragraph level (`\n\n`): a paragraph is a complete unit — if it
+  //     doesn't already end with sentence-final punctuation, append 。
+  //     so the boundary is audible.
+  //   - Line level (`\n`): list items / table rows / headings are also
+  //     complete units — append ；(list/table) or 。(heading). A soft
+  //     line break inside a paragraph (e.g. a wrapped math formula) is
+  //     NOT a boundary: collapse to a space.
+  const paragraphs = s.split(/\n\s*\n/);
+  s = paragraphs
+    .map((para) => {
+      const lines = para.split('\n');
+      const out: string[] = [];
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line) continue;
+        // Drop markdown-only lines: table separator rows & thematic breaks.
+        if (/^\|[\s:|-]+\|$/.test(line)) continue;
+        if (/^(-{3,}|\*{3,}|_{3,})$/.test(line)) continue;
+
+        // Inline cleanup.
+        let body = line;
+        body = body.replace(/^[ \t]*\|/, '').replace(/\|[ \t]*$/, '');
+        body = body.replace(/\|/g, '，');
+        const isList = /^[-*+][ \t]+/.test(body) || /^\d+[.、）][ \t]+/.test(body);
+        body = body.replace(/^[-*+][ \t]+/, '').replace(/^\d+[.、）][ \t]+/, '');
+        const isHeading = /^#{1,6}[ \t]+/.test(body);
+        body = body.replace(/^#{1,6}[ \t]+/, '');
+        body = body.trim();
+        if (!body) continue;
+
+        const kind: 'list' | 'table' | 'heading' | 'para' = isList
+          ? 'list'
+          : line.startsWith('|')
+            ? 'table'
+            : isHeading
+              ? 'heading'
+              : 'para';
+
+        // Append a pause at the END of a structural unit.
+        const end = kind === 'list' || kind === 'table' ? '；' : '。';
+        const alreadyEnds =
+          /[。！？；，、：.?!;,]$/.test(body) || kind === 'para';
+        out.push(body + (alreadyEnds ? '' : end));
+      }
+      // Paragraph-level close: a plain-text paragraph should end with a
+      // sentence-final mark. Strip any trailing non-final punctuation (a
+      // dangling `，`/`、`), then ensure `。`. List/table paragraphs keep
+      // their `；` — each item is an equal sibling; closing the last one
+      // with `。` would misread it as a different kind of boundary.
+      let joined = out.join(' ');
+      if (/[；]$/.test(joined)) return joined;
+      joined = joined.replace(/[，、：:,.，]+$/g, '');
+      if (joined && !/[。！？]$/.test(joined)) joined += '。';
+      return joined;
+    })
+    .filter(Boolean)
+    .join(' ');
+
+  // 8. Tidy: collapse spaces around punctuation, drop repeated ；, strip
+  //    edge noise. Duplicate marks arise where a structural pause meets
+  //    punctuation that was already in the source (e.g. a table cell that
+  //    ended in `，` right before the row's `；`). Collapse each run to the
+  //    STRONGEST mark so a stray `；，，` never reads as a stutter. Spaces
+  //    AFTER sentence-final marks (。！？) are KEPT — they're the audible
+  //    gap between paragraphs. Spaces before any mark, or after a
+  //    mid-sentence mark (，、；), are dropped — those come from source
+  //    cell separators, not real pauses.
+  s = s.replace(/[ \t]+([。；，、：,.?!])/g, '$1');
+  s = s.replace(/([，、；])[ \t]+/g, '$1');
+  s = s.replace(/，+/g, '，');
+  s = s.replace(/[。！？]+/g, '。');
+  s = s.replace(/；[，]+/g, '；');
+  s = s.replace(/[，]+；/g, '；');
+  s = s.replace(/；+/g, '；');
+  s = s.replace(/。；/g, '。');
+  s = s.replace(/；。/g, '。');
+  s = s.replace(/^[；，。、\s]+/g, '');
+  s = s.replace(/[ \t]+$/g, '');
+
+  return s.trim();
+}
+
+/**
  * Build the text to be spoken for a node from the selected fields. Pure
  * function — exported so unit tests can exercise every field combination
  * without going through the SpeechController.
@@ -809,8 +954,8 @@ export function composeSpeechText(
       summaryMode === 'full'
         ? (node.fullSummary ?? node.shortSummary)
         : (node.shortSummary ?? node.fullSummary);
-    const trimmed = (summary ?? '').trim();
-    if (trimmed) parts.push(trimmed);
+    const cleaned = (summary ?? '').trim();
+    if (cleaned) parts.push(cleanSummaryForSpeech(cleaned));
   }
 
   return parts.join('，');

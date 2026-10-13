@@ -314,4 +314,37 @@ describe('TourEngine: speech-aware pacing respects the user interval (regression
 
     engine.stop();
   });
+
+  it('no absolute cap: a still-playing utterance is never advanced past by a clock', async () => {
+    // Regression guard for the removed SPEECH_WAIT_TIMEOUT_MS: a long
+    // summary must be read to its natural end. If the adapter promise
+    // never resolves, the engine must keep waiting (the only exits are
+    // pause/stop/manual advance, or the speech controller's own
+    // silent-stub verdict releasing the wait via fireEnd).
+    const cy = makeCy3();
+    const engine = new TourEngine(cy);
+    const neverResolves = new Promise<void>(() => {});
+    let stepCount = 0;
+    engine.start('a', {
+      interval: 1000,
+      maxDepth: 5,
+      strategy: asStrategy('has-dfs'),
+      waitForSpeech: true,
+      waitForSpeechEnd: () => ({
+        promise: neverResolves,
+        cancel: () => {},
+      }),
+      onStep: () => {
+        stepCount++;
+      },
+      onComplete: () => {},
+    });
+
+    // Wait well past several `minGap` renewals (minGap = 500ms here).
+    // If any per-step clock fired, stepCount would climb past 1.
+    await new Promise((r) => setTimeout(r, 2200));
+    expect(stepCount).toBe(1);
+
+    engine.stop();
+  });
 });

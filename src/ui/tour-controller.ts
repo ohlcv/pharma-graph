@@ -407,16 +407,20 @@ export class TourController {
    * Behaviour:
    * - If TTS is ON and a real utterance is queued, resolve when the
    *   utterance's `end` / `error` event fires (whichever comes first).
+   *   There is NO absolute timeout: a long summary is read to its
+   *   natural end. The only early release is the speech controller's
+   *   silent-stub verdict (speech.ts scheduleSilentCheck), which fires a
+   *   synthetic `end` when the engine is judged mute — so a wedged
+   *   engine can't lock the tour forever without truncating a healthy
+   *   long utterance.
    * - If TTS is OFF (or no utterance yet), resolve after `interval - 600ms`
    *   so we preserve the legacy fixed-timer pacing. Without this fallback,
    *   scheduleNext would visit the next node immediately and the tour
    *   would race through the graph (1s → 20 nodes) with no reading.
-   * - A safety timer (10s) fires as a last resort in case the browser
-   *   never sends any end event (the same class of bug the speech
-   *   controller's silent-check guards).
    *
-   * `cancel()` short-circuits the promise + clears BOTH timers so a
-   * pause / stop / manual next can't trigger a stale `visitNext`.
+   * `cancel()` short-circuits the promise, clears the fallback timer and
+   * unsubscribes the end listener so a pause / stop / manual next can't
+   * trigger a stale `visitNext`.
    *
    * @param intervalMs The user-facing tour interval (slider value, ms).
    *                   Used only for the TTS-off fallback pacing.
@@ -426,16 +430,16 @@ export class TourController {
     cancel: () => void;
   } {
     let cancelled = false;
-    let safetyTimer: ReturnType<typeof setTimeout> | null = null;
     let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+    let unsubscribeEnd: (() => void) | null = null;
     let resolveOnce: () => void = () => {};
     const promise = new Promise<void>((resolve) => {
       resolveOnce = () => {
         if (cancelled) return;
         cancelled = true; // single-shot: any path that fires first wins
-        if (safetyTimer !== null) {
-          clearTimeout(safetyTimer);
-          safetyTimer = null;
+        if (unsubscribeEnd !== null) {
+          unsubscribeEnd();
+          unsubscribeEnd = null;
         }
         if (fallbackTimer !== null) {
           clearTimeout(fallbackTimer);
@@ -445,13 +449,10 @@ export class TourController {
       };
 
       if (speechController.isActive && speechController.isSpeaking) {
-        const unsubscribe = speechController.onEnd(resolveOnce);
-        // Adapter-level safety: if no `end`/`error` arrives within this
-        // window, fire anyway so the engine never locks.
-        safetyTimer = setTimeout(() => {
-          unsubscribe();
-          resolveOnce();
-        }, 10000);
+        // 无绝对超时：长摘要必须读完。silent-stub 判定会以 fireEnd()
+        // 释放本等待（见 speech.ts scheduleSilentCheck），死引擎不会
+        // 永久锁死漫游。
+        unsubscribeEnd = speechController.onEnd(resolveOnce);
         return;
       }
 
