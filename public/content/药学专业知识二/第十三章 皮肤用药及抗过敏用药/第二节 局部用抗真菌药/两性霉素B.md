@@ -21,4 +21,7 @@ edges_out:
   - target: cls-polyene-y2-13-02
     type: instance_of
     reason: 两性霉素B是多烯类的代表药物
+  - target: med-amphotericin-b-y2-09-11
+    type: equivalent_to
+    reason: 与抗真菌药中的两性霉素B为同一药物
 ---

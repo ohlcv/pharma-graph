@@ -18,4 +18,7 @@ edges_out:
   - target: cls-keratolytic-topical-y2-13-03
     type: instance_of
     reason: 维A酸是局部用抗角化药的代表药物
+  - target: med-tretinoin-y2-10-07
+    type: equivalent_to
+    reason: 与其他抗肿瘤药物中的维A酸为同一药物
 ---

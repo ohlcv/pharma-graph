@@ -18,4 +18,7 @@ edges_out:
   - target: cls-biologic-y2-13-09
     type: subclass_of
     reason: 抗IgE单克隆抗体是生物制剂的子类
+  - target: cls-anti-ige-y2-03-03
+    type: equivalent_to
+    reason: 与平喘药中的抗IgE单克隆抗体为同一药物分类
 ---
