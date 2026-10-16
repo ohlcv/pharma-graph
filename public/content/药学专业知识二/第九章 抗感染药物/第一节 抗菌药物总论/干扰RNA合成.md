@@ -19,4 +19,7 @@ edges_out:
   - target: cls-nucleic-y2-09-01
     type: subclass_of
     reason: 干扰RNA合成是影响细菌核酸合成的子类
+  - target: cls-dna-y2-09-01
+    type: disjoint_with
+    reason: 同为影响细菌核酸合成下的并列子类，成员互斥
 ---

@@ -51,4 +51,7 @@ edges_out:
   - target: cls-hbv-y2-09-15
     type: subclass_of
     reason: 核苷（酸）类药（NAs）是治疗慢性乙型肝炎药的子类
+  - target: cls-ifn-y2-09-15
+    type: disjoint_with
+    reason: 同为治疗慢性乙型肝炎药下的并列子类，成员互斥
 ---
