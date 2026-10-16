@@ -25,4 +25,8 @@ edges_out:
     type: subclass_of
     reason: 抑制谷氨酸受体的具体类型
 
+  - target: cls-ampa-y2-01-02
+    type: disjoint_with
+    reason: 同为抑制谷氨酸受体下的并列子类，成员互斥
+
 ---

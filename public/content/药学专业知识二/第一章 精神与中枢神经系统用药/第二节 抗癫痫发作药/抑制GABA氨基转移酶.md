@@ -29,4 +29,8 @@ edges_out:
     type: instance_of
     reason: 抑制GABA氨基转移酶的代表药物
 
+  - target: cls-gaba-a-y2-01-02
+    type: disjoint_with
+    reason: 同为增强GABA抑制性下的并列子类，成员互斥
+
 ---
