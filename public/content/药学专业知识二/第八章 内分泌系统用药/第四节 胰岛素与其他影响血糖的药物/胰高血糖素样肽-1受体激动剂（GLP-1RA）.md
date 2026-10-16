@@ -25,7 +25,4 @@ edges_out:
   - target: cls-incretin-y2-08-04
     type: subclass_of
     reason: 胰高血糖素样肽-1受体激动剂（GLP-1RA）是肠促胰素类降糖药的子类
-  - target: cls-gip-y2-08-04
-    type: disjoint_with
-    reason: 同为肠促胰素类降糖药下的并列子类，成员互斥
 ---

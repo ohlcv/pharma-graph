@@ -17,7 +17,4 @@ edges_out:
   - target: cls-selective-cox2-inhibitor-y2-02-01
     type: subclass_of
     reason: 属于选择性COX-2抑制剂
-  - target: cls-highly-selective-cox2-y2-02-01
-    type: disjoint_with
-    reason: 同为选择性COX-2抑制剂下的并列子类，成员互斥
 ---

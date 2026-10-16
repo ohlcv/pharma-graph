@@ -17,10 +17,4 @@ edges_out:
   - target: cls-sodium-channel-y2-05-01
     type: subclass_of
     reason: 钠通道阻滞剂的子类
-  - target: cls-class-ia-y2-05-01
-    type: disjoint_with
-    reason: 同为钠通道阻滞剂下的并列子类，成员互斥
-  - target: cls-class-ib-y2-05-01
-    type: disjoint_with
-    reason: 同为钠通道阻滞剂下的并列子类，成员互斥
 ---
