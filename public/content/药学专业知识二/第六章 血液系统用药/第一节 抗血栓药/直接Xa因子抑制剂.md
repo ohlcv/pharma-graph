@@ -17,4 +17,7 @@ edges_out:
   - target: cls-direct-anticoagulant-y2-06-01
     type: subclass_of
     reason: 是直接抗凝药下的一个亚类
+  - target: cls-direct-thrombin-inhibitor-y2-06-01
+    type: disjoint_with
+    reason: 同为直接抗凝药下的并列子类，成员互斥
 ---
