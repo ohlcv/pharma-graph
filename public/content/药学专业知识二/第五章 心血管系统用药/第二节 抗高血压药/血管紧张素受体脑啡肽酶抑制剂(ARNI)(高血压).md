@@ -19,4 +19,10 @@ edges_out:
   - target: cls-arni-y2-05-05
     type: equivalent_to
     reason: 与抗心力衰竭药中的血管紧张素受体脑啡肽酶抑制剂(ARNI)为同一药物类别
+  - target: cls-acei-hyper-y2-05-02
+    type: disjoint_with
+    reason: 同为肾素-血管紧张素系统(RAS)抑制药下的并列子类，成员互斥
+  - target: cls-arb-hyper-y2-05-02
+    type: disjoint_with
+    reason: 同为肾素-血管紧张素系统(RAS)抑制药下的并列子类，成员互斥
 ---

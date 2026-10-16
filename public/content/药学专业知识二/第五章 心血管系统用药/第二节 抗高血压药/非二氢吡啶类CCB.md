@@ -16,4 +16,7 @@ edges_out:
   - target: cls-ccb-y2-05-02
     type: subclass_of
     reason: 是钙通道阻滞剂下的一个亚类
+  - target: cls-dhp-ccb-y2-05-02
+    type: disjoint_with
+    reason: 同为钙通道阻滞剂(CCB)下的并列子类，成员互斥
 ---

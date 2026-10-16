@@ -16,4 +16,10 @@ edges_out:
   - target: cls-cardioprotect-y2-05-05
     type: subclass_of
     reason: 是保护心脏类药物下的一个亚类
+  - target: cls-raas-inhibitor-y2-05-05
+    type: disjoint_with
+    reason: 同为保护心脏下的并列子类，成员互斥
+  - target: cls-sgc-stimulator-y2-05-05
+    type: disjoint_with
+    reason: 同为保护心脏下的并列子类，成员互斥
 ---
