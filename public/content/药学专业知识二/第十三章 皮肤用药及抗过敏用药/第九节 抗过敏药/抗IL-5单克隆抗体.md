@@ -21,4 +21,10 @@ edges_out:
   - target: cls-anti-il5-y2-03-03
     type: equivalent_to
     reason: 与平喘药中的抗IL-5单克隆抗体为同一药物分类
+  - target: cls-anti-ige-y2-13-09
+    type: disjoint_with
+    reason: 同为生物制剂下的并列子类，成员互斥
+  - target: cls-anti-il4-13-y2-13-09
+    type: disjoint_with
+    reason: 同为生物制剂下的并列子类，成员互斥
 ---

@@ -18,4 +18,7 @@ edges_out:
   - target: cls-biologic-y2-13-09
     type: subclass_of
     reason: 抗IL-4、IL-13单克隆抗体是生物制剂的子类
+  - target: cls-anti-ige-y2-13-09
+    type: disjoint_with
+    reason: 同为生物制剂下的并列子类，成员互斥
 ---
