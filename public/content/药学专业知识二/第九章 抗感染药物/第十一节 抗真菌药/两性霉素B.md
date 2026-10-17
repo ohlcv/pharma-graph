@@ -1,6 +1,6 @@
 ---
 id: med-amphotericin-b-y2-09-11
-label: 两性霉素B
+label: 两性霉素B（抗真菌药）
 fill: cls-drug
 stroke: double
 location:

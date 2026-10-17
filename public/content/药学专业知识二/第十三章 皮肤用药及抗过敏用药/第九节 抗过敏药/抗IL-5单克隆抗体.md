@@ -1,6 +1,6 @@
 ---
 id: cls-anti-il5-y2-13-09
-label: 抗IL-5单克隆抗体
+label: 抗IL-5单克隆抗体（抗过敏药）
 fill: cls-classification
 location:
   book: 药学专业知识二

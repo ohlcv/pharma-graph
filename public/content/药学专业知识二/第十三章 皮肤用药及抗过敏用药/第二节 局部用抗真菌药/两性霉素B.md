@@ -1,6 +1,6 @@
 ---
 id: drug-amphotericin-b-y2-13-02
-label: 两性霉素B
+label: 两性霉素B（局部用抗真菌药）
 fill: cls-drug
 
 location:

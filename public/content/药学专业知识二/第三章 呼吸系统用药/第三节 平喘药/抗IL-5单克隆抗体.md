@@ -1,6 +1,6 @@
 ---
 id: cls-anti-il5-y2-03-03
-label: 抗IL-5单克隆抗体
+label: 抗IL-5单克隆抗体（平喘药）
 fill: cls-classification
 stroke: double
 location:

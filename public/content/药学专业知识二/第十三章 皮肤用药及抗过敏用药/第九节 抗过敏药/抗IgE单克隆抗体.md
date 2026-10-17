@@ -1,6 +1,6 @@
 ---
 id: cls-anti-ige-y2-13-09
-label: 抗IgE单克隆抗体
+label: 抗IgE单克隆抗体（抗过敏药）
 fill: cls-classification
 location:
   book: 药学专业知识二

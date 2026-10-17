@@ -1,6 +1,6 @@
 ---
 id: cls-anti-ige-y2-03-03
-label: 抗IgE单克隆抗体
+label: 抗IgE单克隆抗体（平喘药）
 fill: cls-classification
 stroke: double
 location:

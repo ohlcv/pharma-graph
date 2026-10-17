@@ -1,6 +1,6 @@
 ---
 id: drug-tretinoin-y2-13-03
-label: 维A酸
+label: 维A酸（痤疮治疗药）
 fill: cls-drug
 location:
   book: 药学专业知识二

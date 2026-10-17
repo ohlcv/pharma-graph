@@ -1,6 +1,6 @@
 ---
 id: drug-amphotericin-b-y2-09-01
-label: 两性霉素B
+label: 两性霉素B（抗菌药物总论）
 fill: cls-drug
 location:
   book: 药学专业知识二

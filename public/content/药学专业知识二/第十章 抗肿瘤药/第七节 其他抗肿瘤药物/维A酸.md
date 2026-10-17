@@ -1,6 +1,6 @@
 ---
 id: med-tretinoin-y2-10-07
-label: 维A酸
+label: 维A酸（其他抗肿瘤药物）
 fill: cls-drug
 stroke: double
 

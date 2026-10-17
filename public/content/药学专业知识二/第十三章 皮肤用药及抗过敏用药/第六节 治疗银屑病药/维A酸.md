@@ -1,6 +1,6 @@
 ---
 id: drug-tretinoin-y2-13-06
-label: 维A酸
+label: 维A酸（治疗银屑病药）
 fill: cls-drug
 
 location:
