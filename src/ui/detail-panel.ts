@@ -453,6 +453,11 @@ function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
     ? filteredTags.map((t) => `<span class="np-tag np-tag--inline">${escHtml(t)}</span>`).join('')
     : '';
 
+  const published = typeof d.published === 'string' ? d.published.trim() : '';
+  const publishedHtml = published
+    ? `<div class="np-hero__published">发布于 ${escHtml(published)}</div>`
+    : '';
+
   return `<div class="np-hero">
   <div class="np-hero__badges">
     <span class="np-badge np-badge--type" style="color:${color};border-color:${rgba(color, 0.4)};background:${rgba(color, 0.12)}">${escHtml(fillText)}</span>
@@ -461,6 +466,7 @@ function buildHeroHtml(d: cytoscape.NodeDataDefinition): string {
   ${tagsHtml ? `<div class="np-hero__tags">${tagsHtml}</div>` : ''}
   <div class="np-hero__name">${escHtml(nodeName)}</div>
   ${location}
+  ${publishedHtml}
 </div>`;
 }
 

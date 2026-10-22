@@ -48,6 +48,8 @@ export type GraphNode = {
     subsection?: string;
   };
   tags?: string[];
+  /** 发布/更新时间（YYYY-MM-DD），可选 */
+  published?: string;
   // ── 边 ───────────────────────────────────────────────────
   edges_out?: EdgeTarget[];
 };
@@ -91,6 +93,7 @@ export function parseFrontmatter(raw: string): {
     subsection?: string;
   };
   tags?: string[];
+  published?: string;
   edges_out?: EdgeTarget[];
   [key: string]: unknown;
 } | null {
@@ -171,6 +174,16 @@ export function parseFrontmatter(raw: string): {
       ? tagsRaw.filter((t): t is string => typeof t === 'string')
       : undefined;
 
+    // published —— 发布/更新时间，只接受 YYYY-MM-DD（YAML 裸日期解析为字符串，
+    // 这里额外兼容 yaml 解析器返回 Date 的情况）
+    const publishedRaw = fm['published'];
+    const published =
+      typeof publishedRaw === 'string'
+        ? publishedRaw.trim()
+        : publishedRaw instanceof Date
+          ? publishedRaw.toISOString().slice(0, 10)
+          : undefined;
+
     return {
       id: typeof fm['id'] === 'string' ? String(fm['id']).trim() : undefined,
       label: typeof fm['label'] === 'string' ? String(fm['label']).trim() : undefined,
@@ -182,6 +195,7 @@ export function parseFrontmatter(raw: string): {
       summary,
       location,
       tags: tags && tags.length > 0 ? tags : undefined,
+      published,
       edges_out: Array.isArray(fm['edges_out']) ? (fm['edges_out'] as EdgeTarget[]) : undefined,
     };
   } catch {
@@ -249,6 +263,7 @@ export async function computeGraphData(): Promise<GraphData> {
         summary: fm.summary,
         location: fm.location,
         tags: fm.tags,
+        published: fm.published,
         edges_out: fm.edges_out,
       });
     } catch (err) {

@@ -64,6 +64,8 @@ export interface NodeData {
   summary?: string; // 摘要（shortSummary 优先，否则 fullSummary）
   location?: NodeLocation;
   tags?: string[];
+  /** 文章发布/更新时间，格式 YYYY-MM-DD（不参与图形编码，仅详情面板展示） */
+  published?: string;
   body?: string; // 正文内容（md 文件中 frontmatter 后的部分）
   /** Manifest-style path to the source file (e.g. `药学专业知识二/第一章 .../COMT抑制剂.md`).
    *  Used by the detail panel to resolve relative image references against

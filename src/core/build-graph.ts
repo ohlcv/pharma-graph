@@ -248,6 +248,7 @@ export function buildGraph(
       summary: fm.summary,
       location: fm.location,
       tags: fm.tags,
+      published: fm.published,
       body: fm.body,
       // The browser path keys these `../../content/<rel>...`; the CLI uses
       // absolute or repo-relative paths. Strip the well-known prefix when
@@ -290,6 +291,8 @@ export interface PrebuiltNode {
     subsection?: string;
   };
   tags?: string[];
+  /** 发布/更新时间（YYYY-MM-DD），可选 */
+  published?: string;
   /** 正文。graph-data.json 里没带的话，详情面板的「正文」页就是空的（见 detail-panel.buildBodyHtml）。 */
   body?: string;
   edges_out?: Array<{ target: string; type: string; reason?: string }>;
@@ -327,6 +330,7 @@ export function buildGraphFromPrebuilt(prebuilt: PrebuiltGraphData): BuildResult
     weight: n.weight ?? 1,
     location: n.location,
     tags: n.tags,
+    published: n.published,
     body: n.body,
     edges_out: n.edges_out,
     // rel from the prebuilt file is the sourcePath relative to public/content/

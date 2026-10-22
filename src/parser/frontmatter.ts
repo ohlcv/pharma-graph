@@ -58,6 +58,9 @@ export interface NodeMeta {
   /** 派生字段：优先 shortSummary，否则 fullSummary */
   summary?: string;
   location?: NodeLocation;
+
+  /** 文章发布/更新时间，格式 YYYY-MM-DD（可选，不参与图形编码） */
+  published?: string;
 }
 
 export interface EdgeDef {
@@ -138,6 +141,9 @@ function basename(filepath: string): string {
 
 /** 必需的顶级字段 */
 const REQUIRED_FIELDS = ['id'];
+
+/** published 字段允许的唯一格式 */
+const PUBLISHED_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Resolve the source-of-truth object. The new schema nests all metadata
@@ -311,6 +317,25 @@ export function parseFrontmatterWithWarnings(
     ? tagsRaw.filter((t): t is string => typeof t === 'string')
     : [];
 
+  // published —— 发布/更新时间，只接受 YYYY-MM-DD
+  // YAML 会把裸日期（published: 2026-01-29）解析成字符串，date 对象不会出现；
+  // 但若作者写字面量 `2026-1-29` 或带时间，则按非法格式告警而不是静默丢弃。
+  const publishedRaw = fm['published'];
+  const published =
+    typeof publishedRaw === 'string'
+      ? publishedRaw.trim()
+      : publishedRaw instanceof Date
+        ? publishedRaw.toISOString().slice(0, 10)
+        : undefined;
+  if (published !== undefined && !PUBLISHED_PATTERN.test(published)) {
+    warnings.push({
+      file: filePath,
+      field: 'published',
+      message: `published 值 "${published}" 不是 YYYY-MM-DD 格式`,
+      severity: 'warning',
+    });
+  }
+
   const result: ParseResult = {
     fm: {
       id,
@@ -321,6 +346,7 @@ export function parseFrontmatterWithWarnings(
       shortSummary,
       fullSummary,
       summary,
+      published,
       edges_out: edges.length > 0 ? edges : undefined,
       tags: tags.length > 0 ? tags : undefined,
       location: location
@@ -408,6 +434,8 @@ export function stringifyFrontmatter(fm: ParsedFrontmatter, body: string): strin
     if (fm.location.subsection) loc['subsection'] = fm.location.subsection;
     if (Object.keys(loc).length > 0) top['location'] = loc;
   }
+
+  if (fm.published) top['published'] = fm.published;
 
   const yamlStr = yamlStringify(top, { indent: 2, lineWidth: 0 });
   return `---\n${yamlStr}---\n${body}`;

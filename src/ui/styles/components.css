@@ -1856,6 +1856,12 @@
     line-height: 1.5;
     word-break: break-word;
   }
+  .np-hero__published {
+    font-size: var(--text-sm);
+    color: var(--muted);
+    line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+  }
   .np-hero__tags {
     display: flex;
     flex-wrap: wrap;

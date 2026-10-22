@@ -1160,6 +1160,7 @@ export class Renderer {
             summary: n.summary,
             location: n.location,
             tags: n.tags ?? [],
+            published: n.published,
             body: n.body,
             // 详情面板按它懒加载正文（body 不进 graph-data.json，见 detail-panel.loadBody）
             sourcePath: n.sourcePath,
