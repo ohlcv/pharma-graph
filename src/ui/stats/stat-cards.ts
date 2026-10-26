@@ -16,9 +16,26 @@ let _statsRaf: number | null = null;
 let _statsDebounce: ReturnType<typeof setTimeout> | null = null;
 let _statsPending = false;
 let _sheetStatsDebounce: ReturnType<typeof setTimeout> | null = null;
+/** Node/edge count signature of the last legend rebuild. */
+let _legendSignature = '';
 
 // Auto-start perf monitoring when this module is imported (boot-time init).
 startPerfMonitor();
+
+/**
+ * Legend counts are grouped by static node/edge attributes (`fill`, `edgeType`),
+ * so they only change when the graph gains or loses elements — not on every
+ * highlight/selection change. Rebuilding them on each stats tick used to run
+ * ~20 full-graph selector scans per keystroke (`match` was the second largest
+ * entry in the CPU profile), all of which returned the same numbers.
+ */
+function refreshLegendCounts(cy: Core): void {
+  const signature = `${cy.nodes().length}/${cy.edges().length}`;
+  if (signature === _legendSignature) return;
+  _legendSignature = signature;
+  populateEssenceLegend(cy);
+  populateEdgeLegend(cy);
+}
 
 function doUpdateStats(cy: Core): void {
   _statsPending = true;
@@ -35,8 +52,7 @@ function doUpdateStats(cy: Core): void {
     const el = document.getElementById('stat-layout');
     if (el) el.textContent = getCurrentLayout().toUpperCase();
 
-    populateEssenceLegend(cy);
-    populateEdgeLegend(cy);
+    refreshLegendCounts(cy);
   });
 }
 

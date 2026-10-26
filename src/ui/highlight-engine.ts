@@ -8,6 +8,12 @@ import { CLASSES } from '../core/renderer.js';
 export class HighlightEngine {
   private prevSelectedNodeId: string | null = null;
   private prevSelectedNodeName: string | null = null;
+  /** Ids of the current search hit set. `null` = no active search. */
+  private searchHits: Set<string> | null = null;
+  /** Cached lowercase `label` of every non-layer-parent node. */
+  private labelRows: { count: number; rows: Array<{ id: string; text: string }> } | null = null;
+  /** Elements currently dimmed by the active search via inline bypass. */
+  private searchDimmed: cytoscape.CollectionReturnValue | null = null;
 
   constructor(private cy: cytoscape.Core) {}
 
@@ -18,16 +24,33 @@ export class HighlightEngine {
 
   // ── Private helpers: extract common patterns ──────────────────────────────────
 
-  /** Clear all highlighting classes and selections. */
+  /**
+   * Clear every interaction-state class from the graph and drop any selection.
+   * Scoped to elements that actually carry one of these classes: cytoscape
+   * re-runs style resolution for *every* element passed to `removeClass`, even
+   * when the element doesn't have that class — a whole-graph sweep cost
+   * ~860ms on this graph while the affected set is usually a few dozen nodes.
+   */
   private resetClasses(): void {
-    this.cy
-      .elements()
-      .removeClass(
-        [CLASSES.DIMMED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED, CLASSES.HIGHLIGHTED_EDGE].join(
-          ' ',
-        ),
-      );
-    this.cy.elements().unselect();
+    this.cy.batch(() => {
+      this.cy
+        .elements(
+          [
+            CLASSES.DIMMED,
+            CLASSES.SELECTED_NODE,
+            CLASSES.HIGHLIGHTED,
+            CLASSES.HIGHLIGHTED_EDGE,
+          ]
+            .map((c) => `.${c}`)
+            .join(', '),
+        )
+        .removeClass(
+          [CLASSES.DIMMED, CLASSES.SELECTED_NODE, CLASSES.HIGHLIGHTED, CLASSES.HIGHLIGHTED_EDGE].join(
+            ' ',
+          ),
+        );
+      this.cy.$(':selected').unselect();
+    });
   }
 
   /** Dim edges that are not connected to any highlighted node.
@@ -62,6 +85,8 @@ export class HighlightEngine {
     prevNodeId: string | null;
     prevNodeName: string | null;
   } {
+    this.searchHits = null;
+    this.clearSearchDim();
     const prev = this.getSelectedNodeInfo();
 
     const node = this.cy.getElementById(nodeId);
@@ -97,6 +122,8 @@ export class HighlightEngine {
   }
 
   highlightNeighbors(nodeId: string): void {
+    this.searchHits = null;
+    this.clearSearchDim();
     const node = this.cy.getElementById(nodeId);
     if (node.empty()) return;
     this.cy.batch(() => {
@@ -108,38 +135,146 @@ export class HighlightEngine {
     });
   }
 
+  /**
+   * Lowercase label index, rebuilt only when the node count changes. Searching
+   * used to call `data('label').toLowerCase()` for every node on every
+   * keystroke — 2.7k allocations plus 2.7k cytoscape `data()` lookups per key,
+   * which showed up as the single largest `dataImpl` cost in the CPU profile.
+   */
+  private getLabelRows(): Array<{ id: string; text: string }> {
+    const count = this.cy.nodes().length;
+    if (this.labelRows && this.labelRows.count === count) return this.labelRows.rows;
+    const rows: Array<{ id: string; text: string }> = [];
+    this.cy.nodes().forEach((n: cytoscape.NodeSingular) => {
+      if (n.hasClass(CLASSES.LAYER_PARENT)) return;
+      rows.push({ id: n.id(), text: String(n.data('label') ?? '').toLowerCase() });
+    });
+    this.labelRows = { count, rows };
+    return rows;
+  }
+
   highlightSearch(query: string): string[] {
-    const results: string[] = [];
-    this.resetClasses();
+    const q = query.trim().toLowerCase();
+    if (!q) {
+      this.searchHits = null;
+      this.clearSearchDim();
+      this.cy.batch(() => this.resetClasses());
+      return [];
+    }
 
-    if (!query.trim()) return results;
+    const hits: string[] = [];
+    for (const row of this.getLabelRows()) {
+      if (row.text.includes(q)) hits.push(row.id);
+    }
+    const next = new Set(hits);
 
-    const q = query.toLowerCase();
-    this.cy.batch(() => {
-      const candidates = this.cy.nodes().not(`.${CLASSES.LAYER_PARENT}`);
-      // Partition first, then mutate each half once, instead of one
-      // addClass/select per node.
-      const hits = candidates.filter((n: cytoscape.NodeSingular) =>
-        ((n.data('label') ?? '') as string).toLowerCase().includes(q),
-      );
-      const misses = candidates.not(hits);
+    const prev = this.searchHits;
+    const prevLive = prev !== null && this.cy.nodes(`.${CLASSES.HIGHLIGHTED}`).length === prev.size;
 
-      hits.addClass(CLASSES.HIGHLIGHTED).select();
-      misses.addClass(CLASSES.DIMMED).unselect();
-      hits.forEach((n: cytoscape.NodeSingular) => {
-        results.push(n.id());
+    // Narrowing a query often leaves the hit set untouched (extra characters
+    // that match nothing, or the same single drug). In that case skip the whole
+    // restyle: cytoscape re-renders the viewport on any style change, and a
+    // no-op keystroke would otherwise pay for the whole graph.
+    if (
+      prevLive &&
+      prev.size === next.size &&
+      // Self-check: another code path (focusOnNode on commit, a legend filter)
+      // may have replaced `.highlighted` since the last search. Counting the
+      // live class set is one selector pass and keeps the cache honest.
+      [...next].every((id) => prev.has(id))
+    ) {
+      return hits;
+    }
+
+    if (!prevLive) {
+      // Fresh search session. Hits get the `.highlighted` class; everything
+      // else is dimmed with an *inline bypass* instead of `.dimmed`. Both end
+      // up looking the same, but a class change forces cytoscape to re-match
+      // the stylesheet (~0.2ms per element, ~750ms for this graph), while a
+      // bypass only overrides one property (~0.02ms per element). That
+      // difference is the typing freeze users hit on the first character.
+      this.clearSearchDim();
+      const hitNodes = this.nodesById(next);
+      const hitEdges = hitNodes.edgesWith(hitNodes);
+      this.cy.batch(() => {
+        this.resetClasses();
+        hitNodes.addClass(CLASSES.HIGHLIGHTED);
+        hitEdges.addClass(CLASSES.HIGHLIGHTED_EDGE);
+        this.dimElements(
+          this.cy
+            .elements()
+            .not(hitNodes)
+            .not(hitEdges)
+            .not(`.${CLASSES.LAYER_PARENT}`),
+        );
       });
+      this.searchHits = next;
+      return hits;
+    }
 
-      this.dimUnhighlightedEdges();
+    // Same search session — only touch the elements whose state actually
+    // changed, so a keystroke costs O(delta) instead of O(graph).
+    const added: string[] = [];
+    for (const id of hits) if (!prev.has(id)) added.push(id);
+    const removed: string[] = [];
+    for (const id of prev) if (!next.has(id)) removed.push(id);
+
+    this.cy.batch(() => {
+      const addedNodes = this.nodesById(new Set(added));
+      addedNodes.removeClass(CLASSES.DIMMED).removeStyle('opacity').addClass(CLASSES.HIGHLIGHTED);
+
+      const removedNodes = this.nodesById(new Set(removed));
+      removedNodes.removeClass(CLASSES.HIGHLIGHTED);
+      this.dimElements(removedNodes);
+
+      // Edges are only lit while both endpoints are hits, so every edge
+      // touching a changed node needs re-evaluating.
+      const touchedEdges = addedNodes.union(removedNodes).connectedEdges();
+      const internalEdges = touchedEdges.filter(
+        (e: cytoscape.EdgeSingular) => next.has(e.source().id()) && next.has(e.target().id()),
+      );
+      internalEdges.removeStyle('opacity').addClass(CLASSES.HIGHLIGHTED_EDGE);
+      this.dimElements(touchedEdges.not(internalEdges).removeClass(CLASSES.HIGHLIGHTED_EDGE));
     });
 
-    return results;
+    this.searchHits = next;
+    return hits;
+  }
+
+  /**
+   * Collect nodes by id with a plain JS filter — avoids generating a compound
+   * selector (string escaping + selector engine) every keystroke.
+   */
+  private nodesById(ids: Set<string>): cytoscape.CollectionReturnValue {
+    return this.cy.nodes().filter((n: cytoscape.NodeSingular) => ids.has(n.id()));
+  }
+
+  /** Opacity used for non-matches while a search is active (mirrors `.dimmed`). */
+  private static readonly SEARCH_DIM_OPACITY = 0.1;
+
+  /**
+   * Dim elements with an inline bypass and remember them, so the whole set can
+   * be restored in one go when the search ends or another highlight takes over.
+   */
+  private dimElements(elements: cytoscape.CollectionReturnValue): void {
+    if (elements.empty()) return;
+    elements.style('opacity', HighlightEngine.SEARCH_DIM_OPACITY);
+    this.searchDimmed = this.searchDimmed ? this.searchDimmed.union(elements) : elements;
+  }
+
+  /** Restore every element dimmed by the current search. */
+  private clearSearchDim(): void {
+    if (!this.searchDimmed) return;
+    this.cy.batch(() => this.searchDimmed?.removeStyle('opacity'));
+    this.searchDimmed = null;
   }
 
   /**
    * Highlight nodes by their `fill` value (领域顶层类), e.g. `cls-drug`, `cls-feature`.
    */
   highlightFill(fill: string): void {
+    this.searchHits = null;
+    this.clearSearchDim();
     this.cy.batch(() => {
       this.resetClasses();
 
@@ -153,6 +288,8 @@ export class HighlightEngine {
   }
 
   highlightEdgeType(edgeType: string): void {
+    this.searchHits = null;
+    this.clearSearchDim();
     this.cy.batch(() => {
       this.resetClasses();
 
@@ -174,10 +311,14 @@ export class HighlightEngine {
   }
 
   dimAll(): void {
+    this.searchHits = null;
+    this.clearSearchDim();
     this.cy.elements().addClass(CLASSES.DIMMED);
   }
 
   highlightEdgeOnly(edgeId: string): void {
+    this.searchHits = null;
+    this.clearSearchDim();
     const edge = this.cy.getElementById(edgeId);
     if (edge.empty()) return;
     this.cy.batch(() => {
@@ -190,6 +331,8 @@ export class HighlightEngine {
   }
 
   reset(): void {
+    this.searchHits = null;
+    this.clearSearchDim();
     this.cy.batch(() => {
       this.resetClasses();
       // Clear any inline border styles set by highlightNode() (border-width,

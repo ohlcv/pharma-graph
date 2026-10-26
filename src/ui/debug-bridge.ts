@@ -33,12 +33,14 @@ export interface DebugBridge {
   };
   /** 预览漫游顺序。控制台调用：_dbg.previewSequence() / _dbg.previewSequence('has-dfs') */
   previewSequence: (strategyId?: string) => void;
+  cy: () => cytoscape.Core;
 }
 
 export function installDebugBridge(renderer: Renderer): void {
   const cy: cytoscape.Core = renderer.getCy();
 
   const bridge: DebugBridge = {
+    cy: () => cy,
     overlay: () => {
       toggleDebugOverlay(renderer);
     },

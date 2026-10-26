@@ -29,6 +29,8 @@ export class Search {
   private _activeIndex = -1;
   /** Becomes true the moment the user presses ArrowUp/Down or Enter. */
   private _hasNavigated = false;
+  /** Whether a search session (non-empty query) is already running. */
+  private _isActive = false;
 
   constructor(
     private cy: cytoscape.Core,
@@ -43,9 +45,12 @@ export class Search {
    * Returns the ordered list of matching node IDs.
    */
   search(query: string): string[] {
-    // Clear any active legend filter so the search results aren't
-    // contaminated by a previously active shape/edge filter.
-    clearAllFilters();
+    const active = query.trim().length > 0;
+    // Clearing the legend filter is bookkeeping (active-filter state + row
+    // `.active` classes), not something that changes per character. Doing it on
+    // every keystroke walked the legend DOM for no reason.
+    if (active && !this._isActive) clearAllFilters();
+    this._isActive = active;
     this.results = this.highlight.highlightSearch(query);
     this._activeIndex = -1;
     this._hasNavigated = false;
@@ -110,6 +115,7 @@ export class Search {
     this.results = [];
     this._activeIndex = -1;
     this._hasNavigated = false;
+    this._isActive = false;
     clearAllFilters();
     forEachStatic((el) => el.classList.remove('active'), '.legend-row', '.bs-chip');
     this.highlight.reset();
