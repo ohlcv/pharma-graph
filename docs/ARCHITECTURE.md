@@ -1,6 +1,6 @@
 # 药学知识图谱 · 架构文档（ARCHITECTURE）
 
-> 更新日期：2026-10-18　·　基线：commit `81feb676`（工作树 clean；`public/graph-data.json` 为已提交的构建产物）
+> 更新日期：2026-10-26　·　基线：commit `a17c9624`（工作树 clean；`public/graph-data.json` 为已提交的构建产物）
 >
 > 本文件是项目的**结构地图**：每个目录、每个文件的路径、职责、大小与行数，以及最终汇总。它是活文档，`src/`、`tests/`、`scripts/`、`docs/` 有变动时应同步更新。
 >
@@ -14,7 +14,7 @@
 
 - 数据源：`public/content/**/*.md`（frontmatter 承载节点元数据）
 - 构建期：脚本把 Markdown 预生成为 `graph-data.json` + `content-manifest.json`
-- 渲染：前端用 Cytoscape.js 渲染 **2,720 节点 / 3,161 边**的交互拓扑，附带漫游学习引擎
+- 渲染：前端用 Cytoscape.js 渲染 **2,731 节点 / 3,172 边**的交互拓扑，附带漫游学习引擎
 
 数据与视图分离，关系只在发起方（`edges_out`）单向定义。详见 [DEVELOP.md](./DEVELOP.md)。
 
@@ -24,13 +24,13 @@
 
 | 路径                                        | 类型 | 职责                                                                          | 大小 / 行数                                                   |
 | ------------------------------------------- | ---- | ----------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `src/`                                      | 目录 | 全部 TypeScript 源码（解析 / 核心逻辑 / UI）—— **不含测试**                   | 82 文件 / 31,217 行                                           |
+| `src/`                                      | 目录 | 全部 TypeScript 源码（解析 / 核心逻辑 / UI）—— **不含测试**                   | 82 文件 / 31,431 行                                           |
 | `tests/`                                    | 目录 | **物理隔离于 `src/` 的测试树**（`unit/` `component/` `e2e/` 三层；详见 §3.7） | 46 文件 / 9,039 行                                            |
 | `scripts/`                                  | 目录 | 构建与治理入口（构建链、校验、审计）                                          | 10 文件 / 2,359 行                                            |
-| `build/`                                    | 目录 | 构建期库代码（被 vite.config 与 scripts 入口共享）                            | 1 文件 / 623 行                                               |
+| `build/`                                    | 目录 | 构建期库代码（被 vite.config 与 scripts 入口共享）                            | 1 文件 / 638 行                                               |
 | `tools/`                                    | 目录 | 一次性修复 / 迁移 / 性能测量工具（用完归档）                                   | 23 文件 / 4,192 行                                            |
-| `docs/`                                     | 目录 | 文档（架构、规范、ADR 决策记录、调试记录、审计报告）                          | 48 文件 / 36,809 行                                           |
-| `public/`                                   | 目录 | 静态资产 + 内容 Markdown + 预生成数据（Vite 的 publicDir）                    | 2,747 文件 / 71,824 行                                        |
+| `docs/`                                     | 目录 | 文档（架构、规范、ADR 决策记录、调试记录、审计报告）                          | 48 文件 / 36,825 行                                           |
+| `public/`                                   | 目录 | 静态资产 + 内容 Markdown + 预生成数据（Vite 的 publicDir）                    | 2,758 文件 / 96,905 行                                        |
 | `dist/`                                     | 目录 | Vite 构建产物，vercel 部署时自动构建，不入仓库                                | —                                                             |
 | `examples/`                                 | 目录 | 功能演示页                                                                    | 1 文件 / 1,717 行                                             |
 | `archive/`                                  | 目录 | 归档内容与一次性迁移脚本                                                      | 7 文件 / 3,005 行（根目录 2 个 + `archive/scripts/` 5 个 ts） |
@@ -51,25 +51,25 @@
 
 > **测试隔离约定**：测试文件**全部**放在 `tests/`（参见 AGENTS.md §2.4），不在 `src/` 下。`vite.config.ts` 通过 `build.rollupOptions.external` 把 `*.test.*` 路径排除出生产构建，ESLint `no-restricted-imports` 禁止业务源码 `import` 测试文件。
 
-## 3. `src/` — 源码（82 个文件，31,217 行，约 1.12 MB，不含测试）
+## 3. `src/` — 源码（82 个文件，31,431 行，约 1.13 MB，不含测试）
 
-### 3.1 `src/parser/` — Markdown 解析层（3 文件 / 469 行 / 18,073 B）
+### 3.1 `src/parser/` — Markdown 解析层（3 文件 / 497 行 / 19,108 B）
 
 | 路径                            | 职责                                         |     大小 | 行数 |
 | ------------------------------- | -------------------------------------------- | -------: | ---: |
 | `src/parser/content-manager.ts` | 扫描 content 目录、收集文件                  |    726 B |   21 |
-| `src/parser/frontmatter.ts`     | frontmatter 解析 / 序列化 / 校验入口         | 15,864 B |  414 |
+| `src/parser/frontmatter.ts`     | frontmatter 解析 / 序列化 / 校验入口         | 16,899 B |  442 |
 | `src/parser/schema.ts`          | fill 白名单（从 FILL_CONFIG 派生）与字段校验 |  1,483 B |   34 |
 
 > 测试已迁出 `src/parser/`，见 §3.7 / §6。原 `frontmatter.test.ts`、`location-audit.test.ts` 现在位于 `tests/component/parser/`。
 
-### 3.2 `src/core/` — 图谱核心逻辑（顶层 20 文件 + `spectacle/` 5 文件 / 10,561 行 / 421,684 B；测试见 §3.7）
+### 3.2 `src/core/` — 图谱核心逻辑（顶层 20 文件 + `spectacle/` 5 文件 / 10,568 行 / 421,983 B；测试见 §3.7）
 
 **顶层（20 文件）**
 
 | 路径                                   | 职责                                               |     大小 |  行数 |
 | -------------------------------------- | -------------------------------------------------- | -------: | ----: |
-| `src/core/build-graph.ts`              | 从 frontmatter 构建节点边 + BFS 深度 / 子树算法    | 12,584 B |   344 |
+| `src/core/build-graph.ts`              | 从 frontmatter 构建节点边 + BFS 深度 / 子树算法    | 12,719 B |   348 |
 | `src/core/config.ts`                   | 全局配置：FILL_CONFIG / 布局 / 边类型映射 / 主题色 | 34,374 B |   859 |
 | `src/core/content-loader.ts`           | 内容加载器                                         |  3,523 B |    80 |
 | `src/core/device-capability.ts`        | 设备能力检测（移动端 / 大屏 / 能否逐帧动画）       |  5,133 B |   115 |
@@ -78,7 +78,7 @@
 | `src/core/force-drag.ts`               | 力导向拖拽交互                                     | 10,922 B |   332 |
 | `src/core/glow-overlay.ts`             | glow / flow 光效覆盖层（独立 canvas）              | 43,607 B |   967 |
 | `src/core/graph-manager.ts`            | 图数据装配与缓存管理                               |  3,826 B |   110 |
-| `src/core/graph.ts`                    | 节点 / 边数据结构定义                              |  4,193 B |    95 |
+| `src/core/graph.ts`                    | 节点 / 边数据结构定义                              |  4,321 B |    97 |
 | `src/core/halton.ts`                   | Halton 低差异序列（预动画铺点）                    |    965 B |    25 |
 | `src/core/layout-worker.ts`            | 布局 Web Worker 入口（euler 在 worker 内算）       |  2,700 B |    85 |
 | `src/core/layout-worker-client.ts`     | Worker 客户端 + 等待预动画 + 入场插值              | 14,996 B |   404 |
@@ -86,7 +86,7 @@
 | `src/core/node-shape-outline.ts`       | 节点形状描边渲染                                   |  8,089 B |   233 |
 | `src/core/optimized-content-loader.ts` | 流式 .md 加载 fallback                             | 11,475 B |   372 |
 | `src/core/prebuilt-loader.ts`          | 加载预生成 graph-data.json                         |  4,407 B |   110 |
-| `src/core/renderer.ts`                 | Cytoscape 实例 + 样式表 + 布局入口                 | 52,769 B | 1,195 |
+| `src/core/renderer.ts`                 | Cytoscape 实例 + 样式表 + 布局入口                 | 52,805 B | 1,196 |
 | `src/core/theme-colors.ts`             | 主题色读取与切换                                   |  1,392 B |    35 |
 | `src/core/tour.ts`                     | 漫游引擎（DFS/拓扑序、档位、applyRootScope）       | 96,033 B | 2,238 |
 
@@ -132,7 +132,7 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 | ------------------------------------- | ---------------------- | ----: | ---: |
 | `src/types/cytoscape-extensions.d.ts` | Cytoscape 类型声明补充 | 270 B |   14 |
 
-### 3.5 `src/ui/` — 浏览器层 UI（52 文件 / 18,984 行 / 698,847 B）
+### 3.5 `src/ui/` — 浏览器层 UI（52 文件 / 19,163 行 / 706,330 B）
 
 > 含根目录 33 个 `.ts` + `layout/` 7 个 + `stats/` 3 个 + `styles/` 9 个 `.css`（`src/` 树内另有 4 个 `.DS_Store`，为 macOS 元数据，不计入）；测试见 §3.7。
 
@@ -146,7 +146,7 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 | `src/ui/action-handlers.ts`   | 注册全部 action 处理器            |  5,474 B |  171 |
 | `src/ui/dom-cache.ts`         | DOM 引用缓存                      |  1,963 B |   54 |
 | `src/ui/logger.ts`            | 日志工具（DEV 才输出）            |  1,583 B |   41 |
-| `src/ui/debug-bridge.ts`      | 调试桥接                          |  2,971 B |   93 |
+| `src/ui/debug-bridge.ts`      | 调试桥接                          |  3,017 B |   95 |
 | `src/ui/ui-helpers.ts`        | 通用 UI 辅助（toast 等）          |  3,624 B |   84 |
 | `src/ui/app-debug.ts`         | 应用调试面板（独立调试 UI）       | 41,234 B |  938 |
 
@@ -157,11 +157,11 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 | `src/ui/graph-events.ts`       | Cytoscape 事件绑定（点击 / 悬停 / 缩放） | 12,525 B |   289 |
 | `src/ui/drag-manager.ts`       | 侧栏 / 面板拖拽与吸附                    | 22,385 B |   624 |
 | `src/ui/focus-node.ts`         | 节点聚焦                                 |  4,108 B |   113 |
-| `src/ui/highlight-engine.ts`   | 高亮引擎                                 |  7,885 B |   236 |
-| `src/ui/search.ts`             | 搜索逻辑                                 |  6,078 B |   167 |
+| `src/ui/highlight-engine.ts`   | 高亮引擎                                 |  13,932 B |   379 |
+| `src/ui/search.ts`             | 搜索逻辑                                 |  6,399 B |   173 |
 | `src/ui/search-ui.ts`          | 搜索 UI                                  |  7,844 B |   196 |
 | `src/ui/keyboard-shortcuts.ts` | 快捷键                                   |  3,491 B |   114 |
-| `src/ui/detail-panel.ts`       | 节点详情面板（正文懒加载）               | 28,750 B |   648 |
+| `src/ui/detail-panel.ts`       | 节点详情面板（正文懒加载）               | 28,971 B |   654 |
 | `src/ui/bigscreen.ts`          | 大屏模式                                 | 23,139 B |   555 |
 | `src/ui/ui-toggle.ts`          | UI 开关                                  |  6,037 B |   170 |
 | `src/ui/music-player.ts`       | 背景音乐                                 |  3,080 B |    93 |
@@ -200,7 +200,7 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 | `src/ui/legend-manager.ts`       | 图例管理          | 12,334 B |  289 |
 | `src/ui/layout-manager.ts`       | 布局管理          |  1,317 B |   37 |
 | `src/ui/layout-menu.ts`          | 布局菜单          |    408 B |   11 |
-| `src/ui/stats/stat-cards.ts`     | 统计卡片          |  2,541 B |   62 |
+| `src/ui/stats/stat-cards.ts`     | 统计卡片          |  3,243 B |   78 |
 | `src/ui/stats/stat-animation.ts` | 统计动画          |  1,640 B |   59 |
 | `src/ui/stats/perf-monitor.ts`   | 性能监控（UI 侧） |  5,117 B |  166 |
 
@@ -209,7 +209,7 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 | 路径                                       | 职责                         |     大小 | 行数 |
 | ------------------------------------------ | ---------------------------- | -------: | ---: |
 | `src/ui/styles/base.css`                   | 基础样式                     | 18,536 B |  437 |
-| `src/ui/styles/components.css`             | 组件样式（最大）             |108,666 B |3,754 |
+| `src/ui/styles/components.css`             | 组件样式（最大）             |108,812 B |3,760 |
 | `src/ui/styles/glass.css`                  | 液态玻璃皮肤（@layer glass） | 36,171 B |  929 |
 | `src/ui/styles/index.css`                  | 样式入口                     |  1,572 B |   24 |
 | `src/ui/styles/layout.css`                 | 布局样式                     | 20,316 B |  672 |
@@ -222,12 +222,12 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 
 | 路径                                   | 文件数 |    行数 |      字节 |
 | -------------------------------------- | -----: | ------: | --------: |
-| `src/parser/`                          |      3 |     469 |    18,073 |
-| `src/core/`（含 `spectacle/`）         |     25 |  10,561 |   421,684 |
+| `src/parser/`                          |      3 |     497 |    19,108 |
+| `src/core/`（含 `spectacle/`）         |     25 |  10,568 |   421,983 |
 | `src/data/`                            |      1 |   1,189 |    37,805 |
 | `src/types/`                           |      1 |      14 |       270 |
-| `src/ui/`（含 layout/ stats/ styles/） |     52 |  18,984 |   698,847 |
-| **合计**                               | **82** |**31,217**|**1,176,679** |
+| `src/ui/`（含 layout/ stats/ styles/） |     52 |  19,163 |   706,330 |
+| **合计**                               | **82** |**31,431**|**1,185,496** |
 
 > 不含 `*.test.ts`：测试全部位于 §3.7 的 `tests/` 树。`src/` 树内有 4 个 `.DS_Store`（macOS 元数据，已剔除）。
 
@@ -335,11 +335,11 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 | `scripts/validate-graph-deep.ts`    | 深度校验                              |  4,482 B |  141 |
 | `scripts/validate.ts`               | 严格 schema 校验（CI 门禁，非零退出） |  5,223 B |  163 |
 
-### 4.2 `build/` — 构建期共享库（1 个文件，623 行，约 22 KB）
+### 4.2 `build/` — 构建期共享库（1 个文件，638 行，约 22 KB）
 
 | 路径                     | 职责                                                                                                                |     大小 | 行数 |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------- | -------: | ---: |
-| `build/build-content.ts` | 内容构建核心：frontmatter 解析 → graph-data.json / content-manifest / sitemap（被 vite.config 与 scripts 入口共享） | 22,093 B |  623 |
+| `build/build-content.ts` | 内容构建核心：frontmatter 解析 → graph-data.json / content-manifest / sitemap（被 vite.config 与 scripts 入口共享） | 22,659 B |  638 |
 
 ### 4.3 `tools/` — 一次性修复 / 迁移 / 测量工具（23 个文件，4,192 行，约 142 KB）
 
@@ -371,7 +371,7 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 
 > 迁移说明：`build-content.ts` 原在 `scripts/`，因被 vite.config.ts 与多个 scripts 入口 import，属共享库，移至 `build/`。一次性修复 / 迁移 / 测量 / 截图工具（`fix-*`、`migrate-*`、`audit-*`、`measure-*`、`profile-*`、`probe-*`、`snap-*`、`trace-*`、`preview-*`）不参与构建链，统一放 `tools/`。
 
-## 5. `docs/` — 文档（48 个文件，36,809 行，约 4.79 MB）
+## 5. `docs/` — 文档（48 个文件，36,825 行，约 4.79 MB）
 
 ### 5.1 架构与规范
 
@@ -381,11 +381,11 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 | `docs/CODE-WIKI.md`         | 代码维基（全文件级说明；2026-08 后未刷新，部分行级说明可能漂移 → 待 refresh） |  41,052 B |   675 |
 | `docs/RULES.md`             | 规则汇总                                                                      |  25,526 B |   318 |
 | `docs/SKILL.md`             | 技能 / 工作流说明                                                             |  60,615 B |   998 |
-| `docs/frontmatter.md`       | frontmatter 模板与规范                                                        |  15,931 B |   264 |
+| `docs/frontmatter.md`       | frontmatter 模板与规范                                                        |  16,665 B |   280 |
 | `docs/frontmatter-audit.md` | 审计报告（生成物，由 `npm run audit` 生成；勿手改）                           |1,085,766 B | 6,987 |
 | `docs/Cytoscape.md`         | Cytoscape.js v3 通用速查（不绑定项目）                                        |  12,423 B |   408 |
 | `docs/布局参数清单.md`      | LAYOUTS 配置审计清单（cytoscape 扩展字段校对）                                |  64,024 B |   710 |
-| `docs/ARCHITECTURE.md`      | 本文件（结构地图，活文档；自身大小会随编辑变动）                              |  53,072 B |   558 |
+| `docs/ARCHITECTURE.md`      | 本文件（结构地图，活文档；自身大小会随编辑变动）                              |  53,288 B |   558 |
 
 ### 5.2 决策记录 `docs/ADR/`
 
@@ -403,7 +403,7 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 | `docs/ADR/ADR-0008-surface-shadow-transition-tokens.md`     | 表面 / 阴影 / 过渡令牌                                        |    4,943 B |   119 |
 | `docs/ADR/ADR-0009-tour-scope-modes.md`                    | 漫游范围模式（单选子树 / 筛选集合）                           |    5,411 B |   126 |
 | `docs/ADR/ADR-0010-ios-lockscreen-narration-local-tts.md`  | iOS 锁屏漫游旁白（本地 WASM TTS + 循环音频保活，无后端无增量费用） |   13,677 B |   247 |
-| `docs/ADR/migration-report-ADR-0001-APPLY.md`               | ADR-0001 迁移执行报告（217 文件 / 167 isa 转换 / 2026-07-14） |  105,338 B | 1,249 |
+| `docs/ADR/ADR-0001-migration-report.md`                     | ADR-0001 迁移执行报告（217 文件 / 167 isa 转换 / 2026-07-14） |  105,338 B | 1,249 |
 
 ### 5.3 调试记录 `docs/DEBUG/`
 
@@ -471,14 +471,14 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 >
 > **跑测试**：`npm test`（一次性）/ `npm run test:watch` / `npx vitest run tests/unit`（最快）/ `npx vitest run tests/component`（DOM）。
 
-## 7. `public/` — 静态资产与内容（2,747 文件，71,824 行，约 11.7 MB）
+## 7. `public/` — 静态资产与内容（2,758 文件，96,905 行，约 12.5 MB）
 
 | 路径                                                    | 内容                                          |        大小 |
 | ------------------------------------------------------- | --------------------------------------------- | ----------: |
-| `public/content/**/*.md`                                | 知识节点 Markdown（**2,720 个文件**）         | ≈ 2.1 MB |
-| `public/graph-data.json`                                | 构建期预生成整图数据（单行 JSON，2,720 节点 / 3,161 边） | 3,474,817 B |
-| `public/content-manifest.json`                          | 节点索引（构建生成，不提交）                  |   326,279 B |
-| `public/sitemap.xml`                                    | SEO 站点地图（构建生成，不提交）              | 1,262,895 B |
+| `public/content/**/*.md`                                | 知识节点 Markdown（**2,731 个文件**）         | ≈ 2.8 MB |
+| `public/graph-data.json`                                | 构建期预生成整图数据（单行 JSON，2,731 节点 / 3,172 边） | 3,488,228 B |
+| `public/content-manifest.json`                          | 节点索引（构建生成，不提交）                  |   327,070 B |
+| `public/sitemap.xml`                                    | SEO 站点地图（构建生成，不提交）              | 1,266,481 B |
 | `public/audio/Echoes of the Eye - Travelers Encore.mp3` | 背景音乐                                      |     3.3 MB |
 | `public/images/`（2 张 PNG：目录图 / 拓扑图）           | 目录与拓扑图                                  |   1,777,594 B |
 | `public/diagnose.js`                                    | 诊断脚本                                      |     1,572 B |
@@ -486,7 +486,7 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 | `public/favicon.svg`                                    | 图标                                          |     1,082 B |
 | `public/robots.txt`                                     | 爬虫协议                                      |       525 B |
 
-> `public/content/` 按学科分目录：`药学专业知识二`（2,453 个 `.md`）、`个人成长与生存策略`（179，辅助体系）、`药学综合知识与技能`（69）、`药学专业知识一`（14）；另有 5 个科目级 `.md`（`药学专业知识一/二/综合知识与技能.md`、`药事管理与法规.md`、`执业药师考试体系.md`）。节点目录结构：`{科目}/{章}/{节}/{考点}.md`。
+> `public/content/` 按学科分目录：`药学专业知识二`（2,453 个 `.md`）、`个人成长与生存策略`（179，辅助体系）、`药学综合知识与技能`（69）、`药学专业知识一`（14）、`药事管理与法规`（11）；另有 5 个科目级 `.md`（`药学专业知识一/二/综合知识与技能.md`、`药事管理与法规.md`、`执业药师考试体系.md`）。节点目录结构：`{科目}/{章}/{节}/{考点}.md`。另有 17 个无扩展名的说明文档（如 `00 阅读指南`、`…_节点说明总结`），**不入图**、不参与解析。
 
 ---
 
@@ -508,28 +508,28 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 
 | 区域                                                                                          |      文件数 |          行数 |             字节 |
 | --------------------------------------------------------------------------------------------- | ----------: | ------------: | ---------------: |
-| `src/`（源码，不含测试）                                                                      |          82 |        31,217 |        1,176,679 |
+| `src/`（源码，不含测试）                                                                      |          82 |        31,431 |        1,185,496 |
 | `tests/`（顶层测试树）                                                                        |          46 |         9,039 |          341,101 |
 | `scripts/`                                                                                    |          10 |         2,359 |           77,377 |
-| `build/`                                                                                      |           1 |           623 |           22,093 |
+| `build/`                                                                                      |           1 |           638 |           22,659 |
 | `tools/`                                                                                      |          23 |         4,192 |          145,122 |
-| `docs/`（不含 archive 子目录）                                                                |          25 |        15,276 |        1,622,089 |
+| `docs/`（不含 archive 子目录）                                                                |          25 |        15,292 |        1,622,823 |
 | `docs/archive/`（不含 zip）                                                                   |          22 |        21,533 |        1,259,283 |
 | `docs/archive/content v1.0.zip`（二进制）                                                     |           1 |             — |        2,136,627 |
-| `public/`（含 content）                                                                       |       2,747 |        71,824 |       12,249,561 |
+| `public/`（含 content）                                                                       |       2,758 |        96,905 |       13,087,038 |
 | `examples/`                                                                                   |           1 |         1,717 |           60,357 |
 | `archive/`（根目录：HTML 1 + vercel.json + scripts/ 5 个 ts）                                 |           7 |         3,005 |          112,709 |
-| **小计（非二进制，不含 zip）**                                                                | **2,963** |  **160,785** |   **17,066,371** |
+| **小计（非二进制，不含 zip）**                                                                | **2,975** |  **186,111** |   **17,913,965** |
 | 根配置文件（package*.json、tsconfig、vite、vitest、eslint、prettier、vercel、env、editorconfig、gitignore、prettierignore、AGENTS、README、`.cursor/rules/*.mdc` 等） | 16 | 12,900 | 479,633 |
-| 二进制 / 大文件（graph-data.json 3.5MB、sitemap.xml 1.3MB、content-manifest.json 327KB、音频 3.3MB、PNG 1.8MB、zip 2.1MB） | 7 | — | ≈ 12,233,113 |
-| **总计**                                                                                      | **2,986** |  **173,685** |   **≈ 29,779,117** |
+| 二进制 / 大文件（graph-data.json 3.5MB、sitemap.xml 1.3MB、content-manifest.json 327KB、音频 3.3MB、PNG 1.8MB、zip 2.1MB） | 7 | — | ≈ 12,250,901 |
+| **总计**                                                                                      | **2,998** |  **199,011** |   **≈ 30,644,499** |
 
 > 说明：
 >
-> - 行数为 `wc -l` 等价统计（换行符 \n 计数），字节为文件字节数（含换行）。
+> - 行数为 `wc -l` 等价统计（换行符 \n 计数），字节为文件字节数（含换行）；`public/` 行数不含音频 / PNG 等二进制。
 > - `docs/archive/content v1.0.zip` 为二进制，不计行，故不计入「小计」。
 > - 汇总不含 `dist/`（CI 生成）。
-> - **「二进制 / 大文件」行与 `public/` 行存在重复计入**（那 6 项本就在 `public/` 内），沿用原文口径仅作体积提示；因此「总计」的字节数偏高。**仓库实际体积 ≈ 17,054,618 + 479,633 ≈ 17.5 MB（不含 `.git`）**。
+> - **「二进制 / 大文件」行与 `public/` 行存在重复计入**（那 6 项本就在 `public/` 内），沿用原文口径仅作体积提示；因此「总计」的字节数偏高。**仓库实际体积 ≈ 17,913,965 + 479,633 ≈ 18.4 MB（不含 `.git`）**。
 > - 决策记录（ADR）全部位于 `docs/ADR/` 单一目录下。
 > - `tests/` 与 `src/` 物理分离（AGENTS.md §2.4）；业务源码 import 测试文件会被 ESLint 拒绝。
 > - 全库另有 37 个 `.DS_Store`（macOS 元数据），各表统计均已剔除。
@@ -540,7 +540,7 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 
 1. **新增 / 删除文件**：更新对应目录的表格，保持"路径 ↔ 职责 ↔ 大小 / 行数"一致。新增测试时必须放进 `tests/{unit,component,e2e}/`，**不放回 `src/`**。
 2. **大文件预警**（≥ 30KB）：
-   - 源码：`src/ui/styles/components.css`（106KB / 3,754 行）、`src/core/tour.ts`（94KB / 2,238 行）、`src/ui/tour-controller.ts`（68KB）、`src/core/renderer.ts`（52KB）、`src/ui/speech.ts`（46KB）、`src/ui/main.ts`（44KB）、`src/core/glow-overlay.ts`（43KB）、`src/ui/app-debug.ts`（40KB）、`src/core/config.ts`（34KB）—— 接近拆分阈值，**改之前先看是否该沿职责切分**。
+   - 源码：`src/ui/styles/components.css`（108KB / 3,760 行）、`src/core/tour.ts`（94KB / 2,238 行）、`src/ui/tour-controller.ts`（68KB）、`src/core/renderer.ts`（52KB）、`src/ui/speech.ts`（46KB）、`src/ui/main.ts`（44KB）、`src/core/glow-overlay.ts`（43KB）、`src/ui/app-debug.ts`（40KB）、`src/core/config.ts`（34KB）—— 接近拆分阈值，**改之前先看是否该沿职责切分**。
    - 样式：`src/ui/styles/tour.css`（39KB）、`glass.css`（35KB）。
    - 文档：`docs/archive/all-frontmatter-extracted.md`（630KB）为生成物，勿手改；`docs/布局参数清单.md`（64KB）为审计产物。
    - 数据：`public/graph-data.json`（3.5MB）随节点数膨胀，每次内容改动都会重建。
