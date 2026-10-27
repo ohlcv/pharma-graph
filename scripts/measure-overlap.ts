@@ -17,6 +17,7 @@ import euler from 'cytoscape-euler';
 import dagre from 'cytoscape-dagre';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parse as yamlParse } from 'yaml';
 import { LAYOUTS } from '../src/core/config.js';
 
@@ -30,7 +31,7 @@ const NODE_H = 36;
 const DEFAULT_W = NODE_W;
 const DEFAULT_H = NODE_H;
 
-const CONTENT_DIR = '/Users/meow/Developer/pharma-graph/public/content';
+const CONTENT_DIR = fileURLToPath(new URL('../public/content', import.meta.url));
 
 function walk(dir: string): string[] {
   const out: string[] = [];
