@@ -100,10 +100,14 @@ export interface ParseResult {
   warnings: ParseWarning[];
 }
 
-function parseFrontmatterRaw(raw: string): { data: Record<string, unknown>; content: string } {
+function parseFrontmatterRaw(raw: string): {
+  data: Record<string, unknown>;
+  content: string;
+  hasFrontmatter: boolean;
+} {
   const trimmed = raw.replace(/^\uFEFF/, ''); // Remove BOM
   const match = trimmed.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)/);
-  if (!match) return { data: {}, content: trimmed };
+  if (!match) return { data: {}, content: trimmed, hasFrontmatter: false };
   const yamlBlock = match[1];
   const content = match[2];
   let data: Record<string, unknown>;
@@ -116,7 +120,7 @@ function parseFrontmatterRaw(raw: string): { data: Record<string, unknown>; cont
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(`YAML 解析失败：${msg}`);
   }
-  return { data, content };
+  return { data, content, hasFrontmatter: true };
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────
@@ -183,7 +187,12 @@ export function parseFrontmatterWithWarnings(
   filePath: string,
   options: { softFail?: boolean } = {},
 ): ParseResult {
-  const { data, content } = parseFrontmatterRaw(raw);
+  const { data, content, hasFrontmatter } = parseFrontmatterRaw(raw);
+  if (!hasFrontmatter) {
+    throw new Error(
+      `frontmatter 缺失或格式错误：文件第一行必须是顶格的 ---，并以另一行顶格的 --- 结束（文件: ${filePath}）`,
+    );
+  }
   const fm = pickSource(data);
   const warnings: ParseWarning[] = [];
 

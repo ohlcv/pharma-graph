@@ -58,7 +58,7 @@
 | 路径                            | 职责                                         |     大小 | 行数 |
 | ------------------------------- | -------------------------------------------- | -------: | ---: |
 | `src/parser/content-manager.ts` | 扫描 content 目录、收集文件                  |    726 B |   21 |
-| `src/parser/frontmatter.ts`     | frontmatter 解析 / 序列化 / 校验入口         | 16,899 B |  442 |
+| `src/parser/frontmatter.ts`     | frontmatter 解析 / 序列化 / 校验入口         | 17,195 B |  451 |
 | `src/parser/schema.ts`          | fill 白名单（从 FILL_CONFIG 派生）与字段校验 |  1,483 B |   34 |
 
 > 测试已迁出 `src/parser/`，见 §3.7 / §6。原 `frontmatter.test.ts`、`location-audit.test.ts` 现在位于 `tests/component/parser/`。
@@ -161,7 +161,7 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 | `src/ui/search.ts`             | 搜索逻辑                                 |  6,399 B |   173 |
 | `src/ui/search-ui.ts`          | 搜索 UI                                  |  7,844 B |   196 |
 | `src/ui/keyboard-shortcuts.ts` | 快捷键                                   |  3,491 B |   114 |
-| `src/ui/detail-panel.ts`       | 节点详情面板（正文懒加载）               | 28,971 B |   654 |
+| `src/ui/detail-panel.ts`       | 节点详情面板（正文懒加载 / Markdown 分节） | 29,475 B |   673 |
 | `src/ui/bigscreen.ts`          | 大屏模式                                 | 23,139 B |   555 |
 | `src/ui/ui-toggle.ts`          | UI 开关                                  |  6,037 B |   170 |
 | `src/ui/music-player.ts`       | 背景音乐                                 |  3,080 B |    93 |
@@ -209,7 +209,7 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 | 路径                                       | 职责                         |     大小 | 行数 |
 | ------------------------------------------ | ---------------------------- | -------: | ---: |
 | `src/ui/styles/base.css`                   | 基础样式                     | 18,536 B |  437 |
-| `src/ui/styles/components.css`             | 组件样式（最大）             |108,812 B |3,760 |
+| `src/ui/styles/components.css`             | 组件样式（最大）             |108,921 B |3,765 |
 | `src/ui/styles/glass.css`                  | 液态玻璃皮肤（@layer glass） | 36,171 B |  929 |
 | `src/ui/styles/index.css`                  | 样式入口                     |  1,572 B |   24 |
 | `src/ui/styles/layout.css`                 | 布局样式                     | 20,316 B |  672 |
@@ -265,7 +265,7 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 | `tests/component/core/config-layouts.test.ts`            | 配置布局组件测试           | 10,991 B |  241 |
 | `tests/component/core/tour-engine.test.ts`               | 漫游引擎集成测试           | 51,919 B |1,325 |
 | `tests/component/core/tour-engine-speech.test.ts`        | 漫游 + 语音联动            | 12,131 B |  350 |
-| `tests/component/parser/frontmatter.test.ts`             | frontmatter 准集成（扫盘） |  8,571 B |  297 |
+| `tests/component/parser/frontmatter.test.ts`             | frontmatter 准集成（扫盘 + 分隔线硬校验） |  9,049 B |  311 |
 | `tests/component/parser/location-audit.test.ts`          | location 审计扫盘          |  1,409 B |   37 |
 | `tests/component/ui/action-dispatcher.test.ts`           | action 分发器 DOM 测试     |  6,688 B |  214 |
 | `tests/component/ui/app-debug.test.ts`                   | 调试面板 DOM 测试          | 12,958 B |  343 |
@@ -273,7 +273,7 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 | `tests/component/ui/bigscreen.test.ts`                   | 大屏 DOM                   |  6,352 B |  185 |
 | `tests/component/ui/bottom-sheet-easing.test.ts`          | 底部 sheet 缓动            |  3,702 B |   88 |
 | `tests/component/ui/detail-panel-body-lazy.test.ts`      | 详情面板正文懒加载         |  6,781 B |  173 |
-| `tests/component/ui/detail-panel-questions.test.ts`      | 详情面板问答切片           |  3,308 B |   82 |
+| `tests/component/ui/detail-panel-questions.test.ts`      | 详情面板正文分节（H2/intro） |  4,979 B |  121 |
 | `tests/component/ui/focus-node.test.ts`                  | 节点聚焦                   |  2,948 B |   76 |
 | `tests/component/ui/graph-events-helpers.test.ts`        | 图事件辅助                 |  6,883 B |  158 |
 | `tests/component/ui/graph-events.test.ts`                | 图事件                     |  7,402 B |  207 |
@@ -540,7 +540,7 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 
 1. **新增 / 删除文件**：更新对应目录的表格，保持"路径 ↔ 职责 ↔ 大小 / 行数"一致。新增测试时必须放进 `tests/{unit,component,e2e}/`，**不放回 `src/`**。
 2. **大文件预警**（≥ 30KB）：
-   - 源码：`src/ui/styles/components.css`（108KB / 3,760 行）、`src/core/tour.ts`（94KB / 2,238 行）、`src/ui/tour-controller.ts`（68KB）、`src/core/renderer.ts`（52KB）、`src/ui/speech.ts`（46KB）、`src/ui/main.ts`（44KB）、`src/core/glow-overlay.ts`（43KB）、`src/ui/app-debug.ts`（40KB）、`src/core/config.ts`（34KB）—— 接近拆分阈值，**改之前先看是否该沿职责切分**。
+   - 源码：`src/ui/styles/components.css`（109KB / 3,765 行）、`src/core/tour.ts`（94KB / 2,238 行）、`src/ui/tour-controller.ts`（68KB）、`src/core/renderer.ts`（52KB）、`src/ui/speech.ts`（46KB）、`src/ui/main.ts`（44KB）、`src/core/glow-overlay.ts`（43KB）、`src/ui/app-debug.ts`（40KB）、`src/core/config.ts`（34KB）—— 接近拆分阈值，**改之前先看是否该沿职责切分**。
    - 样式：`src/ui/styles/tour.css`（39KB）、`glass.css`（35KB）。
    - 文档：`docs/archive/all-frontmatter-extracted.md`（630KB）为生成物，勿手改；`docs/布局参数清单.md`（64KB）为审计产物。
    - 数据：`public/graph-data.json`（3.5MB）随节点数膨胀，每次内容改动都会重建。

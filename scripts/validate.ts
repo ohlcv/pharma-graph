@@ -69,6 +69,9 @@ export async function validate(): Promise<void> {
     // Collect node IDs for cross-reference validation
     allIds.add(fm.id);
 
+    // Validate body heading hierarchy (docs/frontmatter.md §3.8)
+    errors.push(...validateBodyHeadings(relPath, fm.body ?? ''));
+
     // Validate fill field (replaces the deprecated essence field)
     if (fm.fill && !isValidFill(fm.fill)) {
       errors.push({
@@ -154,6 +157,76 @@ function toRelativePath(filePath: string): string {
   const parts = filePath.split(/[/\\]/);
   const idx = parts.findIndex((p) => p === 'content');
   return idx === -1 ? filePath : parts.slice(idx).join('/');
+}
+
+interface BodyHeading {
+  line: number;
+  level: number;
+}
+
+// 只认围栏代码块之外的 ATX 标题（``` 里以 # 开头的注释不算标题）
+function collectBodyHeadings(body: string): BodyHeading[] {
+  const headings: BodyHeading[] = [];
+  let inFence = false;
+  body.split('\n').forEach((line, index) => {
+    if (line.trim().startsWith('```')) {
+      inFence = !inFence;
+      return;
+    }
+    if (inFence) return;
+    const match = /^(#{1,6}) /.exec(line);
+    if (match) headings.push({ line: index + 1, level: match[1].length });
+  });
+  return headings;
+}
+
+function validateBodyHeadings(relPath: string, body: string): ValidationError[] {
+  if (!body.trim()) return [];
+
+  const errors: ValidationError[] = [];
+  const headings = collectBodyHeadings(body);
+  const h1 = headings.filter((h) => h.level === 1);
+
+  if (headings.length === 0) {
+    return [
+      {
+        file: relPath,
+        field: 'body',
+        message: `正文缺少标题：有正文就必须有且仅有一个 H1（见 docs/frontmatter.md §3.8）`,
+        severity: 'error',
+      },
+    ];
+  }
+
+  if (h1.length !== 1) {
+    errors.push({
+      file: relPath,
+      field: 'body',
+      message: `正文必须恰好有一个 H1，当前 ${h1.length} 个（见 docs/frontmatter.md §3.8）`,
+      severity: 'error',
+    });
+  } else if (headings[0].line !== h1[0].line) {
+    errors.push({
+      file: relPath,
+      field: 'body',
+      message: `H1 必须是正文的第一个标题，当前首个标题在正文第 ${headings[0].line} 行`,
+      severity: 'error',
+    });
+  }
+
+  for (let i = 1; i < headings.length; i++) {
+    if (headings[i].level > headings[i - 1].level + 1) {
+      errors.push({
+        file: relPath,
+        field: 'body',
+        message: `标题层级跳级：正文第 ${headings[i - 1].line} 行是 H${headings[i - 1].level}，第 ${headings[i].line} 行直接跳到 H${headings[i].level}`,
+        severity: 'error',
+      });
+      break;
+    }
+  }
+
+  return errors;
 }
 
 // Run if executed directly

@@ -30,7 +30,7 @@ const NODE_H = 36;
 const DEFAULT_W = NODE_W;
 const DEFAULT_H = NODE_H;
 
-const CONTENT_DIR = '/Users/meow/Desktop/Project/pharma-graph/public/content';
+const CONTENT_DIR = '/Users/meow/Developer/pharma-graph/public/content';
 
 function walk(dir: string): string[] {
   const out: string[] = [];

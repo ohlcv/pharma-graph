@@ -1702,6 +1702,11 @@
     color: var(--text);
     line-height: 1.65;
   }
+  .np-page .np-body-intro {
+    font-size: var(--text-md);
+    color: var(--text);
+    line-height: 1.7;
+  }
   .np-page .np-tags {
     display: flex;
     flex-wrap: wrap;

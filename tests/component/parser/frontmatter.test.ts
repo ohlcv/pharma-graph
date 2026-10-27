@@ -254,11 +254,25 @@ body`;
     expect(fm.label).toBe('BOM 测试');
   });
 
-  it('returns empty content when no frontmatter block exists', () => {
-    // Design choice: parser still runs required-field validation even when
-    // no frontmatter block exists. Documenting the behaviour.
+  it('throws when no frontmatter block exists', () => {
+    // Every content file must carry frontmatter; a body-only file is a hard error.
     const raw = 'just markdown, no frontmatter';
-    expect(() => parseFrontmatter(raw, 'j.md')).toThrow(/缺少必需字段/);
+    expect(() => parseFrontmatter(raw, 'j.md')).toThrow(/frontmatter 缺失或格式错误/);
+  });
+
+  it('throws when the file starts with whitespace before ---', () => {
+    expect(() => parseFrontmatter('\n---\nid: x\n---\nbody', 'j2.md')).toThrow(
+      /frontmatter 缺失或格式错误/,
+    );
+    expect(() => parseFrontmatter('  ---\nid: x\n---\nbody', 'j3.md')).toThrow(
+      /frontmatter 缺失或格式错误/,
+    );
+  });
+
+  it('throws when the closing --- is missing', () => {
+    expect(() => parseFrontmatter('---\nid: x\nlabel: y\nbody', 'j4.md')).toThrow(
+      /frontmatter 缺失或格式错误/,
+    );
   });
 
   it('drops tag entries that are not strings', () => {

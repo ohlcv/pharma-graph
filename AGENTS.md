@@ -22,7 +22,9 @@
 
 - 节点 id、label、fill、edges_out、深度等**全部存在 Markdown YAML frontmatter**。**不要**在源码里硬编码节点 id 或关系。
 - YAML 解析对**格式极其敏感**。任何带 `**`（Markdown 加粗）、跨行裸值、`|`/`>`/`@`/`%`/反引号开头的值都必须用双引号包起来。
+- frontmatter 区块是**强制**的：文件第一行必须是顶格的 `---`，并以另一行顶格的 `---` 结束；缺失任一条或首行有前置空行/空格，解析器直接报错，不会退化成「整份文件当正文」。
 - 加新节点 / 改现有节点 frontmatter → 先读 [`.cursor/rules/frontmatter-conventions.mdc`](./.cursor/rules/frontmatter-conventions.mdc) 和 [`docs/frontmatter.md`](./docs/frontmatter.md)。
+- **正文（body）标题层级**：有正文就必须有且仅有一个 H1，且为正文首个标题；分节用 H2，其下再用 H3，不得跳级。完整规则见 [`docs/frontmatter.md` §3.8](./docs/frontmatter.md)，`npm run validate` 会强制校验。
 - 自检命令（项目根执行）：
   ```bash
   node -e "require('yaml').parseAllDocuments(require('fs').readFileSync('<file>.md','utf8').split('---')[1])"

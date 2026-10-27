@@ -209,6 +209,7 @@ graph-events/highlight-engine/detail-panel/search 等模块接管交互
 #### [frontmatter.ts](../src/parser/frontmatter.ts)
 
 - **职责**：纯 JS frontmatter 解析器，浏览器兼容。从 Markdown 文件顶部的 `---` YAML 块提取节点元数据，校验必填字段（`id` 等），转换 `edges_out` / `tags` / `location` / `body`，并向 caller 报告结构化 warning（issue #14）。
+- **分隔线契约**：文件第一行必须是顶格的 `---`，并以另一行顶格的 `---` 结束（BOM 会被剥掉）。找不到成对分隔线、首行有前置空行/空格、或缺少结束线时直接抛错，不再降级为「整份文件当正文」。
 - **关键类型**：
   - `NodeMeta` — 节点元数据（id/label/essence/field/tier/summary/location）
   - `EdgeDef` — 边定义（target/type/reason）
@@ -320,7 +321,7 @@ graph-events/highlight-engine/detail-panel/search 等模块接管交互
 
 #### 面板与视图
 
-- **[detail-panel.ts](../src/ui/detail-panel.ts)** — 节点详情面板。构造时查找 DOM、初始化 pin toggle（`UiToggle`）、绑定 tab/pin/节点点击/section collapse 事件。
+- **[detail-panel.ts](../src/ui/detail-panel.ts)** — 节点详情面板。构造时查找 DOM、初始化 pin toggle（`UiToggle`）、绑定 tab/pin/节点点击/section collapse 事件。正文（「文」页签）用 `parseBodySections()` 分节：交给 marked lexer 识别 H2，第一个 H2 之前的标题/导语保留为 `intro`，无 H2 时整段按 Markdown 渲染；H2 之后的 H3+ 留在所属分节内。`<!-- @np-skip -->` 仍用于隐藏紧随其后的 H2 分节。
 - **[bigscreen.ts](../src/ui/bigscreen.ts)** — 影院/大屏模式。隐藏 UI 并全屏，ESC/双击画布退出。提供 `registerFitFn`/`registerTourController`/`registerCyAccessor`/`isBigscreen`。
 - **[focus-node.ts](../src/ui/focus-node.ts)** — 相机聚焦动画。`focusOnNode(cy, nodeId, opts)` 支持只移动相机不重置 highlight 的 "preview" 模式（搜索自动居中用）。
 

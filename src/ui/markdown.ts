@@ -46,6 +46,8 @@ const SAFE_TAGS = [
   'b',
   'i',
   's',
+  'sup',
+  'sub',
   'del',
   'u',
   'ul',

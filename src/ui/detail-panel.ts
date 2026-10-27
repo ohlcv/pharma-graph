@@ -16,6 +16,7 @@ import { uiState, registerPinToggle } from './state.js';
 import { forEachStatic } from './dom-cache.js';
 import { UiToggle } from './ui-toggle.js';
 import { restorePanelBounds, hasSavedBounds } from './drag-manager.js';
+import { marked } from 'marked';
 import { renderMarkdown } from './markdown.js';
 import { parseFrontmatter } from '../parser/frontmatter.js';
 
@@ -568,17 +569,18 @@ function buildEdgesHtml(node: cytoscape.NodeSingular, cy: cytoscape.Core): strin
 
 function buildBodyHtml(d: cytoscape.NodeDataDefinition, sourcePath: string): string {
   if (!d.body) return '';
-  const questions = parseBodyQuestions(d.body as string);
-  if (questions.length === 0) return '';
-  return questions
-    .map(
-      (q) =>
-        `<div class="np-question">
-  <div class="np-question__label">${escHtml(q.label)}</div>
-  <div class="np-question__answer np-markdown">${renderMarkdown(q.answer, sourcePath)}</div>
-</div>`,
-    )
-    .join('');
+  const { intro, sections } = parseBodySections(d.body as string);
+  const parts: string[] = [];
+  if (intro) {
+    parts.push(`<div class="np-body-intro np-markdown">${renderMarkdown(intro, sourcePath)}</div>`);
+  }
+  for (const s of sections) {
+    parts.push(`<div class="np-question">
+  <div class="np-question__label">${escHtml(s.label)}</div>
+  <div class="np-question__answer np-markdown">${renderMarkdown(s.answer, sourcePath)}</div>
+</div>`);
+  }
+  return parts.join('');
 }
 
 /** 文页签首次切到、正文尚未返回时的占位内容。 */
@@ -618,37 +620,54 @@ function escAttr(s: string): string {
 // rendered Markdown and impossible to trigger by accident.
 const PANEL_SKIP_SENTINEL = /^[ \t]*<!--\s*@np-skip\s*-->[ \t]*$/m;
 
-export function parseBodyQuestions(body: string): Array<{ label: string; answer: string }> {
-  // Find every H2 boundary and walk the body in one pass. The split+filter
-  // approach loses the position information needed to check the line that
-  // precedes each H2 for the sentinel.
-  const out: Array<{ label: string; answer: string }> = [];
-  // `re` matches "## <title>" at the start of a line. Lookahead ensures we
-  // start at H2 boundaries, not arbitrary "## " inside a paragraph.
-  const h2 = /^## (.*)$/gm;
-  const matches: { label: string; start: number; end: number }[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = h2.exec(body)) !== null) {
-    matches.push({ label: m[1].trim(), start: m.index, end: h2.lastIndex });
-  }
-  for (let i = 0; i < matches.length; i++) {
-    const cur = matches[i];
-    const next = matches[i + 1];
-    // Answer text spans from the end of the current H2 line to the start
-    // of the next H2 (or the end of the body).
-    const answerStart = cur.end;
-    const answerEnd = next ? next.start : body.length;
-    const answer = body.slice(answerStart, answerEnd).trim();
+export interface BodySections {
+  /** Content before the first H2 (document title, intro). Rendered as Markdown. */
+  intro: string;
+  /** One entry per H2 heading, with the Markdown body that follows it. */
+  sections: Array<{ label: string; answer: string }>;
+}
 
-    // Detect the sentinel on the line just before this H2.
-    // The text between the previous H2's end (or body start) and this
-    // H2's start is the "preamble"; if it contains the sentinel, the
-    // author has flagged this section as hidden.
-    const prevEnd = i === 0 ? 0 : matches[i - 1].end;
-    const preamble = body.slice(prevEnd, cur.start);
-    if (PANEL_SKIP_SENTINEL.test(preamble)) continue;
+// Uses marked's lexer rather than a /^## / regex so that headings inside
+// fenced code blocks, setext headings and inline "## " text are classified
+// by the same rules as the renderer. Content before the first H2 is kept in
+// `intro` instead of being discarded, and a body without any H2 is returned
+// whole as `intro`.
+export function parseBodySections(body: string): BodySections {
+  const sections: BodySections['sections'] = [];
+  let intro = '';
+  let current: { label: string; answer: string } | null = null;
+  // Set when the @np-skip sentinel precedes an H2: that section is dropped
+  // until the next H2 boundary.
+  let dropping = false;
 
-    out.push({ label: cur.label, answer });
+  const flush = () => {
+    if (!current) return;
+    sections.push({ label: current.label, answer: current.answer.trim() });
+    current = null;
+  };
+
+  for (const token of marked.lexer(body)) {
+    if (token.type === 'heading' && token.depth === 2) {
+      const before = current ? current.answer : intro;
+      if (PANEL_SKIP_SENTINEL.test(before)) {
+        // Keep the preceding section (the comment is invisible), drop the
+        // sentinel so it cannot hide the following H2 as well, then skip
+        // this section's tokens.
+        if (current) current.answer = current.answer.replace(PANEL_SKIP_SENTINEL, '');
+        else intro = intro.replace(PANEL_SKIP_SENTINEL, '');
+        flush();
+        dropping = true;
+        continue;
+      }
+      flush();
+      dropping = false;
+      current = { label: token.text, answer: '' };
+      continue;
+    }
+    if (dropping) continue;
+    if (current) current.answer += token.raw;
+    else intro += token.raw;
   }
-  return out;
+  flush();
+  return { intro: intro.trim(), sections };
 }

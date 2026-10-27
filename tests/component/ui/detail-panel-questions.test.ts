@@ -1,34 +1,64 @@
-// Tests for the `parseBodyQuestions` panel-section parser.
+// Tests for the `parseBodySections` panel-section parser.
+// The parser runs the same marked lexer as the renderer, so headings are
+// recognised by Markdown rules (fenced code blocks, setext, etc.) instead of
+// a line regex. Content before the first H2 — and bodies with no H2 at all —
+// are kept as `intro`, never dropped.
+//
 // Issue #8: the parser used to drop sections whose title matched a
-// hard-coded Chinese question string. That was a fragile string-equality
-// check that would silently eat any user-written section with the same
-// wording. The new sentinel-based design hides a section only when the
-// author has explicitly inserted the `<!-- @np-skip -->` HTML comment
-// on the line immediately before its H2.
+// hard-coded Chinese question string. The sentinel design hides a section
+// only when the author explicitly inserts the `<!-- @np-skip -->` HTML
+// comment on the line immediately before its H2.
 //
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { parseBodyQuestions } from '@/ui/detail-panel';
+import { parseBodySections } from '@/ui/detail-panel';
 
-describe('parseBodyQuestions', () => {
+describe('parseBodySections', () => {
   it('returns each H2 as a label/answer pair', () => {
     const body = ['## 第一个问题', '答案是 A。', '', '## 第二个问题', '答案是 B。'].join('\n');
-    const qs = parseBodyQuestions(body);
-    expect(qs.map((q) => q.label)).toEqual(['第一个问题', '第二个问题']);
-    expect(qs.map((q) => q.answer)).toEqual(['答案是 A。', '答案是 B。']);
+    const { intro, sections } = parseBodySections(body);
+    expect(intro).toBe('');
+    expect(sections.map((s) => s.label)).toEqual(['第一个问题', '第二个问题']);
+    expect(sections.map((s) => s.answer)).toEqual(['答案是 A。', '答案是 B。']);
+  });
+
+  it('keeps the preamble before the first H2 instead of dropping it', () => {
+    const body = ['# 文档标题', '', '开头导语。', '', '## 第一节', '', '内容 A。'].join('\n');
+    const { intro, sections } = parseBodySections(body);
+    expect(intro).toContain('# 文档标题');
+    expect(intro).toContain('开头导语。');
+    expect(sections).toEqual([{ label: '第一节', answer: '内容 A。' }]);
+  });
+
+  it('returns a body without H2 as intro, not as an empty result', () => {
+    const { intro, sections } = parseBodySections('正文没有 H2 章节。');
+    expect(intro).toBe('正文没有 H2 章节。');
+    expect(sections).toEqual([]);
+  });
+
+  it('does not treat "## " inside a fenced code block as a section boundary', () => {
+    const body = ['```md', '## 不是标题', '```', '', '## 真标题', '内容。'].join('\n');
+    const { intro, sections } = parseBodySections(body);
+    expect(intro).toContain('## 不是标题');
+    expect(sections.map((s) => s.label)).toEqual(['真标题']);
+  });
+
+  it('keeps H3 and deeper headings inside the enclosing H2 answer', () => {
+    const body = ['## 第一节', '', '### 小节', '', '正文。', '', '## 第二节', '答案。'].join('\n');
+    const { sections } = parseBodySections(body);
+    expect(sections).toHaveLength(2);
+    expect(sections[0].answer).toContain('### 小节');
+    expect(sections[1].answer).toBe('答案。');
   });
 
   it('keeps a section whose title coincidentally matches the old hard-coded wording', () => {
-    // The pre-fix SKIP set would have silently dropped this. With the
-    // sentinel design, the title is just data — no string equality
-    // filter runs — so the section is preserved verbatim.
     const body = ['## 它在整套框架里属于哪一层、放在哪一块？', '这是一段真实回答，不该被吞。'].join(
       '\n',
     );
-    const qs = parseBodyQuestions(body);
-    expect(qs).toHaveLength(1);
-    expect(qs[0].label).toBe('它在整套框架里属于哪一层、放在哪一块？');
-    expect(qs[0].answer).toBe('这是一段真实回答，不该被吞。');
+    const { sections } = parseBodySections(body);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].label).toBe('它在整套框架里属于哪一层、放在哪一块？');
+    expect(sections[0].answer).toBe('这是一段真实回答，不该被吞。');
   });
 
   it('drops a section preceded by the @np-skip sentinel', () => {
@@ -43,14 +73,27 @@ describe('parseBodyQuestions', () => {
       '## 再来一个保留',
       '也应保留。',
     ].join('\n');
-    const qs = parseBodyQuestions(body);
-    expect(qs.map((q) => q.label)).toEqual(['保留的问题', '再来一个保留']);
+    const { intro, sections } = parseBodySections(body);
+    expect(intro).toBe('');
+    expect(sections.map((s) => s.label)).toEqual(['保留的问题', '再来一个保留']);
+    expect(sections[0].answer).toBe('应保留。');
+    expect(sections[1].answer).toBe('也应保留。');
+  });
+
+  it('only skips the flagged H2, not every following section', () => {
+    const body = [
+      '<!-- @np-skip -->',
+      '## 第一个被隐藏',
+      '隐藏一。',
+      '',
+      '## 第二个不该被隐藏',
+      '保留。',
+    ].join('\n');
+    const { sections } = parseBodySections(body);
+    expect(sections.map((s) => s.label)).toEqual(['第二个不该被隐藏']);
   });
 
   it('treats the sentinel as a no-op when it appears inside an answer, not before an H2', () => {
-    // The sentinel is a *per-section* gate, not a global token. If the
-    // comment shows up mid-answer (because an author pasted it inside a
-    // code block, say), it must not hide any neighbouring section.
     const body = [
       '## 第一个问题',
       '答案里恰好写了 <!-- @np-skip --> 这串文本。',
@@ -58,9 +101,9 @@ describe('parseBodyQuestions', () => {
       '## 第二个问题',
       '正常回答。',
     ].join('\n');
-    const qs = parseBodyQuestions(body);
-    expect(qs).toHaveLength(2);
-    expect(qs[0].answer).toContain('<!-- @np-skip -->');
+    const { sections } = parseBodySections(body);
+    expect(sections).toHaveLength(2);
+    expect(sections[0].answer).toContain('<!-- @np-skip -->');
   });
 
   it('tolerates whitespace variations around the sentinel', () => {
@@ -72,11 +115,7 @@ describe('parseBodyQuestions', () => {
       '## 正常问题',
       '保留。',
     ].join('\n');
-    const qs = parseBodyQuestions(body);
-    expect(qs.map((q) => q.label)).toEqual(['正常问题']);
-  });
-
-  it('returns an empty array when there are no H2 sections', () => {
-    expect(parseBodyQuestions('正文没有 H2 章节。')).toEqual([]);
+    const { sections } = parseBodySections(body);
+    expect(sections.map((s) => s.label)).toEqual(['正常问题']);
   });
 });
