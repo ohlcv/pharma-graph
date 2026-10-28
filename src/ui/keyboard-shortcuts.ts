@@ -1,8 +1,7 @@
 import cytoscape from 'cytoscape';
 import type { Core } from 'cytoscape';
 import { HighlightEngine } from './highlight-engine.js';
-import { closeSpaceMenu, exitToFullGraph, isSpaceMenuOpen } from './space-controller.js';
-import { getActiveSpaceId } from './space-state.js';
+import { closeSpaceMenu, isSpaceMenuOpen } from './space-controller.js';
 
 export interface ShortcutCallbacks {
   fitGraph: () => void;
@@ -78,17 +77,12 @@ export function initShortcuts(cy: Core, callbacks: ShortcutCallbacks): void {
 
     switch (e.key) {
       case 'Escape':
-        // 空间传送的退出链优先级最高，且一次按键只走一步：
-        //   菜单开着 → 只收菜单（不清空间）；
-        //   否则身在某个空间里 → 回全图；
+        // Esc 优先级链精简了一次：
+        //   菜单开着 → 只收菜单；
         //   否则才是原本的"清选中 / 关面板 / 停漫游"。
-        // 反过来的顺序会让用户在空间里按 Esc 先把漫游停了却还困在空间里。
+        // "退空间走 Esc"这条路已经删了——没有全图态，要换空间就走传送门。
         if (isSpaceMenuOpen()) {
           closeSpaceMenu();
-          break;
-        }
-        if (getActiveSpaceId() !== null) {
-          exitToFullGraph();
           break;
         }
         cy.$(':selected').unselect();

@@ -75,6 +75,19 @@ let dismissInstalled = false;
  */
 let bootLayoutPending = false;
 /**
+ * 布局开始那一刻的视角快照（zoom + pan）。
+ *
+ * 用来在 layoutstop 时判定"用户在布局跑的过程中是否动过镜头"。布局本身
+ * 强制 `fit: false`（见 renderer.runLayout），不会动 zoom/pan；所以快照
+ * 与结束时不一致，一定是用户手动缩放/平移过的——这种情况下要尊重用户
+ * 的操作，不再强制取景（真实反馈：重置后布局还在跑，期间缩放/移动屏幕，
+ * 布局完成却给强制挪一下、缩一下，不想要）。
+ *
+ * `null` = 没有在跑的布局 / 已被消费。首屏路径不依赖这个（它走
+ * bootLayoutPending 分支，本来就不取景）。
+ */
+let layoutStartView: { zoom: number; panX: number; panY: number } | null = null;
+/**
  * 菜单打开的时刻。打开菜单的那一次 click 此刻还在往 document 冒泡——必须
  * 放过它，否则菜单会在同一个事件里被自己关掉。
  */
@@ -266,16 +279,18 @@ function installDismissHandlers(): void {
  * 只留当前空间的节点与边。
  *
  * 两个特例永远可见：
- *   - 传送门本身：它背在所有空间上，否则进了空间就出不来了。按 id 判定，
+ *   - 传送门本身：它跨多宇宙，否则进了空间就出不来了。按 id 判定，
  *     不按 class——它是内容树里的正式节点（有自己的 md），不挂 layer-parent
- *     （挂了就会被排除出搜索，而"搜传送门跳过去"恰恰是个有用的入口）。
+ *     （挂了就会被排除出搜索，而"搜传送门跳过去"恰恰是个有用的入口)。
  *   - 虚拟层父节点：容器，不是内容。
  *
  * 只动节点，不动边：边是否可见是 cytoscape 的派生状态（两端都可见才可见），
- * 跟着端点自动成立，`ele.visible()` / `:visible` / boundingBox 全部一致。
- * 显式给 3184 条边各写一份 display bypass 是纯浪费——派生函数已经算过一遍了。
+ * 跟着端点自动成立，`ele.visible()` / `:visible` / boundingBox 全部一致.
+ * 显式给 3184 条边各写一份 display bypass 是纯浪费——派生函数已经算过一遍了.
+ *
+ * 签名收紧为 `space: SpaceInfo`——没有"全图态"了，调用方一定是代表某个空间.
  */
-function applyVisibility(space: SpaceInfo | null): void {
+function applyVisibility(space: SpaceInfo): void {
   const cy = cyRef;
   if (!cy) return;
   cy.batch(() => {
@@ -284,7 +299,7 @@ function applyVisibility(space: SpaceInfo | null): void {
         n.show();
         return;
       }
-      if (!space || space.nodeIds.has(n.id())) n.show();
+      if (space.nodeIds.has(n.id())) n.show();
       else n.hide();
     });
   });
@@ -299,7 +314,7 @@ function applyVisibility(space: SpaceInfo | null): void {
  * 返回全图会以为没生效（真实反馈）。
  *
  * 只做平移，不改内部结构：空间就是连通分量，分量之间没有边，平移不可能
- * 拉断关系。传送门不参与——它跟着视口停靠，坐标没有空间含义。
+ * 拉断关系。传送门不参与——它跨多宇宙，留在 euler 给的原地坐标。
  *
  * **当前所在的空间是锚点，一个像素都不动**，其它岛排到它右边。这样整张图
  * 不会整体平移，镜头也就没必要跟着动（真实反馈：初始化完成后被强制缩放/
@@ -312,8 +327,11 @@ export function separateSpaces(): void {
   const geometry = spaces.map((space) => {
     const points: { id: string; x: number; y: number }[] = [];
     for (const id of space.nodeIds) {
-      // 传送门也是普通内容节点：它属于散点空间，就跟着那个岛一起平移。
-      // 曾经这里把它单独摘出来、再钉到视口角落——那是给它一个假坐标。
+      // 传送门是跨越多宇宙的特殊节点：它不属于任何一个空间，也不跟着
+      // 任何岛平移——euler 给它什么坐标就是什么坐标，在所有宇宙里都看
+      // 同一个坐标。一旦把它算进散点岛一起平移（曾经的做法），它会被
+      // 推到几千单位以外，而当前视口停在药考宇宙——传送门就消失了。
+      if (id === PORTAL_ID) continue;
       const node = cy.getElementById(id);
       if (node.empty()) continue;
       const p = node.position();
@@ -324,8 +342,8 @@ export function separateSpaces(): void {
   });
 
   const plan = planSeparation(geometry, {
-    // 全图态没有"所在空间"，就把最大（第一个）当锚点——它就是主宇宙。
-    anchorId: getActiveSpaceId() ?? spaces[0]?.id,
+    // 锚定当前所在空间——它一个像素都不动，其它岛排到它右边。
+    anchorId: getActiveSpaceId()!,
   });
   if (plan.size === 0) return;
 
@@ -356,27 +374,63 @@ export function settleAfterLayout(): void {
 }
 
 /**
- * `layoutstop` 的统一入口：分岛是每次都要的，取景只有**非首屏**才做。
+ * `layoutstop` 的统一入口：分岛是每次都要的，取景只有**非首屏且用户在
+ * 布局期间没动过镜头**时才做。
  *
  * 为什么要分：首屏那次 euler 是入场动画本身，落定就该停在原地（用户明确
  * 说过"初始化完成之后再强制缩放/平移一下，没有必要"）；而用户主动换布局 /
  * 重跑 euler 时，节点是被甩到全新区位的，镜头守着旧位置多半只剩空地，
  * 重新取景是这次操作的收尾。
+ *
+ * 但用户如果在布局**还在跑**的时候自己缩放/移动了屏幕，那是在表达"我要
+ * 这个视角"，布局结束时再强行取景会把用户的操作覆盖掉（真实反馈）。
+ * 判据靠 `layoutStartView` 快照：布局 `fit: false` 不会动 zoom/pan，所以
+ * 快照与结束时不一致 = 用户动过，跳过取景。
  */
 export function onLayoutStopped(): void {
   if (!cyRef) return;
   if (bootLayoutPending) {
     bootLayoutPending = false;
+    layoutStartView = null;
     settleAfterLayout();
     return;
   }
+  const userTouched = userMovedDuringLayout();
+  layoutStartView = null;
   separateSpaces();
+  // 用户在布局期间动过镜头 → 尊重之，不取景。
+  if (userTouched) return;
   flyToCurrentSpace(false);
 }
 
 /** 启动流程在跑首屏 euler 之前调用一次：这次落定不取景。 */
 export function beginBootLayout(): void {
   bootLayoutPending = true;
+}
+
+/**
+ * 在每次布局开始（`layoutstart`）时调用，记下此刻的 zoom/pan。
+ *
+ * 由 graph-events.ts 的事件监听器调用，不在 space-controller 内部
+ * 自挂监听——保持事件绑定单一入口。
+ */
+export function markLayoutStart(zoom: number, pan: { x: number; y: number }): void {
+  layoutStartView = { zoom, panX: pan.x, panY: pan.y };
+}
+
+/** 浮点容差：zoom/pan 数值如果是同一个 JS 数字，比较结果稳定；
+ *  加一点容差只是为了在极少数浮点漂移下别误判成"用户动过"。 */
+const VIEW_EPS = 1e-9;
+
+function userMovedDuringLayout(): boolean {
+  if (!layoutStartView || !cyRef) return false;
+  const z = cyRef.zoom();
+  const p = cyRef.pan();
+  return (
+    Math.abs(z - layoutStartView.zoom) > VIEW_EPS ||
+    Math.abs(p.x - layoutStartView.panX) > VIEW_EPS ||
+    Math.abs(p.y - layoutStartView.panY) > VIEW_EPS
+  );
 }
 
 /**
@@ -486,7 +540,7 @@ export function enterSpace(spaceId: string, options: EnterSpaceOptions = {}): vo
  *
  * 为什么：空间隔离若只在主动传送后才生效，首屏就是三个空间的**并集**——
  * 四个奇观会和药学节点一起铺在画面上，与「除传送门外交互隔离」的规则矛盾。
- * 落在主空间后，奇观只存在于「奇观与散点」里，要靠传送门过去（或按 Esc 回全图）。
+ * 落在主空间后，奇观只存在于「奇观与散点」里，要靠传送门过去。
  *
  * 只返回落位成功与否，不做任何提示——加载画面上不需要多一条 toast。
  */
@@ -500,18 +554,10 @@ export function enterInitialSpace(): string | null {
 }
 
 export function exitToFullGraph(options: { animate?: boolean } = {}): void {
-  if (!cyRef) return;
-  if (getActiveSpaceId() === null) {
-    closeSpaceMenu();
-    return;
-  }
-  applyVisibility(null);
-  clearSelectionArtifacts();
-  setActiveSpace(null);
-  flyToCurrentSpace(options.animate ?? true);
+  // 全图态已删——没有"退回全图"这回事。用户要换空间就走传送门菜单。
+  // 这个函数保留只是为了避免外部 import 报错——既然它没语义就只做收菜单。
+  void options;
   closeSpaceMenu();
-  onSpaceChange?.(null);
-  showToast('已返回全图', 'info');
 }
 
 /**
@@ -524,6 +570,7 @@ export function exitToFullGraph(options: { animate?: boolean } = {}): void {
 function ensureVisible(nodeId: string): boolean {
   if (!cyRef) return false;
   const active = getActiveSpaceId();
+  // 全图态已删——active 一定有值。这里 return false 是防御性兜底。
   if (active === null) return false;
   if (isPortalNode(nodeId)) return false;
   const space = spaceOfNode(nodeId);
@@ -548,6 +595,7 @@ export function _resetSpaceControllerForTests(): void {
   detailBtn = null;
   dismissInstalled = false;
   bootLayoutPending = false;
+  layoutStartView = null;
   openedAt = Number.NEGATIVE_INFINITY;
   registerEnsureVisible(null);
   setActiveSpace(null);

@@ -537,10 +537,10 @@ function initGraphFromManager(graphManager: GraphManager): void {
     },
   });
 
-  // 启动落位：直接进主空间（执业药师考试体系），不停在「全图」。
-  // 否则首屏是三个空间的并集——四个奇观会和药学节点混在一起，与
-  // 「除传送门外交互隔离」的规则相反。奇观要到「奇观与散点」空间才出现，
-  // Esc 仍可退回全图并集。
+  // 启动落位：直接进主空间（执业药师考试体系）。
+  // 首屏不该是三个空间的并集——四个奇观会和药学节点一起铺在画面上,
+  // 与"除传送门外交互隔离"的规则矛盾。没有"退回全图"这回事，要换
+  // 空间就走传送门菜单。
   enterInitialSpace();
 
   // ── Populate sidebar the moment the graph is ready — not after layout settles.

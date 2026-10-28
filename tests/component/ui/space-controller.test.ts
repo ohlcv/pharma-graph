@@ -25,7 +25,6 @@ import {
   installSpaceController,
   getSpaces,
   enterSpace,
-  exitToFullGraph,
   openSpaceMenu,
   closeSpaceMenu,
   isSpaceMenuOpen,
@@ -35,6 +34,7 @@ import {
   settleAfterLayout,
   beginBootLayout,
   onLayoutStopped,
+  markLayoutStart,
   _resetSpaceControllerForTests,
 } from '@/ui/space-controller';
 import { getActiveSpaceId, ensureNodeVisible } from '@/ui/space-state';
@@ -130,12 +130,12 @@ describe('space-controller', () => {
       expect(cy.getElementById(PORTAL).visible()).toBe(true);
     });
 
-    it('返回全图后一切恢复可见', () => {
-      enterSpace(NEURO, { animate: false });
-      exitToFullGraph({ animate: false });
-      expect(getActiveSpaceId()).toBeNull();
-      expect(cy.nodes(':visible').length).toBe(cy.nodes().length);
-      expect(cy.edges(':visible').length).toBe(cy.edges().length);
+    it('没有"全图态"——退空间这回事不存在了', () => {
+      // 旧测试调过 exitToFullGraph → getActiveSpaceId() === null.
+      // 产品决策已删全图: 没有导出 exitToFullGraph, 也没有"null 空间"运行态.
+      // Esc 现在只收菜单 / 清选中 / 关面板 / 停漫游.
+      enterSpace(EXAM, { animate: false });
+      expect(getActiveSpaceId()).toBe(EXAM);
     });
 
     it('进入会飞一次相机；animate:false 时不飞', () => {
@@ -236,6 +236,41 @@ describe('space-controller', () => {
       onLayoutStopped();
       expect(cy.zoom()).not.toBeCloseTo(0.08, 9);
     });
+
+    it('布局期间用户动过镜头时，layoutstop 不再强制取景', () => {
+      // 模拟生产路径：layoutstart 记下快照，用户在布局跑的过程中缩放/
+      // 平移了，layoutstop 看到 zoom/pan 与快照不一致 → 跳过取景。
+      // 真实反馈：重置后布局还在跑，期间缩放/移动屏幕，布局完成却给强制
+      // 挪一下、缩一下，不想要。
+      enterSpace(EXAM, { animate: false });
+      cy.zoom(0.08);
+      cy.pan({ x: 800, y: 449 });
+
+      markLayoutStart(cy.zoom(), cy.pan());
+      // 用户在布局期间手动改了视角。
+      cy.zoom(0.2);
+      cy.pan({ x: 100, y: 200 });
+
+      onLayoutStopped();
+
+      // 用户动过的视角被尊重，没被取景覆盖。
+      expect(cy.zoom()).toBeCloseTo(0.2, 9);
+      expect(cy.pan()).toEqual({ x: 100, y: 200 });
+    });
+
+    it('布局期间用户没动镜头时，layoutstop 照常取景', () => {
+      // 与上一条对照：markLayoutStart 之后用户没动 → 取景照旧发生。
+      enterSpace(EXAM, { animate: false });
+      cy.zoom(0.08);
+      cy.pan({ x: 800, y: 449 });
+
+      markLayoutStart(cy.zoom(), cy.pan());
+
+      onLayoutStopped();
+
+      // 没动过 → 取景发生，视角变了。
+      expect(cy.zoom()).not.toBeCloseTo(0.08, 9);
+    });
   });
 
   describe('空间分岛', () => {
@@ -257,23 +292,20 @@ describe('space-controller', () => {
       expect(right.x1).toBeGreaterThan(mid.x2);
     });
 
-    it('传送门作为散点空间的普通成员一起平移（没有专属坐标规则）', () => {
+    it('传送门不参与分岛——它是跨越多宇宙的特殊节点，留在 euler 给的原地', () => {
       const deco = cy.getElementById('e8-root-system');
       const portal = cy.getElementById(PORTAL);
-      // 放到同一片位置：分岛后两者的相对位移必须一致——它们同属一个岛。
+      // 把传送门刻意放到散点岛附近——它必须留在原地，不被吹到散点岛一侧
+      // 去之后又被空间隔离掉。曾经真的发生：被推到模型 x=37775，rendered
+      // x=3822 远超视口 1600——传送门就消失了。
       deco.position({ x: 100, y: 100 });
       portal.position({ x: 400, y: 100 });
-      const before = { deco: deco.position(), portal: portal.position() };
 
       separateSpaces();
 
-      const dDeco = deco.position().x - before.deco.x;
-      const dPortal = portal.position().x - before.portal.x;
-      expect(dPortal).toBeCloseTo(dDeco, 6);
-      expect(portal.position().y - before.portal.y).toBeCloseTo(
-        deco.position().y - before.deco.y,
-        6,
-      );
+      // 散点奇观会被分岛平移；传送门一个像素都不动。
+      expect(deco.position()).not.toEqual({ x: 100, y: 100 });
+      expect(portal.position()).toEqual({ x: 400, y: 100 });
     });
   });
 
@@ -322,12 +354,10 @@ describe('space-controller', () => {
       expect(animateSpy).not.toHaveBeenCalled();
     });
 
-    it('目标就在当前空间 / 全图态时不切，返回 false', () => {
+    it('目标就在当前空间时不切，返回 false', () => {
       enterSpace(EXAM, { animate: false });
       expect(ensureNodeVisible('e1')).toBe(false);
       expect(ensureNodeVisible(PORTAL)).toBe(false);
-      exitToFullGraph({ animate: false });
-      expect(ensureNodeVisible('n1')).toBe(false);
     });
   });
 });
