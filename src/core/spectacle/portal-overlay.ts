@@ -364,56 +364,7 @@ export class PortalOverlay {
     ctx.lineWidth = Math.max(1, R * 0.013);
     ctx.stroke();
 
-    // ── 螺旋坠入的粒子 + 沿轨尾迹（批量化）─────────────────────────
-    // 性能：每粒尾迹分两批合并 path，每帧从 5×42=210 stroke 降到 3 stroke。
-    // 每条尾迹按寿命算 3 段，前 2 段（亮）合成一条 path，第 3 段（弱）
-    // 合成另一条 path。头点合并为一次 fill。仍纯 t 函数，不存逐帧状态。
-    const DU = 0.022;
-
-    // Pass A：尾迹段 1+2（亮）。
-    ctx.beginPath();
-    for (const pt of this.particles) {
-      const uNow = (t * pt.rate + pt.offset) % 1;
-      const angNow = pt.phase + t * pt.spin * (1.5 - uNow);
-      const rrNow = R * (1 - uNow) * 0.98;
-      const xNow = Math.cos(angNow) * rrNow;
-      const yNow = Math.sin(angNow) * rrNow;
-      let px = xNow;
-      let py = yNow;
-      for (let k = 1; k <= 2; k++) {
-        const u = (((uNow - k * DU) % 1) + 1) % 1;
-        const ang = pt.phase + t * pt.spin * (1.5 - u);
-        const rr = R * (1 - u) * 0.98;
-        const nx = Math.cos(ang) * rr;
-        const ny = Math.sin(ang) * rr;
-        ctx.moveTo(px, py);
-        ctx.lineTo(nx, ny);
-        px = nx;
-        py = ny;
-      }
-    }
-    ctx.strokeStyle = 'rgba(196,181,253,0.32)';
-    ctx.lineWidth = Math.max(0.6, R * 0.011);
-    ctx.stroke();
-
-    // Pass B：第 3 段（弱尾）。
-    ctx.beginPath();
-    for (const pt of this.particles) {
-      const uNow = (t * pt.rate + pt.offset) % 1;
-      const u2 = (((uNow - 2 * DU) % 1) + 1) % 1;
-      const u3 = (((uNow - 3 * DU) % 1) + 1) % 1;
-      const ang2 = pt.phase + t * pt.spin * (1.5 - u2);
-      const ang3 = pt.phase + t * pt.spin * (1.5 - u3);
-      const rr2 = R * (1 - u2) * 0.98;
-      const rr3 = R * (1 - u3) * 0.98;
-      ctx.moveTo(Math.cos(ang2) * rr2, Math.sin(ang2) * rr2);
-      ctx.lineTo(Math.cos(ang3) * rr3, Math.sin(ang3) * rr3);
-    }
-    ctx.strokeStyle = 'rgba(196,181,253,0.11)';
-    ctx.lineWidth = Math.max(0.6, R * 0.010);
-    ctx.stroke();
-
-    // Pass C：头点（所有粒子头点合并进一条 path，单次 fill）。
+    // ── 螺旋坠入的粒子（无尾迹，每粒单点 fill）─────────────────────
     ctx.beginPath();
     for (const pt of this.particles) {
       const uNow = (t * pt.rate + pt.offset) % 1;

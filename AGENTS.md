@@ -11,7 +11,7 @@
 - **构建期**：脚本把 Markdown 解析为 `public/graph-data.json` + `public/content-manifest.json` + `public/sitemap.xml`。
 - **运行期**：浏览器加载预生成 JSON，用 Cytoscape.js + dagre/euler/cose-bilkent 渲染。
 - **部署**：Vercel 自动构建 `dist/`，不入仓库。
-- **目录骨架**：`src/`（源码）· `build/`（共享构建库）· `scripts/`（构建/治理入口）· `tools/`（一次性迁移）· `docs/`（文档 + ARD 决策）· `public/`（内容 + 预生成）· `tests/`（**独立于 src/** 的测试树，详见 §2.4）· `archive/`（已弃用）。
+- **目录骨架**：`src/`（源码）· `build-content.ts`（**根目录**共享构建库）· `scripts/`（构建/治理入口）· `tools/`（一次性迁移）· `docs/`（文档 + ARD 决策）· `public/`（内容 + 预生成）· `tests/`（**独立于 src/** 的测试树，详见 §2.4）· `archive/`（已弃用）。
 - **结构地图**：见 [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)。新文件 / 新目录前先翻一遍。
 
 ---
@@ -74,7 +74,7 @@ Markdown ──[scripts/build-graph-data.ts]──> graph-data.json ──> 浏�
 
 `src/core/` 不依赖 `src/ui/`；`src/ui/` 是消费者。**单向**。
 
-### 2.2 `scripts/` / `build/` / `tools/` 的边界
+### 2.2 `scripts/` / 根目录共享构建库 / `tools/` 的边界
 
 | 路径                                | 角色                                                             | 是否被 `vite.config.ts` import     |
 | ----------------------------------- | ---------------------------------------------------------------- | ---------------------------------- |
@@ -83,16 +83,17 @@ Markdown ──[scripts/build-graph-data.ts]──> graph-data.json ──> 浏�
 | `scripts/check-graph-fresh.ts`      | 治理：检查图数据是否新鲜                                         | 否，CI / 手动                      |
 | `scripts/validate*.ts`              | 治理：schema / 深度校验（CI 门禁）                               | 否                                 |
 | `scripts/audit-frontmatter.ts`      | 治理：打分审计（**永远 exit 0**，只输出报告）                    | 否                                 |
-| **`build/build-content.ts`**        | **共享构建库**（被 `vite.config.ts` 和多个 scripts 入口 import） | **是**                             |
+| **`build-content.ts`**（项目根目录） | **共享构建库**（被 `vite.config.ts` 和多个 scripts 入口 import） | **是**                             |
 | `tools/*`                           | **一次性**迁移 / 修复脚本，**不参与构建链**                      | 否                                 |
 
-- 修一个构建问题？如果你能直接改 `build/build-content.ts`，那就该在那里改，不要把它推到 `scripts/`。`scripts/` 入口是薄壳。
+- 修一个构建问题？如果你能直接改根目录的 `build-content.ts`，那就该在那里改，不要把它推到 `scripts/`。`scripts/` 入口是薄壳。
+- ⚠️ `build-content.ts` 必须留在项目根目录，**不要挪进 `build/` 目录**：WorkBuddy 发布上传时会按目录名排除「构建产物」，`build/` 恰好撞名导致整个目录被拦（2026-10-29 踩过的坑）。
 
 ### 2.3 写新文件前先问自己三个问题
 
 1. 这个文件属于 `src/core/` 还是 `src/ui/`？**别混进 `src/core/`**。
 2. 这个逻辑如果只是数据变换，应放在 `src/parser/` 而非 `src/core/`。
-3. 这是不是一次性迁移脚本？是 → `tools/`；是被 import 的共享代码 → `build/`；是 `npm run` 入口 → `scripts/`。
+3. 这是不是一次性迁移脚本？是 → `tools/`；是被 import 的共享代码 → 根目录 `build-content.ts`（或新建根目录模块）；是 `npm run` 入口 → `scripts/`。
 
 ### 2.4 测试目录分层（`tests/` 物理隔离出 `src/`）
 

@@ -75,10 +75,10 @@ import { initSearchUI } from './search-ui.js';
 import { initMusicPlayer } from './music-player.js';
 import { installDebugBridge } from './debug-bridge.js';
 import { initStarfield } from './starfield.js';
-import { createCelestialEmblemOverlay } from '../core/spectacle/emblem-overlay.js';
-import { createTesseractOverlay } from '../core/spectacle/tesseract-overlay.js';
-import { createFractalTreeOverlay } from '../core/spectacle/fractal-tree-overlay.js';
-import { createE8StarOverlay } from '../core/spectacle/e8-overlay.js';
+import { createCelestialEmblemOverlay, CELESTIAL_EMBLEM_ID } from '../core/spectacle/emblem-overlay.js';
+import { createTesseractOverlay, TESSERACT_ID } from '../core/spectacle/tesseract-overlay.js';
+import { createFractalTreeOverlay, TREE_ID } from '../core/spectacle/fractal-tree-overlay.js';
+import { createE8StarOverlay, E8_STAR_ID } from '../core/spectacle/e8-overlay.js';
 import { createPortalOverlay, PORTAL_ID } from '../core/spectacle/portal-overlay.js';
 import {
   installSpaceController,
@@ -386,6 +386,20 @@ function initGraphFromManager(graphManager: GraphManager): void {
     : data;
   const portalFromContent = getPortalNode(sliceCache);
   if (portalFromContent) bootstrapData.nodes.push(portalFromContent);
+
+  // 装饰奇观（太极八卦 / 四维空间 / 生命之树 / E8 根系）跟传送门一样需要
+  // 在首屏就出现在 cytoscape 里：它们的内容字段（shortSummary / sourcePath
+  // 等）来自 graph-data.json 的 prebuilt 数据，如果走 overlay 的 cy.add 兜底
+  // 分支创建（data 只剩 id+label），详情面板的「概」「文」页签都会是空的。
+  // 一起塞进 bootstrap 后 spawnXxxNode 走 existing 分支复用，字段完整保留。
+  const SPECTACLE_IDS = new Set([
+    CELESTIAL_EMBLEM_ID,
+    TESSERACT_ID,
+    TREE_ID,
+    E8_STAR_ID,
+  ]);
+  const spectacleNodes = data.nodes.filter((n) => SPECTACLE_IDS.has(n.id));
+  for (const n of spectacleNodes) bootstrapData.nodes.push(n);
 
   logInfo('space bootstrap:', {
     primary: primarySpace?.id,

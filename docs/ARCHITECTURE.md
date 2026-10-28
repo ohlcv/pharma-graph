@@ -27,7 +27,7 @@
 | `src/`                                      | 目录 | 全部 TypeScript 源码（解析 / 核心逻辑 / UI）—— **不含测试**                   | 92 文件 / 33,282 行                                           |
 | `tests/`                                    | 目录 | **物理隔离于 `src/` 的测试树**（`unit/` `component/` `e2e/` 三层；详见 §3.7） | 51 文件 / 9,901 行                                            |
 | `scripts/`                                  | 目录 | 构建与治理入口（构建链、校验、审计）                                          | 10 文件 / 2,441 行                                            |
-| `build/`                                    | 目录 | 构建期库代码（被 vite.config 与 scripts 入口共享）                            | 1 文件 / 638 行                                               |
+| `build-content.ts`                          | 文件 | 构建期库代码，位于项目根目录（被 vite.config 与 scripts 入口共享）           | 1 文件 / 638 行                                               |
 | `tools/`                                    | 目录 | 一次性修复 / 迁移 / 性能测量工具（用完归档）                                   | 23 文件 / 4,192 行                                            |
 | `docs/`                                     | 目录 | 文档（架构、规范、ADR 决策记录、调试记录、审计报告）                          | 57 文件 / 128,749 行                                           |
 | `public/`                                   | 目录 | 静态资产 + 内容 Markdown + 预生成数据（Vite 的 publicDir）                    | 2,806 文件 / 82,162 行                                        |
@@ -361,11 +361,11 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 | `scripts/validate-graph-deep.ts`    | 深度校验                              |  4,482 B |  141 |
 | `scripts/validate.ts`               | 严格 schema 校验（CI 门禁，非零退出；含正文标题层级校验） |  7,356 B |  236 |
 
-### 4.2 `build/` — 构建期共享库（1 个文件，638 行，约 22 KB）
+### 4.2 根目录 `build-content.ts` — 构建期共享库（1 个文件，638 行，约 22 KB）
 
 | 路径                     | 职责                                                                                                                |     大小 | 行数 |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------- | -------: | ---: |
-| `build/build-content.ts` | 内容构建核心：frontmatter 解析 → graph-data.json / content-manifest / sitemap（被 vite.config 与 scripts 入口共享） | 22,659 B |  638 |
+| `build-content.ts`       | 内容构建核心：frontmatter 解析 → graph-data.json / content-manifest / sitemap（被 vite.config 与 scripts 入口共享） | 22,659 B |  638 |
 
 ### 4.3 `tools/` — 一次性修复 / 迁移 / 测量工具（23 个文件，4,192 行，约 142 KB）
 
@@ -395,7 +395,7 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 | `tools/snap-euler.mjs`                    | 截图 | 截布局收敛后的画面                              |  1,950 B |   61 |
 | `tools/snap-fractal-tree.mjs`             | 截图 | 截取生命之树在真实图谱里的观感                  |  2,764 B |   89 |
 
-> 迁移说明：`build-content.ts` 原在 `scripts/`，因被 vite.config.ts 与多个 scripts 入口 import，属共享库，移至 `build/`。一次性修复 / 迁移 / 测量 / 截图工具（`fix-*`、`migrate-*`、`audit-*`、`measure-*`、`profile-*`、`probe-*`、`snap-*`、`trace-*`、`preview-*`）不参与构建链，统一放 `tools/`。
+> 迁移说明：`build-content.ts` 原在 `scripts/`，因被 vite.config.ts 与多个 scripts 入口 import，属共享库，先移至 `build/`；2026-10-29 再移到项目**根目录**——WorkBuddy 发布上传会按目录名排除「构建产物」，`build/` 撞名导致整个目录被拦。一次性修复 / 迁移 / 测量 / 截图工具（`fix-*`、`migrate-*`、`audit-*`、`measure-*`、`profile-*`、`probe-*`、`snap-*`、`trace-*`、`preview-*`）不参与构建链，统一放 `tools/`。
 
 ## 5. `docs/` — 文档（57 个文件，38,507 行，约 19.01 MB）
 
@@ -429,6 +429,8 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 | `docs/ADR/ADR-0008-surface-shadow-transition-tokens.md`     | 表面 / 阴影 / 过渡令牌                                        |    4,943 B |   119 |
 | `docs/ADR/ADR-0009-tour-scope-modes.md`                    | 漫游范围模式（单选子树 / 筛选集合）                           |    5,411 B |   126 |
 | `docs/ADR/ADR-0010-ios-lockscreen-narration-local-tts.md`  | iOS 锁屏漫游旁白（本地 WASM TTS + 循环音频保活，无后端无增量费用） |   13,677 B |   247 |
+| `docs/ADR/ADR-0011-layout-user-viewport-respect.md`        | 布局运行期尊重用户手动镜头操作（layoutstart 快照 + layoutstop 比较） |   10,154 B |   168 |
+| `docs/ADR/ADR-0012-multiverse-render-isolation.md`        | 多重宇宙渲染隔离（cy 只装当前空间 + 切片缓存 + 删全图态 + 传送门常驻） |   17,399 B |   252 |
 | `docs/ADR/ADR-0001-migration-report.md`                     | ADR-0001 迁移执行报告（217 文件 / 167 isa 转换 / 2026-07-14） |  105,338 B | 1,249 |
 
 ### 5.3 调试记录 `docs/DEBUG/`
@@ -548,7 +550,7 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 | `src/`（源码，不含测试）                                                                      |          92 |        33,282 |        1,258,047 |
 | `tests/`（顶层测试树）                                                                        |          51 |         9,901 |          374,974 |
 | `scripts/`                                                                                    |          10 |         2,441 |           80,241 |
-| `build/`                                                                                      |           1 |           638 |           22,659 |
+| 根目录 `build-content.ts`                                                                     |           1 |           638 |           22,659 |
 | `tools/`                                                                                      |          24 |         4,307 |          150,399 |
 | `docs/`（不含 archive 子目录）                                                                |          47 |        126,686 |        18,926,498 |
 | `docs/archive/`（不含 zip）                                                                   |          9 |        2,023 |        -2,049,296 |

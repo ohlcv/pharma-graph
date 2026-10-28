@@ -147,7 +147,7 @@ pharma-graph/
 │   └── ui/                 # 所有 UI 行为：漫游控制器 / 语音朗读 / 详情面板 / 空间控制器 /
 │                           #   大屏 / 搜索 / 高亮 / 邻居牵引 / 星空 / 布局 / 统计 / 样式
 ├── tests/                  # 测试树（顶层隔离于 src/：unit / component / e2e 三层）
-├── build/                  # 构建期共享库（build-content.ts，被 vite.config 与 scripts import）
+├── build-content.ts        # 构建期共享库（被 vite.config 与 scripts import；必须在根目录，勿挪进 build/）
 ├── tools/                  # 一次性迁移 / 测量工具（不参与构建链）
 ├── docs/                   # 开发文档（frontmatter / SKILL / RULES / ADR / DEBUG / 宣发 等）
 ├── ADR/                    # 架构决策（docs/ADR/ 的同级目录别名；正式目录是 docs/ADR/）

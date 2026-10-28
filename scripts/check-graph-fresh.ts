@@ -20,7 +20,7 @@ import {
   GRAPH_DATA_FILENAME,
   PUBLIC_DIR,
   type GraphData,
-} from '../build/build-content.js';
+} from '../build-content.js';
 
 const mode = process.argv.includes('--local') ? 'local' : 'ci';
 

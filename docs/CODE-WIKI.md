@@ -176,7 +176,7 @@ pharma-graph/
 │   ├── measure-overlap.ts    # 布局重叠度量
 │   └── serve.ts              # 静态开发服务器
 │
-├── build/                     # 构建期共享库（build-content.ts，被 vite.config 与 scripts import）
+├── build-content.ts          # 构建期共享库（被 vite.config 与 scripts import；必须在根目录，勿挪进 build/）
 ├── tests/                     # 测试树（顶层，物理隔离于 src/；unit/component/e2e 三层）
 ├── tools/                     # 一次性修复 / 迁移 / 测量工具（不参与构建链）
 ├── archive/scripts/           # 归档的一次性脚本

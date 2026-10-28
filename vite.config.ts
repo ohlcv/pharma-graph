@@ -1,26 +1,20 @@
 import { defineConfig, type Plugin } from 'vite';
 import legacy from '@vitejs/plugin-legacy';
-import { pathToFileURL } from 'node:url';
-import path from 'node:path';
+import { buildGraphData, buildManifest } from './build-content.ts';
 
 // 轻量构建模式（WorkBuddy 沙箱部署用）：DEPLOY_LIGHT=1 时——
 // 1) 跳过 buildStart 里的 buildGraphData 全量重建（约 20s；graph-data.json 已提交且新鲜）；
 // 2) 跳过 plugin-legacy 的 terser ES5 转译（构建最大头；评审场景全是现代浏览器）。
 //
-// 重要：WorkBuddy 上传时会按名字排除「构建产物」目录，项目的共享构建库 `build/`
-// 恰好撞名被拦。因此本文件对它的引用必须走运行时动态 import（用 cwd 拼绝对路径，
-// 打包器无法静态解析，沙箱里也永远走不到这个分支）。本地 `npm run build` / dev /
-// Vercel 路径完全不受影响。
+// 注：build-content.ts 必须放在项目根目录。WorkBuddy 上传时会按目录名排除
+// 「构建产物」，此前它住在 `build/` 里恰好撞名被拦（vite.config 报 Module not
+// found）。放根目录可正常上传；本地 `npm run build` / dev / Vercel 完全不受影响。
 const DEPLOY_LIGHT = process.env.DEPLOY_LIGHT === '1';
 
 export default defineConfig(async () => {
   const plugins: Plugin[] = [];
 
   if (!DEPLOY_LIGHT) {
-    const { buildGraphData, buildManifest } = await import(
-      pathToFileURL(path.join(process.cwd(), 'build', 'build-content.ts')).href
-    );
-
     plugins.push({
       name: 'pharma-graph:content-manifest',
       apply: () => true,
@@ -37,7 +31,7 @@ export default defineConfig(async () => {
           await buildManifest();
         }
       },
-    } as Plugin);
+    });
 
     // Legacy JS bundle (ES5) for Safari <15 / iOS <15 / old Androids.
     // plugin-legacy generates a separate bundle transpiled to ES5 with only the

@@ -571,6 +571,7 @@ export function spawnTreeNode(
   const size = hitboxSize(geometry, heightPx);
   const existing = cy.getElementById(TREE_ID);
   if (existing.nonempty()) {
+    existing.addClass(`layer-parent ${TREE_CLASS}`);
     stripNodeChrome(existing, size);
     return existing;
   }

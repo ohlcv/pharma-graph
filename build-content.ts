@@ -13,7 +13,7 @@ import { readdir, writeFile, stat, mkdir, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, relative, sep, posix } from 'node:path';
 import { parse as yamlParse } from 'yaml';
-import { HIERARCHY_EDGE_TYPES } from '../src/core/edge-types.js';
+import { HIERARCHY_EDGE_TYPES } from './src/core/edge-types.js';
 
 export const CONTENT_DIR = 'public/content';
 export const PUBLIC_DIR = 'public';

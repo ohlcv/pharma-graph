@@ -435,6 +435,7 @@ export function spawnCelestialEmblemNode(cy: cytoscape.Core): cytoscape.NodeSing
 
   const existing = cy.getElementById(CELESTIAL_EMBLEM_ID);
   if (existing.nonempty()) {
+    existing.addClass(`layer-parent ${EMBLEM_CLASS}`);
     stripNodeChrome(existing, size);
     return existing;
   }

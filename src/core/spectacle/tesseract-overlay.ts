@@ -450,6 +450,7 @@ export function spawnTesseractNode(cy: cytoscape.Core): cytoscape.NodeSingular {
 
   const existing = cy.getElementById(TESSERACT_ID);
   if (existing.nonempty()) {
+    existing.addClass(`layer-parent ${TESSERACT_CLASS}`);
     stripNodeChrome(existing, size);
     return existing;
   }

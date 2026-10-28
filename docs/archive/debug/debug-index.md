@@ -412,6 +412,8 @@
 | `debug-tour-stack-overflow-cycle.md` | part_of 环导致栈溢出 + ghost 死代码 |
 | `debug-tesseract-perf-hypothesis-rejected.md` | 装饰节点拖慢布局的假设被否证 + 布局降级换不来帧率 |
 | `debug-load-freeze-layout-worker.md` | 加载期 20 秒冻结 → 布局搬进 Web Worker；无头测量不可信 |
+| `debug-tour-reverse-mode-degenerate.md` | Reverse 漫游退化成 Forward（三个根因，配合 ADR-0003） |
+| `debug-workbuddy-deploy-build-dir-excluded.md` | WorkBuddy 发布六连败：`build/` 撞名被排除 + `$PORT` 不展开 + 60s 窗口（2026-10-29） |
 
 ---
 

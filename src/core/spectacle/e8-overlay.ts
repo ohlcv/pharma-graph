@@ -182,6 +182,7 @@ export function spawnE8StarNode(cy: cytoscape.Core): cytoscape.NodeSingular {
 
   const existing = cy.getElementById(E8_STAR_ID);
   if (existing.nonempty()) {
+    existing.addClass(`layer-parent ${E8_CLASS}`);
     stripNodeChrome(existing, size);
     return existing;
   }

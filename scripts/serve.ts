@@ -1,7 +1,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { computeGraphData } from '../build/build-content.js';
+import { computeGraphData } from '../build-content.js';
 
 const ROOT = path.resolve(process.cwd());
 // 静态根目录指向构建产物 dist/（含 index.html + graph-data.json + 内容副本）。
