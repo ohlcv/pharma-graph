@@ -121,7 +121,7 @@ pharma-graph/
 │   │       ├── tesseract-overlay.ts    # 四维超立方体
 │   │       ├── fractal-tree-overlay.ts # 生命之树（+ fractal-tree-geometry.ts 几何内核）
 │   │       ├── e8-overlay.ts           # E8 根系
-│   │       ├── portal-overlay.ts       # 虫洞传送门（空间唯一通路）
+│   │       ├── portal-overlay.ts       # 虫洞（空间唯一通路）
 │   │       ├── decor-content.ts        # 奇观内容加载（路径自节点推导）
 │   │       └── spectacle-size.ts       # 统一视觉半径换算（SSoT）
 │   │
@@ -343,7 +343,7 @@ graph-events/highlight-engine/detail-panel/search 等模块接管交互
 
 脱离知识层的"空域装置"：真实 cytoscape 节点（压全透明，只留命中盒）+ 独立 canvas overlay 逐帧重绘。打 `layer-parent` class 排除出检索/统计/漫游/force-drag，但参与 euler 斥力物理。
 
-- `emblem-overlay.ts` 太极八卦 · `tesseract-overlay.ts` 四维超立方体 · `fractal-tree-overlay.ts` 生命之树（+ `fractal-tree-geometry.ts` 纯函数几何内核）· `e8-overlay.ts` E8 根系 · `portal-overlay.ts` 虫洞传送门（空间之间唯一通路，含螺旋坠入粒子与吸积盘）
+- `emblem-overlay.ts` 太极八卦 · `tesseract-overlay.ts` 四维超立方体 · `fractal-tree-overlay.ts` 生命之树（+ `fractal-tree-geometry.ts` 纯函数几何内核）· `e8-overlay.ts` E8 根系 · `portal-overlay.ts` 虫洞（空间之间唯一通路，含螺旋坠入粒子与吸积盘）
 - **[decor-content.ts](../src/core/spectacle/decor-content.ts)** — 奇观正文内容加载：路径从节点自身 `rel/sourcePath` 推导（消灭源码里的内容路径字面量），404/解析失败静默降级。
 - **[spectacle-size.ts](../src/core/spectacle/spectacle-size.ts)** — 五个奇观**统一视觉半径**的 SSoT：`V = clamp(spread 系数, 200, 300)`，再按 `DRAWN_EXTENT[shape]` 反推各 overlay 参数。改画法（最大半径倍数）必须同步 `DRAWN_EXTENT`。
 

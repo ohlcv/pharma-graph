@@ -88,6 +88,11 @@ import {
 } from './space-controller.js';
 import { runLayoutInWorker } from '../core/layout-worker-client.js';
 import { initTourSettings } from './tour-settings.js';
+import { sliceGraphBySpace, getPortalNode } from '../core/space-data-cache.js';
+import { computeSpaces, MISC_SPACE_ID } from '../core/spaces.js';
+import { UNIVERSE_ROOTS } from '../core/config.js';
+import { CLASSES } from '../core/renderer.js';
+import type { GraphData } from '../core/graph.js';
 
 let tourController: TourController;
 
@@ -114,7 +119,7 @@ let tourController: TourController;
  *   ?decor=tess       只留超立方体
  *   ?decor=tree       只留生命之树
  *   ?decor=e8         只留 E8 根系
- *   ?decor=portal     只留传送门
+ *   ?decor=portal     只留虫洞
  *   缺省              全部开
  *
  * 刻意用白名单集合（`DECOR_KEYS`）而不是逐个 `DISABLE_*` 布尔：负向列举
@@ -363,12 +368,37 @@ function initGraphFromManager(graphManager: GraphManager): void {
     edges: data.edges.length,
   });
 
+  // ── 多重宇宙：只渲染当前空间 ──────────────────────────────────────
+  //
+  // 按连通分量把全图切成几份子图缓存。cy 里只装"主空间 + 传送门"——
+  // 2735 节点的物理负担降到 O(主空间)。切空间时由 onEnterSpace 负责
+  // remove 旧空间 + add 新空间 + 跑一次 euler（只算那个空间）。
+  const allSpaces = computeSpaces(data.nodes, data.edges, UNIVERSE_ROOTS);
+  const sliceCache = sliceGraphBySpace(data, allSpaces);
+  const primarySpace = allSpaces[0]; // computeSpaces 按"宇宙优先 + 大的在前"排序
+
+  // 首屏数据 = 主空间切片 + 传送门节点
+  const bootstrapData: GraphData = primarySpace
+    ? {
+        nodes: [...sliceCache.get(primarySpace.id)!.nodes],
+        edges: [...sliceCache.get(primarySpace.id)!.edges],
+      }
+    : data;
+  const portalFromContent = getPortalNode(sliceCache);
+  if (portalFromContent) bootstrapData.nodes.push(portalFromContent);
+
+  logInfo('space bootstrap:', {
+    primary: primarySpace?.id,
+    nodes: bootstrapData.nodes.length,
+    edges: bootstrapData.edges.length,
+  });
+
   const container = document.getElementById('cy');
   if (!container) throw new Error('#cy container not found');
 
   uiState.renderer = new Renderer({
     container,
-    data, // 不需要预设位置：下面对所有节点统一做"从中心爆出"动画
+    data: bootstrapData, // 只装主空间——首屏 euler 只跑这部分节点
     layoutName: 'preset', // 不在构造时跑 layout
     layoutConfigs: LAYOUTS,
   });
@@ -525,17 +555,97 @@ function initGraphFromManager(graphManager: GraphManager): void {
   // 搜「传送门」跳过去，是个比在图上找虫洞更靠谱的入口。
   if (!DISABLE_PORTAL) createPortalOverlay({ container, cy });
 
+  // 装饰奇观（太极八卦 / 四维空间 / 生命之树 / E8 根系）是 overlay 运行时
+  // 创建的 cytoscape 节点，不在 graph-data.json 里——所以 computeSpaces 算
+  // allSpaces 时看不到它们，它们目前不属于任何空间。
+  //
+  // 但产品决策是「奇观只属于散点空间」：药学宇宙里不该飘着四个奇观（用户
+  // 实测反馈）。所以把它们补进 misc 空间，让 applyVisibility 按归属显示。
+  // 传送门**不**在这条路径里——它是跨宇宙的，由 controller 单独兜住。
+  for (const n of cy.nodes(`.${CLASSES.LAYER_PARENT}`).toArray()) {
+    const misc = allSpaces.find((s) => s.id === MISC_SPACE_ID);
+    if (misc) misc.nodeIds.add(n.id());
+  }
+
   // 空间控制器要在节点全部就位之后装配：它按连通分量推导空间归属，
   // 少一个节点就会把空间算漏。即便 ?decor=portal 没开虫洞，控制器也照装
   // —— 它同时是焦点跳转（搜索/详情面板/漫游）跨空间的守卫，而那条路径
   // 与虫洞是否显示无关。
+  //
+  // **spaces 必须显式传入**：cy 此刻只装了主空间的内容节点，再从 cy 现场
+  // 算只能看到一个空间（用户实测反馈：菜单只有两项）。allSpaces 是从全图
+  // 算的——上面已经把奇观也补进 misc 了。
   installSpaceController(cy, {
     onShowPortalDetail: () => uiState.detailPanel?.show(PORTAL_ID, true),
     onSpaceChange: () => {
       updateStats(cy);
       syncBottomSheetStats(cy);
     },
-  });
+    // 切空间时换内容：remove 旧空间、add 新空间、跑一次 euler（只算那个空间）。
+    // 这一步是性能关键——cy 永远只装一个空间的内容，euler 物理只算一个空间。
+    onEnterSpace: (spaceId) => {
+      const slice = sliceCache.get(spaceId);
+      if (!slice) return;
+      const renderer = uiState.renderer as Renderer | null;
+      if (!renderer) return;
+      const sliceData: GraphData = { nodes: slice.nodes, edges: slice.edges };
+      // 传送门常驻——它跨宇宙
+      const portal = getPortalNode(sliceCache);
+      if (portal && cy.getElementById(PORTAL_ID).empty()) {
+        sliceData.nodes.push(portal);
+      }
+      // 清掉旧空间所有节点 + 边——传送门和奇观除外。
+      // 传送门跨宇宙常驻；奇观（layer-parent）跟 overlay 生命周期绑定，
+      // remove 了会让 overlay 找不到节点报错。切空间只动普通内容节点。
+      cy.batch(() => {
+        const toRemove = cy.elements().filter((e) => {
+          if (e.isNode() && (e.id() === PORTAL_ID || e.hasClass(CLASSES.LAYER_PARENT))) {
+            return false;
+          }
+          return true;
+        });
+        cy.remove(toRemove);
+      });
+      // add 新空间节点 + 边
+      renderer.addElements(sliceData);
+      // 按_halton 序列把节点摆到 halo 圆上——euler 会从这些位置开始收敛。
+      //
+      // **不加 entering class**：halo 循环加了 entering（opacity:0）之后，
+      // runLayout 的 skipEntering: true 分支只"跳过入场动画处理"，**不会**
+      // 移除 entering——节点就永远 opacity:0 隐形，只有 hover 触发 .hovered
+      // 规则时才现形（用户实测反馈："切换宇宙后只有边显示，节点隐形，鼠标
+      // 点上去才现形"）。切换空间不需要再来一次大爆炸——节点直接可见、
+      // euler 让它们从 halo 散开即可。
+      //
+      // 跳过传送门和奇观：传送门有自己的位置（视口中心），奇观有自己的
+      // overlay 渲染逻辑，halo 重置会把它们的 model 坐标拽到 (0,0)，跟 overlay
+      // 给的初始位置打架。
+      cy.nodes()
+        .not(`node#${PORTAL_ID}`)
+        .not(`.${CLASSES.LAYER_PARENT}`)
+        .forEach((n, i) => {
+          const angle = halton(i, 2) * Math.PI * 2;
+          const ringRadius = 50 + halton(i, 3) * 280;
+          n.position({
+            x: Math.cos(angle) * ringRadius,
+            y: Math.sin(angle) * ringRadius,
+          });
+        });
+      // 传送门位置：用当前视口中心（如果有更好的策略再改）
+      const portalNode = cy.getElementById(PORTAL_ID);
+      if (!portalNode.empty()) {
+        portalNode.position({ x: 0, y: 0 });
+      }
+      // 跑 euler——这次不再走 main 流程的 finishStreamingLayout（那是首屏专用），
+      // 直接调 renderer.runLayout，让它带 animate: true 把节点从 halo 散开。
+      beginBootLayout();
+      renderer.runLayout(
+        DEFAULT_LAYOUT,
+        { randomize: false },
+        { skipEntering: true, onLayoutStop: () => settleAfterLayout() },
+      );
+    },
+  }, allSpaces);
 
   // 启动落位：直接进主空间（执业药师考试体系）。
   // 首屏不该是三个空间的并集——四个奇观会和药学节点一起铺在画面上,

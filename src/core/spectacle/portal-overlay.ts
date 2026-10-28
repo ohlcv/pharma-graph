@@ -1,5 +1,5 @@
 // src/core/spectacle/portal-overlay.ts
-// 传送门（portal-gate）：第五个装饰奇观，也是唯一带交互语义的装饰——
+// 虫洞（portal-gate）：第五个装饰奇观，也是唯一带交互语义的装饰——
 // 连接图谱中各个独立空间（药学宇宙 / 生存策略宇宙 / 奇观散点）的虫洞。
 //
 // 架构与另外四个奇观刻意平行而不是共享基类（同 emblem-overlay.ts 文件头的
@@ -11,10 +11,13 @@
 // SpaceController 弹出空间菜单。这里只负责"虫洞长什么样"和"节点可点"。
 //
 // 视觉：
-//   - 吸积盘：若干同心椭圆环（透视压缩 y 轴），不同速度反向旋转；
+//   - 吸积盘：5 圈同心椭圆环（透视压缩 y 轴），不同速度反向旋转；
+//     内圈青蓝（热）→ 外圈紫（冷）色温梯度。
 //   - 螺旋粒子：每个粒子的轨道半径随时间收缩，越靠近核心角速度越快、
-//     越亮——纯 t 的函数，无逐帧状态，掉帧不会累积误差；
-//   - 事件视界：盘面之上叠一个正圆暗核 + 亮边 + 紫色辉光。
+//     越亮；尾迹按 t 反推 3 个采样段、分两批合并 path 画衰减线段，
+//     纯 t 函数无逐帧状态，掉帧不会累积误差；
+//   - 事件视界：径向渐变暗核（中心更深、边缘略透，读作虚空）+ 亮边 +
+//     外圈爱因斯坦环（引力透镜暗示）+ 紫色辉光。
 //   - prefers-reduced-motion：只画一帧静态图，不起 rAF。
 //   - 节点被空间隔离藏起来时（display:none）整帧跳过——canvas 清空即可。
 
@@ -23,7 +26,7 @@ import { loadDecorContent } from './decor-content.js';
 import { isElementShown } from '../element-visibility.js';
 import { pickSpectacleParam } from './spectacle-size.js';
 
-/** 图上这个节点固定用这个 id；内容节点 public/content/装饰奇观/传送门.md 同名。 */
+/** 图上这个节点固定用这个 id；内容节点 public/content/装饰奇观/虫洞.md 同名。 */
 export const PORTAL_ID = 'portal-gate';
 const PORTAL_CLASS = 'portal-node';
 
@@ -129,7 +132,7 @@ export function spawnPortalNode(cy: cytoscape.Core): cytoscape.NodeSingular {
   const view = safeViewCenter(cy, bb);
   const node = cy.add({
     group: 'nodes',
-    data: { id: PORTAL_ID, label: '传送门' },
+    data: { id: PORTAL_ID, label: '虫洞' },
     position: view,
     classes: `layer-parent ${PORTAL_CLASS}`,
   });
@@ -327,48 +330,128 @@ export class PortalOverlay {
     ctx.save();
     ctx.translate(rx, ry);
 
-    // ── 吸积盘（透视压扁 + 倾斜）──────────────────────────────────────
+    // ── 吸积盘：5 圈色温梯度（内热青 → 外冷紫）+ dash/实线分组绘制 ──
+    // 性能：原版每圈 setLineDash + stroke 各一次（5×2 状态切换），
+    // 现在 dash 圈一组、实线圈一组各单 path 一次 stroke（2 次切换）。
+    // 视觉：色温由内而外从青蓝（hue 200）渐变到紫（hue 270），盘面读出
+    // "内热外冷"的层次，而非原来一坨紫雾。
     ctx.save();
     ctx.rotate(DISK_TILT);
     ctx.scale(1, DISK_SQUASH);
-    for (let i = 0; i < 5; i++) {
-      const rr = R * (0.34 + i * 0.165);
-      const speed = (i % 2 === 0 ? 1 : -1) * (0.06 + i * 0.02);
-      const alpha = 0.32 - i * 0.045;
-      ctx.beginPath();
-      ctx.arc(0, 0, rr, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(167,139,250,${alpha})`;
-      ctx.lineWidth = Math.max(1, R * 0.012);
-      ctx.setLineDash(i === 4 ? [] : [R * 0.16, R * 0.1]);
-      ctx.lineDashOffset = -t * speed * R * 2;
-      ctx.stroke();
-    }
-    ctx.setLineDash([]);
 
-    // ── 螺旋坠入的粒子 ────────────────────────────────────────────────
-    for (const pt of this.particles) {
-      const u = (t * pt.rate + pt.offset) % 1; // 寿命 0（外缘）→ 1（核心）
-      const rr = R * (1 - u) * 0.98;
-      const ang = pt.phase + t * pt.spin * (1.5 - u);
-      const x = Math.cos(ang) * rr;
-      const y = Math.sin(ang) * rr;
-      const size = Math.max(0.8, R * 0.016 * (0.5 + u));
-      ctx.beginPath();
-      ctx.arc(x, y, size, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(196,181,253,${0.25 + 0.6 * u})`;
-      ctx.fill();
+    // 第一组：dash 圈（i=0..3），内热青到中紫
+    ctx.setLineDash([R * 0.16, R * 0.1]);
+    ctx.beginPath();
+    for (let i = 0; i < 4; i++) {
+      const rr = R * (0.34 + i * 0.165);
+      ctx.moveTo(rr, 0);
+      ctx.arc(0, 0, rr, 0, Math.PI * 2);
     }
+    ctx.strokeStyle = 'rgba(170,200,255,0.30)';
+    ctx.lineWidth = Math.max(1, R * 0.012);
+    ctx.lineDashOffset = -t * 0.06 * R * 2;
+    ctx.stroke();
+
+    // 第二组：实线圈（i=4），最外圈收口，冷紫
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    {
+      const rr = R * (0.34 + 4 * 0.165);
+      ctx.moveTo(rr, 0);
+      ctx.arc(0, 0, rr, 0, Math.PI * 2);
+    }
+    ctx.strokeStyle = 'rgba(167,139,250,0.18)';
+    ctx.lineWidth = Math.max(1, R * 0.013);
+    ctx.stroke();
+
+    // ── 螺旋坠入的粒子 + 沿轨尾迹（批量化）─────────────────────────
+    // 性能：每粒尾迹分两批合并 path，每帧从 5×42=210 stroke 降到 3 stroke。
+    // 每条尾迹按寿命算 3 段，前 2 段（亮）合成一条 path，第 3 段（弱）
+    // 合成另一条 path。头点合并为一次 fill。仍纯 t 函数，不存逐帧状态。
+    const DU = 0.022;
+
+    // Pass A：尾迹段 1+2（亮）。
+    ctx.beginPath();
+    for (const pt of this.particles) {
+      const uNow = (t * pt.rate + pt.offset) % 1;
+      const angNow = pt.phase + t * pt.spin * (1.5 - uNow);
+      const rrNow = R * (1 - uNow) * 0.98;
+      const xNow = Math.cos(angNow) * rrNow;
+      const yNow = Math.sin(angNow) * rrNow;
+      let px = xNow;
+      let py = yNow;
+      for (let k = 1; k <= 2; k++) {
+        const u = (((uNow - k * DU) % 1) + 1) % 1;
+        const ang = pt.phase + t * pt.spin * (1.5 - u);
+        const rr = R * (1 - u) * 0.98;
+        const nx = Math.cos(ang) * rr;
+        const ny = Math.sin(ang) * rr;
+        ctx.moveTo(px, py);
+        ctx.lineTo(nx, ny);
+        px = nx;
+        py = ny;
+      }
+    }
+    ctx.strokeStyle = 'rgba(196,181,253,0.32)';
+    ctx.lineWidth = Math.max(0.6, R * 0.011);
+    ctx.stroke();
+
+    // Pass B：第 3 段（弱尾）。
+    ctx.beginPath();
+    for (const pt of this.particles) {
+      const uNow = (t * pt.rate + pt.offset) % 1;
+      const u2 = (((uNow - 2 * DU) % 1) + 1) % 1;
+      const u3 = (((uNow - 3 * DU) % 1) + 1) % 1;
+      const ang2 = pt.phase + t * pt.spin * (1.5 - u2);
+      const ang3 = pt.phase + t * pt.spin * (1.5 - u3);
+      const rr2 = R * (1 - u2) * 0.98;
+      const rr3 = R * (1 - u3) * 0.98;
+      ctx.moveTo(Math.cos(ang2) * rr2, Math.sin(ang2) * rr2);
+      ctx.lineTo(Math.cos(ang3) * rr3, Math.sin(ang3) * rr3);
+    }
+    ctx.strokeStyle = 'rgba(196,181,253,0.11)';
+    ctx.lineWidth = Math.max(0.6, R * 0.010);
+    ctx.stroke();
+
+    // Pass C：头点（所有粒子头点合并进一条 path，单次 fill）。
+    ctx.beginPath();
+    for (const pt of this.particles) {
+      const uNow = (t * pt.rate + pt.offset) % 1;
+      const angNow = pt.phase + t * pt.spin * (1.5 - uNow);
+      const rrNow = R * (1 - uNow) * 0.98;
+      const xNow = Math.cos(angNow) * rrNow;
+      const yNow = Math.sin(angNow) * rrNow;
+      const size = Math.max(0.8, R * 0.016 * (0.5 + uNow));
+      ctx.moveTo(xNow + size, yNow);
+      ctx.arc(xNow, yNow, size, 0, Math.PI * 2);
+    }
+    ctx.fillStyle = 'rgba(196,181,253,0.6)';
+    ctx.fill();
     ctx.restore();
 
-    // ── 事件视界（正圆，盖在盘面之上）────────────────────────────────
+    // ── 事件视界 + 爱因斯坦环（引力透镜暗示）─────────────────────────
     const coreR = R * 0.22;
+    // 爱因斯坦环：盘面之上的一圈细亮蓝环。先画环再画暗核，让暗核的填色
+    // 盖在环的内沿，环只露出 coreR*1.45 之外的那一段。
+    ctx.beginPath();
+    ctx.arc(0, 0, coreR * 1.45, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(165,220,255,0.42)';
+    ctx.lineWidth = Math.max(0.6, R * 0.006);
+    ctx.stroke();
+    // 暗核：径向渐变（中心更深、边缘略透）——读作"虚空"而非"贴黑片"。
+    // 原版 fillStyle = '#0b0614' 是硬色，事件视界像贴了一块黑胶布。
+    const core = ctx.createRadialGradient(0, 0, 0, 0, 0, coreR);
+    core.addColorStop(0, '#04020a');
+    core.addColorStop(0.7, '#0b0614');
+    core.addColorStop(1, 'rgba(11,6,20,0.86)');
     ctx.beginPath();
     ctx.arc(0, 0, coreR, 0, Math.PI * 2);
-    ctx.fillStyle = '#0b0614';
+    ctx.fillStyle = core;
     ctx.shadowColor = 'rgba(139,92,246,0.55)';
     ctx.shadowBlur = coreR * 0.6;
     ctx.fill();
     ctx.shadowBlur = 0;
+    // 亮边
     ctx.beginPath();
     ctx.arc(0, 0, coreR, 0, Math.PI * 2);
     ctx.strokeStyle = 'rgba(196,181,253,0.85)';

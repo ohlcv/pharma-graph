@@ -55,12 +55,24 @@ export interface SpaceControllerOptions {
   onShowPortalDetail?: () => void;
   /** 空间切换后刷新统计卡片（图谱状态 / 底部抽屉里的计数）。 */
   onSpaceChange?: (spaceId: string | null) => void;
+  /**
+   * 切空间时由 main.ts 替换 cy 里的元素：
+   *   1. remove 旧空间的所有节点 + 边
+   *   2. add 新空间的节点 + 边（来自 space-data-cache）
+   *   3. add 传送门节点（跨宇宙常驻）
+   *   4. 跑一次 euler（只算当前空间）
+   *
+   * 这条路径负责性能：只渲染当前空间的节点，euler 也只算当前空间的力学，
+   * 主线程开销从 O(全图) 降到 O(当前空间)。
+   */
+  onEnterSpace?: (spaceId: string) => void;
 }
 
 let cyRef: cytoscape.Core | null = null;
-let spaces: SpaceInfo[] = [];
+let spaces: readonly SpaceInfo[] = [];
 let onSpaceChange: ((spaceId: string | null) => void) | null = null;
 let onShowDetail: (() => void) | null = null;
+let onEnterSpace: ((spaceId: string) => void) | null = null;
 let menuEl: HTMLElement | null = null;
 let listEl: HTMLElement | null = null;
 let detailBtn: HTMLButtonElement | null = null;
@@ -114,17 +126,27 @@ function edgesOf(cy: cytoscape.Core): { source: string; target: string }[] {
 }
 
 /**
- * 装配空间控制器。cy 必须在图数据加载完成后传进来（节点/边都在位），
- * 否则算出来的空间会缺节点。
+ * 装配空间控制器。
+ *
+ * `cy` 必须在图数据加载完成后传进来——除非调用方**显式**提供 `inSpaces`：
+ * 「只渲染当前空间」之后 cy 里只有当前空间的内容节点，再从 cy 算 spaces
+ * 永远只能看到一个空间（用户实测反馈：菜单只显示两项）。调用方应从**全图**
+ * 算一次 spaces 并传进来。
+ *
+ * 不传 `inSpaces` 时（兼容测试夹具——那里 cy 装的是全图）：从 cy 现场算。
  */
 export function installSpaceController(
   cy: cytoscape.Core,
   options: SpaceControllerOptions = {},
+  inSpaces?: readonly SpaceInfo[],
 ): void {
   cyRef = cy;
   onSpaceChange = options.onSpaceChange ?? null;
   onShowDetail = options.onShowPortalDetail ?? null;
-  spaces = computeSpaces(nodesOf(cy), edgesOf(cy), UNIVERSE_ROOTS);
+  onEnterSpace = options.onEnterSpace ?? null;
+  // 注意：参数名是 inSpaces，模块级变量是 spaces——必须显式赋值给模块级变量，
+  // 否则 buildMenu / applyVisibility 等内部函数读的还是旧的 spaces。
+  spaces = inSpaces ?? computeSpaces(nodesOf(cy), edgesOf(cy), UNIVERSE_ROOTS);
   buildMenu();
   installDismissHandlers();
   registerEnsureVisible(ensureVisible);
@@ -161,7 +183,7 @@ function buildMenu(): void {
     <div class="space-menu__panel" role="dialog" aria-modal="true" aria-label="空间传送">
       <div class="space-menu__head">
         <div class="space-menu__head-text">
-          <span class="space-menu__title">传送门</span>
+          <span class="space-menu__title">虫洞</span>
           <span class="space-menu__hint">选择目的地</span>
         </div>
         <button type="button" class="space-menu__close" id="${CLOSE_BTN_ID}" aria-label="关闭" title="关闭">
@@ -173,7 +195,7 @@ function buildMenu(): void {
       </div>
       <ul class="space-menu__list" id="${LIST_ID}"></ul>
       <div class="space-menu__foot">
-        <button type="button" class="space-menu__link" id="${DETAIL_BTN_ID}">传送门详情</button>
+        <button type="button" class="space-menu__link" id="${DETAIL_BTN_ID}">虫洞详情</button>
       </div>
     </div>`;
   document.body.appendChild(el);
@@ -278,24 +300,26 @@ function installDismissHandlers(): void {
 /**
  * 只留当前空间的节点与边。
  *
- * 两个特例永远可见：
- *   - 传送门本身：它跨多宇宙，否则进了空间就出不来了。按 id 判定，
- *     不按 class——它是内容树里的正式节点（有自己的 md），不挂 layer-parent
- *     （挂了就会被排除出搜索，而"搜传送门跳过去"恰恰是个有用的入口)。
- *   - 虚拟层父节点：容器，不是内容。
+ * 唯一跨宇宙节点是传送门：它背在所有空间上，否则进了空间就出不来了。
+ * 按 id 判定，不按 class——它是内容树里的正式节点（有自己的 md），不挂
+ * layer-parent（挂了就会被排除出搜索，而"搜传送门跳过去"恰恰是个有用的入口）。
+ *
+ * 装饰奇观（太极八卦 / 四维空间 / 生命之树 / E8 根系）**不跨宇宙**——它们
+ * 只属于散点空间。曾经这里把它们强制 show，结果药学宇宙首屏里也飘着四个
+ * 奇观（用户实测反馈）。现在按 `space.nodeIds` 归属显示：在散点空间里可见，
+ * 别的空间里 hide。
  *
  * 只动节点，不动边：边是否可见是 cytoscape 的派生状态（两端都可见才可见），
- * 跟着端点自动成立，`ele.visible()` / `:visible` / boundingBox 全部一致.
- * 显式给 3184 条边各写一份 display bypass 是纯浪费——派生函数已经算过一遍了.
+ * 跟着端点自动成立。显式给每条边各写一份 display bypass 是纯浪费。
  *
- * 签名收紧为 `space: SpaceInfo`——没有"全图态"了，调用方一定是代表某个空间.
+ * 签名收紧为 `space: SpaceInfo`——没有"全图态"了，调用方一定是代表某个空间。
  */
 function applyVisibility(space: SpaceInfo): void {
   const cy = cyRef;
   if (!cy) return;
   cy.batch(() => {
     cy.nodes().forEach((n) => {
-      if (n.id() === PORTAL_ID || n.hasClass(CLASSES.LAYER_PARENT)) {
+      if (n.id() === PORTAL_ID) {
         n.show();
         return;
       }
@@ -513,6 +537,13 @@ export interface EnterSpaceOptions {
    * 要的镜头，取景留给布局收敛后的 reframeAfterLayout。
    */
   frame?: boolean;
+  /**
+   * 跳过 `onEnterSpace`：调用方自己已经把节点 add 进 cy 了，不需要 SpaceController
+   * 触发"换内容"路径。仅启动落位用——首次进入主空间时，main.ts 在构造 Renderer
+   * 时就把主空间数据塞进去了，再走一遍 onEnterSpace 等于 remove + add + 跑 euler 一次，
+   * 是浪费。
+   */
+  skipLoad?: boolean;
 }
 
 export function enterSpace(spaceId: string, options: EnterSpaceOptions = {}): void {
@@ -521,11 +552,22 @@ export function enterSpace(spaceId: string, options: EnterSpaceOptions = {}): vo
   if (!space) return;
   const changed = getActiveSpaceId() !== spaceId;
 
+  // 切空间时先换内容：remove 旧空间节点 + add 新空间节点 + 跑 euler。
+  // 这一步在 applyVisibility 之前——先有节点再切可见性，否则空 cytoscape
+  // 上一通 hide/show 没意义。但 frame:false（启动落位那次）不动相机：
+  // 镜头留在 main.ts 设的 0.08 宏观视野，euler 炸开时才看得见全貌。
+  //
+  // skipLoad: 启动落位时调用方已经把主空间数据塞进 cy 了——这次 enterSpace
+  // 只切可见性 + 标记，不重复跑换内容路径。
+  if (changed && onEnterSpace && !options.skipLoad) {
+    onEnterSpace(spaceId);
+  }
+
   applyVisibility(space);
   clearSelectionArtifacts();
   setActiveSpace(spaceId);
-  // frame: false → 镜头留在原处（启动落位时是 0.08 的宏观视野），
-  // 传送门也就先跟着 halo 位置走，等 reframeAfterLayout 再停靠。
+  // frame: false → 镜头留在原处（启动落位时是 0.08 的宏观视野）。
+  // 否则按当前空间重新取景——切空间时这一下让相机飞到目标空间中央。
   if (options.frame !== false) flyToCurrentSpace(options.animate ?? true);
   closeSpaceMenu();
   onSpaceChange?.(spaceId);
@@ -549,7 +591,10 @@ export function enterInitialSpace(): string | null {
   if (!primary || primary.id === MISC_SPACE_ID) return null;
   // frame: false —— 此刻节点还在 halo 预铺位置，取景毫无意义（见 EnterSpaceOptions.frame）。
   // 镜头停在 main.ts 设的 0.08 宏观视野，让 euler 把节点炸开时才看得见全貌。
-  enterSpace(primary.id, { animate: false, silent: true, frame: false });
+  // skipLoad: true —— main.ts 构造 Renderer 时已经把主空间数据塞进 cy 了，
+  // 这里不重复走"换内容"路径（remove + add + 跑 euler）。euler 由 finishStreamingLayout
+  // 那条路径统一触发。
+  enterSpace(primary.id, { animate: false, silent: true, frame: false, skipLoad: true });
   return primary.id;
 }
 
@@ -590,6 +635,7 @@ export function _resetSpaceControllerForTests(): void {
   spaces = [];
   onSpaceChange = null;
   onShowDetail = null;
+  onEnterSpace = null;
   menuEl = null;
   listEl = null;
   detailBtn = null;
