@@ -48,3 +48,7 @@ coverage/
 # graph-data.json 必须提交 — 团队协作保持一致，prebuild 钩子在 vite build 前会重新生成。
 public/sitemap.xml
 public/content-manifest.json
+
+# 调试截图与本地会话数据
+/shots/
+/.workbuddy/

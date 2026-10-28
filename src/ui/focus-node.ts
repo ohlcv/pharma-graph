@@ -13,6 +13,8 @@
 //     preview the first result while the search list is still in view.
 
 import cytoscape from 'cytoscape';
+import { ensureNodeVisible } from './space-state.js';
+import { openSpaceMenu, isPortalNode } from './space-controller.js';
 
 const LAYER_PARENT = 'layer-parent';
 const SELECTED_NODE = 'selected-node';
@@ -62,6 +64,15 @@ export function focusOnNode(
 ): boolean {
   const node = cy.getElementById(nodeId);
   if (node.empty()) return false;
+
+  // 0. 目标可能在另一个空间里（比如人在药学宇宙，搜索命中了生存策略宇宙
+  // 的节点）。先切空间——否则镜头飞过去只看到一片空白。切空间时取景是瞬时的
+  // （没有动画），下面第 5 步的动画再从新空间飞到目标节点。
+  ensureNodeVisible(nodeId);
+  // 焦点落到传送门上时，把空间菜单一起打开。这样"搜传送门 → 回车"和
+  // "详情面板点它"都等于开门，而不是只能呆看一个虫洞（画布上直接点它
+  // 那条路在 graph-events 里，那里会跳过本函数）。
+  if (isPortalNode(nodeId)) openSpaceMenu();
 
   // 1. Cancel overlapping camera moves.
   cy.stop();

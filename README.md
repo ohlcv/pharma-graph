@@ -1,6 +1,6 @@
 # 药学家族关系星图 · pharma-graph
 
-> 基于执业药师考试大纲构建的交互式药学知识图谱：药一 · 药二 · 药综三大科目的知识节点可视化呈现，支持关系推理、漫游学习与多种布局。
+> 基于执业药师考试大纲构建的交互式药学知识图谱：药一 · 药二 · 药综 2,700+ 知识节点连成一张可交互星图，支持关系推理、漫游学习、语音朗读与多重宇宙探索。
 
 [![线上地址](https://img.shields.io/badge/线上地址-pharma.ac.cn-6366f1?style=for-the-badge&logo=firefoxbrowser&logoColor=white)](https://www.pharma.ac.cn/)
 [![Vite](https://img.shields.io/badge/Vite-8.0-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vite.dev/)
@@ -12,7 +12,9 @@
 
 ## ✨ 项目简介
 
-项目把执业药师考试三大核心科目（药学专业知识一、药学专业知识二、药学综合知识与技能）的全部知识点拆解为节点，通过**属种关系（subclass_of）**、**包含关系（part_of）**、**实例关系（instance_of）**、**互斥关系（disjoint_with）**、**等价关系（equivalent_to）**等关联类型连接成一张可交互的拓扑网络。每个节点对应一份独立 Markdown 文档，包含定义、分类、用法、不良反应等完整内容；点击节点即可在详情面板查看正文、跳转关联节点，或启动漫游模式自动学习。
+项目把执业药师考试三大核心科目（药学专业知识一、药学专业知识二、药学综合知识与技能）的 2,700+ 知识点拆解为节点，通过**属种关系（subclass_of）**、**包含关系（part_of）**、**实例关系（instance_of）**、**互斥关系（disjoint_with）**、**等价关系（equivalent_to）**等关联类型连接成一张可交互的拓扑网络。每个节点对应一份独立 Markdown 文档，包含定义、分类、用法、不良反应等完整内容；点击节点即可在详情面板查看正文、跳转关联节点，或启动漫游模式自动学习。
+
+星图不止是考点：整张图由几个**互不连通的空间**组成，空间之间散落着几个实时绘制的奇观，唯一的旅行方式是穿过一扇门——门后是什么，自己去发现。
 
 > **结构约定**：`location` 字段承载教材位置（书→章→节→目），不参与图形编码；节点形状 + 填充色表达语义层（module / strict-class / umbrella-class / concept / medication / illness / notion / mnemonic / summary），边类型表达关系层，二者正交。
 
@@ -22,7 +24,7 @@
 
 ### 探索与交互
 
-- **搜索**：顶栏与移动端双入口，实时模糊匹配 1100+ 节点
+- **搜索**：顶栏与移动端双入口，实时模糊匹配 2700+ 节点
 - **选中详情**：点击高亮关联节点并弹出详情面板（概述 / 正文双页）
 - **右键删除**：临时隐藏节点，聚焦剩余子图
 - **双击锁定**：固定节点位置，防止布局调整时位移
@@ -34,9 +36,10 @@
 
 - **两种策略**：教材顺序（深度优先，按书→章→节→分类→药→口诀） · 层级依赖（拓扑序，先修前置再访节点，一次跑完）
 - **间隔可调**：1s – 10s 连续滑块（步进 500ms，默认 3s）
-- **深度档位**：5 档（结构 → 概览 → 复习重点药 → 口诀 → 全面），无限模式循环直到用户停止
+- **顺序模式**：顺序 / 倒序 / 随机
+- **深度档位**：5 档（结构 · 概览 · 重点 · 全面 · 全部），无限模式循环直到用户停止
 - **手动步进**：暂停后可用上一个 / 下一个按钮或 `[` `]` 键翻页
-- **朗读**：可选开启每步语音播报节点名
+- **语音朗读**：粒度自由组合（标题 / 关联 / 标签 / 摘要 / 正文），语速 0.5–2.0 可调，等读完再自动跳下一站——通勤路上、睡前闭眼都能复习
 
 ### 🗺️ 多布局
 
@@ -55,6 +58,13 @@
 ### 🎬 大屏模式
 
 隐藏全部 UI 元素、图谱铺满全屏，适合课堂演示与投屏讲解。按 `Esc` 或双击画布退出。
+
+### 🚪 空间与奇观（多重宇宙）
+
+- **互不连通的空间**：整张星图由几个宇宙组成（药学宇宙、生存策略宇宙……），空间之间**没有一条边相连**
+- **奇观**：空间之间漂着几个不承载考点的奇观，全部实时 canvas 绘制（太极八卦 / 四维超立方体 / 生命之树 / E8 根系等），统一视觉半径由 `spectacle-size.ts` 管理
+- **传送门**：唯一的旅行方式是穿过那扇连接所有空间的门——门后是什么，自己去发现
+- 启动即进入默认空间（最大宇宙），Esc 可回全图并集；空间归属是**推导**的（连通分量 + `UNIVERSE_ROOTS`），不写进 frontmatter
 
 ### 🌌 加载与背景
 
@@ -96,6 +106,7 @@
 - **药学专业知识一**：药剂学（药物与药品质量体系 · 口服 / 注射 / 皮肤黏膜给药制剂）· 药理与毒理学（药物对机体的作用 · 毒性与安全）· 药物化学（结构作用 · 代谢 · 抗肿瘤 · 抗感染）· 药动学（吸收分布代谢排泄）· 生命药学
 - **药学专业知识二**：神经与精神用药（镇静催眠 · 抗癫痫 · 抗抑郁 · 镇痛 · 抗帕金森 · 抗精神病）· 解热镇痛抗炎与抗风湿 · 呼吸 / 消化 / 心血管 / 泌尿 / 内分泌 / 血液系统用药 · 抗肿瘤与抗感染 · 痛风骨病等
 - **药学综合知识与技能**：药学服务与药师职责 · 处方审核与调剂 · 用药安全与不良反应监测 · 常见病症健康管理 · 慢病长期用药管理 · 特殊人群用药
+- **药事管理与法规（创新）**：《药事管理与法规 2026 速成通关手册》——245 条考点逐条写全，每条下面直接挂真题（2023–2025 三套真题 + 三套压轴卷逐题挂靠，题干、选项、答案、解析一字不少），🟢送分 / 🟡技巧 / 🔴放弃三色分级，书尾「保命清单」
 
 ---
 
@@ -105,12 +116,12 @@
 | ---- | ------------------------------- | ------------------------------------------------------------------------------------------------- |
 | 构建 | Vite 8 + plugin-legacy          | 自定义插件构建期生成 graph-data.json / content-manifest / sitemap；legacy 仅为旧浏览器出 ES5 分包 |
 | 类型 | TypeScript 5.5（strict）        | 核心数据结构全量类型覆盖                                                                          |
-| 图谱 | Cytoscape.js 3.34（canvas）     | 1100+ 节点流畅渲染；glow / flow 动效画在独立覆盖层 canvas，不参与 cytoscape 重绘管线              |
+| 图谱 | Cytoscape.js 3.34（canvas）     | 2700+ 节点流畅渲染；glow / flow 动效画在独立覆盖层 canvas，不参与 cytoscape 重绘管线              |
 | 布局 | euler · cose-bilkent · dagre 等 | 7 种布局引擎组合                                                                                  |
-| 数据 | 构建期预生成 graph-data.json    | 浏览器只 fetch 一个约 1.2MB 的 JSON（ADR-0004），并保留流式 .md 路径作 fallback                   |
+| 数据 | 构建期预生成 graph-data.json    | 浏览器只 fetch 一个约 3.3MB 的 JSON（ADR-0004），并保留流式 .md 路径作 fallback                   |
 | 内容 | marked + yaml + DOMPurify       | Markdown frontmatter 解析 + XSS 清理（详情正文渲染路径）                                          |
 | 样式 | 原生 CSS `@layer`               | 13 层，`glass.css` 最后引入，隐藏态工具类不进层保证优先级                                         |
-| 测试 | Vitest 2 + jsdom                | 30 个测试文件 / 315 用例，UI 模块与源码同目录（`*.test.ts`）                                      |
+| 测试 | Vitest 2 + jsdom                | 48 个测试文件 / 591 用例，测试树顶层隔离于 `tests/`（unit / component / e2e 三层）               |
 | 质量 | ESLint 9 + Prettier 3           | @typescript-eslint + eslint-plugin-prettier                                                       |
 
 ---
@@ -123,23 +134,22 @@ pharma-graph/
 │   ├── content/            # 全部知识节点 Markdown（数据源，按学科/章节分目录）
 │   ├── audio/ images/      # BGM 与静态资源
 │   ├── graph-data.json     # 构建期预生成的整图数据（提交入库，保证协作一致）
-│   ├── sitemap.xml         # 构建时生成，1100+ URL（不提交）
+│   ├── sitemap.xml         # 构建时生成，2700+ URL（不提交）
 │   └── content-manifest.json  # 构建时生成的节点索引（不提交）
 ├── src/
 │   ├── core/               # 图谱核心（不含 UI）：config（视觉单一来源）/ renderer /
-│   │                       #   tour（漫游引擎）/ glow-overlay / build-graph / graph-manager /
+│   │                       #   tour（漫游引擎）/ spaces（空间系统）/ spectacle（奇观 overlay）/
+│   │                       #   glow-overlay / build-graph / graph-manager /
 │   │                       #   prebuilt-loader / force-drag / device-capability 等
 │   ├── parser/             # frontmatter / schema：Markdown 解析与校验
 │   ├── data/               # 领域词表（vocabulary）
 │   ├── types/              # 第三方类型补丁
-│   └── ui/                 # 所有 UI 行为（测试与源码同目录）
-│       ├── main.ts         # 入口与初始化编排
-│       ├── tour-controller.ts / detail-panel.ts / bigscreen.ts / search-ui.ts /
-│       │   graph-events.ts / highlight-engine.ts / neighbor-tug.ts / starfield.ts 等
-│       ├── layout/ stats/  # 布局状态与参数 / 状态卡与 FPS·内存采样
-│       └── styles/         # index.css（@layer 声明 + 全部 import，glass 最后）/
-│                           #   base / layout / components / glass / tour / sidebar/
-├── docs/                   # 开发文档（frontmatter / SKILL / RULES / ADR / DEBUG 等）
+│   └── ui/                 # 所有 UI 行为：漫游控制器 / 语音朗读 / 详情面板 / 空间控制器 /
+│                           #   大屏 / 搜索 / 高亮 / 邻居牵引 / 星空 / 布局 / 统计 / 样式
+├── tests/                  # 测试树（顶层隔离于 src/：unit / component / e2e 三层）
+├── build/                  # 构建期共享库（build-content.ts，被 vite.config 与 scripts import）
+├── tools/                  # 一次性迁移 / 测量工具（不参与构建链）
+├── docs/                   # 开发文档（frontmatter / SKILL / RULES / ADR / DEBUG / 宣发 等）
 ├── ADR/                    # 架构决策（docs/ADR/ 的同级目录别名；正式目录是 docs/ADR/）
 ├── archive/                # 历史版本快照
 ├── scripts/                # 构建与校验脚本（build-graph-data / validate / audit 等）
@@ -168,12 +178,12 @@ npm run preview    # 本地预览构建产物
 
 | 命令                                     | 作用                                   |
 | ---------------------------------------- | -------------------------------------- |
-| `npm run validate`                       | 校验全部 1100+ 份 Markdown frontmatter |
+| `npm run validate`                       | 校验全部 2700+ 份 Markdown frontmatter |
 | `npm run audit`                          | 审计重复 ID / 缺失字段                 |
 | `npm run measure-overlap`                | 计算三科目知识点重叠度                 |
 | `npm run check:graph`                    | 检查预生成的 graph-data.json 是否过期  |
 | `npm run lint` / `lint:fix`              | ESLint 检查 / 自动修复                 |
-| `npm test`                               | 运行全部测试（315 用例）               |
+| `npm test`                               | 运行全部测试（48 文件 / 591 用例）     |
 | `npm run build:graph` / `build:manifest` | 单独重生成图数据 / 节点索引            |
 
 ---
@@ -206,7 +216,7 @@ edges_out: # 对外关联（出边）
 - **JSON-LD 结构化数据**：WebSite（含站内搜索框）· EducationalOrganization · LearningResource · BreadcrumbList 四类实体
 - **`<noscript>` 纯文本**：三大科目说明 · 60+ 核心药名标签 · 平台特色
 - **内联 JSON 数据**：构建时将全部节点与边注入 HTML，爬虫直接可读
-- **sitemap.xml**：首页 + 1100+ 内容页，按路径深度分级 priority
+- **sitemap.xml**：首页 + 2700+ 内容页，按路径深度分级 priority
 - **robots.txt**：允许主流爬虫并声明 Sitemap 绝对 URL
 - **OG / Twitter Card**：summary_large_image 分享卡片
 
@@ -225,6 +235,7 @@ edges_out: # 对外关联（出边）
 | [docs/布局参数清单.md](docs/布局参数清单.md)                                         | 7 种布局的可调参数与默认值                                     |
 | [docs/ADR/](docs/ADR/)                                                               | 架构决策记录（ADR-0001 ~ 0006）                                |
 | [docs/DEBUG/](docs/DEBUG/)                                                           | 问题排查记录（仅活跃问题；已修复归档到 `docs/archive/debug/`） |
+| [docs/宣发/](docs/宣发/)                                                             | 宣发素材：作品宣言与介绍 / 小红书六页轮播 / 1024 投稿填写稿   |
 | [docs/archive/施工单-布局设置重构-2026.md](docs/archive/施工单-布局设置重构-2026.md) | 布局设置重构的施工单（已实施，归档）                           |
 
 ---

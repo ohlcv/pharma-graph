@@ -236,6 +236,29 @@
     padding: 7px 12px;
   }
 
+  /* 空间传送门菜单：大面板档玻璃（模糊 30px + 左上高光），与布局菜单同材质。 */
+  .space-menu__panel {
+    border-radius: var(--radius-3xl);
+    border: 1px solid var(--lg-line);
+    background:
+      radial-gradient(120% 70% at 0% 0%, rgba(255, 255, 255, 0.13) 0%, transparent 60%),
+      var(--lg-tint-dense);
+    -webkit-backdrop-filter: var(--lg-filter-lg);
+    backdrop-filter: var(--lg-filter-lg);
+    box-shadow: var(--lg-bevel), var(--lg-shadow);
+  }
+  .space-menu__item {
+    border-radius: var(--radius-lg);
+    background: var(--lg-fill);
+  }
+  .space-menu__item:hover {
+    background: var(--lg-fill-hi);
+  }
+  /* 目的地项之间只留一条极淡的分隔，避免玻璃上再叠一层卡片感。 */
+  .space-menu__foot {
+    border-top-color: var(--lg-line-soft);
+  }
+
   /* ══════════════════════════════════════════════════════════════════════════
    4. 桌面侧栏：悬浮玻璃卡片
    ══════════════════════════════════════════════════════════════════════════ */

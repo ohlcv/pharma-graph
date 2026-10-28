@@ -31,7 +31,9 @@
 // euler 之【前】——即加在 initGraphFromManager() 函数体的最后几行。
 
 import type cytoscape from 'cytoscape';
-import { parseFrontmatter } from '../../parser/frontmatter.js';
+import { loadDecorContent } from './decor-content.js';
+import { isElementShown } from '../element-visibility.js';
+import { pickSpectacleParam } from './spectacle-size.js';
 
 // ── 数据：原样迁自 data.js ───────────────────────────────────────────────
 
@@ -381,14 +383,6 @@ const RINGS_DEF: RingDef[] = [
 /** 图上这个节点固定用这个 id，找它/避免重复添加都靠它。 */
 export const CELESTIAL_EMBLEM_ID = 'celestial-emblem';
 const EMBLEM_CLASS = 'celestial-emblem-node';
-/** 拉取内容用的 md 路径——按项目内容目录惯例存放。这份 .md 的 frontmatter
- *  需要带 id（哪怕这里用不上）：下面复用的是项目唯一的正式解析器
- *  （src/parser/frontmatter.ts），它对缺 id 的文件会直接抛错。 */
-const CONTENT_REL_PATH = '个人成长与生存策略/太极八卦.md';
-
-function clamp(v: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, v));
-}
 
 function graphSpread(cy: cytoscape.Core): {
   bb: { x1: number; y1: number; x2: number; y2: number };
@@ -406,7 +400,9 @@ function graphSpread(cy: cytoscape.Core): {
 
 /** 十二重叠在一起，视觉体量比单独一个八卦环大得多，半径基准相应调大。 */
 function pickRadius(cy: cytoscape.Core): number {
-  return clamp(graphSpread(cy).spread * 0.075, 140, 340);
+  // 尺寸统一由 spectacle-size 决定（五个奇观共用一个视觉半径）——
+  // 不要再往这里塞 spread 比例或 clamp，那正是原来五个奇观大小不一的成因。
+  return pickSpectacleParam(graphSpread(cy).spread, 'emblem');
 }
 
 /** 命中盒边长——直接从视觉半径换算，而不是写死一个数字。
@@ -537,25 +533,10 @@ function stripNodeChrome(node: cytoscape.NodeSingular, size: number): void {
 
 /** 非阻塞加载——fetch + 用项目正式的 frontmatter 解析器解析成功后，
  *  把内容写入 node data（跟其它节点走的是完全相同的字段/详情面板渲染路径）。
- *  失败（网络、404、frontmatter 缺 id 等）一律静默降级。 */
+ *  失败（网络、404、frontmatter 缺 id 等）一律静默降级。
+ *  md 位置由节点自己的 `rel` 决定（见 decor-content.ts），不在源码里写死。 */
 async function fetchEmblemContent(node: cytoscape.NodeSingular): Promise<void> {
-  try {
-    const url =
-      '/content/' +
-      CONTENT_REL_PATH.split('/')
-        .map((s) => encodeURI(s).replace(/#/g, '%23').replace(/\?/g, '%3F'))
-        .join('/');
-    const res = await fetch(url);
-    if (!res.ok) return;
-    const text = await res.text();
-    const fm = parseFrontmatter(text, CONTENT_REL_PATH);
-    node.data('shortSummary', fm.shortSummary);
-    node.data('fullSummary', fm.fullSummary);
-    node.data('body', fm.body);
-    node.data('sourcePath', CONTENT_REL_PATH);
-  } catch {
-    /* fetch / 解析失败不影响图功能，静默降级 */
-  }
+  await loadDecorContent(node);
 }
 
 export interface CelestialEmblemOverlayOptions {
@@ -633,7 +614,7 @@ export class CelestialEmblemOverlay {
    *  点击区还留在旧尺寸上。 */
   reroll(): void {
     const node = this.cy.getElementById(CELESTIAL_EMBLEM_ID);
-    if (node.empty()) return;
+    if (node.empty() || !isElementShown(node)) return;
     const { x, y } = pickSpawnPoint(this.cy);
     node.position({ x, y });
     this.modelRadius = pickRadius(this.cy);
@@ -699,7 +680,7 @@ export class CelestialEmblemOverlay {
     const node = this.cy.getElementById(CELESTIAL_EMBLEM_ID);
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, this.cssWidth, this.cssHeight);
-    if (node.empty()) return;
+    if (node.empty() || !isElementShown(node)) return;
 
     const p = node.renderedPosition();
     const zoom = this.cy.zoom();

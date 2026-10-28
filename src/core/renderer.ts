@@ -20,6 +20,7 @@ import {
   SHAPE_BY_OWL2,
 } from './config.js';
 import { GlowOverlay } from './glow-overlay.js';
+import { isElementShown } from './element-visibility.js';
 import { readThemeColors, themeKey } from './theme-colors.js';
 
 cytoscape.use(coseBilkent);
@@ -160,7 +161,13 @@ export const RIPPLE_COLORS = {
 // 生效，所以只在某些样式重算时机可见）——难排查。
 // 更好的做法是让各 overlay 导出 class 常量、由这里汇总，那需要给
 // src/core/spectacle/ 加 barrel，见 docs/ARCHITECTURE.md §3.2。
-const DECOR_NODE_CLASSES = ['celestial-emblem-node', 'tesseract-node', 'tree-node', 'e8-star-node'];
+const DECOR_NODE_CLASSES = [
+  'celestial-emblem-node',
+  'tesseract-node',
+  'tree-node',
+  'e8-star-node',
+  'portal-node',
+];
 /** 装饰节点本体（压透明）。逗号展开成多条规则以符合 cytoscape 的选择器语法。 */
 const DECOR_NODE = DECOR_NODE_CLASSES.map((c) => `.${c}`).join(', ');
 
@@ -624,7 +631,7 @@ export interface AddElementsResult {
 }
 
 /** 「适应」在左右下三边留的空白（顶部另外要让开浮层）。 */
-const FIT_PADDING = 50;
+export const FIT_PADDING = 50;
 
 /**
  * 浮在画布上方的固定 chrome（顶栏 + 工具栏）实际占掉的高度。
@@ -633,7 +640,7 @@ const FIT_PADDING = 50;
  * 所以「适应」的顶部必须让开这段高度。这里按渲染结果实测而不是写死 100px：
  * 大屏模式下两条 bar 都是 display:none，≤768px 时工具栏也是 display:none。
  */
-function topChromeHeight(): number {
+export function topChromeHeight(): number {
   if (document.documentElement.classList.contains('bigscreen')) return 0;
   let bottom = 0;
   document.querySelectorAll<HTMLElement>('.topbar, .toolbar').forEach((el) => {
@@ -926,7 +933,11 @@ export class Renderer {
   }
 
   fit(): void {
-    const eles = this.cy.elements();
+    // 空间隔离时"全图"指的是当前空间：被藏起来的空间不该参与取景，
+    // 否则「适应视图」会把镜头拉到能同时看见三个宇宙的高度。
+    // 判据用 isElementShown 而非 ':visible'——后者排除 opacity: 0 的装饰
+    // 奇观与传送门，会把它们排除在取景之外（见 core/element-visibility.ts）。
+    const eles = this.cy.elements().filter(isElementShown);
     if (eles.length === 0) return;
 
     // cytoscape 的 cy.fit(eles, padding) 与布局的 padding 都只支持四边同值，

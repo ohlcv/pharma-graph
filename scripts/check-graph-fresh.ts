@@ -44,9 +44,15 @@ try {
   committedRaw = execFileSync('git', ['show', `HEAD:public/${GRAPH_DATA_FILENAME}`], {
     encoding: 'utf-8',
     stdio: ['ignore', 'pipe', 'ignore'],
+    // graph-data.json is multi-MB and grows with every content commit; the
+    // 1 MiB default triggers ENOBUFS, which the catch below used to swallow
+    // into a silent "skip comparison" — making this CI gate always green.
+    maxBuffer: 64 * 1024 * 1024,
   });
-} catch {
-  // no git, or file not in HEAD — fall back to working tree copy
+} catch (err) {
+  // Report instead of swallowing: a silent skip is indistinguishable from
+  // "nothing to compare" and hides real failures (e.g. ENOBUFS).
+  console.warn(`[check:graph] could not read HEAD copy: ${(err as Error).message}`);
   committedRaw = null;
 }
 
@@ -66,11 +72,13 @@ if (!committedData) {
   process.exit(0);
 }
 
-const sameShape =
-  freshData.stats.nodes === committedData.stats.nodes &&
-  freshData.stats.edges === committedData.stats.edges;
+// Compare content, not just counts: a rename or summary edit keeps node/edge
+// totals identical, so a count-only gate would wave it through. `generated` is
+// a build timestamp — normalised out, same as build-content's own write gate.
+const canonical = (d: GraphData | null): string =>
+  d ? JSON.stringify({ ...d, generated: undefined }) : '';
 
-if (sameShape) {
+if (canonical(freshData) === canonical(committedData)) {
   console.log('[check:graph] ✓ graph-data.json is in sync with markdown.');
   process.exit(0);
 }

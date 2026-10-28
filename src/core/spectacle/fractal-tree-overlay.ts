@@ -19,7 +19,9 @@
 // finishStreamingLayout() 触发第一次 euler 之【前】。
 
 import type cytoscape from 'cytoscape';
-import { parseFrontmatter } from '../../parser/frontmatter.js';
+import { loadDecorContent } from './decor-content.js';
+import { isElementShown } from '../element-visibility.js';
+import { pickSpectacleParam } from './spectacle-size.js';
 import {
   generateTree,
   barkColor,
@@ -32,11 +34,6 @@ import {
 
 export const TREE_ID = 'tree-of-life';
 const TREE_CLASS = 'tree-node';
-const CONTENT_REL_PATH = '个人成长与生存策略/生命之树.md';
-
-function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v;
-}
 
 function graphSpread(cy: cytoscape.Core): {
   bb: { x1: number; y1: number; x2: number; y2: number };
@@ -53,14 +50,17 @@ function graphSpread(cy: cytoscape.Core): {
 }
 
 /**
- * 视觉高度（局部系 trunkLength 的倍数）→ 屏幕高度。
+ * 树高（局部系 trunkLength 的倍数 → 屏幕高度）。
  *
- * 实拍调过两轮：初版按图幅 15%（夹 130–320）在 1182 节点图谱上偏小偏淡，
- * 挤在节点群里几乎看不出是一棵树。抬到 26% / 夹 [190, 460] 后才与超立方体
- * 的视觉体量相当。
+ * 历史：初版按图幅 15%（夹 130–320）在 1182 节点图谱上偏小偏淡，挤在节点群里
+ * 几乎看不出是一棵树；实拍调两轮抬到 26% / 夹 [190, 460]。现在这一档已经折算进
+ * spectacle-size 的统一视觉半径里（tree 的 DRAWN_EXTENT = 0.5），不再单独调。
  */
 function pickHeight(cy: cytoscape.Core): number {
-  return clamp(graphSpread(cy).spread * 0.26, 190, 460);
+  // 尺寸统一由 spectacle-size 决定（五个奇观共用一个视觉半径）。
+  // 这里的返回值是**树高**而不是半径，所以 'tree' 的 DRAWN_EXTENT 是 0.5
+  // （外沿 = H/2）——别在这里再乘比例，否则树又会比同伴高一圈。
+  return pickSpectacleParam(graphSpread(cy).spread, 'tree');
 }
 
 /**
@@ -208,7 +208,7 @@ export class FractalTreeOverlay {
   /** 传送到新的随机起点；命中盒跟着新位置重新同步。 */
   reroll(): void {
     const node = this.cy.getElementById(TREE_ID);
-    if (node.empty()) return;
+    if (node.empty() || !isElementShown(node)) return;
     const { x, y } = pickSpawnPoint(this.cy);
     node.position({ x, y });
     stripNodeChrome(node, hitboxSize(this.geometry, this.treeHeight));
@@ -396,6 +396,14 @@ export class FractalTreeOverlay {
 
     const node = this.cy.getElementById(TREE_ID);
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+
+    // 空间隔离：节点被藏起来（display:none）时整帧跳过。这里直接清整块画布
+    // ——正常路径只按树的包围盒清屏，一旦节点隐藏就没有"下一帧会来清"的
+    // 保障，上一帧的树会永久留在原位。
+    if (node.empty() || !isElementShown(node)) {
+      ctx.clearRect(0, 0, this.cssWidth, this.cssHeight);
+      return;
+    }
 
     const p = node.renderedPosition();
     const zoom = this.cy.zoom();
@@ -624,25 +632,9 @@ function stripNodeChrome(node: cytoscape.NodeSingular, size: { w: number; h: num
 }
 
 /** 非阻塞加载——fetch + 正式 frontmatter 解析器，失败静默降级。
- *  处理与另两个奇观完全一致。 */
+ *  处理与另三个奇观完全一致：路径取自节点自身的 `rel`（decor-content.ts）。 */
 async function fetchTreeContent(node: cytoscape.NodeSingular): Promise<void> {
-  try {
-    const url =
-      '/content/' +
-      CONTENT_REL_PATH.split('/')
-        .map((s) => encodeURI(s).replace(/#/g, '%23').replace(/\?/g, '%3F'))
-        .join('/');
-    const res = await fetch(url);
-    if (!res.ok) return;
-    const text = await res.text();
-    const fm = parseFrontmatter(text, CONTENT_REL_PATH);
-    node.data('shortSummary', fm.shortSummary);
-    node.data('fullSummary', fm.fullSummary);
-    node.data('body', fm.body);
-    node.data('sourcePath', CONTENT_REL_PATH);
-  } catch {
-    /* fetch / 解析失败不影响图功能，静默降级 */
-  }
+  await loadDecorContent(node);
 }
 
 export function createFractalTreeOverlay(options: FractalTreeOverlayOptions): FractalTreeOverlay {

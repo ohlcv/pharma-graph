@@ -19,7 +19,9 @@
 // 工具——现在先保持每个文件独立、可以单独复制粘贴接入。
 
 import type cytoscape from 'cytoscape';
-import { parseFrontmatter } from '../../parser/frontmatter.js';
+import { loadDecorContent } from './decor-content.js';
+import { isElementShown } from '../element-visibility.js';
+import { pickSpectacleParam } from './spectacle-size.js';
 
 // ── 代数：E8 根系 + Coxeter 平面 ─────────────────────────────────────────
 
@@ -143,12 +145,6 @@ for (let i = 0; i < 240; i++) {
 
 export const E8_STAR_ID = 'e8-root-system';
 const E8_CLASS = 'e8-star-node';
-/** 可选内容——没有这份 .md 也完全不影响显示，图上照样是个能点开的空标题。 */
-const E8_CONTENT_PATH = '个人成长与生存策略/E8根系.md';
-
-function clamp(v: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, v));
-}
 
 function graphSpread(cy: cytoscape.Core): {
   bb: { x1: number; y1: number; x2: number; y2: number };
@@ -165,7 +161,8 @@ function graphSpread(cy: cytoscape.Core): {
 }
 
 function pickRadius(cy: cytoscape.Core): number {
-  return clamp(graphSpread(cy).spread * 0.075, 140, 340);
+  // 尺寸统一由 spectacle-size 决定（五个奇观共用一个视觉半径）。
+  return pickSpectacleParam(graphSpread(cy).spread, 'e8');
 }
 
 function hitboxSize(radius: number): number {
@@ -240,24 +237,9 @@ function stripNodeChrome(node: cytoscape.NodeSingular, size: number): void {
   });
 }
 
+/** 非阻塞加载：路径取自节点自身的 `rel`，缺这份 md 也完全不影响显示。 */
 async function fetchE8Content(node: cytoscape.NodeSingular): Promise<void> {
-  try {
-    const url =
-      '/content/' +
-      E8_CONTENT_PATH.split('/')
-        .map((s) => encodeURI(s).replace(/#/g, '%23').replace(/\?/g, '%3F'))
-        .join('/');
-    const res = await fetch(url);
-    if (!res.ok) return;
-    const text = await res.text();
-    const fm = parseFrontmatter(text, E8_CONTENT_PATH);
-    node.data('shortSummary', fm.shortSummary);
-    node.data('fullSummary', fm.fullSummary);
-    node.data('body', fm.body);
-    node.data('sourcePath', E8_CONTENT_PATH);
-  } catch {
-    /* 没这份内容 / 网络失败都无所谓——星星照常转 */
-  }
+  await loadDecorContent(node);
 }
 
 // ── 覆盖层：逐帧刚性旋转这个固定投影 ─────────────────────────────────────
@@ -330,7 +312,7 @@ export class E8StarOverlay {
 
   reroll(): void {
     const node = this.cy.getElementById(E8_STAR_ID);
-    if (node.empty()) return;
+    if (node.empty() || !isElementShown(node)) return;
     const { x, y } = pickSpawnPoint(this.cy);
     node.position({ x, y });
     this.modelRadius = pickRadius(this.cy);
@@ -394,7 +376,7 @@ export class E8StarOverlay {
     const node = this.cy.getElementById(E8_STAR_ID);
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, this.cssWidth, this.cssHeight);
-    if (node.empty()) return;
+    if (node.empty() || !isElementShown(node)) return;
 
     const p = node.renderedPosition();
     const zoom = this.cy.zoom();

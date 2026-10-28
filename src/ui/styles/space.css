@@ -1,0 +1,214 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   space.css — 空间传送门菜单
+   base 层只负责"能用"：定位、排版、状态。玻璃质感交给 glass.css 的
+   @layer glass 覆盖（和 .layout-switcher__menu 同一套做法），删掉那条
+   import 菜单依然完整可用。
+
+   DOM 由 space-controller.ts 在运行时注入（不写进 index.html）：菜单是
+   图数据加载之后才存在的东西，静态 HTML 里摆着只会先渲染一个空壳。
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@layer space {
+  /* [hidden] 的 display:none 来自 UA 样式表，作者样式里的 display:flex 会
+     把它整个盖掉——结果是遮罩层永远铺满视口，挡住画布的一切点击。必须显式
+     把这条优先级抢回来，否则"隐藏"只是个属性、没有任何视觉效果。 */
+  .space-menu[hidden] {
+    display: none !important;
+  }
+
+  .space-menu {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-overlay);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* 让开顶栏 + 工具栏，否则面板会被压在下面。 */
+    padding: var(--chrome-h-gapped) 16px 16px;
+    background: rgba(3, 7, 18, 0.42);
+    opacity: 0;
+    transition: opacity var(--dur-normal) var(--ease-out);
+  }
+
+  .space-menu.visible {
+    opacity: 1;
+  }
+
+  .space-menu__panel {
+    width: min(360px, 100%);
+    padding: 14px;
+    border-radius: var(--radius-3xl);
+    border: 1px solid var(--border-hi);
+    background: var(--panel-tint-solid);
+    box-shadow: 0 28px 64px -18px rgba(0, 0, 0, 0.7);
+    transform: translateY(8px) scale(0.98);
+    opacity: 0;
+    transition:
+      transform var(--dur-normal) var(--ease-spring-pop),
+      opacity var(--dur-normal) var(--ease-out);
+  }
+
+  .space-menu.visible .space-menu__panel {
+    transform: none;
+    opacity: 1;
+  }
+
+  /* 头行：左侧标题 + 提示（竖排），右侧关闭按钮。关闭按钮要顶到面板角上，
+     所以这里用 align-items: flex-start，别让它被拉伸到和两行文字等高。 */
+  .space-menu__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 2px 4px 10px 8px;
+  }
+
+  .space-menu__head-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .space-menu__title {
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0.02em;
+  }
+
+  .space-menu__hint {
+    font-size: var(--text-xs);
+    color: var(--text-2);
+  }
+
+  .space-menu__list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .space-menu__item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+    font-size: var(--text-base);
+    text-align: left;
+    cursor: pointer;
+    transition:
+      background var(--hover-transition) var(--hover-ease),
+      border-color var(--hover-transition) var(--hover-ease);
+  }
+
+  .space-menu__item:hover {
+    background: rgba(var(--accent-rgb), var(--hover-accent-bg-α));
+  }
+
+  .space-menu__item:active {
+    transform: scale(0.99);
+  }
+
+  /* 当前所在空间：chip 档的三件套，与图例 chip / 布局菜单项同一套 α。 */
+  .space-menu__item.active {
+    border-color: rgba(var(--accent-rgb), var(--active-chip-border-α));
+    background: rgba(var(--accent-rgb), var(--active-chip-bg-α));
+  }
+
+  .space-menu__dot {
+    width: 7px;
+    height: 7px;
+    flex-shrink: 0;
+    border-radius: var(--radius-pill);
+    background: var(--accent2);
+    box-shadow: 0 0 8px rgba(var(--accent2-rgb), 0.7);
+  }
+
+  .space-menu__item.active .space-menu__dot {
+    background: var(--accent);
+    box-shadow: 0 0 10px 2px var(--accent-glow);
+  }
+
+  .space-menu__name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .space-menu__count {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--muted);
+  }
+
+  .space-menu__foot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 8px 4px 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .space-menu__link {
+    padding: 6px 10px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--text-2);
+    font-size: var(--text-xs);
+    cursor: pointer;
+    transition: color var(--hover-transition) var(--hover-ease);
+  }
+
+  .space-menu__link:hover:not(:disabled) {
+    color: var(--accent-light);
+  }
+
+  .space-menu__link:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  /* 面板右上角的关闭按钮：与 .node-panel__close 同一套手势与尺寸。
+     菜单原先在页脚写一行「Esc 关闭」——那不是控件，点不动，只是占地方；
+     彻底关掉一条路反而更清楚：右上角 × 关面板，Esc 退空间。 */
+  .space-menu__close {
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--muted);
+    cursor: pointer;
+    transition:
+      background var(--hover-transition) var(--hover-ease),
+      color var(--hover-transition) var(--hover-ease);
+  }
+
+  .space-menu__close:hover {
+    background: rgba(248, 113, 113, var(--danger-α));
+    color: var(--red);
+  }
+
+  .space-menu__close svg {
+    width: 12px;
+    height: 12px;
+  }
+
+}

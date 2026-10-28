@@ -18,6 +18,7 @@ import {
   onDragEnd as forceDragEnd,
   cancel as cancelForceDrag,
 } from '../core/force-drag.js';
+import { openSpaceMenu, isPortalNode, onLayoutStopped } from './space-controller.js';
 
 export interface GraphEventDeps {
   cy: cytoscape.Core;
@@ -83,6 +84,13 @@ export function initGraphEvents(deps: GraphEventDeps): void {
 
   cy.on('tap', 'node', (evt) => {
     const node = evt.target;
+    // 传送门不走知识节点那条路：它不是"一个知识点"，是一扇门。点它只做
+    // 一件事——弹出空间菜单。跳过后面的高亮/详情/统计，否则会在菜单背后
+    // 偷偷选中一个本该隐形的节点，统计面板也跟着抖一下。
+    if (isPortalNode(node.id())) {
+      openSpaceMenu();
+      return;
+    }
     // 单选节点与侧边栏筛选互斥：点节点 = 退出筛选模式，回到「单选子树」语义。
     // 否则 legend 的 activeShapeFilter / activeEdgeFilter 仍记着旧筛选，
     // 漫游会误以为还在筛选模式；且再点同一筛选会走 toggle-off 分支，
@@ -256,6 +264,9 @@ export function initGraphEvents(deps: GraphEventDeps): void {
     syncBottomSheetStats(cy);
   });
   cy.on('layoutstop', () => {
+    // 每次 layoutstop 都要分岛；取景只在首屏之后——首屏那次是入场动画本身，
+    // 落定就该停在原地，不该再被推一把。分支逻辑在 onLayoutStopped 里。
+    if (!(window as unknown as { __noSep?: boolean }).__noSep) onLayoutStopped();
     updateStats(cy);
     syncBottomSheetStats(cy);
   });

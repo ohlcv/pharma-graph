@@ -79,6 +79,13 @@ import { createCelestialEmblemOverlay } from '../core/spectacle/emblem-overlay.j
 import { createTesseractOverlay } from '../core/spectacle/tesseract-overlay.js';
 import { createFractalTreeOverlay } from '../core/spectacle/fractal-tree-overlay.js';
 import { createE8StarOverlay } from '../core/spectacle/e8-overlay.js';
+import { createPortalOverlay, PORTAL_ID } from '../core/spectacle/portal-overlay.js';
+import {
+  installSpaceController,
+  enterInitialSpace,
+  settleAfterLayout,
+  beginBootLayout,
+} from './space-controller.js';
 import { runLayoutInWorker } from '../core/layout-worker-client.js';
 import { initTourSettings } from './tour-settings.js';
 
@@ -107,6 +114,7 @@ let tourController: TourController;
  *   ?decor=tess       只留超立方体
  *   ?decor=tree       只留生命之树
  *   ?decor=e8         只留 E8 根系
+ *   ?decor=portal     只留传送门
  *   缺省              全部开
  *
  * 刻意用白名单集合（`DECOR_KEYS`）而不是逐个 `DISABLE_*` 布尔：负向列举
@@ -116,13 +124,14 @@ let tourController: TourController;
  */
 const DECOR_OVERRIDE = new URLSearchParams(location.search).get('decor');
 /** 合法奇观 key，顺序即 DECOR_STATE 与接入顺序。 */
-const DECOR_KEYS = ['celestial', 'tess', 'tree', 'e8'] as const;
+const DECOR_KEYS = ['celestial', 'tess', 'tree', 'e8', 'portal'] as const;
 const ONLY = DECOR_OVERRIDE && DECOR_OVERRIDE !== 'off' ? DECOR_OVERRIDE : null;
 const decorEnabled = (key: string): boolean => (ONLY === null ? true : ONLY === key);
 const DISABLE_CELESTIAL = !decorEnabled('celestial');
 const DISABLE_TESSERACT = !decorEnabled('tess');
 const DISABLE_TREE = !decorEnabled('tree');
 const DISABLE_E8 = !decorEnabled('e8');
+const DISABLE_PORTAL = !decorEnabled('portal');
 /** 供调试面板查询当前开关状态。 */
 export const DECOR_STATE = {
   override: DECOR_OVERRIDE,
@@ -132,6 +141,7 @@ export const DECOR_STATE = {
   celestial: !DISABLE_CELESTIAL,
   tree: !DISABLE_TREE,
   e8: !DISABLE_E8,
+  portal: !DISABLE_PORTAL,
 };
 
 // ── 布局质量降级实验开关 (?quality=) ────────────────────────────────────────
@@ -393,6 +403,12 @@ function initGraphFromManager(graphManager: GraphManager): void {
   uiState.search = new Search(uiState.renderer.getCy(), uiState.highlight);
   const cy = uiState.renderer.getCy();
 
+  // 开发期调试挂钩：e2e / 手工排障要读相机、包围盒与空间状态。生产构建里
+  // import.meta.env.DEV 是常量 false，整段会被 tree-shake 掉。
+  if (import.meta.env.DEV) {
+    (window as unknown as Record<string, unknown>).__pg = { cy, renderer: uiState.renderer };
+  }
+
   tourController = new TourController(cy, uiState.renderer, uiState.detailPanel!);
   tourController.mount();
   registerTourController(() => tourController.isRunning() || tourController.isPaused());
@@ -499,6 +515,33 @@ function initGraphFromManager(graphManager: GraphManager): void {
   // 压进单条 path 一次描边。骨架与前三个平行（独立 canvas / 独立 rAF /
   // 命中盒），接入时机的两条约束同样适用。
   if (!DISABLE_E8) createE8StarOverlay({ container, cy });
+  // 传送门：第五个装饰奇观，也是唯一带功能的——点击它弹出空间菜单。
+  // 接入时机的两条约束同上（必须在 halo 循环之后、第一次 Euler 之前），
+  // 因为它要参与斥力物理才有位置。
+  //
+  // 注意它跟另外四个奇观有个关键区别：它是内容树里的正式节点（有自己的
+  // md），不是运行时凭空创建的，所以 spawnPortalNode 走的是"复用已有节点"
+  // 分支，也就意味着它仍可被搜索、仍出现在统计里——这正是想要的：
+  // 搜「传送门」跳过去，是个比在图上找虫洞更靠谱的入口。
+  if (!DISABLE_PORTAL) createPortalOverlay({ container, cy });
+
+  // 空间控制器要在节点全部就位之后装配：它按连通分量推导空间归属，
+  // 少一个节点就会把空间算漏。即便 ?decor=portal 没开虫洞，控制器也照装
+  // —— 它同时是焦点跳转（搜索/详情面板/漫游）跨空间的守卫，而那条路径
+  // 与虫洞是否显示无关。
+  installSpaceController(cy, {
+    onShowPortalDetail: () => uiState.detailPanel?.show(PORTAL_ID, true),
+    onSpaceChange: () => {
+      updateStats(cy);
+      syncBottomSheetStats(cy);
+    },
+  });
+
+  // 启动落位：直接进主空间（执业药师考试体系），不停在「全图」。
+  // 否则首屏是三个空间的并集——四个奇观会和药学节点混在一起，与
+  // 「除传送门外交互隔离」的规则相反。奇观要到「奇观与散点」空间才出现，
+  // Esc 仍可退回全图并集。
+  enterInitialSpace();
 
   // ── Populate sidebar the moment the graph is ready — not after layout settles.
   // stats (node/edge/selected/highlighted + essence/edge legend) are accurate as
@@ -578,6 +621,10 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
     if (settled) return;
     settled = true;
     completeLoadingWithFadeOut();
+    // 布局收敛后才谈得上分岛：euler 之前节点还在 halo 那一小团里，"各空间
+    // 在哪"是假的。分岛锚定当前空间（原地不动），所以这里**不动镜头**——
+    // 爆炸结束时镜头看到哪里就停在哪里，不再补一下强制缩放/平移。
+    if (!(window as unknown as { __noSep?: boolean }).__noSep) settleAfterLayout();
   };
 
   // ── Skip 1: too few nodes — Euler jitter worse than halo positions ─────
@@ -685,6 +732,9 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
     // 非空断言：renderer 在函数开头已做过 `=== null` 早退。TS 仍报是因为
     // runSyncLayout 是函数声明（hoisted），控制流分析无法确定它只在早退之后
     // 被调用。这里的断言是安全的——早退已在调用点之前生效。
+    // 这次落定是入场动画的收尾：只分岛，不取景（见 onLayoutStopped）。
+    beginBootLayout();
+
     renderer!.runLayout(
       DEFAULT_LAYOUT,
       // 不在这里覆盖 animate —— config.ts 里是 `animate: true`，走

@@ -34,6 +34,7 @@
 - **技术栈**：TypeScript + Vite + Cytoscape.js（无 React/Vue 等框架），原生 HTML + 模块化 TS。
 - **内容格式**：Markdown + YAML frontmatter，所有节点元数据集中在 `data:` 块下。
 - **当前状态**：已完成 ISA 边迁移（2026-07-14，详见 [migration-report.md](./archive/migration-report.md)），所有层级关系统一使用 `isa`（子→父）方向。
+- **2026-10 更新**：图数据规模 2,736 节点 / 3,184 边；新增**空间系统**（多重宇宙推导 + 传送门）与 **5 个奇观 overlay**（`src/core/spectacle/`）；测试树物理隔离到顶层 `tests/`（48 文件 / 591 用例）；预生成图数据加载路径（`prebuilt-loader.ts`）。详见 [ARCHITECTURE.md](./ARCHITECTURE.md)。
 
 ---
 
@@ -102,19 +103,34 @@ pharma-graph/
 │   │   ├── graph.ts           # GraphData/NodeData/EdgeData 类型定义
 │   │   ├── build-graph.ts     # 纯函数：ParsedFrontmatter → GraphData
 │   │   ├── graph-manager.ts   # 浏览器入口：组装解析+构建
-│   │   ├── content-loader.ts  # fetch manifest + 并行加载 .md
-│   │   ├── node-builder.ts    # CLI 节点构建入口
-│   │   ├── edge-builder.ts    # CLI 边构建入口
+│   │   ├── prebuilt-loader.ts # 加载构建期预生成的 graph-data.json（主路径）
+│   │   ├── optimized-content-loader.ts  # 流式 .md 加载 fallback
+│   │   ├── content-loader.ts  # fetch manifest + 并行加载 .md（旧路径）
+│   │   ├── node-builder.ts    # 节点构建
+│   │   ├── edge-builder.ts    # 边构建
 │   │   ├── config.ts          # 视觉配置 SSoT（形状/颜色/线型/布局）
 │   │   ├── edge-types.ts      # 边类型词汇表 SSoT
 │   │   ├── renderer.ts        # Cytoscape 实例封装 + 样式表
-│   │   └── tour.ts            # 自动导览引擎（Strategy 模式）
+│   │   ├── tour.ts            # 漫游引擎（Strategy 模式，5 档深度）
+│   │   ├── spaces.ts          # 空间系统：连通分量 + UNIVERSE_ROOTS 推导多重宇宙
+│   │   ├── space-layout.ts    # 空间切换的取景/排布支持
+│   │   ├── element-visibility.ts  # 真实可见性判定（isElementShown）
+│   │   ├── glow-overlay.ts    # glow/flow 光效覆盖层（独立 canvas）
+│   │   └── spectacle/         # 奇观子系统（5 个奇观 overlay + 共享模块）
+│   │       ├── emblem-overlay.ts       # 太极八卦
+│   │       ├── tesseract-overlay.ts    # 四维超立方体
+│   │       ├── fractal-tree-overlay.ts # 生命之树（+ fractal-tree-geometry.ts 几何内核）
+│   │       ├── e8-overlay.ts           # E8 根系
+│   │       ├── portal-overlay.ts       # 虫洞传送门（空间唯一通路）
+│   │       ├── decor-content.ts        # 奇观内容加载（路径自节点推导）
+│   │       └── spectacle-size.ts       # 统一视觉半径换算（SSoT）
 │   │
 │   ├── data/
 │   │   └── vocabulary.ts      # 学科分类/词汇数据
 │   │
 │   ├── types/
-│   │   └── cytoscape-extensions.d.ts  # Cytoscape 扩展类型声明
+│   │   ├── cytoscape-extensions.d.ts  # Cytoscape 扩展类型声明
+│   │   └── cytoscape-visibility.d.ts  # 可见性相关类型补充
 │   │
 │   └── ui/                    # 浏览器 UI 交互层
 │       ├── main.ts            # 应用入口（组装+接线）
@@ -143,16 +159,28 @@ pharma-graph/
 │       ├── anim-pulse.ts        # 节点脉冲动画
 │       ├── logger.ts            # DEV 门控日志
 │       ├── debug-bridge.ts / app-debug.ts  # 调试桥与取证面板
-│       └── styles/              # CSS（base/components/layout/shared/tour）
+│       ├── speech.ts            # 语音朗读（粒度组合/语速 0.5–2.0/等读完再跳）
+│       ├── tour-settings.ts     # 漫游设置（策略/间隔/深度/朗读）
+│       ├── space-controller.ts  # 空间控制器（传送门命中/飞行/初始空间）
+│       ├── space-state.ts       # 空间 UI 状态
+│       ├── starfield.ts         # 三层视差星空背景
+│       └── styles/              # CSS（base/components/layout/shared/tour/glass/space/sidebar）
 │
 ├── scripts/                   # 独立工具脚本（npm run 调用）
 │   ├── validate.ts            # frontmatter 严格校验（CI 门禁）
+│   ├── validate-graph-data.ts # 校验 graph-data.json
+│   ├── validate-graph-deep.ts # 深度校验
+│   ├── build-graph-data.ts / build-content-manifest.ts  # 构建入口（薄壳）
+│   ├── check-graph-fresh.ts   # 图数据新鲜度门禁
 │   ├── audit-frontmatter.ts  # 评分 + ADR 合规报告
 │   ├── measure-overlap.ts    # 布局重叠度量
 │   └── serve.ts              # 静态开发服务器
 │
+├── build/                     # 构建期共享库（build-content.ts，被 vite.config 与 scripts import）
+├── tests/                     # 测试树（顶层，物理隔离于 src/；unit/component/e2e 三层）
+├── tools/                     # 一次性修复 / 迁移 / 测量工具（不参与构建链）
 ├── archive/scripts/           # 归档的一次性脚本
-├── docs/                      # 文档目录（本文件所在）
+├── docs/                      # 文档目录（本文件所在；宣发/ 存放宣言、轮播、投稿素材）
 ├── examples/                  # Cytoscape 示例
 ├── index.html                 # 应用 HTML 入口
 ├── vite.config.ts             # Vite 构建配置（含 manifest 插件）
@@ -303,6 +331,23 @@ graph-events/highlight-engine/detail-panel/search 等模块接管交互
   - `TopoPrereqStrategy` — 基于 `prerequisite` 边构建依赖图，Kahn 拓扑排序，按 tier/location 排序
   - `ALL_STRATEGIES`、`getStrategy(id)`
   - `TourEngine` — 引擎本体，`start()` 用策略生成序列后逐节点推进
+  - `TOUR_DEPTH_CONFIG` — 5 档深度（结构 · 概览 · 重点 · 全面 · 全部）的过滤配置，UI 文案与测试以此为准
+
+#### 空间系统（2026-10 新增）
+
+- **[spaces.ts](../src/core/spaces.ts)** — 空间归属**推导**模块（不存 frontmatter）：对全图跑连通分量，结合 `UNIVERSE_ROOTS` 得到多个互不连通的宇宙（执业药师考试体系 / 个人成长与生存策略）+ 兜底「奇观与散点」；`computeFitTarget` 支持按空间取景。纯函数，有单元测试锁行为。
+- **[space-layout.ts](../src/core/space-layout.ts)** — 空间切换时的取景/排布支持（120 行纯逻辑）。
+- **[element-visibility.ts](../src/core/element-visibility.ts)** — `isElementShown()`：真实可见性判定（display + 尺寸，边再跟端点）。存在的原因：cytoscape 的 `ele.hidden()` 不看 opacity，而奇观节点本体是 `opacity:0` 命中盒，用 `hidden()` 判显隐会把全部奇观误判为隐藏。
+
+#### 奇观子系统 `src/core/spectacle/`（2026-10 新增）
+
+脱离知识层的"空域装置"：真实 cytoscape 节点（压全透明，只留命中盒）+ 独立 canvas overlay 逐帧重绘。打 `layer-parent` class 排除出检索/统计/漫游/force-drag，但参与 euler 斥力物理。
+
+- `emblem-overlay.ts` 太极八卦 · `tesseract-overlay.ts` 四维超立方体 · `fractal-tree-overlay.ts` 生命之树（+ `fractal-tree-geometry.ts` 纯函数几何内核）· `e8-overlay.ts` E8 根系 · `portal-overlay.ts` 虫洞传送门（空间之间唯一通路，含螺旋坠入粒子与吸积盘）
+- **[decor-content.ts](../src/core/spectacle/decor-content.ts)** — 奇观正文内容加载：路径从节点自身 `rel/sourcePath` 推导（消灭源码里的内容路径字面量），404/解析失败静默降级。
+- **[spectacle-size.ts](../src/core/spectacle/spectacle-size.ts)** — 五个奇观**统一视觉半径**的 SSoT：`V = clamp(spread 系数, 200, 300)`，再按 `DRAWN_EXTENT[shape]` 反推各 overlay 参数。改画法（最大半径倍数）必须同步 `DRAWN_EXTENT`。
+
+> ⚠️ 加新奇观的两处单点维护：`src/ui/main.ts` 的 `DECOR_KEYS` + `src/core/renderer.ts` 的 `DECOR_NODE_CLASSES`。
 
 ### 5.3 ui 交互层
 
@@ -339,8 +384,15 @@ graph-events/highlight-engine/detail-panel/search 等模块接管交互
 #### 漫游与布局
 
 - **[tour-controller.ts](../src/ui/tour-controller.ts)** — 漫游 UI 控制器。挂载桌面/移动两套控件，管理 engine 生命周期与 running/paused 标志，写回 `uiState.tour.strategy/pathHistory`。
+- **[tour-settings.ts](../src/ui/tour-settings.ts)** — 漫游设置面板：策略 / 间隔 1–10s / 顺序·倒序·随机 / 5 档深度 / 朗读粒度组合与语速 0.5–2.0。
+- **[speech.ts](../src/ui/speech.ts)** — 语音朗读引擎封装：粒度自由组合（标题/关联/标签/摘要/正文）、语速调节、`waitForSpeech` 等读完再跳下一站、浏览器支持度提示。
 - **[layout-manager.ts](../src/ui/layout-manager.ts)** — 布局切换/参数管理。`fitGraph`/`randomize`/`runLayout`/`syncLayoutDisplay`/`setCurrentLayout`。
 - **[layout-menu.ts](../src/ui/layout-menu.ts)** — 布局下拉菜单开关。
+
+#### 空间与传送门（2026-10 新增）
+
+- **[space-controller.ts](../src/ui/space-controller.ts)** — 空间控制器：传送门点击 → 空间菜单 → 飞行动画切换；启动即进初始空间（`enterInitialSpace`，默认最大宇宙）；`parkPortal` 把传送门停靠在当前视口右下角防止飞出画面。
+- **[space-state.ts](../src/ui/space-state.ts)** — 当前激活空间的 UI 状态。
 
 #### 辅助与工具
 

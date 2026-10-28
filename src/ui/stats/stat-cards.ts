@@ -7,6 +7,7 @@
 // from here for backward compatibility.
 
 import type { Core } from 'cytoscape';
+import { isElementShown } from '../../core/element-visibility.js';
 import { setStat } from './stat-animation.js';
 import { populateEssenceLegend, populateEdgeLegend } from '../legend-manager.js';
 import { getCurrentLayout } from '../layout/layout-engine.js';
@@ -44,11 +45,17 @@ function doUpdateStats(cy: Core): void {
     _statsRaf = null;
     if (!_statsPending) return;
     _statsPending = false;
-    const nodes = cy.nodes().not('.layer-parent');
+    // 空间隔离时只数当前空间：藏起来的宇宙不该出现在"图谱状态"里。
+    // 图例（essence / 边类型）保持全图口径——它是静态钥匙，不随取景变化。
+    //
+    // 口径用 isElementShown（display + 尺寸）而不是 ':visible'：后者含
+    // opacity !== 0，会把 opacity: 0 的装饰奇观与传送门一并排除，全图计数
+    // 凭空少 5 个、奇观空间显示 0 个节点。见 core/element-visibility.ts。
+    const nodes = cy.nodes().not('.layer-parent').filter(isElementShown);
     setStat('stat-nodes', String(nodes.length));
-    setStat('stat-edges', String(cy.edges().length));
+    setStat('stat-edges', String(cy.edges().filter(isElementShown).length));
     setStat('stat-selected', String(cy.$(':selected').length));
-    setStat('stat-highlighted', String(cy.nodes('.highlighted').not('.layer-parent').length));
+    setStat('stat-highlighted', String(cy.nodes('.highlighted').not('.layer-parent').filter(isElementShown).length));
     const el = document.getElementById('stat-layout');
     if (el) el.textContent = getCurrentLayout().toUpperCase();
 
@@ -67,10 +74,13 @@ export function updateStats(cy: Core): void {
 export function syncBottomSheetStats(cy: Core): void {
   if (_sheetStatsDebounce !== null) clearTimeout(_sheetStatsDebounce);
   _sheetStatsDebounce = setTimeout(() => {
-    setStat('bs-stat-nodes', String(cy.nodes().not('.layer-parent').length));
-    setStat('bs-stat-edges', String(cy.edges().length));
+    setStat('bs-stat-nodes', String(cy.nodes().not('.layer-parent').filter(isElementShown).length));
+    setStat('bs-stat-edges', String(cy.edges().filter(isElementShown).length));
     setStat('bs-stat-selected', String(cy.$(':selected').length));
-    setStat('bs-stat-highlighted', String(cy.nodes('.highlighted').not('.layer-parent').length));
+    setStat(
+      'bs-stat-highlighted',
+      String(cy.nodes('.highlighted').not('.layer-parent').filter(isElementShown).length),
+    );
     const el = document.getElementById('bs-stat-layout');
     if (el) el.textContent = getCurrentLayout().toUpperCase();
     _sheetStatsDebounce = null;

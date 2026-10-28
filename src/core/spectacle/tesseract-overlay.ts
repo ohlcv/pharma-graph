@@ -35,13 +35,13 @@
 // 之【前】。两行 create 调用紧挨着放即可。
 
 import type cytoscape from 'cytoscape';
-import { parseFrontmatter } from '../../parser/frontmatter.js';
+import { loadDecorContent } from './decor-content.js';
+import { isElementShown } from '../element-visibility.js';
+import { pickSpectacleParam } from './spectacle-size.js';
 
 /** 图上这个节点固定用这个 id。 */
 export const TESSERACT_ID = 'tesseract-space';
 const TESSERACT_CLASS = 'tesseract-node';
-/** 拉取内容用的 md 路径——跟太极八卦同目录同惯例。 */
-const CONTENT_REL_PATH = '个人成长与生存策略/四维空间.md';
 
 export type Vec3 = readonly [number, number, number];
 export type Vec4 = readonly [number, number, number, number];
@@ -112,7 +112,9 @@ function graphSpread(cy: cytoscape.Core): {
 
 /** 超立方体的视觉体量比太极八卦那十二重环小一档，半径相应收窄。 */
 function pickRadius(cy: cytoscape.Core): number {
-  return clamp(graphSpread(cy).spread * 0.052, 96, 230);
+  // 尺寸统一由 spectacle-size 决定（五个奇观共用一个视觉半径）。
+  // 立方体投影的角点会溢到 R * 1.3，那部分由 DRAWN_EXTENT 反推，不要在这里补。
+  return pickSpectacleParam(graphSpread(cy).spread, 'tesseract');
 }
 
 /** 命中盒边长——从视觉半径换算，不写死数字。见 emblem-overlay.ts
@@ -255,7 +257,7 @@ export class TesseractOverlay {
   /** 传送到新的随机起点；命中盒跟着新半径重新同步。 */
   reroll(): void {
     const node = this.cy.getElementById(TESSERACT_ID);
-    if (node.empty()) return;
+    if (node.empty() || !isElementShown(node)) return;
     const { x, y } = pickSpawnPoint(this.cy);
     node.position({ x, y });
     this.modelRadius = pickRadius(this.cy);
@@ -321,7 +323,7 @@ export class TesseractOverlay {
     const node = this.cy.getElementById(TESSERACT_ID);
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, this.cssWidth, this.cssHeight);
-    if (node.empty()) return;
+    if (node.empty() || !isElementShown(node)) return;
 
     const p = node.renderedPosition();
     const zoom = this.cy.zoom();
@@ -525,25 +527,10 @@ function stripNodeChrome(node: cytoscape.NodeSingular, size: number): void {
 }
 
 /** 非阻塞加载——fetch + 正式 frontmatter 解析器，成功后写入 node data。
- *  失败（网络、404、frontmatter 缺 id 等）一律静默降级。 */
+ *  失败（网络、404、frontmatter 缺 id 等）一律静默降级。
+ *  md 位置由节点自身的 `rel` 决定（decor-content.ts），不再写死目录。 */
 async function fetchTesseractContent(node: cytoscape.NodeSingular): Promise<void> {
-  try {
-    const url =
-      '/content/' +
-      CONTENT_REL_PATH.split('/')
-        .map((s) => encodeURI(s).replace(/#/g, '%23').replace(/\?/g, '%3F'))
-        .join('/');
-    const res = await fetch(url);
-    if (!res.ok) return;
-    const text = await res.text();
-    const fm = parseFrontmatter(text, CONTENT_REL_PATH);
-    node.data('shortSummary', fm.shortSummary);
-    node.data('fullSummary', fm.fullSummary);
-    node.data('body', fm.body);
-    node.data('sourcePath', CONTENT_REL_PATH);
-  } catch {
-    /* fetch / 解析失败不影响图功能，静默降级 */
-  }
+  await loadDecorContent(node);
 }
 
 export function createTesseractOverlay(options: TesseractOverlayOptions): TesseractOverlay {
