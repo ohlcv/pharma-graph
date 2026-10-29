@@ -399,6 +399,10 @@ export function settleAfterLayout(): void {
 export function onLayoutStopped(): void {
   if (!cyRef) return;
   separateSpaces();
+  // 存当前活跃空间坐标——覆盖重置按钮、换布局等不传 onLayoutStop 回调的路径。
+  // 守卫在 cacheActiveSpacePositions 内部：切宇宙执行期间触发的 layoutstop
+  // （activeSpaceId 还是旧的、旧节点已 remove）会被挡住，不错误存坐标。
+  cacheActiveSpacePositions();
 }
 
 // ── 布局坐标缓存 ─────────────────────────────────────────────────────────────
@@ -406,10 +410,13 @@ export function onLayoutStopped(): void {
 /**
  * 把当前活跃空间里所有节点的坐标存进缓存。
  *
- * 在 euler 收敛 + 分岛之后调用——存的是最终位置，下次切回这个空间直接复用，
- * 不需要再摆 halo + 跑 euler + 分岛。由调用方（main.ts 的各布局完成回调）
- * 在布局收敛后显式调用，不挂在 `onLayoutStopped` 上——因为 Worker 布局路径
- * 不触发 cytoscape 全局 `layoutstop`，挂在那里会漏掉首屏 Worker 路径。
+ * 在 euler 收敛后调用——存的是最终位置，下次切回这个空间直接复用，
+ * 不需要再摆 halo + 跑 euler。
+ *
+ * **守卫**：活跃空间的节点必须确实在 cy 里才存。切宇宙执行期间
+ * （`onEnterSpace` 在 `setActiveSpace` 之前跑），如果上一个 euler 被 stop
+ * 触发全局 `layoutstop`，此刻 `getActiveSpaceId()` 还是旧空间，但旧空间
+ * 节点已被 remove——守卫挡住这种情况，不把新空间的坐标错误地存到旧空间名下。
  *
  * 传送门与虚拟层父节点不缓存：传送门跨宇宙、位置每次切都要重置到视口中心；
  * 虚拟层父节点是 overlay 管的容器，坐标有自己的来源。
@@ -418,6 +425,13 @@ export function cacheActiveSpacePositions(): void {
   if (!cyRef) return;
   const active = getActiveSpaceId();
   if (!active) return;
+  // 守卫：活跃空间的代表节点必须在 cy 里。否则跳过——防止切宇宙执行
+  // 期间（setActiveSpace 还没调）错误地把当前 cy 里的节点坐标存到旧空间名下。
+  const space = spaces.find((s) => s.id === active);
+  if (!space || space.nodeIds.size === 0) return;
+  const sampleId = space.nodeIds.values().next().value;
+  if (!sampleId || cyRef.getElementById(sampleId).empty()) return;
+
   const positions = new Map<string, { x: number; y: number }>();
   cyRef
     .nodes()

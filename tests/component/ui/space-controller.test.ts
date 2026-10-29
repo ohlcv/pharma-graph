@@ -297,6 +297,23 @@ describe('space-controller', () => {
       expect(getCachedPositions(EXAM)?.get('e1')).toEqual({ x: 100, y: 200 });
       expect(getCachedPositions(NEURO)?.get('n1')).toEqual({ x: 500, y: 600 });
     });
+
+    it('活跃空间的节点不在 cy 里时不存坐标（守卫）', () => {
+      // 切宇宙执行期间（onEnterSpace 在 setActiveSpace 之前跑），如果上一个
+      // euler 被 stop 触发全局 layoutstop，此刻 activeSpaceId 还是旧空间，
+      // 但旧空间节点已被 remove。守卫挡住这种情况，不把当前 cy 里的节点
+      // 坐标错误地存到旧空间名下。
+      enterSpace(EXAM, { animate: false });
+      // 手动 remove EXAM 的所有节点（模拟切宇宙 remove 旧空间）
+      cy.getElementById('e1').remove();
+      cy.getElementById('e2').remove();
+      cy.getElementById(EXAM).remove();
+
+      cacheActiveSpacePositions();
+
+      // 守卫挡住，没存
+      expect(getCachedPositions(EXAM)).toBeNull();
+    });
   });
 
   describe('空间分岛', () => {

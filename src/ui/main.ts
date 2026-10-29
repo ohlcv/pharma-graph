@@ -98,6 +98,19 @@ import type { GraphData } from '../core/graph.js';
 let tourController: TourController;
 
 /**
+ * 首屏加载是否已收尾（「大爆炸！」条已开始渐隐）。
+ *
+ * **模块级状态**——曾经是 `finishStreamingLayout` 的局部变量，但首屏 euler
+ * 可能在收敛前就被切宇宙替换（renderer.runLayout 会 stop 旧实例，首屏的
+ * onLayoutStop 回调因 instance 检查被跳过），这时需要在 `onEnterSpace`
+ * 里兜底调 `completeLoading`。局部变量外面的函数访问不到（JS 闭包作用域），
+ * 所以提升到模块级，让所有需要它的入口都能调单一闸门。
+ *
+ * `completeLoading()` 是唯一会把它翻成 true 的地方，幂等保护完整。
+ */
+let bootSettled = false;
+
+/**
  * 装饰节点（太极八卦 / 四维空间）的运行时停用开关（URL 控制）。
  *
  * 背景：两者共用同一套机制（真实 cytoscape 节点 + 独立 canvas 逐帧重绘）。
@@ -260,6 +273,29 @@ function completeLoadingWithFadeOut(): void {
     { once: true },
   );
   indicator.classList.add('hidden');
+}
+
+/**
+ * 首屏加载收尾的**唯一入口**：幂等——`bootSettled` 闸门保证只有第一次调用
+ * 真正生效，之后所有调用都是 no-op。
+ *
+ * 三条首屏路径（节点<80跳过 / 慢设备跳过 / Worker完成 / euler收敛）都在
+ * 自己的完成回调里调它；`onEnterSpace` 在「首屏 euler 还没收敛就被切宇宙
+ * 替换」的边界场景里也调它做兜底。无论谁调、调几次，加载条都只会渐隐一次。
+ *
+ * 职责：
+ *   1. `completeLoadingWithFadeOut()` —— DOM 表现层渐隐（封装在专用函数里，
+ *      不在外部直接操作 DOM）
+ *   2. `settleAfterLayout()` —— 分岛（首屏 euler 收敛后才谈得上分岛）
+ */
+function completeLoading(): void {
+  if (bootSettled) return;
+  bootSettled = true;
+  completeLoadingWithFadeOut();
+  // 布局收敛后才谈得上分岛：euler 之前节点还在 halo 那一小团里，"各空间
+  // 在哪"是假的。分岛锚定当前空间（原地不动），所以这里**不动镜头**——
+  // 爆炸结束时镜头看到哪里就停在哪里，不再补一下强制缩放/平移。
+  if (!(window as unknown as { __noSep?: boolean }).__noSep) settleAfterLayout();
 }
 
 /**
@@ -605,6 +641,11 @@ function initGraphFromManager(graphManager: GraphManager): void {
       if (!slice) return;
       const renderer = uiState.renderer as Renderer | null;
       if (!renderer) return;
+      // 首屏 euler 可能还没收敛就被这次切宇宙替换（renderer.runLayout 会
+      // stop 旧实例）。首屏的 onLayoutStop 回调因 instance 检查被跳过，
+      // completeLoading 永远不调 → 「大爆炸！」条卡死。这里兜底：调
+      // completeLoading（幂等，已收尾则 no-op）。
+      completeLoading();
       // 查缓存坐标：有就给节点注入 position，add 时直接落到最终位置。
       const cached = getCachedPositions(spaceId);
       const nodes = cached
@@ -759,23 +800,10 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
   cy.stop(undefined, true);
   cy.elements().removeClass('entering');
 
-  // `settled` 是三条路径共用的「已收尾」闸门：任何一条路径开始收尾后，
-  // 其他路径的回调都必须变成 no-op，否则加载指示器会被触发多次。
-  //
-  // 声明在 `completeLoading` 之前 —— 后者闭包按引用读它，而 `let` 有 TDZ，
-  // 跳过路径(nodeCount<80 / 慢设备 / quality=preset)会同步调用
-  // completeLoading，必须保证 `settled` 已被绑定。
-  let settled = false;
-
-  const completeLoading = (): void => {
-    if (settled) return;
-    settled = true;
-    completeLoadingWithFadeOut();
-    // 布局收敛后才谈得上分岛：euler 之前节点还在 halo 那一小团里，"各空间
-    // 在哪"是假的。分岛锚定当前空间（原地不动），所以这里**不动镜头**——
-    // 爆炸结束时镜头看到哪里就停在哪里，不再补一下强制缩放/平移。
-    if (!(window as unknown as { __noSep?: boolean }).__noSep) settleAfterLayout();
-  };
+  // `completeLoading` 和它的 `bootSettled` 闸门已提升到模块级——
+  // `onEnterSpace` 在「首屏 euler 没收敛就被切宇宙替换」的边界场景里
+  // 也需要调它做兜底，局部变量外面访问不到（JS 闭包作用域）。
+  // 见模块顶部的 `bootSettled` 和 `completeLoading` 定义。
 
   // ── Skip 1: too few nodes — Euler jitter worse than halo positions ─────
   if (nodeCount < 80) {
@@ -862,10 +890,10 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
       return;
     }
     logInfo(`[layout-worker] 完成，耗时 ${(result.elapsedMs / 1000).toFixed(2)}s`);
-    // 注意:这里不要设 settled = true —— settled 是 completeLoading 内部的
-    // 闸门,由入场动画收尾时(animatePositionsTo.onSettled)统一触发。
-    // 否则此处先设 true 会让 completeLoading 提前 short-circuit,
-    // 「**大爆炸**」状态条永远不会出现。
+    // 这里不调 completeLoading —— Worker 算完坐标后还有 animatePositionsTo
+    // 入场动画，收尾时机由动画的 onSettled 回调决定。提前调会让「大爆炸！」
+    // 状态条在动画还在跑时就消失。bootSettled 闸门由 completeLoading 内部管，
+    // 外部不直接碰。
   });
 
   /**
