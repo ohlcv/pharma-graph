@@ -639,9 +639,14 @@ function initGraphFromManager(graphManager: GraphManager): void {
         portalNode.position({ x: 0, y: 0 });
       }
       if (cached) {
-        // 有缓存：节点已带最终坐标，不摆 halo、不跑 euler。分岛对单空间是
-        // no-op（当前空间锚定不动），跑一下确保状态一致。
-        settleAfterLayout();
+        // 有缓存：节点已带最终坐标（存的时候已经是分岛后的位置），不摆
+        // halo、不跑 euler、也不再分岛。
+        //
+        // 不调 settleAfterLayout：enterSpace 里 onEnterSpace 在
+        // setActiveSpace **之前**执行（见 space-controller.ts enterSpace 时序），
+        // 此刻 getActiveSpaceId() 还是旧空间——separateSpaces 会拿空锚点
+        // （旧空间节点已 remove）+ 新节点算出错误平移，把节点挤到一起。
+        // 缓存坐标本身已是最终位置，无需任何后处理。
         return;
       }
       // 没缓存：按_halton 序列把节点摆到 halo 圆上——euler 会从这些位置
