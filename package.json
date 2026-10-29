@@ -24,7 +24,8 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "deploy:workbuddy": "vite-node scripts/workbuddy-deploy.ts"
   },
   "dependencies": {
     "core-js": "^3.50.0",

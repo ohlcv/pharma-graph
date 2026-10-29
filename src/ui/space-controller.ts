@@ -78,28 +78,6 @@ let listEl: HTMLElement | null = null;
 let detailBtn: HTMLButtonElement | null = null;
 let dismissInstalled = false;
 /**
- * 接下来这次 layoutstop 是不是首屏那次。
- *
- * 光靠"落定过了没有"判断不出来：main 的 layout 选项回调（completeLoading →
- * settleAfterLayout）比 cy 的 'layoutstop' 事件**先**跑，等事件到的时候首屏
- * 已经被标成"落定过"了，于是又走一遍取景——用户看到的正是那一下多余的缩放。
- * 所以由启动流程显式打标（beginBootLayout），事件端只消费。
- */
-let bootLayoutPending = false;
-/**
- * 布局开始那一刻的视角快照（zoom + pan）。
- *
- * 用来在 layoutstop 时判定"用户在布局跑的过程中是否动过镜头"。布局本身
- * 强制 `fit: false`（见 renderer.runLayout），不会动 zoom/pan；所以快照
- * 与结束时不一致，一定是用户手动缩放/平移过的——这种情况下要尊重用户
- * 的操作，不再强制取景（真实反馈：重置后布局还在跑，期间缩放/移动屏幕，
- * 布局完成却给强制挪一下、缩一下，不想要）。
- *
- * `null` = 没有在跑的布局 / 已被消费。首屏路径不依赖这个（它走
- * bootLayoutPending 分支，本来就不取景）。
- */
-let layoutStartView: { zoom: number; panX: number; panY: number } | null = null;
-/**
  * 菜单打开的时刻。打开菜单的那一次 click 此刻还在往 document 冒泡——必须
  * 放过它，否则菜单会在同一个事件里被自己关掉。
  */
@@ -398,63 +376,19 @@ export function settleAfterLayout(): void {
 }
 
 /**
- * `layoutstop` 的统一入口：分岛是每次都要的，取景只有**非首屏且用户在
- * 布局期间没动过镜头**时才做。
+ * `layoutstop` 的统一入口：**只分岛，永不取景。**
  *
- * 为什么要分：首屏那次 euler 是入场动画本身，落定就该停在原地（用户明确
- * 说过"初始化完成之后再强制缩放/平移一下，没有必要"）；而用户主动换布局 /
- * 重跑 euler 时，节点是被甩到全新区位的，镜头守着旧位置多半只剩空地，
- * 重新取景是这次操作的收尾。
+ * 用户明确要求：任何布局结束后都不要强制移动/缩放画面——无论是首屏入场、
+ * 重置按钮、换布局、还是虫洞切换宇宙触发的 euler，落定后镜头停在哪就停在哪。
+ * 分岛（`separateSpaces`）只做整岛平移且锚定当前空间，被看的内容原地不动，
+ * 不会带镜头走。要看全就按 F（适应视图）。
  *
- * 但用户如果在布局**还在跑**的时候自己缩放/移动了屏幕，那是在表达"我要
- * 这个视角"，布局结束时再强行取景会把用户的操作覆盖掉（真实反馈）。
- * 判据靠 `layoutStartView` 快照：布局 `fit: false` 不会动 zoom/pan，所以
- * 快照与结束时不一致 = 用户动过，跳过取景。
+ * 曾经这里分"首屏不取景 / 非首屏取景 / 用户动过则不取景"三支（ADR-0011），
+ * 用户在虫洞切宇宙场景下反馈"任何地方都不想要"，于是全部砍掉，统一不取景。
  */
 export function onLayoutStopped(): void {
   if (!cyRef) return;
-  if (bootLayoutPending) {
-    bootLayoutPending = false;
-    layoutStartView = null;
-    settleAfterLayout();
-    return;
-  }
-  const userTouched = userMovedDuringLayout();
-  layoutStartView = null;
   separateSpaces();
-  // 用户在布局期间动过镜头 → 尊重之，不取景。
-  if (userTouched) return;
-  flyToCurrentSpace(false);
-}
-
-/** 启动流程在跑首屏 euler 之前调用一次：这次落定不取景。 */
-export function beginBootLayout(): void {
-  bootLayoutPending = true;
-}
-
-/**
- * 在每次布局开始（`layoutstart`）时调用，记下此刻的 zoom/pan。
- *
- * 由 graph-events.ts 的事件监听器调用，不在 space-controller 内部
- * 自挂监听——保持事件绑定单一入口。
- */
-export function markLayoutStart(zoom: number, pan: { x: number; y: number }): void {
-  layoutStartView = { zoom, panX: pan.x, panY: pan.y };
-}
-
-/** 浮点容差：zoom/pan 数值如果是同一个 JS 数字，比较结果稳定；
- *  加一点容差只是为了在极少数浮点漂移下别误判成"用户动过"。 */
-const VIEW_EPS = 1e-9;
-
-function userMovedDuringLayout(): boolean {
-  if (!layoutStartView || !cyRef) return false;
-  const z = cyRef.zoom();
-  const p = cyRef.pan();
-  return (
-    Math.abs(z - layoutStartView.zoom) > VIEW_EPS ||
-    Math.abs(p.x - layoutStartView.panX) > VIEW_EPS ||
-    Math.abs(p.y - layoutStartView.panY) > VIEW_EPS
-  );
 }
 
 /**
@@ -566,9 +500,13 @@ export function enterSpace(spaceId: string, options: EnterSpaceOptions = {}): vo
   applyVisibility(space);
   clearSelectionArtifacts();
   setActiveSpace(spaceId);
-  // frame: false → 镜头留在原处（启动落位时是 0.08 的宏观视野）。
-  // 否则按当前空间重新取景——切空间时这一下让相机飞到目标空间中央。
-  if (options.frame !== false) flyToCurrentSpace(options.animate ?? true);
+  // 不取景：切宇宙会触发 onEnterSpace → 跑 euler，节点会从 halo 散开。
+  // 此刻取景是基于 halo 起始位置算的（半径 50-330 的一小团），目标是错的，
+  // euler 把节点炸开后视觉上就是"强制移动+缩放"。用户明确要求任何地方都
+  // 不要强制动镜头——切完宇宙自己按 F（适应视图）即可。
+  // `frame` option 保留在接口里以兼容现有调用方，但当前不再驱动取景。
+  void options.frame;
+  void options.animate;
   closeSpaceMenu();
   onSpaceChange?.(spaceId);
   if (changed && !options.silent) {
@@ -640,8 +578,6 @@ export function _resetSpaceControllerForTests(): void {
   listEl = null;
   detailBtn = null;
   dismissInstalled = false;
-  bootLayoutPending = false;
-  layoutStartView = null;
   openedAt = Number.NEGATIVE_INFINITY;
   registerEnsureVisible(null);
   setActiveSpace(null);

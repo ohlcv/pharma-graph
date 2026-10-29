@@ -314,9 +314,18 @@
     .empty-state__icon,
     .topbar__badge-dot,
     .topbar__badge::before,
-    .tour-dt__dot,
-    .node-ripple {
+    .tour-dt__dot {
       animation: none !important;
+    }
+    /* 波纹是用户主动点击的即时反馈（0.5s、单次、非循环），按
+     prefers-reduced-motion 规范属于「必要的操作反馈」应予保留，不能和
+     shimmer / dot-pulse 这些循环装饰一起 kill。之前把它列进上面
+     animation:none 列表 + 上方 universal 的 animation-duration:0.001ms，
+     配合 layout.css 的 forwards fill，会让波纹瞬间跳到 100% 帧
+     (opacity:0) 并停住——点一下就消失，肉眼完全看不见扩散动效。
+     这里显式豁免 duration，让它即便在 reduced-motion 下也正常扩散。 */
+    .node-ripple {
+      animation-duration: 0.5s !important;
     }
     /* Respect that the user still wants visible feedback: keep outlines, but
      remove the halo/glow which is itself a (subtle) motion driver. */

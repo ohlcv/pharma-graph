@@ -32,9 +32,7 @@ import {
   isPortalNode,
   separateSpaces,
   settleAfterLayout,
-  beginBootLayout,
   onLayoutStopped,
-  markLayoutStart,
   _resetSpaceControllerForTests,
 } from '@/ui/space-controller';
 import { getActiveSpaceId, ensureNodeVisible } from '@/ui/space-state';
@@ -138,20 +136,20 @@ describe('space-controller', () => {
       expect(getActiveSpaceId()).toBe(EXAM);
     });
 
-    it('进入会飞一次相机；animate:false 时不飞', () => {
-      const animateSpy = vi.spyOn(cy, 'animate').mockImplementation(() => undefined as never);
-      enterSpace(EXAM);
-      expect(animateSpy).toHaveBeenCalledTimes(1);
-      const opts = animateSpy.mock.calls[0][0] as {
-        zoom: number;
-        pan: { x: number; y: number };
-      };
-      expect(opts.zoom).toBeGreaterThan(0);
-      expect(Number.isFinite(opts.pan.x)).toBe(true);
+    it('切宇宙不动相机——任何地方都不要强制取景', () => {
+      // 用户明确要求：切宇宙（虫洞传送）时不要强制移动/缩放画面。
+      // 曾经 enterSpace 会调 flyToCurrentSpace(animate) 让相机飞到目标空间，
+      // 但切宇宙会触发 euler（节点从 halo 散开），此刻取景基于 halo 起始
+      // 位置算的目标是错的，视觉上就是"强制移动+缩放"。
+      enterSpace(EXAM, { animate: false });
+      cy.zoom(0.08);
+      cy.pan({ x: 800, y: 449 });
 
-      animateSpy.mockClear();
-      enterSpace(NEURO, { animate: false });
-      expect(animateSpy).not.toHaveBeenCalled();
+      // 再切一次空间（EXAM → NEURO），镜头应原封不动。
+      enterSpace(NEURO);
+
+      expect(cy.zoom()).toBeCloseTo(0.08, 9);
+      expect(cy.pan()).toEqual({ x: 800, y: 449 });
     });
   });
 
@@ -224,52 +222,27 @@ describe('space-controller', () => {
       expect(cy.getElementById(PORTAL).position()).toEqual(portalBefore);
     });
 
-    it('首屏那次 layoutstop 不取景，之后的才取景', () => {
+    it('任何 layoutstop 都不取景——只分岛，不动镜头', () => {
+      // 用户明确要求：任何布局结束后都不要强制移动/缩放画面。
+      // 曾经 onLayoutStopped 区分首屏/非首屏/用户是否动过三支（ADR-0011），
+      // 虫洞切宇宙场景反馈"任何地方都不想要"，于是统一为：只分岛，永不取景。
+      enterSpace(EXAM, { animate: false });
       cy.zoom(0.08);
       cy.pan({ x: 800, y: 449 });
 
-      beginBootLayout();
+      // 多次 layoutstop（模拟首屏、重置、换布局、切宇宙触发的各种布局）
+      // 都不该改 zoom/pan。
       onLayoutStopped();
       expect(cy.zoom()).toBeCloseTo(0.08, 9);
-
-      // 用户主动重排布局：节点被甩到新位置，取景是对这次操作的收尾。
-      onLayoutStopped();
-      expect(cy.zoom()).not.toBeCloseTo(0.08, 9);
-    });
-
-    it('布局期间用户动过镜头时，layoutstop 不再强制取景', () => {
-      // 模拟生产路径：layoutstart 记下快照，用户在布局跑的过程中缩放/
-      // 平移了，layoutstop 看到 zoom/pan 与快照不一致 → 跳过取景。
-      // 真实反馈：重置后布局还在跑，期间缩放/移动屏幕，布局完成却给强制
-      // 挪一下、缩一下，不想要。
-      enterSpace(EXAM, { animate: false });
-      cy.zoom(0.08);
-      cy.pan({ x: 800, y: 449 });
-
-      markLayoutStart(cy.zoom(), cy.pan());
-      // 用户在布局期间手动改了视角。
-      cy.zoom(0.2);
-      cy.pan({ x: 100, y: 200 });
+      expect(cy.pan()).toEqual({ x: 800, y: 449 });
 
       onLayoutStopped();
-
-      // 用户动过的视角被尊重，没被取景覆盖。
-      expect(cy.zoom()).toBeCloseTo(0.2, 9);
-      expect(cy.pan()).toEqual({ x: 100, y: 200 });
-    });
-
-    it('布局期间用户没动镜头时，layoutstop 照常取景', () => {
-      // 与上一条对照：markLayoutStart 之后用户没动 → 取景照旧发生。
-      enterSpace(EXAM, { animate: false });
-      cy.zoom(0.08);
-      cy.pan({ x: 800, y: 449 });
-
-      markLayoutStart(cy.zoom(), cy.pan());
+      expect(cy.zoom()).toBeCloseTo(0.08, 9);
+      expect(cy.pan()).toEqual({ x: 800, y: 449 });
 
       onLayoutStopped();
-
-      // 没动过 → 取景发生，视角变了。
-      expect(cy.zoom()).not.toBeCloseTo(0.08, 9);
+      expect(cy.zoom()).toBeCloseTo(0.08, 9);
+      expect(cy.pan()).toEqual({ x: 800, y: 449 });
     });
   });
 

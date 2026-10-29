@@ -18,7 +18,7 @@ import {
   onDragEnd as forceDragEnd,
   cancel as cancelForceDrag,
 } from '../core/force-drag.js';
-import { openSpaceMenu, isPortalNode, onLayoutStopped, markLayoutStart } from './space-controller.js';
+import { openSpaceMenu, isPortalNode, onLayoutStopped } from './space-controller.js';
 
 export interface GraphEventDeps {
   cy: cytoscape.Core;
@@ -251,14 +251,7 @@ export function initGraphEvents(deps: GraphEventDeps): void {
   // Any layout start (manual switch, hotkey, programmatic) must abort
   // an in-flight force-drag session — otherwise the simulation's tick
   // would overwrite the new layout's positions frame-by-frame.
-  //
-  // 同时记下此刻的 zoom/pan：layoutstop 时用来判定"用户在布局跑的过程
-  // 中是否动过镜头"。布局 fit:false 不会动 zoom/pan，所以快照与结束时
-  // 不一致一定是用户手动操作的，应予尊重（不再强制取景）。
-  cy.on('layoutstart', () => {
-    cancelForceDrag();
-    markLayoutStart(cy.zoom(), cy.pan());
-  });
+  cy.on('layoutstart', () => cancelForceDrag());
   cy.on('dragfree', () => {
     deps.setDragging(false);
     // `free` already reset drag mode; doing it again here was a second

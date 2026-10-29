@@ -84,7 +84,6 @@ import {
   installSpaceController,
   enterInitialSpace,
   settleAfterLayout,
-  beginBootLayout,
 } from './space-controller.js';
 import { runLayoutInWorker } from '../core/layout-worker-client.js';
 import { initTourSettings } from './tour-settings.js';
@@ -652,7 +651,8 @@ function initGraphFromManager(graphManager: GraphManager): void {
       }
       // 跑 euler——这次不再走 main 流程的 finishStreamingLayout（那是首屏专用），
       // 直接调 renderer.runLayout，让它带 animate: true 把节点从 halo 散开。
-      beginBootLayout();
+      // 不需要 beginBootLayout 打标：onLayoutStopped 现在统一只分岛不取景，
+      // 所有布局结束后都不再强制动镜头（用户明确要求）。
       renderer.runLayout(
         DEFAULT_LAYOUT,
         { randomize: false },
@@ -856,9 +856,7 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
     // 非空断言：renderer 在函数开头已做过 `=== null` 早退。TS 仍报是因为
     // runSyncLayout 是函数声明（hoisted），控制流分析无法确定它只在早退之后
     // 被调用。这里的断言是安全的——早退已在调用点之前生效。
-    // 这次落定是入场动画的收尾：只分岛，不取景（见 onLayoutStopped）。
-    beginBootLayout();
-
+    // onLayoutStopped 现在统一只分岛不取景，无需 beginBootLayout 打首屏标。
     renderer!.runLayout(
       DEFAULT_LAYOUT,
       // 不在这里覆盖 animate —— config.ts 里是 `animate: true`，走
