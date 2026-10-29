@@ -1,8 +1,15 @@
 # ADR-0011: 布局运行期尊重用户手动镜头操作
 
+> **⚠️ 已被取代（2026-10-29 同日）**：用户进一步反馈"任何地方都不想要强制取景"
+> （含虫洞切宇宙场景），本 ADR 的"用户动过则不取景 / 没动则取景"三支判定被推翻。
+> `layoutStartView` 快照、`bootLayoutPending`、`markLayoutStart` 全部删除，
+> `onLayoutStopped()` 简化为只 `separateSpaces()`，永不取景。
+> 另新增布局坐标缓存（`cacheActiveSpacePositions`/`getCachedPositions`）让切宇宙瞬切。
+> 见当日工作日志"彻底取消布局后取景 + 布局坐标缓存"段。本文保留作历史记录。
+
 | 字段         | 值                                                                    |
 | ------------ | --------------------------------------------------------------------- |
-| **状态**     | Accepted · Implemented                                                |
+| **状态**     | ~~Accepted · Implemented~~ → Superseded（同日被推翻）                 |
 | **日期**     | 2026-10-29                                                            |
 | **决策者**   | 项目所有者                                                            |
 | **影响范围** | `src/ui/space-controller.ts`、`src/ui/graph-events.ts`                |

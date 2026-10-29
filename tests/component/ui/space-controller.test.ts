@@ -33,6 +33,8 @@ import {
   separateSpaces,
   settleAfterLayout,
   onLayoutStopped,
+  cacheActiveSpacePositions,
+  getCachedPositions,
   _resetSpaceControllerForTests,
 } from '@/ui/space-controller';
 import { getActiveSpaceId, ensureNodeVisible } from '@/ui/space-state';
@@ -243,6 +245,57 @@ describe('space-controller', () => {
       onLayoutStopped();
       expect(cy.zoom()).toBeCloseTo(0.08, 9);
       expect(cy.pan()).toEqual({ x: 800, y: 449 });
+    });
+  });
+
+  describe('布局坐标缓存', () => {
+    it('cacheActiveSpacePositions 把当前活跃空间的节点坐标存进缓存', () => {
+      enterSpace(EXAM, { animate: false });
+      // 给节点一些确定坐标
+      cy.getElementById('e1').position({ x: 100, y: 200 });
+      cy.getElementById('e2').position({ x: 300, y: 400 });
+      cy.getElementById(EXAM).position({ x: 0, y: 0 });
+
+      cacheActiveSpacePositions();
+
+      const cached = getCachedPositions(EXAM);
+      expect(cached).not.toBeNull();
+      expect(cached!.get('e1')).toEqual({ x: 100, y: 200 });
+      expect(cached!.get('e2')).toEqual({ x: 300, y: 400 });
+      expect(cached!.get(EXAM)).toEqual({ x: 0, y: 0 });
+    });
+
+    it('传送门不被缓存——它跨宇宙，位置每次切都要重置', () => {
+      enterSpace(EXAM, { animate: false });
+      cy.getElementById(PORTAL).position({ x: 999, y: 999 });
+
+      cacheActiveSpacePositions();
+
+      const cached = getCachedPositions(EXAM);
+      expect(cached).not.toBeNull();
+      expect(cached!.has(PORTAL)).toBe(false);
+    });
+
+    it('没访问过的空间返回 null', () => {
+      enterSpace(EXAM, { animate: false });
+      cacheActiveSpacePositions();
+      expect(getCachedPositions(NEURO)).toBeNull();
+    });
+
+    it('切换空间后各自有独立缓存', () => {
+      // 进 EXAM，存坐标
+      enterSpace(EXAM, { animate: false });
+      cy.getElementById('e1').position({ x: 100, y: 200 });
+      cacheActiveSpacePositions();
+
+      // 进 NEURO，存坐标
+      enterSpace(NEURO, { animate: false });
+      cy.getElementById('n1').position({ x: 500, y: 600 });
+      cacheActiveSpacePositions();
+
+      // 两份缓存都在，互不干扰
+      expect(getCachedPositions(EXAM)?.get('e1')).toEqual({ x: 100, y: 200 });
+      expect(getCachedPositions(NEURO)?.get('n1')).toEqual({ x: 500, y: 600 });
     });
   });
 

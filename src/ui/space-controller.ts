@@ -78,6 +78,16 @@ let listEl: HTMLElement | null = null;
 let detailBtn: HTMLButtonElement | null = null;
 let dismissInstalled = false;
 /**
+ * 布局坐标缓存：spaceId → (nodeId → {x, y})。
+ *
+ * 第一次跑完 euler 后把当前活跃空间的节点坐标存进来；下次切回这个空间时
+ * add 节点直接带 position，跳过 halo + euler，瞬间到位。省掉每次切宇宙都
+ * 要再看一遍大爆炸的等待（药学宇宙 2556 节点的 euler 要跑几秒）。
+ *
+ * 坐标是"布局收敛 + 分岛之后"的最终位置，切回时直接复用，不需要再分岛。
+ */
+const layoutCache = new Map<string, Map<string, { x: number; y: number }>>();
+/**
  * 菜单打开的时刻。打开菜单的那一次 click 此刻还在往 document 冒泡——必须
  * 放过它，否则菜单会在同一个事件里被自己关掉。
  */
@@ -391,6 +401,48 @@ export function onLayoutStopped(): void {
   separateSpaces();
 }
 
+// ── 布局坐标缓存 ─────────────────────────────────────────────────────────────
+
+/**
+ * 把当前活跃空间里所有节点的坐标存进缓存。
+ *
+ * 在 euler 收敛 + 分岛之后调用——存的是最终位置，下次切回这个空间直接复用，
+ * 不需要再摆 halo + 跑 euler + 分岛。由调用方（main.ts 的各布局完成回调）
+ * 在布局收敛后显式调用，不挂在 `onLayoutStopped` 上——因为 Worker 布局路径
+ * 不触发 cytoscape 全局 `layoutstop`，挂在那里会漏掉首屏 Worker 路径。
+ *
+ * 传送门与虚拟层父节点不缓存：传送门跨宇宙、位置每次切都要重置到视口中心；
+ * 虚拟层父节点是 overlay 管的容器，坐标有自己的来源。
+ */
+export function cacheActiveSpacePositions(): void {
+  if (!cyRef) return;
+  const active = getActiveSpaceId();
+  if (!active) return;
+  const positions = new Map<string, { x: number; y: number }>();
+  cyRef
+    .nodes()
+    .not(`#${PORTAL_ID}`)
+    .not(`.${CLASSES.LAYER_PARENT}`)
+    .forEach((n) => {
+      const p = n.position();
+      positions.set(n.id(), { x: p.x, y: p.y });
+    });
+  layoutCache.set(active, positions);
+}
+
+/**
+ * 取某空间的缓存坐标。
+ *
+ * 有 → 返回只读 Map（nodeId → {x,y}），调用方 add 节点时注入 position，
+ * 跳过 halo + euler。
+ * 无 → 返回 null，调用方走完整布局路径。
+ */
+export function getCachedPositions(
+  spaceId: string,
+): ReadonlyMap<string, { x: number; y: number }> | null {
+  return layoutCache.get(spaceId) ?? null;
+}
+
 /**
  * 传送后的相机目标：把当前可见内容整体取景。
  * 缩到 MIN/MAX 之间——超大的宇宙不会变灰雾，单节点的空间也不会糊成一片。
@@ -579,6 +631,7 @@ export function _resetSpaceControllerForTests(): void {
   detailBtn = null;
   dismissInstalled = false;
   openedAt = Number.NEGATIVE_INFINITY;
+  layoutCache.clear();
   registerEnsureVisible(null);
   setActiveSpace(null);
 }

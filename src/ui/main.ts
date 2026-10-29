@@ -84,6 +84,8 @@ import {
   installSpaceController,
   enterInitialSpace,
   settleAfterLayout,
+  cacheActiveSpacePositions,
+  getCachedPositions,
 } from './space-controller.js';
 import { runLayoutInWorker } from '../core/layout-worker-client.js';
 import { initTourSettings } from './tour-settings.js';
@@ -594,14 +596,24 @@ function initGraphFromManager(graphManager: GraphManager): void {
       updateStats(cy);
       syncBottomSheetStats(cy);
     },
-    // 切空间时换内容：remove 旧空间、add 新空间、跑一次 euler（只算那个空间）。
-    // 这一步是性能关键——cy 永远只装一个空间的内容，euler 物理只算一个空间。
+    // 切空间时换内容：remove 旧空间、add 新空间。
+    // 有缓存坐标时直接注入 position（跳过 halo + euler，瞬间到位）；
+    // 没缓存时摆 halo + 跑 euler，收敛后把坐标存进缓存——下次切回这个空间
+    // 就是瞬切，不用再看一遍大爆炸。
     onEnterSpace: (spaceId) => {
       const slice = sliceCache.get(spaceId);
       if (!slice) return;
       const renderer = uiState.renderer as Renderer | null;
       if (!renderer) return;
-      const sliceData: GraphData = { nodes: slice.nodes, edges: slice.edges };
+      // 查缓存坐标：有就给节点注入 position，add 时直接落到最终位置。
+      const cached = getCachedPositions(spaceId);
+      const nodes = cached
+        ? slice.nodes.map((n) => {
+            const p = cached.get(n.id);
+            return p ? { ...n, position: p } : n;
+          })
+        : slice.nodes;
+      const sliceData: GraphData = { nodes, edges: slice.edges };
       // 传送门常驻——它跨宇宙
       const portal = getPortalNode(sliceCache);
       if (portal && cy.getElementById(PORTAL_ID).empty()) {
@@ -619,20 +631,30 @@ function initGraphFromManager(graphManager: GraphManager): void {
         });
         cy.remove(toRemove);
       });
-      // add 新空间节点 + 边
+      // add 新空间节点 + 边（有缓存时节点已带 position，add 即落位）
       renderer.addElements(sliceData);
-      // 按_halton 序列把节点摆到 halo 圆上——euler 会从这些位置开始收敛。
+      // 传送门位置：用当前视口中心（如果有更好的策略再改）
+      const portalNode = cy.getElementById(PORTAL_ID);
+      if (!portalNode.empty()) {
+        portalNode.position({ x: 0, y: 0 });
+      }
+      if (cached) {
+        // 有缓存：节点已带最终坐标，不摆 halo、不跑 euler。分岛对单空间是
+        // no-op（当前空间锚定不动），跑一下确保状态一致。
+        settleAfterLayout();
+        return;
+      }
+      // 没缓存：按_halton 序列把节点摆到 halo 圆上——euler 会从这些位置
+      // 开始收敛。
       //
       // **不加 entering class**：halo 循环加了 entering（opacity:0）之后，
       // runLayout 的 skipEntering: true 分支只"跳过入场动画处理"，**不会**
-      // 移除 entering——节点就永远 opacity:0 隐形，只有 hover 触发 .hovered
-      // 规则时才现形（用户实测反馈："切换宇宙后只有边显示，节点隐形，鼠标
-      // 点上去才现形"）。切换空间不需要再来一次大爆炸——节点直接可见、
-      // euler 让它们从 halo 散开即可。
+      // 移除 entering——节点就永远 opacity:0 隐形（用户实测反馈："切换宇宙
+      // 后只有边显示，节点隐形"）。切换空间不需要再来一次大爆炸——节点
+      // 直接可见、euler 让它们从 halo 散开即可。
       //
       // 跳过传送门和奇观：传送门有自己的位置（视口中心），奇观有自己的
-      // overlay 渲染逻辑，halo 重置会把它们的 model 坐标拽到 (0,0)，跟 overlay
-      // 给的初始位置打架。
+      // overlay 渲染逻辑，halo 重置会把它们的 model 坐标拽到 (0,0)。
       cy.nodes()
         .not(`node#${PORTAL_ID}`)
         .not(`.${CLASSES.LAYER_PARENT}`)
@@ -644,19 +666,18 @@ function initGraphFromManager(graphManager: GraphManager): void {
             y: Math.sin(angle) * ringRadius,
           });
         });
-      // 传送门位置：用当前视口中心（如果有更好的策略再改）
-      const portalNode = cy.getElementById(PORTAL_ID);
-      if (!portalNode.empty()) {
-        portalNode.position({ x: 0, y: 0 });
-      }
-      // 跑 euler——这次不再走 main 流程的 finishStreamingLayout（那是首屏专用），
-      // 直接调 renderer.runLayout，让它带 animate: true 把节点从 halo 散开。
-      // 不需要 beginBootLayout 打标：onLayoutStopped 现在统一只分岛不取景，
-      // 所有布局结束后都不再强制动镜头（用户明确要求）。
+      // 跑 euler——直接调 renderer.runLayout，让它带 animate: true 把节点
+      // 从 halo 散开。收敛后分岛 + 存坐标（下次切回这个空间就是瞬切）。
       renderer.runLayout(
         DEFAULT_LAYOUT,
         { randomize: false },
-        { skipEntering: true, onLayoutStop: () => settleAfterLayout() },
+        {
+          skipEntering: true,
+          onLayoutStop: () => {
+            settleAfterLayout();
+            cacheActiveSpacePositions();
+          },
+        },
       );
     },
   }, allSpaces);
@@ -824,6 +845,10 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
     },
     () => {
       completeLoading();
+      // 首屏 euler 收敛后存主空间坐标——下次切走再切回主空间时瞬切，
+      // 不用再看一遍大爆炸。Worker 路径不触发 cytoscape 全局 layoutstop，
+      // 所以必须在这里显式调。
+      cacheActiveSpacePositions();
     },
   ).then((result) => {
     if (!result) {
@@ -877,6 +902,8 @@ function finishStreamingLayout(counts: { nodeCount: number }): void {
         // 的「500ms 静止 + 60s 硬超时 + 100ms 轮询节流」三层硬编码。
         onLayoutStop: () => {
           completeLoading();
+          // 首屏 euler 收敛后存主空间坐标——下次切走再切回主空间时瞬切。
+          cacheActiveSpacePositions();
         },
       },
     );
