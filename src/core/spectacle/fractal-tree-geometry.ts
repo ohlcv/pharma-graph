@@ -1,7 +1,7 @@
 // src/core/spectacle/fractal-tree-geometry.ts
 // 分形树的几何内核：L-system 风格递归生成的枝干骨架 + 季节色标度。
 //
-// 与 tesseract-overlay.ts / emblem-overlay.ts 的分工：那两个文件把
+// 与 tesseract-overlay.ts / taiji_bagua_overlay.ts 的分工：那两个文件把
 // 数学、canvas 绘制、节点生命周期、Markdown 加载全塞在一个类里。这里刻意把
 // **几何抽成纯函数**，因为分形树的成败几乎全在参数上（分枝角度/长度衰减/
 // 层级/粗细），必须能脱离浏览器反复试——把调参困在 canvas 类里就只能靠

@@ -75,7 +75,7 @@ import { initSearchUI } from './search-ui.js';
 import { initMusicPlayer } from './music-player.js';
 import { installDebugBridge } from './debug-bridge.js';
 import { initStarfield } from './starfield.js';
-import { createCelestialEmblemOverlay, CELESTIAL_EMBLEM_ID } from '../core/spectacle/emblem-overlay.js';
+import { createTaijiBaguaOverlay, TAIJI_BAGUA_ID } from '../core/spectacle/taiji_bagua_overlay.js';
 import { createTesseractOverlay, TESSERACT_ID } from '../core/spectacle/tesseract-overlay.js';
 import { createFractalTreeOverlay, TREE_ID } from '../core/spectacle/fractal-tree-overlay.js';
 import { createE8StarOverlay, E8_STAR_ID } from '../core/spectacle/e8-overlay.js';
@@ -434,7 +434,7 @@ function initGraphFromManager(graphManager: GraphManager): void {
   // 分支创建（data 只剩 id+label），详情面板的「概」「文」页签都会是空的。
   // 一起塞进 bootstrap 后 spawnXxxNode 走 existing 分支复用，字段完整保留。
   const SPECTACLE_IDS = new Set([
-    CELESTIAL_EMBLEM_ID,
+    TAIJI_BAGUA_ID,
     TESSERACT_ID,
     TREE_ID,
     E8_STAR_ID,
@@ -587,9 +587,9 @@ function initGraphFromManager(graphManager: GraphManager): void {
   // Euler's repulsion physics. Must come AFTER the halo loop above (which
   // blindly touches every node including this one) and BEFORE
   // finishStreamingLayout() triggers the first Euler run — so it has a
-  // position from the very first physics tick. See emblem-overlay.ts
+  // position from the very first physics tick. See taiji_bagua_overlay.ts
   // header for the full rationale.
-  if (!DISABLE_CELESTIAL) createCelestialEmblemOverlay({ container, cy });
+  if (!DISABLE_CELESTIAL) createTaijiBaguaOverlay({ container, cy });
   // 四维空间（tesseract）：与太极八卦同机制的第二个装饰节点，独立 overlay +
   // 独立 canvas，生命周期互不牵连。接入时机的两条约束同上。
   if (!DISABLE_TESSERACT) createTesseractOverlay({ container, cy });

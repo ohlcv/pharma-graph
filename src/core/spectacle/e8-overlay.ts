@@ -11,7 +11,7 @@
 // 每点度数恒为 56。这里是把同一份算法搬进浏览器，换成每帧刚性旋转
 // 这个固定投影（跟维基百科上那些"E8 旋转"动图是同一种做法）。
 //
-// 节点生命周期跟 emblem-overlay.ts（太极八卦）是同一套骨架：孤立
+// 节点生命周期跟 taiji_bagua_overlay.ts（太极八卦）是同一套骨架：孤立
 // 无边、不 lock()、打 layer-parent 排除出"知识"、stripNodeChrome() 抹掉
 // cytoscape 自身的可见样式只留命中盒、canvas 覆盖层读 node.renderedPosition()
 // + cy.zoom() 逐帧画。四份骨架目前是各自独立的文件（有一点重复代码），
@@ -141,7 +141,7 @@ for (let i = 0; i < 240; i++) {
   }
 }
 
-// ── 节点生命周期（骨架同 celestial-emblem-node.ts，见文件头说明） ──────────
+// ── 节点生命周期（骨架同 taiji_bagua_overlay.ts，见文件头说明） ──────────
 
 export const E8_STAR_ID = 'e8-root-system';
 const E8_CLASS = 'e8-star-node';

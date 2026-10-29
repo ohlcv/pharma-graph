@@ -2,7 +2,7 @@
 // 生命之树：图谱里第三个观赏奇观节点。一棵 L-system 递归生成的分形树，
 // 树冠末梢缀着缓慢明灭的光点（果实 / 星子），随节点位置由 euler 斥力吹动。
 //
-// 架构与 tesseract-overlay.ts / emblem-overlay.ts 完全平行：
+// 架构与 tesseract-overlay.ts / taiji_bagua_overlay.ts 完全平行：
 // 独立 canvas + 独立 rAF + 独立节点生命周期。**不**复用它们的基类——三个奇观
 // 各自的绘制循环毫无共性（十二重文字环 / 16 顶点 4D 投影 / 递归枝干），
 // 抽公共基类只会得到一个塞满互斥状态的上帝对象。
