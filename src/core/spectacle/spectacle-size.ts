@@ -1,5 +1,5 @@
 // src/core/spectacle/spectacle-size.ts
-// 五个奇观的**唯一**尺寸来源。
+// 六个奇观的**唯一**尺寸来源。
 //
 // 背景：每个 overlay 原来各自写一条 pickRadius 公式，各自一套 clamp 上下限：
 //
@@ -22,7 +22,7 @@
 // V 本身随图幅缩放但夹在 [200, 300]（模型坐标）：上限 300 是为了不让奇观
 // 压过周围真实节点。
 
-export type SpectacleShape = 'emblem' | 'tesseract' | 'tree' | 'e8' | 'portal';
+export type SpectacleShape = 'emblem' | 'tesseract' | 'tree' | 'e8' | 'portal' | 'jade-capital';
 
 /**
  * 每个形状「画出来的最外沿半径」相对它收到的尺寸参数的倍数。
@@ -33,6 +33,7 @@ export type SpectacleShape = 'emblem' | 'tesseract' | 'tree' | 'e8' | 'portal';
  *   e8        240 根的投影外沿      → R * 1.10
  *   portal    吸积盘 reach          → R * 1.25
  *   tree      参数是**高度**，外沿是 H/2 → 0.5
+ *   jade-capital 光柱外端 + 城环最外 → R * 1.15（授箓光束瞬态到 -R*1.1，已含余量）
  *
  * 改任何奇观的画法（尤其是最大半径倍数）就要回来改这里，否则它又会
  * 比同伴大一圈或小一圈。
@@ -43,6 +44,7 @@ const DRAWN_EXTENT: Record<SpectacleShape, number> = {
   tree: 0.5,
   e8: 1.1,
   portal: 1.25,
+  'jade-capital': 1.15,
 };
 
 /** 视觉半径相对图幅的比例倍率（沿用 emblem/e8 原来调过的那一档）。 */

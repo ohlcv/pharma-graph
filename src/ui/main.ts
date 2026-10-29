@@ -80,6 +80,7 @@ import { createTesseractOverlay, TESSERACT_ID } from '../core/spectacle/tesserac
 import { createFractalTreeOverlay, TREE_ID } from '../core/spectacle/fractal-tree-overlay.js';
 import { createE8StarOverlay, E8_STAR_ID } from '../core/spectacle/e8-overlay.js';
 import { createPortalOverlay, PORTAL_ID } from '../core/spectacle/portal-overlay.js';
+import { createJadeCapitalOverlay, JADE_CAPITAL_ID } from '../core/spectacle/jade-capital-overlay.js';
 import {
   installSpaceController,
   enterInitialSpace,
@@ -134,6 +135,7 @@ let bootSettled = false;
  *   ?decor=tree       只留生命之树
  *   ?decor=e8         只留 E8 根系
  *   ?decor=portal     只留虫洞
+ *   ?decor=jade       只留白玉京
  *   缺省              全部开
  *
  * 刻意用白名单集合（`DECOR_KEYS`）而不是逐个 `DISABLE_*` 布尔：负向列举
@@ -143,7 +145,7 @@ let bootSettled = false;
  */
 const DECOR_OVERRIDE = new URLSearchParams(location.search).get('decor');
 /** 合法奇观 key，顺序即 DECOR_STATE 与接入顺序。 */
-const DECOR_KEYS = ['celestial', 'tess', 'tree', 'e8', 'portal'] as const;
+const DECOR_KEYS = ['celestial', 'tess', 'tree', 'e8', 'portal', 'jade'] as const;
 const ONLY = DECOR_OVERRIDE && DECOR_OVERRIDE !== 'off' ? DECOR_OVERRIDE : null;
 const decorEnabled = (key: string): boolean => (ONLY === null ? true : ONLY === key);
 const DISABLE_CELESTIAL = !decorEnabled('celestial');
@@ -151,6 +153,7 @@ const DISABLE_TESSERACT = !decorEnabled('tess');
 const DISABLE_TREE = !decorEnabled('tree');
 const DISABLE_E8 = !decorEnabled('e8');
 const DISABLE_PORTAL = !decorEnabled('portal');
+const DISABLE_JADE = !decorEnabled('jade');
 /** 供调试面板查询当前开关状态。 */
 export const DECOR_STATE = {
   override: DECOR_OVERRIDE,
@@ -161,6 +164,7 @@ export const DECOR_STATE = {
   tree: !DISABLE_TREE,
   e8: !DISABLE_E8,
   portal: !DISABLE_PORTAL,
+  jade: !DISABLE_JADE,
 };
 
 // ── 布局质量降级实验开关 (?quality=) ────────────────────────────────────────
@@ -434,6 +438,7 @@ function initGraphFromManager(graphManager: GraphManager): void {
     TESSERACT_ID,
     TREE_ID,
     E8_STAR_ID,
+    JADE_CAPITAL_ID,
   ]);
   const spectacleNodes = data.nodes.filter((n) => SPECTACLE_IDS.has(n.id));
   for (const n of spectacleNodes) bootstrapData.nodes.push(n);
@@ -605,6 +610,10 @@ function initGraphFromManager(graphManager: GraphManager): void {
   // 分支，也就意味着它仍可被搜索、仍出现在统计里——这正是想要的：
   // 搜「传送门」跳过去，是个比在图上找虫洞更靠谱的入口。
   if (!DISABLE_PORTAL) createPortalOverlay({ container, cy });
+  // 白玉京：第六个装饰奇观。李白晚年绝唱「天上白玉京」的视觉化——
+  // 仙凡双层撕裂 + 未完成的授箓循环（光落下→螺旋上升→顶点停留一瞬→
+  // 破碎陨落）。接入时机的两条约束同上（halo 之后、第一次 Euler 之前）。
+  if (!DISABLE_JADE) createJadeCapitalOverlay({ container, cy });
 
   // 装饰奇观（太极八卦 / 四维空间 / 生命之树 / E8 根系）是 overlay 运行时
   // 创建的 cytoscape 节点，不在 graph-data.json 里——所以 computeSpaces 算

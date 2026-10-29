@@ -34,7 +34,7 @@
 - **技术栈**：TypeScript + Vite + Cytoscape.js（无 React/Vue 等框架），原生 HTML + 模块化 TS。
 - **内容格式**：Markdown + YAML frontmatter，所有节点元数据集中在 `data:` 块下。
 - **当前状态**：已完成 ISA 边迁移（2026-07-14，详见 [migration-report.md](./archive/migration-report.md)），所有层级关系统一使用 `isa`（子→父）方向。
-- **2026-10 更新**：图数据规模 2,736 节点 / 3,184 边；新增**空间系统**（多重宇宙推导 + 传送门）与 **5 个奇观 overlay**（`src/core/spectacle/`）；测试树物理隔离到顶层 `tests/`（48 文件 / 591 用例）；预生成图数据加载路径（`prebuilt-loader.ts`）。详见 [ARCHITECTURE.md](./ARCHITECTURE.md)。
+- **2026-10 更新**：图数据规模 2,736 节点 / 3,184 边；新增**空间系统**（多重宇宙推导 + 传送门）与 **6 个奇观 overlay**（`src/core/spectacle/`）；测试树物理隔离到顶层 `tests/`（48 文件 / 591 用例）；预生成图数据加载路径（`prebuilt-loader.ts`）。详见 [ARCHITECTURE.md](./ARCHITECTURE.md)。
 
 ---
 
@@ -116,12 +116,13 @@ pharma-graph/
 │   │   ├── space-layout.ts    # 空间切换的取景/排布支持
 │   │   ├── element-visibility.ts  # 真实可见性判定（isElementShown）
 │   │   ├── glow-overlay.ts    # glow/flow 光效覆盖层（独立 canvas）
-│   │   └── spectacle/         # 奇观子系统（5 个奇观 overlay + 共享模块）
+│   │   └── spectacle/         # 奇观子系统（6 个奇观 overlay + 共享模块）
 │   │       ├── emblem-overlay.ts       # 太极八卦
 │   │       ├── tesseract-overlay.ts    # 四维超立方体
 │   │       ├── fractal-tree-overlay.ts # 生命之树（+ fractal-tree-geometry.ts 几何内核）
 │   │       ├── e8-overlay.ts           # E8 根系
 │   │       ├── portal-overlay.ts       # 虫洞（空间唯一通路）
+│   │       ├── jade-capital-overlay.ts # 白玉京（仙凡双层 + 未完成的授箓）
 │   │       ├── decor-content.ts        # 奇观内容加载（路径自节点推导）
 │   │       └── spectacle-size.ts       # 统一视觉半径换算（SSoT）
 │   │
@@ -343,9 +344,9 @@ graph-events/highlight-engine/detail-panel/search 等模块接管交互
 
 脱离知识层的"空域装置"：真实 cytoscape 节点（压全透明，只留命中盒）+ 独立 canvas overlay 逐帧重绘。打 `layer-parent` class 排除出检索/统计/漫游/force-drag，但参与 euler 斥力物理。
 
-- `emblem-overlay.ts` 太极八卦 · `tesseract-overlay.ts` 四维超立方体 · `fractal-tree-overlay.ts` 生命之树（+ `fractal-tree-geometry.ts` 纯函数几何内核）· `e8-overlay.ts` E8 根系 · `portal-overlay.ts` 虫洞（空间之间唯一通路，含螺旋坠入粒子与吸积盘）
+- `emblem-overlay.ts` 太极八卦 · `tesseract-overlay.ts` 四维超立方体 · `fractal-tree-overlay.ts` 生命之树（+ `fractal-tree-geometry.ts` 纯函数几何内核）· `e8-overlay.ts` E8 根系 · `portal-overlay.ts` 虫洞（空间之间唯一通路，含螺旋坠入粒子与吸积盘）· `jade-capital-overlay.ts` 白玉京（仙凡双层撕裂 + 未完成的授箓循环）
 - **[decor-content.ts](../src/core/spectacle/decor-content.ts)** — 奇观正文内容加载：路径从节点自身 `rel/sourcePath` 推导（消灭源码里的内容路径字面量），404/解析失败静默降级。
-- **[spectacle-size.ts](../src/core/spectacle/spectacle-size.ts)** — 五个奇观**统一视觉半径**的 SSoT：`V = clamp(spread 系数, 200, 300)`，再按 `DRAWN_EXTENT[shape]` 反推各 overlay 参数。改画法（最大半径倍数）必须同步 `DRAWN_EXTENT`。
+- **[spectacle-size.ts](../src/core/spectacle/spectacle-size.ts)** — 六个奇观**统一视觉半径**的 SSoT：`V = clamp(spread 系数, 200, 300)`，再按 `DRAWN_EXTENT[shape]` 反推各 overlay 参数。改画法（最大半径倍数）必须同步 `DRAWN_EXTENT`。
 
 > ⚠️ 加新奇观的两处单点维护：`src/ui/main.ts` 的 `DECOR_KEYS` + `src/core/renderer.ts` 的 `DECOR_NODE_CLASSES`。
 

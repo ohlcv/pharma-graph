@@ -63,7 +63,7 @@
 
 > 测试已迁出 `src/parser/`，见 §3.7 / §6。原 `frontmatter.test.ts`、`location-audit.test.ts` 现在位于 `tests/component/parser/`。
 
-### 3.2 `src/core/` — 图谱核心逻辑（顶层 23 文件 + `spectacle/` 8 文件 / 11,420 行 / 455,592 B；测试见 §3.7）
+### 3.2 `src/core/` — 图谱核心逻辑（顶层 23 文件 + `spectacle/` 9 文件 / 11,953 行 / 476,781 B；测试见 §3.7）
 
 **顶层（23 文件）**
 
@@ -96,7 +96,7 @@
 | `src/core/space-layout.ts`             | 空间切换的取景 / 排布支持                          |  4,415 B |   120 |
 | `src/core/spaces.ts`                   | 空间系统：连通分量 + `UNIVERSE_ROOTS` 推导多重宇宙 |  6,703 B |   200 |
 
-**`src/core/spectacle/` — 奇观节点（8 文件 / 3,293 行 / 124,830 B）**
+**`src/core/spectacle/` — 奇观节点（9 文件 / 3,826 行 / 146,019 B）**
 
 脱离知识层的空域装置：真实 cytoscape 节点 + 独立 canvas overlay 逐帧重绘。
 打 `layer-parent` class 排除出检索 / 统计 / 漫游 / force-drag，但**参与 euler
@@ -115,6 +115,7 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 | `src/core/spectacle/fractal-tree-geometry.ts`| （树的共享几何）| —                    | 纯函数几何内核，可脱 canvas 测试  | 11,398 B |   271 |
 | `src/core/spectacle/e8-overlay.ts`         | E8 根系        | `e8-root-system`     | 240 根 Coxeter 平面投影 / 6720 棱 | 16,273 B |   467 |
 | `src/core/spectacle/portal-overlay.ts`      | 虫洞            | `portal-gate`        | 吸积盘 + 螺旋坠入粒子；空间之间唯一通路 | 14,166 B |   384 |
+| `src/core/spectacle/jade-capital-overlay.ts`| 白玉京          | `jade-capital`       | 仙凡双层撕裂：12 玉柱 + 5 城环 + 未完成的授箓循环 | 21,189 B |   533 |
 | `src/core/spectacle/decor-content.ts`       | （共享）        | —                    | 奇观正文加载，路径自节点 `rel` 推导，404 静默降级 |  3,144 B |    73 |
 | `src/core/spectacle/spectacle-size.ts`      | （共享）        | —                    | 统一视觉半径 SSoT：`V = clamp(spread 系数, 200, 300)`，按 `DRAWN_EXTENT[shape]` 反推参数 |  3,365 B |    80 |
 
@@ -123,7 +124,7 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 > ② `src/core/renderer.ts` 的 `DECOR_NODE_CLASSES`（样式表压透明的 class 列表）。
 > 漏 ① → 开关关不掉；漏 ② → 节点在样式表兜底路径下露出 cytoscape 默认椭圆。
 >
-> 五份 overlay 的生命周期骨架（含传送门）（canvas / ResizeObserver / rAF / visibilitychange /
+> 六份 overlay 的生命周期骨架（含传送门）（canvas / ResizeObserver / rAF / visibilitychange /
 > `stripNodeChrome`）**刻意各自独立不抽基类**——画法毫无共性，抽出来只会得到
 > 一个塞满互斥状态的上帝对象。这是已知技术债。
 
@@ -243,7 +244,7 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 | 路径                                   | 文件数 |    行数 |      字节 |
 | -------------------------------------- | -----: | ------: | --------: |
 | `src/parser/`                          |      3 |     506 |    19,404 |
-| `src/core/`（含 `spectacle/`）         |     31 |  11,420 |   455,592 |
+| `src/core/`（含 `spectacle/`）         |     32 |  11,953 |   476,781 |
 | `src/data/`                            |      1 |   1,189 |    37,805 |
 | `src/types/`                           |      2 |      42 |     1,457 |
 | `src/ui/`（含 layout/ stats/ styles/） |     55 |  20,125 |   743,789 |
