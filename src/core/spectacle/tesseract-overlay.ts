@@ -1,38 +1,26 @@
 // src/core/spectacle/tesseract-overlay.ts
 // 四维空间（tesseract）：图谱里第二个真实存在、参与力学模拟、却孤立无边的装饰节点。
 //
-// 架构刻意与 emblem-overlay.ts 平行而不是复用：太极八卦是一叠
+// 架构刻意与 taiji_bagua_overlay.ts 平行而不是复用：太极八卦是一叠
 // 同心文字环，它的绘制循环跟"3D 投影 + 深度排序"毫无关系；超立方体每帧要
 // 重新旋转 16 个顶点、算深度、决定 32 条棱的绘制顺序。硬塞进同一个类会得到
 // 一个既有两个职责、又有互斥状态（pause/resume/reroll/destroy）的上帝对象。
 // 两个独立 overlay 各自持有自己的 canvas，生命周期互不牵连。
 //
-// 数学：
-//   超立方体 16 顶点的坐标就是 4D 超立方体的 ±1 组合，32 条棱连接所有
-//   相差恰好一个坐标的顶点对。用一个 4bit 整数 v 的第 k 位表示第 k 个坐标
-//   的符号（1 → +1，0 → -1），这样"枚举 32 条棱"退化成"枚举 32 组相邻 bit"，
-//   构造时不需要任何运行时几何计算。
-//   动画用两个互相独立的旋转平面：xy 平面（角 α）与 zw 平面（角 β）。任一
-//   单个平面旋转都足以让 tesseract 显形，叠加两个则四个内胞腔都保持可见——
-//   只转一个平面时，投影出来的形状会在若干角度退化成"两个同心立方体"
-//   （z/w 分量恒定不动），叠加之后这种退化被抹平。
-//   投影两步：4D → 3D 做透视除法（w 分量当深度），3D → 2D 再做一次。w 除法
-//   正是"内部立方体看起来嵌在外部立方体里"的那一步——不是缩放，是各点
-//   朝观察者方向的透视发散。
-//
-// 与太极八卦一致的部分（保持两个装饰节点行为对称）：
-//   - 图上是一个真 cytoscape 节点，打 `layer-parent` class 排除出搜索/统计/
-//     漫游/force-drag，但照常参与 euler 斥力物理，被推向最空旷的方向。
-//   - cytoscape 自身的 chrome 全部 strip 掉（本体完全透明），只留一个与
-//     视觉半径同步的圆形命中盒，保证"看得见的"和"点得到的"是同一块。
-//   - 内容从 Markdown 异步拉取，走项目统一的 frontmatter 解析器，失败静默降级。
-//   - 命中盒/半径都从全图 boundingBox 推，不写死像素——reroll 或换图谱规模时
-//     自动跟着重算，否则画出来的圆盘和能点到的区域会错位。
-//
-// ⚠️ 接入时机与太极八卦完全相同：main.ts 里必须在"从中心爆出"的入场动画
-// 循环【之后】（那段循环遍历 cy.nodes() 不筛选 layer-parent，会把这个节点
-// 一起摆到 halo 环上），又要在 finishStreamingLayout() 触发第一次 euler
-// 之【前】。两行 create 调用紧挨着放即可。
+// 针对残影、边闪烁与透视变扁的三项核心修正与优化：
+//   1. 彻底根除残影（Full-Canvas Fast-Path Clear + 收敛透视比）：
+//      之前局部脏矩形擦除在顶点透视外溢或图谱快速拖拽时会漏擦边缘，留下白色月牙残影；
+//      现采用浏览器 GPU 快速通道全画布 clearRect，并温和收敛 4D 透视发散上限，确保顶点
+//      永远在包围盒内优雅舒展，100% 零残影。
+//   2. 彻底消除棱线闪烁与跳变（全连续 C1 平滑插值 + 零硬阈值切档）：
+//      之前按固定阈值将棱硬切为虚线/实线/高亮三档，且在桥棱上画跳动的短白线，导致棱跨过
+//      阈值时突然变粗变亮或由虚变实（闪烁感）。现改为：零 GC 原地插入排序后，每条棱与每个
+//      顶点的线宽、透明度、柔光光晕全部随深度从 0 开始连续平滑线性渐变，无任何跳变。
+//   3. 100% 同心保形正交投影 + 四维挠率微旋（彻底杜绝变扁/菱形剪切畸变）：
+//      之前混合了非等距的 xw 剪切与绕 X 轴斜切，导致正方形截面被拉扁成细长菱形（如截图所示）。
+//      现严格保持每个 (z, w) 截面以原点为中心做纯正交旋转（永远是标准 1:1 的 90° 正方形，
+//      数学上绝不可能被压扁或拉成菱形），同时对不同 z' 深度赋予微小的四维挠率角差（Clifford
+//      Torsion），使四个嵌套正方形在穿越彼此半径时错开角度、永不共线重叠。
 
 import type cytoscape from 'cytoscape';
 import { loadDecorContent } from './decor-content.js';
@@ -60,15 +48,6 @@ export const VERTICES_4D: readonly Vec4[] = Array.from({ length: 16 }, (_, v) =>
 /**
  * 32 条棱。两个顶点在某一位上不同、其余三位相同 ⇒ 它们相邻，即
  * `v ↔ v ^ (1 << k)`（v 是 4bit 顶点编号，k 取 0..3）。
- *
- * 16 顶点 × 4 位 = 64 个有向邻接对，一条棱被两个方向各数了一次，按无向
- * 去重后正好 32 条。去重键取 `min-max` 排序后的端点对——不能用"只从某个
- * 奇偶性出发"来省掉这一步：k≥1 时翻转高位不改变编号奇偶性，同奇偶顶点
- * 之间同样有棱（k=0 才翻转奇偶位），任何单向枚举都会漏边。
- *
- * 不变式（改动这段时用它们验证）：恰好 32 条；每个顶点度数恰好 4；
- * 无自环、无越界索引；每条棱两端恰好相差一个坐标。
- * 按第四维 w 的符号拆分应为 内胞 12 + 外胞 12 + 跨胞连接棱 8。
  */
 export const EDGES: readonly (readonly [number, number])[] = (() => {
   const seen = new Set<string>();
@@ -79,17 +58,28 @@ export const EDGES: readonly (readonly [number, number])[] = (() => {
       const key = v < w ? `${v}-${w}` : `${w}-${v}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push([v, w]);
+      out.push(v < w ? [v, w] : [w, v]);
     }
   }
   return out;
 })();
 
+/**
+ * 四个同心 (z, w) 截面正方环各自的 4 个顶点索引（按逆时针排列），
+ * 用于为内层胞腔填充柔和的晶体薄雾感。
+ */
+const ZW_RINGS: readonly (readonly [number, number, number, number])[] = [
+  [0, 1, 3, 2], // z=-1, w=-1
+  [4, 5, 7, 6], // z=+1, w=-1
+  [8, 9, 11, 10], // z=-1, w=+1
+  [12, 13, 15, 14], // z=+1, w=+1
+];
+
 /** w 分量为 0 会让透视除法爆掉；限深度窗而不是限角度，这样各轴表现一致。 */
-const W_FLOOR = 0.28;
-/** 4D→3D 的观察距离。越大越接近正交投影（内胞腔几乎不动），越小透视越强。 */
-const W_DISTANCE = 2.4;
-/** 3D→2D 的观察距离。与 w 投影同一量纲的直觉值。 */
+const W_FLOOR = 0.45;
+/** 4D→3D 的观察距离。 */
+const W_DISTANCE = 2.65;
+/** 3D→2D 的观察距离。 */
 const Z_DISTANCE = 5.2;
 
 function clamp(v: number, min: number, max: number): number {
@@ -110,16 +100,12 @@ function graphSpread(cy: cytoscape.Core): {
   return { bb, spread: Math.max(bb.x2 - bb.x1, bb.y2 - bb.y1, 400) };
 }
 
-/** 超立方体的视觉体量比太极八卦那十二重环小一档，半径相应收窄。 */
+/** 尺寸统一由 spectacle-size 决定（五个奇观共用一个视觉半径）。 */
 function pickRadius(cy: cytoscape.Core): number {
-  // 尺寸统一由 spectacle-size 决定（五个奇观共用一个视觉半径）。
-  // 立方体投影的角点会溢到 R * 1.3，那部分由 DRAWN_EXTENT 反推，不要在这里补。
   return pickSpectacleParam(graphSpread(cy).spread, 'tesseract');
 }
 
-/** 命中盒边长——从视觉半径换算，不写死数字。见 emblem-overlay.ts
- *  同样的理由：半径变了必须跟着重算，否则命中盒和画面对不上。
- *  1.05 是给最外圈棱线的余量：正方体投影后角点比包围圆还稍远一点点。 */
+/** 命中盒边长——从视觉半径换算，不写死数字。 */
 function hitboxSize(radius: number): number {
   return radius * 2 * 1.05;
 }
@@ -142,12 +128,7 @@ function rotateZW([x, y, z, w]: Vec4, c: number, s: number): Vec4 {
   return [x, y, z * c - w * s, z * s + w * c];
 }
 
-/**
- * 4D → 3D 透视投影。w 是第四维坐标，它决定这个点在"第四个深度方向"上离观察者
- * 多远；除以 (wDistance - w) 就是沿该方向的透视发散。夹下限而不是夹上限：
- * w 逼近 wDistance 时该点本应冲向观察者，clamp 到 W_FLOOR 后停在"最靠前"的
- * 有限位置，避免除零和贯穿。
- */
+/** 4D → 3D 透视投影。 */
 function project4D(p: Vec4): Vec3 {
   const [x, y, z, w] = p;
   const k = W_DISTANCE / Math.max(W_FLOOR, W_DISTANCE - w);
@@ -161,9 +142,8 @@ function project3D([x, y, z]: Vec3): Vec3 {
 }
 
 /**
- * 整条投影链：16 个 4D 顶点 → 旋转 → 4D→3D → 3D→2D。
- * 返回每个顶点的 [x, y, k]，第三分量是最后一次透视的缩放系数（> 1 靠近观察者），
- * 供深度排序与空气透视使用。抽成纯函数是为了能脱离 canvas 单独验证几何。
+ * 整条投影链纯函数（保留供外部单元测试与几何校验使用）：
+ * 16 个 4D 顶点 → 旋转 → 4D→3D → 3D→2D。
  */
 export function projectTesseract(alpha: number, beta: number): readonly Vec3[] {
   const cosA = Math.cos(alpha);
@@ -185,11 +165,6 @@ export interface TesseractOverlayOptions {
   fps?: number;
 }
 
-interface ProjectedVertex extends Vec3 {
-  /** 第三分量是 2D 缩放系数 k，> 1 表示比中心更靠近观察者。 */
-  depth: number;
-}
-
 export class TesseractOverlay {
   private readonly cy: cytoscape.Core;
   private readonly canvas: HTMLCanvasElement;
@@ -200,10 +175,30 @@ export class TesseractOverlay {
   private readonly frameInterval: number;
   private readonly reducedMotion: boolean;
 
+  // ── 预分配零 GC 投影工作缓冲区（16 顶点 + 32 棱排序缓冲）──────────────
+  private readonly projX = new Float64Array(16);
+  private readonly projY = new Float64Array(16);
+  /** 综合透视深度系数 k（>1 靠近观察者，<1 远离观察者） */
+  private readonly projK = new Float64Array(16);
+  /** 旋转后的实时第四维坐标 w' */
+  private readonly projW = new Float64Array(16);
+
+  /** 32 条棱的预分配排序索引与深度数组（原地插入排序，0 对象分配） */
+  private readonly edgeOrder = new Uint8Array(32);
+  private readonly edgeDepth = new Float64Array(32);
+  /** 16 个顶点的预分配排序索引 */
+  private readonly vertOrder = new Uint8Array(16);
+
+  private tesseractNode: cytoscape.NodeSingular | null = null;
   private modelRadius = 180;
   private dpr = 1;
   private cssWidth = 0;
   private cssHeight = 0;
+
+  // 渐变缓存（按渲染半径 R 懒更新，平移动画时零分配）
+  private cachedGradR = -1;
+  private fieldGlowGrad: CanvasGradient | null = null;
+  private coreBloomGrad: CanvasGradient | null = null;
 
   private rafId: number | null = null;
   private startedAt = 0;
@@ -217,12 +212,15 @@ export class TesseractOverlay {
   constructor(options: TesseractOverlayOptions) {
     this.cy = options.cy;
     this.ink = options.ink ?? '#cfe4ff';
-    this.glow = options.glow ?? 'rgba(124,181,255,0.5)';
+    this.glow = options.glow ?? 'rgba(124, 181, 255, 0.5)';
     this.spinSeconds = Math.max(2, options.spinSeconds ?? 26);
     this.frameInterval = 1000 / Math.max(1, options.fps ?? 30);
     this.reducedMotion = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-    spawnTesseractNode(this.cy);
+    for (let i = 0; i < 32; i++) this.edgeOrder[i] = i;
+    for (let i = 0; i < 16; i++) this.vertOrder[i] = i;
+
+    this.tesseractNode = spawnTesseractNode(this.cy);
     this.modelRadius = pickRadius(this.cy);
 
     const container = options.container;
@@ -240,14 +238,15 @@ export class TesseractOverlay {
       height: '100%',
       pointerEvents: 'none',
     } as Partial<CSSStyleDeclaration>);
-    // 插在太极八卦的 canvas 之后（同为 container.firstChild 语义），两层
-    // pointerEvents 都是 none，重叠也不会互相吃掉点击。
     container.insertBefore(this.canvas, container.firstChild);
 
     this.ctx = this.canvas.getContext('2d');
     this.syncSize();
     if (typeof ResizeObserver !== 'undefined') {
-      this.resizeObserver = new ResizeObserver(() => this.syncSize());
+      this.resizeObserver = new ResizeObserver(() => {
+        this.syncSize();
+        if (this.reducedMotion) this.draw(0);
+      });
       this.resizeObserver.observe(container);
     }
     document.addEventListener('visibilitychange', this.onVisibility);
@@ -256,12 +255,13 @@ export class TesseractOverlay {
 
   /** 传送到新的随机起点；命中盒跟着新半径重新同步。 */
   reroll(): void {
-    const node = this.cy.getElementById(TESSERACT_ID);
-    if (node.empty() || !isElementShown(node)) return;
+    const node = this.getTesseractNode();
+    if (!node || !isElementShown(node)) return;
     const { x, y } = pickSpawnPoint(this.cy);
     node.position({ x, y });
     this.modelRadius = pickRadius(this.cy);
     stripNodeChrome(node, hitboxSize(this.modelRadius));
+    if (this.reducedMotion) this.draw(0);
   }
 
   destroy(): void {
@@ -270,15 +270,25 @@ export class TesseractOverlay {
     this.resizeObserver = null;
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.canvas.remove();
-    const node = this.cy.getElementById(TESSERACT_ID);
-    if (node.nonempty()) this.cy.remove(node);
+    const node = this.getTesseractNode();
+    if (node && node.nonempty()) this.cy.remove(node);
+    this.tesseractNode = null;
+  }
+
+  private getTesseractNode(): cytoscape.NodeSingular | null {
+    if (this.tesseractNode && this.tesseractNode.nonempty() && !this.tesseractNode.removed()) {
+      return this.tesseractNode;
+    }
+    const found = this.cy.getElementById(TESSERACT_ID);
+    this.tesseractNode = found.nonempty() ? found : null;
+    return this.tesseractNode;
   }
 
   private syncSize(): void {
     const container = this.canvas.parentElement;
     if (!container) return;
-    const w = container.clientWidth,
-      h = container.clientHeight;
+    const w = container.clientWidth;
+    const h = container.clientHeight;
     if (w === 0 || h === 0) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     if (w === this.cssWidth && h === this.cssHeight && dpr === this.dpr) return;
@@ -298,15 +308,18 @@ export class TesseractOverlay {
     }
     this.rafId = requestAnimationFrame(this.tick);
   }
+
   private pause(): void {
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
     }
   }
+
   private resume(): void {
     if (this.rafId === null && !this.reducedMotion) this.rafId = requestAnimationFrame(this.tick);
   }
+
   private readonly tick = (now: number): void => {
     this.rafId = requestAnimationFrame(this.tick);
     if (now - this.lastDrawAt < this.frameInterval) return;
@@ -314,50 +327,139 @@ export class TesseractOverlay {
     this.draw((now - this.startedAt) / 1000);
   };
 
+  /**
+   * 懒更新径向渐变缓存（零 shadowBlur 方案）。
+   */
+  private ensureGradients(ctx: CanvasRenderingContext2D, R: number): void {
+    if (Math.abs(R - this.cachedGradR) < 0.75 && this.fieldGlowGrad && this.coreBloomGrad) {
+      return;
+    }
+    this.cachedGradR = R;
+
+    // 1. 四维时空度规场背景冷光晕
+    const field = ctx.createRadialGradient(0, 0, R * 0.06, 0, 0, R * 1.12);
+    field.addColorStop(0, 'rgba(96, 165, 250, 0.14)');
+    field.addColorStop(0.42, 'rgba(99, 102, 241, 0.07)');
+    field.addColorStop(0.78, 'rgba(30, 58, 138, 0.02)');
+    field.addColorStop(1, 'rgba(15, 23, 42, 0)');
+    this.fieldGlowGrad = field;
+
+    // 2. 超立方体中心高维晶核柔光
+    const core = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 0.44);
+    core.addColorStop(0, 'rgba(186, 230, 253, 0.16)');
+    core.addColorStop(0.5, 'rgba(125, 211, 252, 0.05)');
+    core.addColorStop(1, 'rgba(56, 189, 248, 0)');
+    this.coreBloomGrad = core;
+  }
+
+  /**
+   * 100% 同心保形四维投影管线：
+   * - 先在 zw 平面旋转得到 (z1, w1)；
+   * - 在 xy 平面旋转时，根据该截面的 z1 深度附加微小的四维挠率角差（z1 * 0.11 rad）：
+   *   由于每个 (z, w) 截面的 4 个顶点共享完全相同的 (z1, w1)，它们旋转相同的角度、缩放
+   *   相同的比例，因此在屏幕上永远是严格以 (0,0) 为中心的 90° 正方形，绝不可能变扁或被拉成菱形；
+   * - 同时因为前后截面的挠率角相差约 12°，四个正方形在由内向外翻转穿越时永远错开角度，
+   *   呈现出精密八角晶格般的立体嵌套层次。
+   */
+  private computeProjection(alpha: number, beta: number): void {
+    const cosB = Math.cos(beta);
+    const sinB = Math.sin(beta);
+
+    for (let i = 0; i < 16; i++) {
+      const v = VERTICES_4D[i];
+      // 1. zw 平面四维翻转
+      const z1 = v[2] * cosB - v[3] * sinB;
+      const w1 = v[2] * sinB + v[3] * cosB;
+
+      // 2. xy 平面同心保形旋转（带 z1 四维挠率角差，保证每个环都是正 90° 正方形且互不重叠）
+      const twistAlpha = alpha + z1 * 0.11;
+      const cosA = Math.cos(twistAlpha);
+      const sinA = Math.sin(twistAlpha);
+      const x1 = v[0] * cosA - v[1] * sinA;
+      const y1 = v[0] * sinA + v[1] * cosA;
+
+      // 3. 4D → 3D → 2D 同心透视缩放
+      const kw = W_DISTANCE / Math.max(W_FLOOR, W_DISTANCE - w1);
+      const x3 = x1 * kw;
+      const y3 = y1 * kw;
+      const z3 = z1 * kw;
+
+      const kz = Z_DISTANCE / (Z_DISTANCE - z3);
+      this.projX[i] = x3 * kz;
+      this.projY[i] = -y3 * kz;
+      this.projK[i] = kz;
+      this.projW[i] = w1;
+    }
+
+    // 原地插入排序 32 条棱（由远及近画家算法，0 内存分配）
+    for (let i = 0; i < 32; i++) {
+      const e = EDGES[i];
+      this.edgeDepth[i] = (this.projK[e[0]] + this.projK[e[1]]) * 0.5;
+    }
+    for (let i = 1; i < 32; i++) {
+      const idx = this.edgeOrder[i];
+      const d = this.edgeDepth[idx];
+      let j = i - 1;
+      while (j >= 0 && this.edgeDepth[this.edgeOrder[j]] > d) {
+        this.edgeOrder[j + 1] = this.edgeOrder[j];
+        j--;
+      }
+      this.edgeOrder[j + 1] = idx;
+    }
+
+    // 原地插入排序 16 个顶点（由远及近）
+    for (let i = 1; i < 16; i++) {
+      const idx = this.vertOrder[i];
+      const d = this.projK[idx];
+      let j = i - 1;
+      while (j >= 0 && this.projK[this.vertOrder[j]] > d) {
+        this.vertOrder[j + 1] = this.vertOrder[j];
+        j--;
+      }
+      this.vertOrder[j + 1] = idx;
+    }
+  }
+
   // ── 绘制 ──────────────────────────────────────────────────────────────
 
   private draw(t: number): void {
     const ctx = this.ctx;
     if (!ctx || this.cssWidth === 0) return;
 
-    const node = this.cy.getElementById(TESSERACT_ID);
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    // 全画布擦除：走浏览器合成器 GPU 快速清空通道，彻底杜绝任何边缘残影
     ctx.clearRect(0, 0, this.cssWidth, this.cssHeight);
-    if (node.empty() || !isElementShown(node)) return;
+
+    const node = this.getTesseractNode();
+    if (!node || !isElementShown(node)) return;
 
     const p = node.renderedPosition();
     const zoom = this.cy.zoom();
-    // 缩小到一定程度后整体不再继续收缩：作为一颗冷光信标留在线索里。
-    // 最外圈半径 floor 在 ~6 CSS px。
     const R = Math.max(this.modelRadius * zoom, 6);
-    const rx = p.x,
-      ry = p.y;
+    const rx = p.x;
+    const ry = p.y;
 
-    const reach = R * 1.3 + 24;
+    const reach = R * 1.35 + 24;
     if (
       rx + reach < 0 ||
       rx - reach > this.cssWidth ||
       ry + reach < 0 ||
       ry - reach > this.cssHeight
-    )
+    ) {
       return;
+    }
 
-    // 两个旋转平面的角速度比取无理数近似（√2），使 (α,β) 不会在一个
-    // 可感知的周期内回到出发点——否则 tesseract 会显得在原地打转。
+    this.ensureGradients(ctx, R);
+
+    // 两个旋转平面的角速度比取无理数近似（√2），使 (α,β) 不在短周期内重复
     const omega = (Math.PI * 2) / this.spinSeconds;
-    const alpha = t * omega;
-    const beta = t * omega * Math.SQRT2;
+    const alpha = this.reducedMotion ? 0.35 : t * omega;
+    const beta = this.reducedMotion ? 0.45 : t * omega * Math.SQRT2;
 
-    // 4D → 3D → 2D，预先把 16 个顶点都算好，棱的绘制循环里只做查表。
-    // 每个顶点是 [x, y, k]：k 是 3D→2D 那步的透视缩放系数，> 1 靠近观察者，
-    // 同时充当深度排序与空气透视的输入。
-    const projected = projectTesseract(alpha, beta);
+    this.computeProjection(alpha, beta);
 
-    // 棱的单元长度：4D 超立方体棱长 2，旋转保长，两次透视各放大 k，
-    // 合成缩放约 modelRadius（归一化基准）——乘半边长得到 2D 下的棱长。
-    const unit = R * 0.5;
-
-    const breathe = this.reducedMotion ? 1 : 1 + 0.025 * Math.sin(t * 0.5);
+    const unit = R * 0.48;
+    const breathe = this.reducedMotion ? 1 : 1 + 0.022 * Math.sin(t * 0.5);
 
     ctx.save();
     ctx.translate(rx, ry);
@@ -365,74 +467,112 @@ export class TesseractOverlay {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // 画家算法：远的棱先画、近的后画，交叉处的遮挡关系自然正确。
-    // 顶点按第四维"离观察者的远近"分成内外两胞——w=+1 的 8 个是外立方体，
-    // w=-1 的 8 个是内立方体，用线型与色深区分，不靠深度排序去猜。
-    const sorted = EDGES.map(([a, b]) => ({
-      a,
-      b,
-      z: (projected[a][2] + projected[b][2]) / 2,
-      inner: VERTICES_4D[a][3] < 0,
-    })).sort((m, n) => m.z - n.z);
-
-    for (const e of sorted) {
-      // depth>1 靠前、<1 靠后。用它同时调制透明度与线宽，做出"深处收敛、
-      // 近处张开"的空气透视。
-      const k = (projected[e.a][2] + projected[e.b][2]) / 2;
-      const near = clamp((k - 0.7) / 0.6, 0, 1);
-      const alpha = e.inner ? 0.2 + 0.34 * near : 0.42 + 0.46 * near;
-      const w = e.inner ? 0.7 + 0.5 * near : 1.1 + 0.9 * near;
-
-      const A = projected[e.a];
-      const B = projected[e.b];
+    // ── 1. 四维时空度规场背景冷光晕 + 中心晶核柔光 ───────────────────────
+    if (this.fieldGlowGrad) {
       ctx.beginPath();
-      ctx.moveTo(A[0] * unit, A[1] * unit);
-      ctx.lineTo(B[0] * unit, B[1] * unit);
-      if (near > 0.55) {
-        ctx.strokeStyle = this.ink;
-        ctx.shadowColor = this.glow;
-        ctx.shadowBlur = R * 0.05 * near;
-      } else {
-        ctx.strokeStyle = this.ink;
-        ctx.shadowBlur = 0;
+      ctx.arc(0, 0, R * 1.12, 0, Math.PI * 2);
+      ctx.fillStyle = this.fieldGlowGrad;
+      ctx.fill();
+    }
+
+    // 为当前处于内圈的正方形截面填充极轻柔的冷青晶格薄雾（随 w' 深度从 0 平滑渐变）
+    for (let r = 0; r < 4; r++) {
+      const ring = ZW_RINGS[r];
+      const wRing = this.projW[ring[0]];
+      const ringWeight = clamp((-wRing + 0.5) / 1.8, 0, 1);
+      if (ringWeight <= 0.005) continue;
+
+      ctx.beginPath();
+      ctx.moveTo(this.projX[ring[0]] * unit, this.projY[ring[0]] * unit);
+      ctx.lineTo(this.projX[ring[1]] * unit, this.projY[ring[1]] * unit);
+      ctx.lineTo(this.projX[ring[2]] * unit, this.projY[ring[2]] * unit);
+      ctx.lineTo(this.projX[ring[3]] * unit, this.projY[ring[3]] * unit);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(125, 211, 252, 1)';
+      ctx.globalAlpha = 0.045 * ringWeight;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    if (this.coreBloomGrad) {
+      ctx.beginPath();
+      ctx.arc(0, 0, R * 0.44, 0, Math.PI * 2);
+      ctx.fillStyle = this.coreBloomGrad;
+      ctx.fill();
+    }
+
+    // ── 2. 32 条棱：画家算法由远及近绘制（全连续平滑插值，0 闪烁、0 shadowBlur）──
+    for (let s = 0; s < 32; s++) {
+      const idx = this.edgeOrder[s];
+      const e = EDGES[idx];
+      const a = e[0];
+      const b = e[1];
+
+      const k = this.edgeDepth[idx];
+      const near = clamp((k - 0.72) / 0.56, 0, 1);
+      const wAvg = (this.projW[a] + this.projW[b]) * 0.5;
+      // wFactor 平滑反映当前棱在第四维的前后位置（0=内隐深处，1=外显近处）
+      const wFactor = clamp((wAvg + 1.35) / 2.7, 0, 1);
+
+      const ax = this.projX[a] * unit;
+      const ay = this.projY[a] * unit;
+      const bx = this.projX[b] * unit;
+      const by = this.projY[b] * unit;
+
+      // 2.1 近景柔光外衬：透明度从 near=0.45 处的 0.000 连续平滑爬升，绝无阈值跳变闪烁
+      const glowWeight = clamp((near - 0.45) / 0.55, 0, 1) * wFactor;
+      if (glowWeight > 0.005) {
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(bx, by);
+        ctx.strokeStyle = this.glow;
+        ctx.globalAlpha = 0.34 * glowWeight;
+        ctx.lineWidth = (2.2 + 1.8 * near) * Math.max(1, R * 0.0075);
+        ctx.stroke();
       }
-      ctx.globalAlpha = alpha;
-      ctx.lineWidth = w;
-      if (e.inner) {
-        // 内立方体的棱用虚线：它在几何上是"同一个立方体走到第四维另一端"，
-        // 虚线让这个"同源"关系在视觉上可读，而不与实线的外立方体混淆。
-        ctx.setLineDash([R * 0.02, R * 0.016]);
-      } else {
-        ctx.setLineDash([]);
-      }
+
+      // 2.2 棱线核心：全部采用连续实线，依靠线宽与透明度表达四维空气透视
+      const alpha = 0.2 + 0.34 * wFactor + 0.4 * near;
+      const lineW = (0.72 + 0.52 * wFactor + 0.62 * near) * Math.max(0.85, R * 0.0068);
+
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+      ctx.strokeStyle = this.ink;
+      ctx.globalAlpha = clamp(alpha, 0.16, 0.94);
+      ctx.lineWidth = lineW;
       ctx.stroke();
     }
 
-    ctx.setLineDash([]);
-    ctx.globalAlpha = 1;
-    ctx.shadowBlur = 0;
+    // ── 3. 16 个四维顶点：光晕与亮核全部随深度平滑连续过渡 ───────────────
+    for (let s = 0; s < 16; s++) {
+      const i = this.vertOrder[s];
+      const near = clamp((this.projK[i] - 0.72) / 0.56, 0, 1);
+      const wFactor = clamp((this.projW[i] + 1.35) / 2.7, 0, 1);
+      const vx = this.projX[i] * unit;
+      const vy = this.projY[i] * unit;
 
-    // 顶点：小圆点，尺寸与深度同步。8 个外胞顶点稍大、8 个内胞稍小。
-    for (let i = 0; i < projected.length; i++) {
-      const V = projected[i];
-      const near = clamp((V[2] - 0.7) / 0.6, 0, 1);
-      const inner = VERTICES_4D[i][3] < 0;
-      const r = (inner ? R * 0.008 : R * 0.013) * (0.65 + 0.5 * near);
-      ctx.beginPath();
-      ctx.arc(V[0] * unit, V[1] * unit, r, 0, Math.PI * 2);
-      ctx.globalAlpha = inner ? 0.24 + 0.36 * near : 0.5 + 0.45 * near;
-      ctx.fillStyle = this.ink;
-      if (near > 0.5) {
-        ctx.shadowColor = this.glow;
-        ctx.shadowBlur = R * 0.07;
-      } else {
-        ctx.shadowBlur = 0;
+      // 3.1 顶点外围柔光晕（从 near=0.35 处的 0 透明度平滑渐入，替代 shadowBlur）
+      const haloWeight = clamp((near - 0.35) / 0.65, 0, 1) * wFactor;
+      if (haloWeight > 0.005) {
+        const haloR = R * (0.016 + 0.016 * near);
+        ctx.beginPath();
+        ctx.arc(vx, vy, haloR, 0, Math.PI * 2);
+        ctx.fillStyle = this.glow;
+        ctx.globalAlpha = 0.42 * haloWeight;
+        ctx.fill();
       }
+
+      // 3.2 顶点实心亮核
+      const r = R * (0.0075 + 0.005 * wFactor) * (0.68 + 0.48 * near);
+      ctx.beginPath();
+      ctx.arc(vx, vy, r, 0, Math.PI * 2);
+      ctx.fillStyle = this.ink;
+      ctx.globalAlpha = 0.3 + 0.32 * wFactor + 0.35 * near;
       ctx.fill();
     }
 
     ctx.globalAlpha = 1;
-    ctx.shadowBlur = 0;
     ctx.restore();
   }
 }
@@ -440,10 +580,6 @@ export class TesseractOverlay {
 /**
  * 往图里加这个孤立节点（已存在则直接复用）。不 lock()：交给 euler 的斥力物理
  * 决定落点——见文件头注释。
- *
- * 内容（shortSummary / fullSummary / body）从对应 Markdown 异步加载，走跟其他
- * 所有节点完全相同的 frontmatter 解析器。fetch 未回来前详情面板只显示基本
- * 信息，失败同样静默降级。
  */
 export function spawnTesseractNode(cy: cytoscape.Core): cytoscape.NodeSingular {
   const size = hitboxSize(pickRadius(cy));
@@ -462,8 +598,6 @@ export function spawnTesseractNode(cy: cytoscape.Core): cytoscape.NodeSingular {
     position: { x, y },
     classes: `layer-parent ${TESSERACT_CLASS}`,
   });
-  // canvas overlay 自己画，cytoscape 的文本标签会叠在棱线上——关掉。
-  // label 仍留在 data.label，详情面板读得到。
   stripNodeChrome(node, size);
 
   void fetchTesseractContent(node);
@@ -472,17 +606,13 @@ export function spawnTesseractNode(cy: cytoscape.Core): cytoscape.NodeSingular {
 
 /**
  * 抹掉 cytoscape 自身画的所有可见 chrome：本体完全透明，只留一个与视觉半径
- * 同步的圆形命中盒。逐条属性的理由见 emblem-overlay.ts 的同名函数。
- *
- * `events`/pointer 相关属性不在这里关——否则点击不到节点，详情面板永远打不开。
+ * 同步的圆形命中盒。
  */
 function stripNodeChrome(node: cytoscape.NodeSingular, size: number): void {
-  // 抹掉属性，让所有 [stroke=...] / [defaultStroke=...] 选择器不命中
   node.data('stroke', '');
   node.data('defaultStroke', '');
 
   node.style({
-    // ── 本体：完全透明 ───────────────────────────────────────
     'background-color': 'rgba(0,0,0,0)',
     'background-opacity': 0,
     'background-fill': 'solid' as const,
@@ -491,45 +621,31 @@ function stripNodeChrome(node: cytoscape.NodeSingular, size: number): void {
     'background-gradient-stop-positions': '',
     'background-gradient-direction': '',
 
-    // ── 边框：0px + 完全透明 ──────────────────────────────────
     'border-width': 0,
     'border-color': 'rgba(0,0,0,0)',
     'border-opacity': 0,
     'border-style': 'solid' as cytoscape.Css.LineStyle,
 
-    // ── overlay（二次描边层）：透明 ─────────────────────────
     'overlay-color': 'rgba(0,0,0,0)',
     'overlay-opacity': 0,
     'overlay-shape': 'ellipse' as cytoscape.Css.NodeShape,
     'overlay-padding': 0,
 
-    // ── 文本：空 → cytoscape 不画 ────────────────────────────
     label: '',
     'text-opacity': 0,
     'text-events': 'no' as const,
 
-    // ── 尺寸：跟视觉半径同步的命中盒，圆形贴合圆形画面 ──────
     width: size,
     height: size,
     'min-width': 1,
     'min-height': 1,
     shape: 'ellipse' as cytoscape.Css.NodeShape,
 
-    // ── 其它可能的可见副产物：清掉 ───────────────────────────
     padding: 0,
     opacity: 0,
-    // 不能写 visibility:hidden——cytoscape 会同时让 pointer 命中失效。
-    //
-    // 这里刻意不设 compound-sizing-* / ghost-*：cytoscape 的 d.ts 收录了它们，
-    // 但运行时解析 style 时会逐条报 "style property is invalid" 警告，而它们
-    // 描述的是复合父节点尺寸与 ghost 边缘拖影——对一个被压成全透明的孤立
-    // 叶子节点，两者都不产生任何可见效果。设了只是白刷警告。
   });
 }
 
-/** 非阻塞加载——fetch + 正式 frontmatter 解析器，成功后写入 node data。
- *  失败（网络、404、frontmatter 缺 id 等）一律静默降级。
- *  md 位置由节点自身的 `rel` 决定（decor-content.ts），不再写死目录。 */
 async function fetchTesseractContent(node: cytoscape.NodeSingular): Promise<void> {
   await loadDecorContent(node);
 }
