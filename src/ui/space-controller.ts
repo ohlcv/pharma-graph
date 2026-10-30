@@ -171,7 +171,7 @@ function buildMenu(): void {
     <div class="space-menu__panel" role="dialog" aria-modal="true" aria-label="空间传送">
       <div class="space-menu__head">
         <div class="space-menu__head-text">
-          <span class="space-menu__title">虫洞</span>
+          <span class="space-menu__title">卡冈图雅</span>
           <span class="space-menu__hint">选择目的地</span>
         </div>
         <button type="button" class="space-menu__close" id="${CLOSE_BTN_ID}" aria-label="关闭" title="关闭">
@@ -183,7 +183,7 @@ function buildMenu(): void {
       </div>
       <ul class="space-menu__list" id="${LIST_ID}"></ul>
       <div class="space-menu__foot">
-        <button type="button" class="space-menu__link" id="${DETAIL_BTN_ID}">虫洞详情</button>
+        <button type="button" class="space-menu__link" id="${DETAIL_BTN_ID}">卡冈图雅详情</button>
       </div>
     </div>`;
   document.body.appendChild(el);

@@ -75,7 +75,7 @@ import { initSearchUI } from './search-ui.js';
 import { initMusicPlayer } from './music-player.js';
 import { installDebugBridge } from './debug-bridge.js';
 import { initStarfield } from './starfield.js';
-import { createTaijiBaguaOverlay, TAIJI_BAGUA_ID } from '../core/spectacle/taiji_bagua_overlay.js';
+import { createTaijiBaguaOverlay, TAIJI_BAGUA_ID } from '../core/spectacle/taiji-bagua-overlay.js';
 import { createTesseractOverlay, TESSERACT_ID } from '../core/spectacle/tesseract-overlay.js';
 import { createFractalTreeOverlay, TREE_ID } from '../core/spectacle/fractal-tree-overlay.js';
 import { createE8StarOverlay, E8_STAR_ID } from '../core/spectacle/e8-overlay.js';
@@ -587,7 +587,7 @@ function initGraphFromManager(graphManager: GraphManager): void {
   // Euler's repulsion physics. Must come AFTER the halo loop above (which
   // blindly touches every node including this one) and BEFORE
   // finishStreamingLayout() triggers the first Euler run — so it has a
-  // position from the very first physics tick. See taiji_bagua_overlay.ts
+  // position from the very first physics tick. See taiji-bagua-overlay.ts
   // header for the full rationale.
   if (!DISABLE_CELESTIAL) createTaijiBaguaOverlay({ container, cy });
   // 四维空间（tesseract）：与太极八卦同机制的第二个装饰节点，独立 overlay +

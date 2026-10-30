@@ -1,7 +1,7 @@
 // src/core/spectacle/tesseract-overlay.ts
 // 四维空间（tesseract）：图谱里第二个真实存在、参与力学模拟、却孤立无边的装饰节点。
 //
-// 架构刻意与 taiji_bagua_overlay.ts 平行而不是复用：太极八卦是一叠
+// 架构刻意与 taiji-bagua-overlay.ts 平行而不是复用：太极八卦是一叠
 // 同心文字环，它的绘制循环跟"3D 投影 + 深度排序"毫无关系；超立方体每帧要
 // 重新旋转 16 个顶点、算深度、决定 32 条棱的绘制顺序。硬塞进同一个类会得到
 // 一个既有两个职责、又有互斥状态（pause/resume/reroll/destroy）的上帝对象。

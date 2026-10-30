@@ -8,7 +8,7 @@ import {
   rgba,
   DEFAULT_TREE_PARAMS,
   type TreeParams,
-} from '@/core/spectacle/fractal-tree-geometry';
+} from '@/core/spectacle/fractal-tree-overlay';
 
 /** 固定 seed 的伪随机（mulberry32），保证测试完全可复现。 */
 function seeded(seed: number): () => number {

@@ -1,4 +1,4 @@
-// src/core/spectacle/taiji_bagua_overlay.ts
+// src/core/spectacle/taiji-bagua-overlay.ts
 // 太极八卦·周天罗盘：
 // 图谱里一个真实存在、参与力学模拟、却孤立无边的装饰奇观节点。
 //

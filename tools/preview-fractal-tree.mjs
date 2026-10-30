@@ -14,7 +14,7 @@ import {
   barkColor,
   foliageColor,
   rgba,
-} from '../src/core/spectacle/fractal-tree-geometry.ts';
+} from '../src/core/spectacle/fractal-tree-overlay.ts';
 
 // 参数网格：重点探 depthDecay（分枝角随深度的收缩速度）。
 // 第一版没有 depthDecay，角度恒定，实测 maxDepth≥10 时整幅糊成灌木噪点。
@@ -76,7 +76,7 @@ ${GRID.map(
 ).join('\n')}
 </div>
 <script type="module">
-import { generateTree, barkColor, foliageColor, rgba } from ${JSON.stringify(new URL('../src/core/spectacle/fractal-tree-geometry.ts', import.meta.url).href)};
+import { generateTree, barkColor, foliageColor, rgba } from ${JSON.stringify(new URL('../src/core/spectacle/fractal-tree-overlay.ts', import.meta.url).href)};
 
 const GRID = ${JSON.stringify(GRID)};
 
