@@ -109,12 +109,11 @@ E8 根系与太极八卦没有共同语义可共享前缀。几何内核等非 o
 
 | 路径                                         | 奇观           | 节点 id              | 职责                             |     大小 |  行数 |
 | -------------------------------------------- | -------------- | -------------------- | -------------------------------- | -------: | ----: |
-| `src/core/spectacle/taiji_bagua_overlay.ts` | 太极八卦       | `celestial-emblem`   | 十二重同心环 + 中心太极 + 语义级 LOD | 30,044 B | 1,005 |
+| `src/core/spectacle/taiji-bagua-overlay.ts` | 太极八卦       | `celestial-emblem`   | 十二重同心环 + 中心太极 + 语义级 LOD | 30,044 B | 1,005 |
 | `src/core/spectacle/tesseract-overlay.ts`   | 四维空间       | `tesseract-space`    | 4D 超立方体 16 顶点 / 32 棱     | 22,202 B |   551 |
-| `src/core/spectacle/fractal-tree-overlay.ts`| 生命之树       | `tree-of-life`       | L-system 树 + 末梢光点           | 26,816 B |   650 |
-| `src/core/spectacle/fractal-tree-geometry.ts`| （树的共享几何）| —                    | 纯函数几何内核，可脱 canvas 测试  | 11,398 B |   271 |
-| `src/core/spectacle/e8-overlay.ts`         | E8 根系        | `e8-root-system`     | 240 根 Coxeter 平面投影 / 6720 棱 | 16,273 B |   467 |
-| `src/core/spectacle/portal-overlay.ts`      | 虫洞            | `portal-gate`        | 吸积盘 + 螺旋坠入粒子；空间之间唯一通路 | 14,166 B |   384 |
+| `src/core/spectacle/fractal-tree-overlay.ts`| 生命之树       | `tree-of-life`       | L-system 树 + 末梢光点（含几何内核） | 28,245 B |   809 |
+| `src/core/spectacle/e8-overlay.ts`          | E8 根系        | `e8-root-system`     | 240 根 Coxeter 平面投影 / 6720 棱 | 23,282 B |   651 |
+| `src/core/spectacle/portal-overlay.ts`      | 卡冈图雅        | `portal-gate`        | 引力透镜 + 多普勒蓝移/红移吸积盘；空间之间唯一通路 | 24,777 B |   636 |
 | `src/core/spectacle/jade-capital-overlay.ts`| 白玉京          | `jade-capital`       | 仙凡双层撕裂：12 玉柱 + 5 城环 + 未完成的授箓循环 | 21,189 B |   533 |
 | `src/core/spectacle/decor-content.ts`       | （共享）        | —                    | 奇观正文加载，路径自节点 `rel` 推导，404 静默降级 |  3,144 B |    73 |
 | `src/core/spectacle/spectacle-size.ts`      | （共享）        | —                    | 统一视觉半径 SSoT：`V = clamp(spread 系数, 200, 300)`，按 `DRAWN_EXTENT[shape]` 反推参数 |  3,365 B |    80 |
