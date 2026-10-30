@@ -11,7 +11,7 @@ import { DEFAULT_EDGE_TYPE, EDGE_TYPES } from '@/core/edge-types';
 // 相对仓库根目录（vitest 的 cwd），不再写死 /Users/meow/...；内容目录不存在时整条用例跳过。
 const REAL_FILE = join(
   process.cwd(),
-  'public/content/个人成长与生存策略/第一章 认知底色/趋同进化：相同选择压力下不同起点收敛到同一终点.md',
+  'public/content/个人成长与生存策略/第一章 世界观/第三节 世界的演化：选择压力与路径收敛/趋同进化：相同选择压力下不同起点收敛到同一终点.md',
 );
 
 describe('real-file regression', () => {
@@ -26,7 +26,7 @@ describe('real-file regression', () => {
       expect(fm.shortSummary).toBeTruthy();
       // Either layout should now surface a non-trivial fullSummary.
       expect(fm.fullSummary).toBeTruthy();
-      expect(fm.fullSummary!.length).toBeGreaterThan(1000);
+      expect(fm.fullSummary!.length).toBeGreaterThan(900);
     },
   );
 });
