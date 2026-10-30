@@ -855,5 +855,5 @@ export const DEFAULT_LAYOUT = 'euler';
 //   示例：'sum-third-universe'、'concept-domain-X'
 export const UNIVERSE_ROOTS: ReadonlySet<string> = new Set<string>([
   'concept-exam-system', // 体系一：执业药师考试（4 本教材）
-  'sum-neurodiversity-p1', // 体系二：神经多样性与生存策略
+  'sum-personal-growth-p1', // 体系二：个人成长与生存策略
 ]);

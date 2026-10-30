@@ -41,7 +41,7 @@ import { getActiveSpaceId, ensureNodeVisible } from '@/ui/space-state';
 
 /** 与 config.ts 的 UNIVERSE_ROOTS 一致——刻意不另造一套假 id。 */
 const EXAM = 'concept-exam-system';
-const NEURO = 'sum-neurodiversity-p1';
+const NEURO = 'sum-personal-growth-p1';
 const PORTAL = 'portal-gate';
 
 function makeGraph(): cytoscape.Core {
@@ -56,7 +56,7 @@ function makeGraph(): cytoscape.Core {
     { group: 'nodes', data: { id: 'e1', label: '药一' } },
     { group: 'nodes', data: { id: 'e2', label: '药二' } },
     // 体系二
-    { group: 'nodes', data: { id: NEURO, label: '神经多样性生存策略集合' } },
+    { group: 'nodes', data: { id: NEURO, label: '个人成长与生存策略' } },
     { group: 'nodes', data: { id: 'n1', label: '八字命理' } },
     // 孤立装饰 + 传送门（都无连边）
     { group: 'nodes', data: { id: 'e8-root-system', label: 'E8 根系' } },
