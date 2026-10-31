@@ -9,7 +9,7 @@ updated: '2026-10-30'
 evolution_phase: S5-社交推理与价值防线确立期
 version: v5
 status: approved
-sequence_in_book: 147
+sequence_in_book: 158
 fill: cls-feature
 location:
   book: 个人成长与生存策略

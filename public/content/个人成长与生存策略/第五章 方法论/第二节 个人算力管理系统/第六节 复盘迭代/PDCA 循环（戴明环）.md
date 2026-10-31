@@ -8,7 +8,7 @@ updated: '2026-10-30'
 evolution_phase: S4-算力账本与感官脚手架期
 version: v5
 status: approved
-sequence_in_book: 193
+sequence_in_book: 129
 fill: cls-concept
 location:
   book: 个人成长与生存策略
