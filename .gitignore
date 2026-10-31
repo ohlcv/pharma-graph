@@ -52,3 +52,6 @@ public/content-manifest.json
 # 调试截图与本地会话数据
 /shots/
 /.workbuddy/
+
+# IDE 分享包产物
+/.trae-html-share-packages/
