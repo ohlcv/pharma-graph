@@ -1,7 +1,8 @@
 #!/bin/bash
 # pharma-graph 启动脚本
-# 用法: ./start.sh            # 启动 dev server（先清理旧进程）
-#       ./start.sh sync       # 启动并打开同步布局模式 ?layout=sync
+# 用法: ./start.command       # 启动 dev server（先清理旧进程）
+#       ./start.command sync  # 启动并打开同步布局模式 ?layout=sync
+#       （也可直接在 Finder 里双击运行）
 set -euo pipefail
 cd "$(dirname "$0")"
 
