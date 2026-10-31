@@ -80,7 +80,19 @@ import { createTesseractOverlay, TESSERACT_ID } from '../core/spectacle/tesserac
 import { createFractalTreeOverlay, TREE_ID } from '../core/spectacle/fractal-tree-overlay.js';
 import { createE8StarOverlay, E8_STAR_ID } from '../core/spectacle/e8-overlay.js';
 import { createPortalOverlay, PORTAL_ID } from '../core/spectacle/portal-overlay.js';
-import { createJadeCapitalOverlay, JADE_CAPITAL_ID } from '../core/spectacle/jade-capital-overlay.js';
+import {
+  createJadeCapitalOverlay,
+  JADE_CAPITAL_ID,
+} from '../core/spectacle/jade-capital-overlay.js';
+import { createIndraNetOverlay, INDRA_NET_ID } from '../core/spectacle/indra-net-overlay.js';
+import {
+  createChanFractalPivotOverlay,
+  CHAN_PIVOT_ID,
+} from '../core/spectacle/chan-fractal-pivot-overlay.js';
+import {
+  createChaosAttractorOverlay,
+  CHAOS_ATTRACTOR_ID,
+} from '../core/spectacle/chaos-attractor-island-overlay.js';
 import {
   installSpaceController,
   enterInitialSpace,
@@ -136,6 +148,9 @@ let bootSettled = false;
  *   ?decor=e8         只留 E8 根系
  *   ?decor=portal     只留虫洞
  *   ?decor=jade       只留白玉京
+ *   ?decor=indra      只留华严因陀罗宝珠网
+ *   ?decor=chan       只留缠论多级别自同构中枢
+ *   ?decor=chaos      只留洛伦兹双翼与稳定岛
  *   缺省              全部开
  *
  * 刻意用白名单集合（`DECOR_KEYS`）而不是逐个 `DISABLE_*` 布尔：负向列举
@@ -145,7 +160,17 @@ let bootSettled = false;
  */
 const DECOR_OVERRIDE = new URLSearchParams(location.search).get('decor');
 /** 合法奇观 key，顺序即 DECOR_STATE 与接入顺序。 */
-const DECOR_KEYS = ['celestial', 'tess', 'tree', 'e8', 'portal', 'jade'] as const;
+const DECOR_KEYS = [
+  'celestial',
+  'tess',
+  'tree',
+  'e8',
+  'portal',
+  'jade',
+  'indra',
+  'chan',
+  'chaos',
+] as const;
 const ONLY = DECOR_OVERRIDE && DECOR_OVERRIDE !== 'off' ? DECOR_OVERRIDE : null;
 const decorEnabled = (key: string): boolean => (ONLY === null ? true : ONLY === key);
 const DISABLE_CELESTIAL = !decorEnabled('celestial');
@@ -154,6 +179,9 @@ const DISABLE_TREE = !decorEnabled('tree');
 const DISABLE_E8 = !decorEnabled('e8');
 const DISABLE_PORTAL = !decorEnabled('portal');
 const DISABLE_JADE = !decorEnabled('jade');
+const DISABLE_INDRA = !decorEnabled('indra');
+const DISABLE_CHAN = !decorEnabled('chan');
+const DISABLE_CHAOS = !decorEnabled('chaos');
 /** 供调试面板查询当前开关状态。 */
 export const DECOR_STATE = {
   override: DECOR_OVERRIDE,
@@ -165,6 +193,9 @@ export const DECOR_STATE = {
   e8: !DISABLE_E8,
   portal: !DISABLE_PORTAL,
   jade: !DISABLE_JADE,
+  indra: !DISABLE_INDRA,
+  chan: !DISABLE_CHAN,
+  chaos: !DISABLE_CHAOS,
 };
 
 // ── 布局质量降级实验开关 (?quality=) ────────────────────────────────────────
@@ -439,6 +470,9 @@ function initGraphFromManager(graphManager: GraphManager): void {
     TREE_ID,
     E8_STAR_ID,
     JADE_CAPITAL_ID,
+    INDRA_NET_ID,
+    CHAN_PIVOT_ID,
+    CHAOS_ATTRACTOR_ID,
   ]);
   const spectacleNodes = data.nodes.filter((n) => SPECTACLE_IDS.has(n.id));
   for (const n of spectacleNodes) bootstrapData.nodes.push(n);
@@ -614,6 +648,15 @@ function initGraphFromManager(graphManager: GraphManager): void {
   // 仙凡双层撕裂 + 未完成的授箓循环（光落下→螺旋上升→顶点停留一瞬→
   // 破碎陨落）。接入时机的两条约束同上（halo 之后、第一次 Euler 之前）。
   if (!DISABLE_JADE) createJadeCapitalOverlay({ container, cy });
+  // 华严因陀罗宝珠网：第七个装饰奇观。37 珠四重全息曼陀罗 + K_37 的 666 条全连弦 +
+  // 珠中映珠语义级 LOD + 36 边生成树骨架脉冲循环。
+  if (!DISABLE_INDRA) createIndraNetOverlay({ container, cy });
+  // 缠论多级别自同构中枢：第八个装饰奇观。18 个顶底分型 / 17 段笔 + 三重递归中枢晶匣 +
+  // 下方 MACD 相平面动量面积背驰对照（S₁ vs S₂）+ 五类买卖点星芒锚点。
+  if (!DISABLE_CHAN) createChanFractalPivotOverlay({ container, cy });
+  // 洛伦兹双翼与稳定岛：第九个装饰奇观。RK4 三维奇怪吸引子 + 蝴蝶效应双生粒子 +
+  // 奇里科夫标准映射 KAM 稳定岛链（离屏烘焙）的混沌相空间切片。
+  if (!DISABLE_CHAOS) createChaosAttractorOverlay({ container, cy });
 
   // 装饰奇观（太极八卦 / 四维空间 / 生命之树 / E8 根系）是 overlay 运行时
   // 创建的 cytoscape 节点，不在 graph-data.json 里——所以 computeSpaces 算
@@ -635,107 +678,111 @@ function initGraphFromManager(graphManager: GraphManager): void {
   // **spaces 必须显式传入**：cy 此刻只装了主空间的内容节点，再从 cy 现场
   // 算只能看到一个空间（用户实测反馈：菜单只有两项）。allSpaces 是从全图
   // 算的——上面已经把奇观也补进 misc 了。
-  installSpaceController(cy, {
-    onShowPortalDetail: () => uiState.detailPanel?.show(PORTAL_ID, true),
-    onSpaceChange: () => {
-      updateStats(cy);
-      syncBottomSheetStats(cy);
-    },
-    // 切空间时换内容：remove 旧空间、add 新空间。
-    // 有缓存坐标时直接注入 position（跳过 halo + euler，瞬间到位）；
-    // 没缓存时摆 halo + 跑 euler，收敛后把坐标存进缓存——下次切回这个空间
-    // 就是瞬切，不用再看一遍大爆炸。
-    onEnterSpace: (spaceId) => {
-      const slice = sliceCache.get(spaceId);
-      if (!slice) return;
-      const renderer = uiState.renderer as Renderer | null;
-      if (!renderer) return;
-      // 首屏 euler 可能还没收敛就被这次切宇宙替换（renderer.runLayout 会
-      // stop 旧实例）。首屏的 onLayoutStop 回调因 instance 检查被跳过，
-      // completeLoading 永远不调 → 「大爆炸！」条卡死。这里兜底：调
-      // completeLoading（幂等，已收尾则 no-op）。
-      completeLoading();
-      // 查缓存坐标：有就给节点注入 position，add 时直接落到最终位置。
-      const cached = getCachedPositions(spaceId);
-      const nodes = cached
-        ? slice.nodes.map((n) => {
-            const p = cached.get(n.id);
-            return p ? { ...n, position: p } : n;
-          })
-        : slice.nodes;
-      const sliceData: GraphData = { nodes, edges: slice.edges };
-      // 传送门常驻——它跨宇宙
-      const portal = getPortalNode(sliceCache);
-      if (portal && cy.getElementById(PORTAL_ID).empty()) {
-        sliceData.nodes.push(portal);
-      }
-      // 清掉旧空间所有节点 + 边——传送门和奇观除外。
-      // 传送门跨宇宙常驻；奇观（layer-parent）跟 overlay 生命周期绑定，
-      // remove 了会让 overlay 找不到节点报错。切空间只动普通内容节点。
-      cy.batch(() => {
-        const toRemove = cy.elements().filter((e) => {
-          if (e.isNode() && (e.id() === PORTAL_ID || e.hasClass(CLASSES.LAYER_PARENT))) {
-            return false;
-          }
-          return true;
-        });
-        cy.remove(toRemove);
-      });
-      // add 新空间节点 + 边（有缓存时节点已带 position，add 即落位）
-      renderer.addElements(sliceData);
-      // 传送门位置：用当前视口中心（如果有更好的策略再改）
-      const portalNode = cy.getElementById(PORTAL_ID);
-      if (!portalNode.empty()) {
-        portalNode.position({ x: 0, y: 0 });
-      }
-      if (cached) {
-        // 有缓存：节点已带最终坐标（存的时候已经是分岛后的位置），不摆
-        // halo、不跑 euler、也不再分岛。
-        //
-        // 不调 settleAfterLayout：enterSpace 里 onEnterSpace 在
-        // setActiveSpace **之前**执行（见 space-controller.ts enterSpace 时序），
-        // 此刻 getActiveSpaceId() 还是旧空间——separateSpaces 会拿空锚点
-        // （旧空间节点已 remove）+ 新节点算出错误平移，把节点挤到一起。
-        // 缓存坐标本身已是最终位置，无需任何后处理。
-        return;
-      }
-      // 没缓存：按_halton 序列把节点摆到 halo 圆上——euler 会从这些位置
-      // 开始收敛。
-      //
-      // **不加 entering class**：halo 循环加了 entering（opacity:0）之后，
-      // runLayout 的 skipEntering: true 分支只"跳过入场动画处理"，**不会**
-      // 移除 entering——节点就永远 opacity:0 隐形（用户实测反馈："切换宇宙
-      // 后只有边显示，节点隐形"）。切换空间不需要再来一次大爆炸——节点
-      // 直接可见、euler 让它们从 halo 散开即可。
-      //
-      // 跳过传送门和奇观：传送门有自己的位置（视口中心），奇观有自己的
-      // overlay 渲染逻辑，halo 重置会把它们的 model 坐标拽到 (0,0)。
-      cy.nodes()
-        .not(`node#${PORTAL_ID}`)
-        .not(`.${CLASSES.LAYER_PARENT}`)
-        .forEach((n, i) => {
-          const angle = halton(i, 2) * Math.PI * 2;
-          const ringRadius = 50 + halton(i, 3) * 280;
-          n.position({
-            x: Math.cos(angle) * ringRadius,
-            y: Math.sin(angle) * ringRadius,
+  installSpaceController(
+    cy,
+    {
+      onShowPortalDetail: () => uiState.detailPanel?.show(PORTAL_ID, true),
+      onSpaceChange: () => {
+        updateStats(cy);
+        syncBottomSheetStats(cy);
+      },
+      // 切空间时换内容：remove 旧空间、add 新空间。
+      // 有缓存坐标时直接注入 position（跳过 halo + euler，瞬间到位）；
+      // 没缓存时摆 halo + 跑 euler，收敛后把坐标存进缓存——下次切回这个空间
+      // 就是瞬切，不用再看一遍大爆炸。
+      onEnterSpace: (spaceId) => {
+        const slice = sliceCache.get(spaceId);
+        if (!slice) return;
+        const renderer = uiState.renderer as Renderer | null;
+        if (!renderer) return;
+        // 首屏 euler 可能还没收敛就被这次切宇宙替换（renderer.runLayout 会
+        // stop 旧实例）。首屏的 onLayoutStop 回调因 instance 检查被跳过，
+        // completeLoading 永远不调 → 「大爆炸！」条卡死。这里兜底：调
+        // completeLoading（幂等，已收尾则 no-op）。
+        completeLoading();
+        // 查缓存坐标：有就给节点注入 position，add 时直接落到最终位置。
+        const cached = getCachedPositions(spaceId);
+        const nodes = cached
+          ? slice.nodes.map((n) => {
+              const p = cached.get(n.id);
+              return p ? { ...n, position: p } : n;
+            })
+          : slice.nodes;
+        const sliceData: GraphData = { nodes, edges: slice.edges };
+        // 传送门常驻——它跨宇宙
+        const portal = getPortalNode(sliceCache);
+        if (portal && cy.getElementById(PORTAL_ID).empty()) {
+          sliceData.nodes.push(portal);
+        }
+        // 清掉旧空间所有节点 + 边——传送门和奇观除外。
+        // 传送门跨宇宙常驻；奇观（layer-parent）跟 overlay 生命周期绑定，
+        // remove 了会让 overlay 找不到节点报错。切空间只动普通内容节点。
+        cy.batch(() => {
+          const toRemove = cy.elements().filter((e) => {
+            if (e.isNode() && (e.id() === PORTAL_ID || e.hasClass(CLASSES.LAYER_PARENT))) {
+              return false;
+            }
+            return true;
           });
+          cy.remove(toRemove);
         });
-      // 跑 euler——直接调 renderer.runLayout，让它带 animate: true 把节点
-      // 从 halo 散开。收敛后分岛 + 存坐标（下次切回这个空间就是瞬切）。
-      renderer.runLayout(
-        DEFAULT_LAYOUT,
-        { randomize: false },
-        {
-          skipEntering: true,
-          onLayoutStop: () => {
-            settleAfterLayout();
-            cacheActiveSpacePositions();
+        // add 新空间节点 + 边（有缓存时节点已带 position，add 即落位）
+        renderer.addElements(sliceData);
+        // 传送门位置：用当前视口中心（如果有更好的策略再改）
+        const portalNode = cy.getElementById(PORTAL_ID);
+        if (!portalNode.empty()) {
+          portalNode.position({ x: 0, y: 0 });
+        }
+        if (cached) {
+          // 有缓存：节点已带最终坐标（存的时候已经是分岛后的位置），不摆
+          // halo、不跑 euler、也不再分岛。
+          //
+          // 不调 settleAfterLayout：enterSpace 里 onEnterSpace 在
+          // setActiveSpace **之前**执行（见 space-controller.ts enterSpace 时序），
+          // 此刻 getActiveSpaceId() 还是旧空间——separateSpaces 会拿空锚点
+          // （旧空间节点已 remove）+ 新节点算出错误平移，把节点挤到一起。
+          // 缓存坐标本身已是最终位置，无需任何后处理。
+          return;
+        }
+        // 没缓存：按_halton 序列把节点摆到 halo 圆上——euler 会从这些位置
+        // 开始收敛。
+        //
+        // **不加 entering class**：halo 循环加了 entering（opacity:0）之后，
+        // runLayout 的 skipEntering: true 分支只"跳过入场动画处理"，**不会**
+        // 移除 entering——节点就永远 opacity:0 隐形（用户实测反馈："切换宇宙
+        // 后只有边显示，节点隐形"）。切换空间不需要再来一次大爆炸——节点
+        // 直接可见、euler 让它们从 halo 散开即可。
+        //
+        // 跳过传送门和奇观：传送门有自己的位置（视口中心），奇观有自己的
+        // overlay 渲染逻辑，halo 重置会把它们的 model 坐标拽到 (0,0)。
+        cy.nodes()
+          .not(`node#${PORTAL_ID}`)
+          .not(`.${CLASSES.LAYER_PARENT}`)
+          .forEach((n, i) => {
+            const angle = halton(i, 2) * Math.PI * 2;
+            const ringRadius = 50 + halton(i, 3) * 280;
+            n.position({
+              x: Math.cos(angle) * ringRadius,
+              y: Math.sin(angle) * ringRadius,
+            });
+          });
+        // 跑 euler——直接调 renderer.runLayout，让它带 animate: true 把节点
+        // 从 halo 散开。收敛后分岛 + 存坐标（下次切回这个空间就是瞬切）。
+        renderer.runLayout(
+          DEFAULT_LAYOUT,
+          { randomize: false },
+          {
+            skipEntering: true,
+            onLayoutStop: () => {
+              settleAfterLayout();
+              cacheActiveSpacePositions();
+            },
           },
-        },
-      );
+        );
+      },
     },
-  }, allSpaces);
+    allSpaces,
+  );
 
   // 启动落位：直接进主空间（执业药师考试体系）。
   // 首屏不该是三个空间的并集——四个奇观会和药学节点一起铺在画面上,

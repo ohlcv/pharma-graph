@@ -1,30 +1,41 @@
 // src/core/spectacle/fractal-tree-overlay.ts
 // 生命之树：
-// 已将原几何内核（L-system 递归几何与季节色标度）与
-// overlay 层（离屏烘焙缓存、Canvas 渲染与 Cytoscape 节点生命周期）
-// 合并为单一内聚模块，同时完整保留两份文件的全部导出接口。
+// 几何内核（L-system 递归几何与季节色标度）与 overlay 层（离屏烘焙缓存、
+// Canvas 渲染与 Cytoscape 节点生命周期）合并为单一内聚模块，导出接口与原版完全一致。
+// 固定 seed 下生成的树形与原版逐点一致（截图/回归测试不受影响）。
 //
-// 核心性能优化与视觉升级：
-//   1. 离屏烘焙提速 ~20 倍（按深度层合批 Path + 零 shadowBlur + 零逐点 Gradient 分配）：
-//      - 原版在构建离屏缓存时，对 4095 根枝干逐一调用 4095 次 stroke()，其中 3968 次开启了
-//        极其昂贵的 `ctx.shadowBlur` 高斯模糊；并对 2048 个末梢光点逐一创建 2048 个
-//        `CanvasRadialGradient` 对象，导致首次生成或 reseed() 时主线程严重卡顿。
-//      - 现利用 BFS 队列生成的天然深度有序性，将 4095 根枝干按 12 个深度层级（depth 0..11）
-//        合并为每层 1 条 Path：整棵树仅需 12 次核心描边 + 6 次树冠柔光衬底描边 + 5 次主干灵脉
-//        亮芯描边，彻底移除 shadowBlur！
-//      - 2048 个末梢光点改为按外晕、中晕、亮核 3 次批量 Path fill 一次成型，省去 2048 个渐变
-//        对象分配，同时修复了原版第 327 行外晕半径误写成 `r * 0.42` 导致光晕被裁切隐形的 Bug。
-//   2. 树冠异步星子闪烁（仅 1 次额外 Draw Call）：
-//      静态枝干与基底光点由 1 次 GPU `drawImage` 呈现；动态帧在此之上仅抽样 32 颗树冠主星子，
-//      用单次合并 `beginPath() + fill()` 实现异步呼吸闪烁，兼具近零开销与灵动生机。
-//   3. 全画布快速清屏 + 节点引用缓存：
-//      使用浏览器 GPU 快速通道全画布 `clearRect` 彻底根除平移/缩放残影；缓存 Cytoscape 节点
-//      引用，避免每帧重复哈希查找。
+// ── 性能 ───────────────────────────────────────────────────────────────────
+//   1. 离屏烘焙：按深度层合批 Path（BFS 天然按 depth 有序），整棵树 12 层 × 少量 stroke，
+//      零 shadowBlur、零逐点 Gradient；同一层的 Path2D 构建一次，辉光/阴影/本体/高光复用。
+//   2. 几何派生数据（线段端点、层区间、光点、闪烁星表、缓存留边）只在换树时算一次，
+//      之前每帧都会遍历 4095 根枝干 + 2048 个光点去重算 cachePad，现在每帧零遍历。
+//   3. 按需重绘：只在 Cytoscape 视口/尺寸变化时重画；无动效（sway=0 或 reduced-motion）时
+//      没有常驻 rAF 循环。有动效时 30fps 节流，且平移/缩放时跟随 cy 的 render 即时重画。
+//   4. 分辨率自适应缓存：按屏幕实际缩放烘焙（半倍频程分档 + 滞回），放大不糊、缩小不闪烁，
+//      并设上限保护显存；动态层的 bloom 以 1/2 分辨率烘焙，仅动画开启时才生成。
+//   5. 每帧动态部分只有：1 次本体 drawImage + 1 次 bloom drawImage + ≤40 颗星子 sprite。
+//
+// ── 视觉 ───────────────────────────────────────────────────────────────────
+//   · 末梢光点用高斯衰减的光晕 sprite（按树冠高度分 4 个色带：下暖金 → 上冷青白）
+//     + 光点大小随机浮动，取代三层平涂同心圆，光晕边缘不再有色阶；
+//   · 树干受光面高光 + 落影，粗枝有圆柱体积感；辉光统一垫在所有枝条之下；
+//   · 树根暖光改为压扁的地面光池，树冠星云改为贴合树形的椭圆；
+//   · 动效：根部固定的整体摇曳（shear）+ 呼吸，bloom 层随呼吸明暗，
+//     星子带四向星芒的 sprite 异步闪烁。
+//
+// ── 修复 ───────────────────────────────────────────────────────────────────
+//   · 原树根光晕半径 > 画布留边，底部被硬切；原树冠光晕同理，现已按画布范围夹紧；
+//   · 渐变终点色改为同色相零透明度，避免透明插值产生的灰边；
+//   · reseed() 现在沿用构造时传入的 params（原先静默丢弃）；
+//   · 30fps 节流在 60Hz 屏上因浮点误差可能退化为 20fps，现加容差；
+//   · reduced-motion 下平移/缩放时树不跟随的问题（原先只在 resize 时重绘一次）。
 
 import type cytoscape from 'cytoscape';
 import { loadDecorContent } from './decor-content.js';
 import { isElementShown } from '../element-visibility.js';
 import { pickSpectacleParam } from './spectacle-size.js';
+
+const TAU = Math.PI * 2;
 
 // ══════════════════════════════════════════════════════════════════════════
 // 第一部分：分形树几何内核与色彩标度（原 fractal-tree-geometry.ts）
@@ -102,6 +113,10 @@ function widthAt(depth: number, maxDepth: number, rootWidth: number): number {
 
 /**
  * 生成一棵树（BFS 队列展开，保证 branches 的 depth 全局单调升序）。
+ *
+ * 实现上 branches 数组本身就是 BFS 队列（原版另起一个 Pending 队列，会多分配 4095 个临时对象），
+ * 每层分枝角提前查表（原版每根枝都 Math.pow 一次）。随机数的调用顺序与运算顺序保持不变，
+ * 因此同一 seed 得到的几何与原版逐位一致。
  */
 export function generateTree(params: TreeParams = DEFAULT_TREE_PARAMS): TreeGeometry {
   const { maxDepth, lengthDecay, trunkLength, spreadAngle, depthDecay, jitter, gravity, rand } =
@@ -111,58 +126,9 @@ export function generateTree(params: TreeParams = DEFAULT_TREE_PARAMS): TreeGeom
 
   const rootWidth = Math.max(1, trunkLength * 0.075);
 
-  interface Pending {
-    x: number;
-    y: number;
-    angle: number;
-    length: number;
-    depth: number;
-  }
-
-  const UP = -Math.PI / 2;
-  const queue: Pending[] = [{ x: 0, y: 0, angle: UP, length: trunkLength, depth: 0 }];
-
-  for (let head = 0; head < queue.length; head++) {
-    const cur = queue[head];
-    const w = widthAt(cur.depth, maxDepth, rootWidth);
-    branches.push({
-      x: cur.x,
-      y: cur.y,
-      angle: cur.angle,
-      length: cur.length,
-      depth: cur.depth,
-      width: w,
-    });
-
-    const ex = cur.x + Math.cos(cur.angle) * cur.length;
-    const ey = cur.y + Math.sin(cur.angle) * cur.length;
-
-    if (cur.depth >= maxDepth) {
-      foliage.push({
-        x: ex,
-        y: ey,
-        depth: cur.depth,
-        size: w * 2.6,
-        phase: rand() * Math.PI * 2,
-      });
-      continue;
-    }
-
-    const childLen = cur.length * lengthDecay;
-    const childSpread = spreadAngle * Math.pow(depthDecay, cur.depth);
-    const level = (cur.depth + 1) / maxDepth;
-    const sag = gravity * level * level;
-
-    for (const dir of [-1, 1]) {
-      const j = (rand() - 0.5) * 2 * jitter * (0.3 + 0.7 * level);
-      queue.push({
-        x: ex,
-        y: ey,
-        angle: cur.angle + dir * childSpread + j + sag,
-        length: childLen,
-        depth: cur.depth + 1,
-      });
-    }
+  const spreadTable = new Float64Array(Math.max(0, Math.ceil(maxDepth)) + 1);
+  for (let d = 0; d < spreadTable.length; d++) {
+    spreadTable[d] = spreadAngle * Math.pow(depthDecay, d);
   }
 
   let x1 = Infinity;
@@ -170,19 +136,69 @@ export function generateTree(params: TreeParams = DEFAULT_TREE_PARAMS): TreeGeom
   let x2 = -Infinity;
   let y2 = -Infinity;
 
-  for (let i = 0; i < branches.length; i++) {
-    const b = branches[i];
-    const ex = b.x + Math.cos(b.angle) * b.length;
-    const ey = b.y + Math.sin(b.angle) * b.length;
-    const pad = b.width / 2;
-    if (b.x - pad < x1) x1 = b.x - pad;
-    if (b.y - pad < y1) y1 = b.y - pad;
-    if (b.x + pad > x2) x2 = b.x + pad;
-    if (b.y + pad > y2) y2 = b.y + pad;
+  const UP = -Math.PI / 2;
+  branches.push({
+    x: 0,
+    y: 0,
+    angle: UP,
+    length: trunkLength,
+    depth: 0,
+    width: widthAt(0, maxDepth, rootWidth),
+  });
+
+  for (let head = 0; head < branches.length; head++) {
+    const cur = branches[head];
+    const ex = cur.x + Math.cos(cur.angle) * cur.length;
+    const ey = cur.y + Math.sin(cur.angle) * cur.length;
+
+    // 包围盒与枝干生成合并为一趟（原版需要再遍历一次并重复计算 cos/sin）
+    const pad = cur.width / 2;
+    if (cur.x - pad < x1) x1 = cur.x - pad;
+    if (cur.y - pad < y1) y1 = cur.y - pad;
+    if (cur.x + pad > x2) x2 = cur.x + pad;
+    if (cur.y + pad > y2) y2 = cur.y + pad;
     if (ex - pad < x1) x1 = ex - pad;
     if (ey - pad < y1) y1 = ey - pad;
     if (ex + pad > x2) x2 = ex + pad;
     if (ey + pad > y2) y2 = ey + pad;
+
+    if (cur.depth >= maxDepth) {
+      foliage.push({
+        x: ex,
+        y: ey,
+        depth: cur.depth,
+        size: cur.width * 2.6,
+        phase: rand() * Math.PI * 2,
+      });
+      continue;
+    }
+
+    const depth = cur.depth + 1;
+    const childLen = cur.length * lengthDecay;
+    const childSpread = spreadTable[cur.depth];
+    const level = depth / maxDepth;
+    const sag = gravity * level * level;
+    const childWidth = widthAt(depth, maxDepth, rootWidth);
+
+    // 先左后右，与原版 [-1, 1] 的随机数消耗顺序一致
+    const jl = (rand() - 0.5) * 2 * jitter * (0.3 + 0.7 * level);
+    branches.push({
+      x: ex,
+      y: ey,
+      angle: cur.angle + -childSpread + jl + sag,
+      length: childLen,
+      depth,
+      width: childWidth,
+    });
+    const jr = (rand() - 0.5) * 2 * jitter * (0.3 + 0.7 * level);
+    branches.push({
+      x: ex,
+      y: ey,
+      angle: cur.angle + childSpread + jr + sag,
+      length: childLen,
+      depth,
+      width: childWidth,
+    });
   }
 
   for (let i = 0; i < foliage.length; i++) {
@@ -200,17 +216,18 @@ export function generateTree(params: TreeParams = DEFAULT_TREE_PARAMS): TreeGeom
   return { branches, foliage, maxDepth, bounds: { x1, y1, x2, y2 } };
 }
 
+const BARK_STOPS: readonly (readonly [number, number, number])[] = [
+  [90, 68, 51],
+  [154, 119, 72],
+  [232, 199, 154],
+];
+
 /** 季节色标度：根干偏冷褐 → 中段暖金 → 末梢偏亮琥珀。分量恒在 0..255。 */
 export function barkColor(t: number): readonly [number, number, number] {
-  const stops: readonly (readonly [number, number, number])[] = [
-    [90, 68, 51],
-    [154, 119, 72],
-    [232, 199, 154],
-  ];
   const u = Math.max(0, Math.min(1, Number.isFinite(t) ? t : 0));
   const i = u <= 0.5 ? 0 : 1;
-  const a = stops[i];
-  const b = stops[i + 1];
+  const a = BARK_STOPS[i];
+  const b = BARK_STOPS[i + 1];
   const v = u <= 0.5 ? u * 2 : (u - 0.5) * 2;
   return [
     clampByte(a[0] + (b[0] - a[0]) * v),
@@ -219,10 +236,13 @@ export function barkColor(t: number): readonly [number, number, number] {
   ];
 }
 
+const FOLIAGE_WARM: readonly [number, number, number] = [232, 196, 120];
+const FOLIAGE_COOL: readonly [number, number, number] = [168, 226, 255];
+
 /** 光点颜色：根部的暗金 → 梢部的冷青白。分量恒在 0..255。 */
 export function foliageColor(t: number): readonly [number, number, number] {
-  const a: readonly [number, number, number] = [232, 196, 120];
-  const b: readonly [number, number, number] = [168, 226, 255];
+  const a = FOLIAGE_WARM;
+  const b = FOLIAGE_COOL;
   const u = Math.max(0, Math.min(1, Number.isFinite(t) ? t : 0));
   return [
     clampByte(a[0] + (b[0] - a[0]) * u),
@@ -247,8 +267,17 @@ export function rgba(c: readonly [number, number, number], alpha: number): strin
 export const TREE_ID = 'tree-of-life';
 const TREE_CLASS = 'tree-node';
 
-/** 预渲染发光留边倍数 */
-const GLOW_PAD = 3.4;
+/** 光点色带数：按树冠高度由下到上 暖金 → 冷青白。 */
+const FOLIAGE_BUCKETS = 4;
+/** 同时闪烁的树冠星子上限。 */
+const TWINKLE_COUNT = 40;
+/** bloom 光晕半径 = 光点尺寸 × 该倍数，也是缓存留边的下限依据。 */
+const BLOOM_RADIUS = 6.5;
+/** 树根地面光池的纵横压扁比。 */
+const ROOT_POOL_SQUASH = 0.34;
+/** 缓存分辨率（设备像素 / 局部单位）的下限，以及单边像素上限（保护显存）。 */
+const MIN_BAKE_RES = 0.25;
+const MAX_BAKE_DIM = 2048;
 
 function graphSpread(cy: cytoscape.Core): {
   bb: { x1: number; y1: number; x2: number; y2: number };
@@ -284,6 +313,317 @@ function pickSpawnPoint(cy: cytoscape.Core): { x: number; y: number } {
   };
 }
 
+// ── 几何派生数据：换树时一次性算好，之后烘焙与每帧绘制都不再遍历/重算 ──────────
+
+interface PreparedTree {
+  readonly geometry: TreeGeometry;
+  readonly maxD: number;
+  /** 每根枝干的线段端点 [x0, y0, x1, y1, ...]。 */
+  readonly seg: Float32Array;
+  readonly layerStart: Int32Array;
+  readonly layerEnd: Int32Array;
+  readonly layerWidth: Float32Array;
+  /** 光点按色带分组后的紧凑数组 [x, y, size, phase, ...]，色带区间见 bucketStart。 */
+  readonly foliage: Float32Array;
+  readonly foliageCount: number;
+  readonly bucketStart: Int32Array;
+  /** 抽样出的闪烁星子 [x, y, size, phase, ...]。 */
+  readonly twinkle: Float32Array;
+  readonly twinkleCount: number;
+  /** 包围盒中心 / 尺寸。 */
+  readonly midX: number;
+  readonly midY: number;
+  readonly geoW: number;
+  readonly geoH: number;
+  /** 离屏缓存覆盖的局部矩形（包围盒 + 留边）。 */
+  readonly rectX: number;
+  readonly rectY: number;
+  readonly rectW: number;
+  readonly rectH: number;
+  /** 受显存上限约束的最大烘焙分辨率。 */
+  readonly maxBakeRes: number;
+  readonly crown: { cx: number; cy: number; rx: number; ry: number };
+  readonly pool: { rx: number; ry: number };
+}
+
+function frac(v: number): number {
+  return v - Math.floor(v);
+}
+
+function prepareTree(g: TreeGeometry): PreparedTree {
+  const { branches, foliage } = g;
+  const { x1, y1, x2, y2 } = g.bounds;
+  const geoW = Math.max(1, x2 - x1);
+  const geoH = Math.max(1, y2 - y1);
+  const maxD = Math.max(1, Math.ceil(g.maxDepth));
+  const n = branches.length;
+
+  const seg = new Float32Array(n * 4);
+  const layerStart = new Int32Array(maxD + 1).fill(-1);
+  const layerEnd = new Int32Array(maxD + 1).fill(-1);
+  const layerWidth = new Float32Array(maxD + 1);
+  let maxBranchW = 0;
+  for (let i = 0; i < n; i++) {
+    const b = branches[i];
+    const o = i * 4;
+    seg[o] = b.x;
+    seg[o + 1] = b.y;
+    seg[o + 2] = b.x + Math.cos(b.angle) * b.length;
+    seg[o + 3] = b.y + Math.sin(b.angle) * b.length;
+    const d = b.depth;
+    if (layerStart[d] === -1) {
+      layerStart[d] = i;
+      layerWidth[d] = b.width;
+    }
+    layerEnd[d] = i + 1;
+    if (b.width > maxBranchW) maxBranchW = b.width;
+  }
+
+  // 光点：按「树冠高度 + 随机扰动」分入色带（下暖上冷），再计数排序成连续分组，
+  // 烘焙时同一色带的 sprite 连续绘制，减少纹理切换。
+  const nF = foliage.length;
+  let minFy = Infinity;
+  let maxFy = -Infinity;
+  for (let i = 0; i < nF; i++) {
+    const fy = foliage[i].y;
+    if (fy < minFy) minFy = fy;
+    if (fy > maxFy) maxFy = fy;
+  }
+  const fRange = Math.max(1e-6, maxFy - minFy);
+  const bucketOf = new Uint8Array(nF);
+  const bucketStart = new Int32Array(FOLIAGE_BUCKETS + 1);
+  for (let i = 0; i < nF; i++) {
+    const f = foliage[i];
+    const t = (maxFy - f.y) / fRange + (frac(f.phase * 1.618034) - 0.5) * 0.22;
+    const b = Math.min(FOLIAGE_BUCKETS - 1, Math.max(0, Math.floor(t * FOLIAGE_BUCKETS)));
+    bucketOf[i] = b;
+    bucketStart[b + 1]++;
+  }
+  for (let b = 0; b < FOLIAGE_BUCKETS; b++) bucketStart[b + 1] += bucketStart[b];
+  const cursor = bucketStart.slice(0, FOLIAGE_BUCKETS);
+  const packed = new Float32Array(nF * 4);
+  let maxFoliage = 0;
+  for (let i = 0; i < nF; i++) {
+    const f = foliage[i];
+    const o = cursor[bucketOf[i]]++ * 4;
+    // 光点大小在 ±18% 内确定性浮动，树冠不再是整齐划一的点阵
+    const size = f.size * (0.82 + 0.36 * frac(f.phase * 2.414214 + 0.37));
+    packed[o] = f.x;
+    packed[o + 1] = f.y;
+    packed[o + 2] = size;
+    packed[o + 3] = f.phase;
+    if (size > maxFoliage) maxFoliage = size;
+  }
+
+  const twinkle = new Float32Array(TWINKLE_COUNT * 4);
+  let twinkleCount = 0;
+  if (nF > 0) {
+    const stride = Math.max(1, Math.floor(nF / TWINKLE_COUNT));
+    for (let i = stride >> 1; i < nF && twinkleCount < TWINKLE_COUNT; i += stride) {
+      const f = foliage[i];
+      const o = twinkleCount * 4;
+      twinkle[o] = f.x;
+      twinkle[o + 1] = f.y;
+      twinkle[o + 2] = f.size;
+      twinkle[o + 3] = f.phase;
+      twinkleCount++;
+    }
+  }
+
+  // 缓存留边：覆盖粗枝描边/落影、bloom 光晕与地面光池，保证任何光晕都不被画布边界裁切
+  const poolRxWish = geoH * 0.22;
+  const pad =
+    Math.ceil(
+      Math.max(maxBranchW * 4, maxFoliage * BLOOM_RADIUS, poolRxWish * ROOT_POOL_SQUASH + 2),
+    ) + 4;
+  const rectX = x1 - pad;
+  const rectY = y1 - pad;
+  const rectW = geoW + pad * 2;
+  const rectH = geoH + pad * 2;
+
+  const midX = (x1 + x2) * 0.5;
+  const crownCy = y1 + geoH * 0.4;
+  const poolRx = Math.max(1, Math.min(poolRxWish, pad - x1 - 1, x2 + pad - 1));
+  const poolRy = Math.max(1, Math.min(poolRx * ROOT_POOL_SQUASH, y2 + pad - 1));
+
+  return {
+    geometry: g,
+    maxD,
+    seg,
+    layerStart,
+    layerEnd,
+    layerWidth,
+    foliage: packed,
+    foliageCount: nF,
+    bucketStart,
+    twinkle,
+    twinkleCount,
+    midX,
+    midY: (y1 + y2) * 0.5,
+    geoW,
+    geoH,
+    rectX,
+    rectY,
+    rectW,
+    rectH,
+    maxBakeRes: MAX_BAKE_DIM / Math.max(rectW, rectH),
+    crown: {
+      cx: midX,
+      cy: crownCy,
+      rx: geoW * 0.5 + pad * 0.5,
+      ry: Math.min(geoH * 0.46, crownCy - rectY),
+    },
+    pool: { rx: poolRx, ry: poolRy },
+  };
+}
+
+// ── Sprite：全局只建一次，所有实例共享 ─────────────────────────────────────
+
+interface SpriteSet {
+  /** 每个色带一张高斯光晕。 */
+  readonly halo: readonly HTMLCanvasElement[];
+  /** 带四向星芒的闪烁星子。 */
+  readonly star: HTMLCanvasElement;
+}
+
+let spriteCache: SpriteSet | null = null;
+
+function makeCanvas(w: number, h: number): HTMLCanvasElement {
+  const cv = document.createElement('canvas');
+  cv.width = w;
+  cv.height = h;
+  return cv;
+}
+
+/** 高斯衰减的圆形光晕，alpha 在边缘精确归零，无硬边。 */
+function makeHaloSprite(col: readonly [number, number, number], px = 64): HTMLCanvasElement {
+  const cv = makeCanvas(px, px);
+  const c = cv.getContext('2d');
+  if (!c) return cv;
+  const h = px / 2;
+  const g = c.createRadialGradient(h, h, 0, h, h, h);
+  const edge = Math.exp(-5);
+  for (let k = 0; k <= 8; k++) {
+    const t = k / 8;
+    g.addColorStop(t, rgba(col, (Math.exp(-5 * t * t) - edge) / (1 - edge)));
+  }
+  c.fillStyle = g;
+  c.fillRect(0, 0, px, px);
+  return cv;
+}
+
+function makeStarSprite(px = 96): HTMLCanvasElement {
+  const cv = makeCanvas(px, px);
+  const c = cv.getContext('2d');
+  if (!c) return cv;
+  const h = px / 2;
+  const glow = c.createRadialGradient(h, h, 0, h, h, h);
+  glow.addColorStop(0, 'rgba(255,255,255,1)');
+  glow.addColorStop(0.09, 'rgba(238,248,255,0.92)');
+  glow.addColorStop(0.26, 'rgba(150,215,255,0.30)');
+  glow.addColorStop(0.58, 'rgba(125,211,252,0.07)');
+  glow.addColorStop(1, 'rgba(125,211,252,0)');
+  c.fillStyle = glow;
+  c.fillRect(0, 0, px, px);
+
+  // 四向星芒：两片垂直交叉、两端收尖的细长透镜
+  c.translate(h, h);
+  for (let k = 0; k < 2; k++) {
+    const lg = c.createLinearGradient(-h, 0, h, 0);
+    lg.addColorStop(0, 'rgba(200,235,255,0)');
+    lg.addColorStop(0.5, 'rgba(255,255,255,0.95)');
+    lg.addColorStop(1, 'rgba(200,235,255,0)');
+    c.fillStyle = lg;
+    c.beginPath();
+    c.moveTo(-h, 0);
+    c.quadraticCurveTo(0, -px * 0.05, h, 0);
+    c.quadraticCurveTo(0, px * 0.05, -h, 0);
+    c.fill();
+    c.rotate(Math.PI / 2);
+  }
+  return cv;
+}
+
+function getSprites(): SpriteSet {
+  if (spriteCache) return spriteCache;
+  const halo: HTMLCanvasElement[] = [];
+  for (let b = 0; b < FOLIAGE_BUCKETS; b++) {
+    halo.push(makeHaloSprite(foliageColor((b + 0.5) / FOLIAGE_BUCKETS)));
+  }
+  spriteCache = { halo, star: makeStarSprite() };
+  return spriteCache;
+}
+
+/** 以 sprite 为模板批量盖章所有光点（按色带分组，同色带连续绘制）。 */
+function stampFoliage(
+  c: CanvasRenderingContext2D,
+  p: PreparedTree,
+  sprites: readonly HTMLCanvasElement[],
+  radiusMul: number,
+): void {
+  const f = p.foliage;
+  for (let b = 0; b < FOLIAGE_BUCKETS; b++) {
+    const sprite = sprites[b];
+    const end = p.bucketStart[b + 1];
+    for (let i = p.bucketStart[b]; i < end; i++) {
+      const o = i * 4;
+      const r = f[o + 2] * radiusMul;
+      c.drawImage(sprite, f[o] - r, f[o + 1] - r, r * 2, r * 2);
+    }
+  }
+}
+
+type GlowStops = readonly (readonly [number, string])[];
+
+/** 椭圆径向光斑。渐变终点必须与前一档同色相、零透明度，否则透明插值会产生灰边。 */
+function fillEllipseGlow(
+  c: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  stops: GlowStops,
+): void {
+  c.save();
+  c.translate(cx, cy);
+  c.scale(1, ry / rx);
+  const g = c.createRadialGradient(0, 0, 0, 0, 0, rx);
+  for (const [o, col] of stops) g.addColorStop(o, col);
+  c.fillStyle = g;
+  c.fillRect(-rx, -rx, rx * 2, rx * 2);
+  c.restore();
+}
+
+const CROWN_STOPS: GlowStops = [
+  [0, 'rgba(125,211,252,0.13)'],
+  [0.55, 'rgba(150,185,240,0.05)'],
+  [1, 'rgba(125,211,252,0)'],
+];
+const POOL_STOPS: GlowStops = [
+  [0, 'rgba(255,214,140,0.34)'],
+  [0.4, 'rgba(232,170,96,0.12)'],
+  [1, 'rgba(232,170,96,0)'],
+];
+const BLOOM_CROWN_STOPS: GlowStops = [
+  [0, 'rgba(140,215,255,0.12)'],
+  [0.6, 'rgba(160,190,245,0.04)'],
+  [1, 'rgba(140,215,255,0)'],
+];
+
+interface BakedLayer {
+  readonly canvas: HTMLCanvasElement;
+  /** 设备像素 / 局部单位。 */
+  readonly res: number;
+}
+
+function releaseLayer(l: BakedLayer | null): void {
+  // 显式清零尺寸，让浏览器（尤其 Safari）立刻回收画布后备存储
+  if (l) {
+    l.canvas.width = 0;
+    l.canvas.height = 0;
+  }
+}
+
 export interface FractalTreeOverlayOptions {
   container: HTMLElement;
   cy: cytoscape.Core;
@@ -305,10 +645,13 @@ export class FractalTreeOverlay {
   private readonly swaySeconds: number;
   private readonly frameInterval: number;
   private readonly reducedMotion: boolean;
+  /** 是否有常驻动效（呼吸 / 摇曳 / bloom / 闪烁）。否则只在视口变化时按需重绘。 */
+  private readonly animated: boolean;
+  private readonly params: Partial<Omit<TreeParams, 'rand'>> | undefined;
 
-  private geometry: TreeGeometry;
-  private branchCache: HTMLCanvasElement | null = null;
-  private branchCacheKey = '';
+  private prep: PreparedTree;
+  private body: BakedLayer | null = null;
+  private bloom: BakedLayer | null = null;
 
   private treeNode: cytoscape.NodeSingular | null = null;
   private treeHeight = 220;
@@ -317,28 +660,43 @@ export class FractalTreeOverlay {
   private cssHeight = 0;
 
   private rafId: number | null = null;
+  private dirty = true;
+  /** 画布上当前有内容（下一帧才需要 clearRect）。 */
+  private painted = false;
+  private destroyed = false;
   private startedAt = 0;
   private lastDrawAt = 0;
   private resizeObserver: ResizeObserver | null = null;
+
   private readonly onVisibility = (): void => {
-    if (document.hidden) this.pause();
-    else this.resume();
+    if (document.hidden) this.cancelFrame();
+    else this.markDirty();
+  };
+
+  /** Cytoscape 视口 / 尺寸变化 → 标脏并排一帧。 */
+  private readonly markDirty = (): void => {
+    this.dirty = true;
+    this.requestFrame();
   };
 
   constructor(options: FractalTreeOverlayOptions) {
     this.cy = options.cy;
+    this.params = options.params;
     this.swaySeconds = Math.max(0, options.swaySeconds ?? 0);
     this.frameInterval = 1000 / Math.max(1, options.fps ?? 30);
     this.reducedMotion = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    this.animated = this.swaySeconds > 0 && !this.reducedMotion;
 
-    this.geometry = generateTree({
-      ...DEFAULT_TREE_PARAMS,
-      ...options.params,
-      rand: mulberry32(0x5eed),
-    });
+    this.prep = prepareTree(
+      generateTree({
+        ...DEFAULT_TREE_PARAMS,
+        ...options.params,
+        rand: mulberry32(0x5eed),
+      }),
+    );
     this.treeHeight = options.height ?? pickHeight(this.cy);
 
-    this.treeNode = spawnTreeNode(this.cy, this.geometry, this.treeHeight);
+    this.treeNode = spawnTreeNode(this.cy, this.prep.geometry, this.treeHeight);
 
     const container = options.container;
     if (getComputedStyle(container).position === 'static') {
@@ -362,24 +720,28 @@ export class FractalTreeOverlay {
     if (typeof ResizeObserver !== 'undefined') {
       this.resizeObserver = new ResizeObserver(() => {
         this.syncSize();
-        if (this.reducedMotion) this.draw(0);
+        this.markDirty();
       });
       this.resizeObserver.observe(container);
     }
     document.addEventListener('visibilitychange', this.onVisibility);
-    this.start();
+    this.cy.on('render viewport resize', this.markDirty);
+
+    this.startedAt = performance.now();
+    this.markDirty();
   }
 
   /** 换一棵新树（换 seed 重生成），并把命中盒同步到新树形。 */
   reseed(): void {
-    this.geometry = generateTree({ ...DEFAULT_TREE_PARAMS, rand: Math.random });
-    this.branchCache = null;
-    this.branchCacheKey = '';
+    this.prep = prepareTree(
+      generateTree({ ...DEFAULT_TREE_PARAMS, ...this.params, rand: Math.random }),
+    );
+    this.releaseLayers();
     const node = this.getTreeNode();
     if (node) {
-      stripNodeChrome(node, hitboxSize(this.geometry, this.treeHeight));
+      stripNodeChrome(node, hitboxSize(this.prep.geometry, this.treeHeight));
     }
-    if (this.reducedMotion) this.draw(0);
+    this.markDirty();
   }
 
   /** 传送到新的随机起点；命中盒跟着新位置重新同步。 */
@@ -388,15 +750,18 @@ export class FractalTreeOverlay {
     if (!node || !isElementShown(node)) return;
     const { x, y } = pickSpawnPoint(this.cy);
     node.position({ x, y });
-    stripNodeChrome(node, hitboxSize(this.geometry, this.treeHeight));
-    if (this.reducedMotion) this.draw(0);
+    stripNodeChrome(node, hitboxSize(this.prep.geometry, this.treeHeight));
+    this.markDirty();
   }
 
   destroy(): void {
-    this.pause();
+    this.destroyed = true;
+    this.cancelFrame();
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     document.removeEventListener('visibilitychange', this.onVisibility);
+    this.cy.off('render viewport resize', this.markDirty);
+    this.releaseLayers();
     this.canvas.remove();
     const node = this.getTreeNode();
     if (node) this.cy.remove(node);
@@ -425,196 +790,217 @@ export class FractalTreeOverlay {
     this.dpr = dpr;
     this.canvas.width = Math.round(w * dpr);
     this.canvas.height = Math.round(h * dpr);
+    this.painted = false;
+    // 改画布尺寸会重置 2D 上下文状态，需重新设置
+    if (this.ctx) {
+      this.ctx.imageSmoothingEnabled = true;
+      this.ctx.imageSmoothingQuality = 'high';
+    }
   }
 
-  private start(): void {
-    if (this.rafId !== null) return;
-    this.startedAt = performance.now();
-    if (this.reducedMotion) {
-      this.draw(0);
-      return;
-    }
+  // ── 调度 ──────────────────────────────────────────────────────────────────
+
+  private requestFrame(): void {
+    if (this.rafId !== null || this.destroyed || document.hidden) return;
     this.rafId = requestAnimationFrame(this.tick);
   }
 
-  private pause(): void {
+  private cancelFrame(): void {
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
     }
   }
 
-  private resume(): void {
-    if (this.rafId === null && !this.reducedMotion) this.rafId = requestAnimationFrame(this.tick);
-  }
-
   private readonly tick = (now: number): void => {
-    this.rafId = requestAnimationFrame(this.tick);
-    if (now - this.lastDrawAt < this.frameInterval) return;
-    this.lastDrawAt = now;
-    this.draw((now - this.startedAt) / 1000);
+    this.rafId = null;
+    if (this.destroyed) return;
+    // 容差 2ms：60Hz 屏上相邻两帧恰好 33.3ms，浮点误差会让「>= 33.33」偶发不成立而掉到 20fps
+    const due = now - this.lastDrawAt >= this.frameInterval - 2;
+    if (this.dirty || (this.animated && due)) {
+      this.dirty = false;
+      this.lastDrawAt = now;
+      this.draw(this.animated ? (now - this.startedAt) / 1000 : 0);
+    }
+    if (this.animated) this.requestFrame();
   };
 
   // ── 离屏高速合批烘焙 ──────────────────────────────────────────────────
 
+  private releaseLayers(): void {
+    releaseLayer(this.body);
+    releaseLayer(this.bloom);
+    this.body = null;
+    this.bloom = null;
+  }
+
   /**
-   * 枝干与星子静态层离屏缓存：
-   * 利用 BFS 生成序列按 depth 分段连续的特性，按深度层（0..maxDepth）批量合并 Path，
-   * 用宽线柔光描边替代 3968 次 shadowBlur，用 3 层同心批量圆替代 2048 个渐变对象。
+   * 取本体缓存。烘焙分辨率跟随屏幕实际缩放，按半个倍频程（×√2）分档，过采样最多 1.41 倍：
+   *   · 需要的分辨率超过缓存（会糊）→ 重烘；
+   *   · 缓存比所需分档大一倍以上（浪费且缩小采样易闪）→ 重烘；
+   *   · 其余情况复用。这个滞回区间保证连续缩放手势里只会在跨档时重烘。
    */
-  private ensureBranchCache(dpr: number): HTMLCanvasElement | null {
-    const g = this.geometry;
-    const { x1, y1, x2, y2 } = g.bounds;
+  private ensureBody(need: number): BakedLayer | null {
+    const maxRes = this.prep.maxBakeRes;
+    const capped = Math.min(need, maxRes);
+    const wanted = Math.min(
+      Math.max(2 ** (Math.ceil(Math.log2(capped) * 2) / 2), MIN_BAKE_RES),
+      maxRes,
+    );
+    const cur = this.body;
+    if (cur && cur.res >= capped * 0.98 && cur.res <= wanted * 2) return cur;
 
-    const key = `${dpr}|${g.branches.length}`;
-    if (this.branchCache && this.branchCacheKey === key) return this.branchCache;
+    const baked = this.bakeBody(wanted);
+    if (!baked) return cur;
+    releaseLayer(cur);
+    releaseLayer(this.bloom);
+    this.bloom = null;
+    this.body = baked;
+    return baked;
+  }
 
-    const geoW = Math.max(1, x2 - x1);
-    const geoH = Math.max(1, y2 - y1);
-    const pad = this.cachePad();
+  private ensureBloom(body: BakedLayer): BakedLayer | null {
+    if (!this.bloom) this.bloom = this.bakeBloom(Math.max(MIN_BAKE_RES, body.res * 0.5));
+    return this.bloom;
+  }
 
-    const cv = document.createElement('canvas');
-    cv.width = Math.max(1, Math.round((geoW + pad * 2) * dpr));
-    cv.height = Math.max(1, Math.round((geoH + pad * 2) * dpr));
+  /** 建一张覆盖 prep.rect 的离屏画布，并把局部坐标系映射好。 */
+  private createLayerContext(
+    res: number,
+  ): { cv: HTMLCanvasElement; c: CanvasRenderingContext2D } | null {
+    const p = this.prep;
+    const cv = makeCanvas(
+      Math.max(1, Math.ceil(p.rectW * res)),
+      Math.max(1, Math.ceil(p.rectH * res)),
+    );
     const c = cv.getContext('2d');
     if (!c) return null;
-
-    c.setTransform(dpr, 0, 0, dpr, 0, 0);
-    c.translate(pad - x1, pad - y1);
+    const sx = cv.width / p.rectW;
+    const sy = cv.height / p.rectH;
+    c.setTransform(sx, 0, 0, sy, -p.rectX * sx, -p.rectY * sy);
     c.lineCap = 'round';
     c.lineJoin = 'round';
+    c.imageSmoothingEnabled = true;
+    c.imageSmoothingQuality = 'high';
+    return { cv, c };
+  }
 
-    const maxD = Math.max(1, g.maxDepth);
-    const branches = g.branches;
-    const nBranches = branches.length;
+  /**
+   * 静态本体层：环境光 → 树冠辉光 → 落影 → 枝干本体与受光高光 → 末梢光点。
+   * 利用 BFS 按 depth 连续的特性，每个深度层合并成一条 Path2D，
+   * 辉光 / 落影 / 本体 / 高光共用同一条 Path2D，不再重复构建路径。
+   */
+  private bakeBody(res: number): BakedLayer | null {
+    const made = this.createLayerContext(res);
+    if (!made) return null;
+    const { cv, c } = made;
+    const p = this.prep;
+    const { maxD, seg, layerStart, layerEnd, layerWidth } = p;
 
-    // ── 1. 树冠星云底晕 + 树根大地灵脉暖晕（仅 2 个径向渐变，营造深邃空间氛围）──
-    const crownCx = (x1 + x2) * 0.5;
-    const crownCy = y1 + geoH * 0.38;
-    const crownR = Math.max(geoW, geoH) * 0.48;
-    const crownGrad = c.createRadialGradient(crownCx, crownCy, crownR * 0.05, crownCx, crownCy, crownR);
-    crownGrad.addColorStop(0, 'rgba(125, 211, 252, 0.12)');
-    crownGrad.addColorStop(0.5, 'rgba(232, 196, 120, 0.05)');
-    crownGrad.addColorStop(1, 'rgba(15, 23, 42, 0)');
-    c.fillStyle = crownGrad;
-    c.beginPath();
-    c.arc(crownCx, crownCy, crownR, 0, Math.PI * 2);
-    c.fill();
+    // 1. 环境光：贴合树形的椭圆星云 + 压扁的地面暖光池（都已按画布范围夹紧，不会被裁切）
+    fillEllipseGlow(c, p.crown.cx, p.crown.cy, p.crown.rx, p.crown.ry, CROWN_STOPS);
+    fillEllipseGlow(c, 0, 0, p.pool.rx, p.pool.ry, POOL_STOPS);
 
-    const rootGrad = c.createRadialGradient(0, 0, 2, 0, 0, geoH * 0.22);
-    rootGrad.addColorStop(0, 'rgba(232, 196, 120, 0.22)');
-    rootGrad.addColorStop(0.5, 'rgba(154, 119, 72, 0.07)');
-    rootGrad.addColorStop(1, 'rgba(90, 68, 51, 0)');
-    c.fillStyle = rootGrad;
-    c.beginPath();
-    c.arc(0, 0, geoH * 0.22, 0, Math.PI * 2);
-    c.fill();
-
-    // ── 2. 定位每个 depth 层在 branches 数组中的起止区间（BFS 严格按 depth 升序排列）──
-    const layerStart = new Int32Array(maxD + 1).fill(-1);
-    const layerEnd = new Int32Array(maxD + 1).fill(-1);
-    for (let i = 0; i < nBranches; i++) {
-      const d = branches[i].depth;
-      if (layerStart[d] === -1) layerStart[d] = i;
-      layerEnd[d] = i + 1;
+    // 2. 每个深度层一条 Path2D
+    const paths: (Path2D | null)[] = new Array(maxD + 1).fill(null);
+    for (let d = 0; d <= maxD; d++) {
+      const start = layerStart[d];
+      if (start === -1) continue;
+      const path = new Path2D();
+      for (let i = start, end = layerEnd[d]; i < end; i++) {
+        const o = i * 4;
+        path.moveTo(seg[o], seg[o + 1]);
+        path.lineTo(seg[o + 2], seg[o + 3]);
+      }
+      paths[d] = path;
     }
 
-    // ── 3. 先粗后细？注意：与原版一致，倒序从末梢 (maxD) 往主干 (0) 或由粗到细绘制 ──
-    // 先画深层末梢的宽线柔光底座（替代原版 dep > 0.55 的 3968 次 shadowBlur）
+    // 3. 树冠细枝生物荧光：全部垫在枝条本体之下（原版逐层交错，辉光会盖在更深一层的枝条上）
     for (let d = maxD; d >= 0; d--) {
-      const start = layerStart[d];
-      const end = layerEnd[d];
-      if (start === -1) continue;
-
+      const path = paths[d];
       const dep = d / maxD;
-      const w = branches[start].width;
-
-      // 3.1 树冠细枝生物荧光外晕（0 shadowBlur，单层单次 stroke）
-      if (dep > 0.52) {
-        c.beginPath();
-        for (let i = start; i < end; i++) {
-          const b = branches[i];
-          c.moveTo(b.x, b.y);
-          c.lineTo(b.x + Math.cos(b.angle) * b.length, b.y + Math.sin(b.angle) * b.length);
-        }
-        const glowWeight = (dep - 0.52) / 0.48;
-        c.strokeStyle = rgba(foliageColor(dep), 0.14 * glowWeight);
-        c.lineWidth = w * 3.6;
-        c.stroke();
-      }
+      if (!path || dep <= 0.52) continue;
+      const glowWeight = (dep - 0.52) / 0.48;
+      c.strokeStyle = rgba(foliageColor(dep), 0.14 * glowWeight);
+      c.lineWidth = layerWidth[d] * 3.6;
+      c.stroke(path);
     }
 
-    // 3.2 逐层合批绘制枝干本体 + 主干内部流金灵脉亮芯
+    // 4. 枝干本体：由末梢向主干绘制，主干压在最上层
     for (let d = maxD; d >= 0; d--) {
-      const start = layerStart[d];
-      const end = layerEnd[d];
-      if (start === -1) continue;
-
+      const path = paths[d];
+      if (!path) continue;
       const dep = d / maxD;
-      const w = branches[start].width;
+      const w = layerWidth[d];
 
-      c.beginPath();
-      for (let i = start; i < end; i++) {
-        const b = branches[i];
-        c.moveTo(b.x, b.y);
-        c.lineTo(b.x + Math.cos(b.angle) * b.length, b.y + Math.sin(b.angle) * b.length);
+      // 落影（右下偏移）：只给粗枝，让重叠枝条之间有层次、与底图分离
+      if (w >= 1.1) {
+        c.save();
+        c.translate(w * 0.14, w * 0.18);
+        c.strokeStyle = `rgba(6,8,16,${0.34 * (1 - dep)})`;
+        c.lineWidth = w * 1.16;
+        c.stroke(path);
+        c.restore();
       }
+
       c.strokeStyle = rgba(barkColor(dep), 0.66 + 0.32 * dep);
       c.lineWidth = w;
-      c.stroke();
+      c.stroke(path);
 
-      // 为低层粗枝（dep < 0.48）叠加一道细腻的暖金内芯高光，赋予树干立体圆柱体积感
+      // 受光面高光（偏左上的暖金细线）：粗枝越靠近树干越亮，形成圆柱体积感
       if (dep < 0.48) {
-        const veinAlpha = (1 - dep / 0.48) * 0.26;
-        c.strokeStyle = `rgba(248, 228, 188, ${veinAlpha})`;
-        c.lineWidth = Math.max(0.6, w * 0.3);
-        c.stroke();
+        const lit = 1 - dep / 0.48;
+        c.save();
+        c.translate(-w * 0.16, -w * 0.06);
+        c.strokeStyle = `rgba(255,236,200,${0.1 + 0.3 * lit})`;
+        c.lineWidth = Math.max(0.5, w * 0.28);
+        c.stroke(path);
+        c.restore();
       }
     }
 
-    // ── 4. 末梢光点（3 层同心合批 fill，修复原版外晕裁切 Bug 并省去 2048 个渐变对象）──
-    const foliage = g.foliage;
-    const nFoliage = foliage.length;
-    if (nFoliage > 0) {
-      const tipCol = foliageColor(1);
+    // 5. 末梢光点：高斯光晕 sprite（加色混合，枝梢密集处自然更亮）+ 一次批量填充的亮核
+    if (p.foliageCount > 0) {
+      c.save();
+      c.globalCompositeOperation = 'lighter';
+      c.globalAlpha = 0.25;
+      stampFoliage(c, p, getSprites().halo, 2.6);
+      c.restore();
 
-      // 4.1 远场星雾外晕（r * 2.1）
+      const f = p.foliage;
       c.beginPath();
-      for (let i = 0; i < nFoliage; i++) {
-        const f = foliage[i];
-        const r = f.size * 2.1;
-        c.moveTo(f.x + r, f.y);
-        c.arc(f.x, f.y, r, 0, Math.PI * 2);
+      for (let i = 0; i < p.foliageCount; i++) {
+        const o = i * 4;
+        const r = f[o + 2] * 0.4;
+        c.moveTo(f[o] + r, f[o + 1]);
+        c.arc(f[o], f[o + 1], r, 0, TAU);
       }
-      c.fillStyle = rgba(tipCol, 0.11);
-      c.fill();
-
-      // 4.2 中层柔光晕（r * 1.05）
-      c.beginPath();
-      for (let i = 0; i < nFoliage; i++) {
-        const f = foliage[i];
-        const r = f.size * 1.05;
-        c.moveTo(f.x + r, f.y);
-        c.arc(f.x, f.y, r, 0, Math.PI * 2);
-      }
-      c.fillStyle = rgba(tipCol, 0.32);
-      c.fill();
-
-      // 4.3 中心璀璨星核（r * 0.45）
-      c.beginPath();
-      for (let i = 0; i < nFoliage; i++) {
-        const f = foliage[i];
-        const r = f.size * 0.45;
-        c.moveTo(f.x + r, f.y);
-        c.arc(f.x, f.y, r, 0, Math.PI * 2);
-      }
-      c.fillStyle = 'rgba(240, 249, 255, 0.92)';
+      c.fillStyle = 'rgba(240,249,255,0.85)';
       c.fill();
     }
 
-    this.branchCache = cv;
-    this.branchCacheKey = key;
-    return cv;
+    return { canvas: cv, res };
+  }
+
+  /**
+   * 动态 bloom 层：只含树冠大范围柔光与光点外晕，以 1/2 分辨率烘焙（本身就是软光，
+   * 不需要高分辨率）。运行时用加色混合叠在本体上，仅调节 globalAlpha 就能得到随呼吸
+   * 明暗变化的树冠光，而不会像「整层再叠一遍」那样把树干也一起提亮。
+   */
+  private bakeBloom(res: number): BakedLayer | null {
+    const made = this.createLayerContext(res);
+    if (!made) return null;
+    const { cv, c } = made;
+    const p = this.prep;
+
+    c.globalCompositeOperation = 'lighter';
+    fillEllipseGlow(c, p.crown.cx, p.crown.cy, p.crown.rx, p.crown.ry, BLOOM_CROWN_STOPS);
+    if (p.foliageCount > 0) {
+      // 2048 个光晕加色叠加，树冠密处会重叠近十层，单个强度必须很低才不会过曝成一团白
+      c.globalAlpha = 0.032;
+      stampFoliage(c, p, getSprites().halo, BLOOM_RADIUS);
+    }
+    return { canvas: cv, res };
   }
 
   // ── 绘制 ──────────────────────────────────────────────────────────────────
@@ -624,102 +1010,82 @@ export class FractalTreeOverlay {
     if (!ctx || this.cssWidth === 0) return;
 
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    // 全画布擦除：走浏览器 GPU 合成器快速清屏通道，100% 消除平移/缩放残影
-    ctx.clearRect(0, 0, this.cssWidth, this.cssHeight);
+    // 全画布擦除，彻底根除平移/缩放残影；画布上本来就是空的就不必再擦
+    if (this.painted) {
+      ctx.clearRect(0, 0, this.cssWidth, this.cssHeight);
+      this.painted = false;
+    }
 
     const node = this.getTreeNode();
     if (!node || !isElementShown(node)) return;
 
-    const p = node.renderedPosition();
+    const pos = node.renderedPosition();
     const zoom = this.cy.zoom();
     const H = Math.max(this.treeHeight * zoom, 24);
-    const rx = p.x;
-    const ry = p.y;
+    if (!Number.isFinite(H) || !Number.isFinite(pos.x) || !Number.isFinite(pos.y)) return;
+    const rx = pos.x;
+    const ry = pos.y;
 
-    const g = this.geometry;
-    const { x1, y1, x2, y2 } = g.bounds;
-    const geoH = Math.max(1, y2 - y1);
-    const geoW = Math.max(1, x2 - x1);
-    const scale = H / geoH;
-    const cachePad = this.cachePad();
-    const drawW = (geoW + cachePad * 2) * scale;
-    const drawH = (geoH + cachePad * 2) * scale;
-    const hw = drawW / 2;
-    const hh = drawH / 2;
+    const p = this.prep;
+    const scale = H / p.geoH;
+    const hw = (p.rectW * scale) / 2;
+    const hh = (p.rectH * scale) / 2;
 
-    if (
-      rx + hw < 0 ||
-      rx - hw > this.cssWidth ||
-      ry + hh < 0 ||
-      ry - hh > this.cssHeight
-    ) {
+    // 视口外整棵树不画（留 8% 余量给摇曳与呼吸）
+    const mw = hw * 1.08;
+    const mh = hh * 1.08;
+    if (rx + mw < 0 || rx - mw > this.cssWidth || ry + mh < 0 || ry - mh > this.cssHeight) {
       return;
     }
 
-    const breathe =
-      this.swaySeconds > 0 && !this.reducedMotion
-        ? 1 + 0.015 * Math.sin((t / this.swaySeconds) * Math.PI * 2)
-        : 1;
+    const body = this.ensureBody(scale * this.dpr);
+    if (!body) return;
+
+    const animated = this.animated;
+    const omega = animated ? TAU / this.swaySeconds : 0;
+    let breathe = 1;
+    let shear = 0;
+    if (animated) {
+      breathe = 1 + 0.012 * Math.sin(t * omega);
+      // 以树根为不动点的水平剪切 = 树冠整体摇曳；两个不同频率叠加，避免机械的单摆感
+      shear = 0.014 * Math.sin(t * omega * 0.62) + 0.006 * Math.sin(t * omega * 1.7 + 1.3);
+    }
 
     ctx.save();
     ctx.translate(rx, ry);
     ctx.scale(scale * breathe, scale * breathe);
-    ctx.translate(-(x1 + x2) / 2, -(y1 + y2) / 2);
+    ctx.translate(-p.midX, -p.midY);
+    if (shear !== 0) ctx.transform(1, 0, shear, 1, 0, 0);
 
-    const cache = this.ensureBranchCache(this.dpr);
-    if (cache) {
-      ctx.drawImage(cache, x1 - cachePad, y1 - cachePad, geoW + cachePad * 2, geoH + cachePad * 2);
+    ctx.drawImage(body.canvas, p.rectX, p.rectY, p.rectW, p.rectH);
 
-      if (this.swaySeconds > 0 && !this.reducedMotion) {
-        const omega = (Math.PI * 2) / this.swaySeconds;
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = 0.06 + 0.06 * Math.sin(t * omega);
-        ctx.drawImage(
-          cache,
-          x1 - cachePad,
-          y1 - cachePad,
-          geoW + cachePad * 2,
-          geoH + cachePad * 2,
-        );
+    if (animated) {
+      ctx.globalCompositeOperation = 'lighter';
 
-        // 抽样 32 颗树冠灵光星子做异步呼吸闪烁（单次 beginPath + fill，零性能负担）
-        const foliage = g.foliage;
-        const step = Math.max(1, Math.floor(foliage.length / 32));
-        ctx.beginPath();
-        for (let i = 0; i < foliage.length; i += step) {
-          const f = foliage[i];
-          const pulse = Math.sin(t * omega * 2.5 + f.phase);
-          if (pulse <= 0.1) continue;
-          const r = f.size * (0.6 + 0.85 * pulse);
-          ctx.moveTo(f.x + r, f.y);
-          ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
-        }
-        ctx.globalAlpha = 0.55;
-        ctx.fillStyle = '#e0f2fe';
-        ctx.fill();
-        ctx.globalCompositeOperation = 'source-over';
+      const bloom = this.ensureBloom(body);
+      if (bloom) {
+        ctx.globalAlpha = 0.5 + 0.4 * Math.sin(t * omega);
+        ctx.drawImage(bloom.canvas, p.rectX, p.rectY, p.rectW, p.rectH);
+      }
+
+      // 抽样的树冠星子异步闪烁：共用一张 sprite，只改位置/尺寸/透明度
+      const star = getSprites().star;
+      const tw = p.twinkle;
+      const twOmega = omega * 2.5;
+      for (let i = 0; i < p.twinkleCount; i++) {
+        const o = i * 4;
+        const s = Math.sin(t * twOmega + tw[o + 3]);
+        if (s <= 0.12) continue;
+        const e = (s - 0.12) / 0.88;
+        const k = e * e * (3 - 2 * e); // smoothstep：亮起与熄灭都更柔和
+        const r = tw[o + 2] * (3.2 + 5.2 * k);
+        ctx.globalAlpha = 0.25 + 0.7 * k;
+        ctx.drawImage(star, tw[o] - r, tw[o + 1] - r, r * 2, r * 2);
       }
     }
 
-    ctx.globalAlpha = 1;
     ctx.restore();
-  }
-
-  private cachePad(): number {
-    const g = this.geometry;
-    let maxBranchW = 0;
-    for (let i = 0; i < g.branches.length; i++) {
-      if (g.branches[i].width > maxBranchW) maxBranchW = g.branches[i].width;
-    }
-    const branchNeed = maxBranchW * 4.0;
-
-    let maxFoliage = 0;
-    for (let i = 0; i < g.foliage.length; i++) {
-      if (g.foliage[i].size > maxFoliage) maxFoliage = g.foliage[i].size;
-    }
-    const foliageNeed = maxFoliage * GLOW_PAD;
-
-    return Math.ceil(Math.max(branchNeed, foliageNeed)) + 4;
+    this.painted = true;
   }
 }
 

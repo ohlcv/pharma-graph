@@ -22,7 +22,16 @@
 // V 本身随图幅缩放但夹在 [200, 300]（模型坐标）：上限 300 是为了不让奇观
 // 压过周围真实节点。
 
-export type SpectacleShape = 'emblem' | 'tesseract' | 'tree' | 'e8' | 'portal' | 'jade-capital';
+export type SpectacleShape =
+  | 'emblem'
+  | 'tesseract'
+  | 'tree'
+  | 'e8'
+  | 'portal'
+  | 'jade-capital'
+  | 'indra-net'
+  | 'chan-fractal-pivot'
+  | 'chaos-attractor-island';
 
 /**
  * 每个形状「画出来的最外沿半径」相对它收到的尺寸参数的倍数。
@@ -34,6 +43,9 @@ export type SpectacleShape = 'emblem' | 'tesseract' | 'tree' | 'e8' | 'portal' |
  *   portal    吸积盘 reach          → R * 1.25
  *   tree      参数是**高度**，外沿是 H/2 → 0.5
  *   jade-capital 光柱外端 + 城环最外 → R * 1.15（授箓光束瞬态到 -R*1.1，已含余量）
+ *   indra-net 37 珠四重全息环 + 离屏光晕 → R * 1.15
+ *   chan-fractal-pivot 引力井视界 R*1.06 + 离屏缓存余量 → R * 1.15
+ *   chaos-attractor-island KAM 外环 R*0.97 + 离屏光晕 R*1.06 → R * 1.15
  *
  * 改任何奇观的画法（尤其是最大半径倍数）就要回来改这里，否则它又会
  * 比同伴大一圈或小一圈。
@@ -45,6 +57,9 @@ const DRAWN_EXTENT: Record<SpectacleShape, number> = {
   e8: 1.1,
   portal: 1.25,
   'jade-capital': 1.15,
+  'indra-net': 1.15,
+  'chan-fractal-pivot': 1.15,
+  'chaos-attractor-island': 1.15,
 };
 
 /** 视觉半径相对图幅的比例倍率（沿用 emblem/e8 原来调过的那一档）。 */

@@ -22,6 +22,9 @@ const SHAPES: { shape: SpectacleShape; expected: number }[] = [
   { shape: 'portal', expected: VISUAL_MAX / 1.25 }, // 240
   { shape: 'tree', expected: VISUAL_MAX / 0.5 }, // 600（树高，外沿是 H/2）
   { shape: 'jade-capital', expected: VISUAL_MAX / 1.15 }, // ≈ 260.87
+  { shape: 'indra-net', expected: VISUAL_MAX / 1.15 }, // ≈ 260.87
+  { shape: 'chan-fractal-pivot', expected: VISUAL_MAX / 1.15 }, // ≈ 260.87
+  { shape: 'chaos-attractor-island', expected: VISUAL_MAX / 1.15 }, // ≈ 260.87
 ];
 
 describe('spectacle-size / 统一视觉半径', () => {

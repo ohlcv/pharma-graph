@@ -168,6 +168,9 @@ const DECOR_NODE_CLASSES = [
   'e8-star-node',
   'portal-node',
   'jade-capital-node',
+  'indra-net-node',
+  'chan-fractal-pivot-node',
+  'chaos-attractor-island-node',
 ];
 /** 装饰节点本体（压透明）。逗号展开成多条规则以符合 cytoscape 的选择器语法。 */
 const DECOR_NODE = DECOR_NODE_CLASSES.map((c) => `.${c}`).join(', ');
